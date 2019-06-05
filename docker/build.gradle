@@ -1,0 +1,25 @@
+// Import task types
+import com.bmuschko.gradle.docker.tasks.image.*
+
+task copyJar(type: Copy) {
+  dependsOn   ':java:k8s-addons:jar'
+  from        "../java/k8s-addons/build/libs/k8s-addons.jar"
+  into        'build'
+}
+
+// Use task types
+task dockerBuildImage(type: DockerBuildImage) {
+  dependsOn 'copyJar'
+  inputDir = file('.')
+  tags.add(dockerImagePrefix + "/elassandra:" + elassandraVersion)
+  buildArgs = [
+          'base_image': dockerBaseImage,
+          'cassandra_k8s_addons_jar': './build/k8s-addons.jar'
+  ]
+}
+
+task dockerPushImage(type: DockerPushImage) {
+  dependsOn 'dockerBuildImage'
+  imageName = dockerImagePrefix + "/elassandra"
+  tag = elassandraVersion
+}
