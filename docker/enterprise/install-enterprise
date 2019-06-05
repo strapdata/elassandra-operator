@@ -1,0 +1,34 @@
+#!/bin/bash -xue
+
+enterprise_version=$1
+nexus_cred=$2
+
+# install JCE
+dagi unzip jq
+curl -jksSLH "Cookie: oraclelicense=accept-securebackup-cookie" -o /tmp/unlimited_jce_policy.zip "http://download.oracle.com/otn-pub/java/jce/8/jce_policy-8.zip"
+unzip -jo -d /etc/java-8-openjdk/security /tmp/unlimited_jce_policy.zip
+
+# get enterprise download url
+NEXUS_URL=https://nexus.repo.strapdata.com
+MAVEN_REPO=maven-releases-public
+GROUP_ID=com.strapdata.elasticsearch.plugin.enterprise
+ARTIFACT_ID=distribution
+FILE_EXTENSION=zip
+enterprise_download_url=$(curl -u $nexus_cred -X GET "${NEXUS_URL}/service/rest/v1/search/assets?repository=${MAVEN_REPO}&maven.groupId=${GROUP_ID}&maven.artifactId=${ARTIFACT_ID}&maven.baseVersion=${enterprise_version}&maven.extension=${FILE_EXTENSION}" -H  "accept: application/json" | jq '.items[0].downloadUrl' -rc)
+
+# install enterprise
+pkg_dir=$(mktemp -d) && chmod 755 "${pkg_dir}"
+cd $pkg_dir
+curl -u ${nexus_cred} -X GET ${enterprise_download_url} -o enterprise.zip
+unzip enterprise.zip
+cd strapdata-enterprise-${enterprise_version}
+mkdir /etc/cassandra/triggers
+./install.sh
+mv /etc/cassandra/triggers/* /usr/share/cassandra/triggers
+rm  -rf /etc/cassandra/triggers
+cd /
+rm -rf $pkg_dir
+chown cassandra:cassandra /usr/share/cassandra
+
+# clean up
+apt-get -y remove unzip jq && apt-get -y autoremove

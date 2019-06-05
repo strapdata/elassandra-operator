@@ -1,0 +1,109 @@
+#!/bin/bash -xue
+
+echoerr() { >&2 echo $@; }
+
+cassandra_version=$1
+
+groupadd -r cassandra --gid=999
+adduser --disabled-password --uid 999 --gid 999 --gecos "Cassandra" cassandra
+
+case $cassandra_version in
+6.*)
+    # supported
+    ;;
+
+2.*)
+    # 2.2 pulls in openjre, which pulls in gtk, x11, etc.
+    # also, the default-config is specific to 3.11.x.
+    # 2.2 fails to start due to unrecognised YAML properties.
+
+    # no k8s addons support, yet.
+    ;&
+
+*)
+    echoerr "WARNING: Cassandra version ${cassandra_version} is unsupported."
+    exit 1;
+esac
+
+pkg_dir=$(mktemp -d) && chmod 755 "${pkg_dir}"
+arch="all"
+arch_pkg_dir="${pkg_dir}/${arch}" && mkdir "${arch_pkg_dir}"
+
+# download the C* packages
+(cd "${arch_pkg_dir}" &&
+    curl -SLO "https://github.com/strapdata/elassandra/releases/download/v${cassandra_version}/elassandra-${cassandra_version}.deb")
+
+dagi dpkg-dev cpio
+
+# build a local repository
+(cd "${pkg_dir}" && dpkg-scanpackages ${arch} | gzip -9c > "${arch_pkg_dir}/Packages.gz")
+
+# install C*
+echo "deb file:${pkg_dir} ${arch}/" > /etc/apt/sources.list.d/cassandra.sources.list
+APT_GET_OPTS="--allow-unauthenticated" dagi elassandra
+
+# package "cleanup"
+mkdir /usr/share/cassandra/agents
+mv /usr/share/cassandra/lib/jamm-0.3.0.jar /usr/share/cassandra/agents/jamm-0.3.0.jar
+cp /etc/cassandra/hotspot_compiler /usr/share/cassandra/
+cp /etc/cassandra/cassandra.yaml /usr/share/cassandra/
+cp /etc/cassandra/elasticsearch.yml /usr/share/cassandra/
+
+# move trigger directory. Is this useful ?
+mv /etc/cassandra/triggers /usr/share/cassandra/triggers
+
+# nuke contents of /etc/cassandra and /var/lib/cassandra since they're injected by volume mounts
+rm -rf /etc/cassandra/* /var/lib/cassandra/*
+
+# add image config .d directories
+mkdir /etc/cassandra/cassandra.yaml.d
+mkdir /etc/cassandra/cassandra-env.sh.d
+mkdir /etc/cassandra/jvm.options.d
+mkdir /etc/cassandra/logback.xml.d
+mkdir /etc/cassandra/elasticsearch.yml.d
+
+# install cassandra-exporter (Prometheus monitoring support)
+(cd "/usr/share/cassandra/agents" &&
+    curl -SLO "https://github.com/instaclustr/cassandra-exporter/releases/download/v0.9.6/cassandra-exporter-agent-0.9.6.jar" &&
+    ln -s cassandra-exporter-agent-0.9.6.jar cassandra-exporter-agent.jar)
+
+# install Instaclustr LDAP and Kerberos authn/authz plugins
+(
+    cd "/usr/share/cassandra/lib"
+
+    # TODO: switch remaining Maven Central URLs to GitHub.
+    case ${cassandra_version} in
+    3.11.*)
+        curl -SLO "https://github.com/instaclustr/cassandra-ldap/releases/download/3.11.4.4/cassandra-ldap-3.11.4.jar"
+        ;;
+    3.0.*)
+        curl -SLO "https://search.maven.org/remotecontent?filepath=com/instaclustr/cassandra-ldap/3.0.18.0/cassandra-ldap-3.0.18.0.jar"
+        ;;
+    2.2.*)
+        curl -SLO "https://search.maven.org/remotecontent?filepath=com/instaclustr/cassandra-ldap/2.2.14.0/cassandra-ldap-2.2.14.jar"
+        ;;
+    *)
+        echoerr "WARNING: No LDAP plugin available for Cassandra version ${cassandra_version}. This feature will be unavailable."
+        ;;
+    esac
+
+    case ${cassandra_version} in
+    3.11.*)
+        curl -SLO "https://github.com/instaclustr/cassandra-kerberos/releases/download/v1.0.0-cassandra-3.11/cassandra-3-11-kerberos-1.0.0.jar"
+        ;;
+    3.0.*)
+        curl -SLO "https://github.com/instaclustr/cassandra-kerberos/releases/download/v1.0.0-cassandra-3.0/cassandra-3-0-kerberos-1.0.0.jar"
+        ;;
+    *)
+        echoerr "WARNING: No Kerberos plugin available for Cassandra version ${cassandra_version}. This feature will be unavailable."
+        ;;
+    esac
+)
+
+
+# clean-up
+rm -rf "${pkg_dir}"
+apt-get -y remove dpkg-dev && apt-get -y autoremove
+
+rm "${BASH_SOURCE}"
+rm /etc/apt/sources.list.d/cassandra.sources.list

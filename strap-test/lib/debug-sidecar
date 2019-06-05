@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+cd `dirname "$BASH_SOURCE"`/../..
+source strap-test/config
+
+name=${1:-dc1}
+index=${2:-0}
+
+kubectl port-forward ${name}-elassandra-${index} 5001:5001

@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+cd `dirname "$BASH_SOURCE"`/../..
+source strap-test/config
+
+dc=${1:-dc1}
+replicas=${2:-1}
+backup_name=${3:-testbackup-${dc}}
+
+cat <<EOF | ./strap-test/lib/deploy-elassandra  "$dc" "$replicas" -
+env:
+  - name: JVM_OPTS
+    value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5001"
+  - name: AZURE_STORAGE_ACCOUNT
+    valueFrom:
+      secretKeyRef:
+        name: azure-storage
+        key: accountName
+  - name: AZURE_STORAGE_ACCESS_KEY
+    valueFrom:
+      secretKeyRef:
+        name: azure-storage
+        key: accessKey
+restoreFromBackup: ${backup_name}
+EOF

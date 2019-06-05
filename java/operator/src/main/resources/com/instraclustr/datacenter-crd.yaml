@@ -1,0 +1,126 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  # name must match the spec fields below, and be in the form: <plural>.<group>
+  name: elassandra-datacenters.stable.strapdata.com
+spec:
+  # group name to use for REST API: /apis/<group>/<version>
+  group: stable.strapdata.com
+  # version name to use for REST API: /apis/<group>/<version>
+  version: v1
+  # either Namespaced or Cluster
+  scope: Namespaced
+  names:
+    # plural name to be used in the URL: /apis/<group>/<version>/<plural>
+    plural: elassandra-datacenters
+    # singular name to be used as an alias on the CLI and for display
+    singular: elassandra-datacenter
+    # kind is normally the CamelCased singular type. Your resource manifests use this.
+    kind: ElassandraDataCenter
+    # shortNames allow shorter string to match your resource on the CLI
+    shortNames:
+    - edc
+  validation:
+    openAPIV3Schema:
+      properties:
+        spec:
+          required:
+          - replicas
+          - elassandraImage
+          - sidecarImage
+          - imagePullPolicy
+          - imagePullSecret
+          - prometheusSupport
+          - privilegedSupported
+          - elasticsearchEnabled
+          properties:
+            name:
+              type: string
+              description: Name of the data center.
+            clusterName:
+              type: string
+              description: Name of the cluster. If null, will default to a generated name.
+            replicas:
+              type: integer
+              minimum: 1
+              description: Number of nodes in the data center.
+            elassandraImage:
+              type: string
+              description: Image to be used for data center.
+            sidecarImage:
+              type: string
+              description: Image to be used for data center.
+            imagePullPolicy:
+              type: string
+              description: Valid values are "Never" "Always" "IfNotPresent".
+            imagePullSecret:
+              type: string
+              description: Container registry pull secret. Can be "".
+            resources:
+              type: object
+              description: the cpu & memory to construct pod.
+            capacity:
+              type: object
+              description: the disk storage to construct pod.
+            env:
+              type: array
+              description: list of env vars to insert into the sidecar.
+            restoreFromBackup:
+              type: string
+              description: Name of an optional backup to restore from.
+            # disable validation because of a bug : https://github.com/kubernetes/kubernetes/pull/76124
+            #userConfigMapVolumeSource:
+            #  type: object
+            #  description: Name of an optional config map to project into container.
+            userSecretVolumeSource:
+              type: object
+              description: Name of an optional secret to project into container.
+            prometheusSupport:
+              type: boolean
+              description: Enable Prometheus support.
+            privilegedSupported:
+              type: boolean
+              description: Attempt to run privileged configuration options for better performance.
+            elasticsearchEnabled:
+              type: boolean
+              description: Enable elasticsearch service
+            ssl:
+              type: boolean
+              description: SSL is enabled and managed by the operator
+            authentication:
+              type: boolean
+              description: Authentication is enabled and managed the operator
+            authorization:
+              type: boolean
+              description: Authorization is enabled and managed the operator
+            enterprise:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                  description: Enable strapdata enterprise plugin
+                jmx:
+                  type: boolean
+                  description: Enable Elasticsearch jmx monitoring
+                https:
+                  type: boolean
+                  description: Enable https on Elasticsearch rest api
+                ssl:
+                  type: boolean
+                  description: Encrypt Elasticsearch internode traffic
+                aaa:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      description: Enable Elasticsearch authentication and authorization
+                    audit:
+                      type: boolean
+                      description: Enabled audit trail
+                    sharedSecret:
+                      type: string
+                      description: Datacenter wide shared secret
+                cbs:
+                  type: boolean
+                  description: Enable content based authorization
+

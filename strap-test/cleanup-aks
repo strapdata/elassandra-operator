@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+cd `dirname "$BASH_SOURCE"`/..
+source strap-test/config
+
+./strap-test/aks/delete-cluster
+./strap-test/aks/delete-storage

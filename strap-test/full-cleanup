@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+cd `dirname "$BASH_SOURCE"`/..
+source strap-test/config
+
+./strap-test/lib/undeploy-operator || true
+kubectl delete sts --all --force --grace-period=0
+kubectl delete pod --all --force --grace-period=0
+kubectl delete svc --all --force --grace-period=0
+kubectl delete edc --all || true
+kubectl delete crd --all
+kubectl delete pvc --all
+kubectl delete cm --all
+kubectl delete secret --all
+helm ls --all --short | xargs -L1 helm delete --purge || true

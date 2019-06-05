@@ -1,0 +1,31 @@
+# Default values for elassandra-operator.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+apiVersion: stable.strapdata.com/v1
+
+image:
+  repository: docker.repo.strapdata.com/elassandra-operator/elassandra-operator
+  tag: latest
+  pullPolicy: IfNotPresent
+
+resources: {}
+  # Suggested resource limits for the operator itself (not elassandra), works with a reasonable sized minikube.
+#  limits:
+#    cpu: 200m
+#    memory: 100Mi
+#  requests:
+#    cpu: 100m
+#    memory: 50Mi
+
+nodeSelector: {}
+
+rbacEnable: true
+
+tolerations: []
+
+affinity: {}
+
+# env: []

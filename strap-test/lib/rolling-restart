@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+cd `dirname "$BASH_SOURCE"`/../..
+source strap-test/config
+
+name=${1:-dc1}
+
+kubectl patch sts ${name}-elassandra -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"`date +'%s'`\"}}}}}"

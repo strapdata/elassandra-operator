@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+                          https://maven.apache.org/xsd/settings-1.0.0.xsd">
+    <servers>
+        <server>
+            <id>strapdata-nexus-release</id>
+            <username>${env.NEXUS_USER}</username>
+            <password>${env.NEXUS_PASSWORD}</password>
+        </server>
+        <server>
+            <id>strapdata-nexus-snapshots</id>
+            <username>${env.NEXUS_USER}</username>
+            <password>${env.NEXUS_PASSWORD}</password>
+        </server>
+        <server>
+            <id>strapdata-nexus-rc</id>
+            <username>${env.NEXUS_USER}</username>
+            <password>${env.NEXUS_PASSWORD}</password>
+        </server>
+        <server>
+            <id>strapdata-nexus-public</id>
+            <username>${env.NEXUS_USER}</username>
+            <password>${env.NEXUS_PASSWORD}</password>
+        </server>
+    </servers>
+
+    <mirrors>
+        <mirror>
+            <id>strapdata-nexus-public</id>
+            <name>strapdata-nexus-public</name>
+            <url>https://nexus.repo.strapdata.com/repository/maven-public/</url>
+            <mirrorOf>*</mirrorOf>
+        </mirror>
+    </mirrors>
+
+    <profiles>
+        <!--fix a bug : https://stackoverflow.com/questions/53010200/maven-surefire-could-not-find-forkedbooter-class -->
+        <profile>
+            <id>SUREFIRE-1588</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <argLine>-Djdk.net.URLClassPath.disableClassPathURLCheck=true</argLine>
+            </properties>
+        </profile>
+    </profiles>
+</settings>

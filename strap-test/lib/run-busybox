@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+cd `dirname "$BASH_SOURCE"`/../..
+source strap-test/config
+
+kubectl apply -f https://k8s.io/examples/admin/dns/busybox.yaml

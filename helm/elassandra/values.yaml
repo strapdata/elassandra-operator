@@ -1,0 +1,85 @@
+# Default values for elassandra.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  elassandraRepository: docker.repo.strapdata.com/elassandra-operator/elassandra
+  entrepriseRepository: docker.repo.strapdata.com/elassandra-operator/enterprise
+  sidecarRepository: docker.repo.strapdata.com/elassandra-operator/elassandra-sidecar
+  elassandraTag: 6.2.3.13
+  sidecarTag: latest
+
+imagePullPolicy: IfNotPresent
+imagePullSecret: ""
+
+privilegedSupported: true
+
+resources:
+  limits:
+    memory: 1024Mi
+  requests:
+    memory: 1024Mi
+dataVolumeClaim:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi
+
+enterprise:
+  enabled: false
+  jmx: false
+  https: false
+  ssl: false
+  aaa:
+    enabled: false
+    shared_secret:
+    audit: false
+  cbs: false
+
+#Example authentication for AWS S3 based backups
+#env:
+#  - name: AWS_ACCESS_KEY_ID
+#    valueFrom:
+#      secretKeyRef:
+#        name: awsbackuptest
+#        key: access
+#  - name: AWS_SECRET_ACCESS_KEY
+#    valueFrom:
+#      secretKeyRef:
+#        name: awsbackuptest
+#        key: secret
+#  - name: AWS_REGION
+#    value: "us-west-2"
+
+#Example authentication for AWS GCP based backups
+#env:
+#  - name: GOOGLE_APPLICATION_CREDENTIALS
+#    value: "/tmp/user-config/service_key.json"
+#  - name: GOOGLE_CLOUD_PROJECT
+#    value: "elassandra-operator"
+#  - name: BUCKET_NAME
+#    value: "my-bucket"
+#
+#userConfigMapVolumeSource:
+#  - name: configMapReference
+
+## Example GCP ConfigMap
+#apiVersion: extensions/v1beta1
+#kind: ConfigMap
+#metadata:
+#  name: configMapReference
+#data:
+#  service_key.json: "XXXXXXXXX"
+
+
+
+#restoreFromBackup: backup-hostname
+
+prometheusEnabled: false
+elasticsearchEnabled: true
+ssl: false
+authentication: false
+authorization: false

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+cd `dirname "$BASH_SOURCE"`/..
+source strap-test/config
+
+name=${1:-dc1}
+replicas=${2:-1}
+
+./strap-test/lib/deploy-operator
+./strap-test/lib/deploy-elassandra ${name} ${replicas}
+./strap-test/lib/wait-dc-ready ${name} ${replicas}
+./strap-test/lib/check-dc-ok ${name} ${replicas}

@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+
+cd `dirname "$BASH_SOURCE"`/../..
+source strap-test/config
+
+rm -rf strap-test/resources/gen
+mkdir -p strap-test/resources/gen
+
+# create root ca
+openssl_conf=$(mktemp)
+cat <<EOF > ${openssl_conf}
+[ req ]
+distinguished_name     = req_distinguished_name
+prompt                 = no
+output_password        = changeit
+default_bits           = 2048
+
+[ v3_ca ]
+basicConstraints = critical,CA:TRUE
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer:always
+
+[ req_distinguished_name ]
+C                      = FR
+O                      = Strapdata
+OU                     = Elassandra
+CN                     = ElassandraMasterCA
+emailAddress           = barth@strapdata.com
+EOF
+
+openssl req \
+    -config ${openssl_conf} \
+    -new -x509 -extensions v3_ca \
+    -keyout strap-test/resources/gen/cakey.pem \
+    -out strap-test/resources/gen/cacert.pem \
+    -days 3650
+
+openssl x509 -in strap-test/resources/gen/cacert.pem -text -noout
+
+# create trustore.jks
+keytool -importcert -file strap-test/resources/gen/cacert.pem -alias ca -keystore strap-test/resources/gen/truststore.jks -keypass changeit -storepass changeit -noprompt
+
+# create root p12
+openssl pkcs12 \
+  -export \
+  -in strap-test/resources/gen/cacert.pem \
+  -inkey strap-test/resources/gen/cakey.pem \
+  -out strap-test/resources/gen/ca.p12 \
+  -name ca -caname ca \
+  -passin pass:changeit -passout pass:changeit

@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+
+cd `dirname "$BASH_SOURCE"`/../..
+source strap-test/config
+
+name=${1:-dc1}
+
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${name}
+data:
+  cassandra_ssl: |
+    server_encryption_options:
+        internode_encryption: all
+        keystore: /tmp/user-secret-config/keystore.jks
+        keystore_password: changeit
+        truststore: /tmp/user-secret-config/truststore.jks
+        truststore_password: changeit
+        protocol: TLSv1.2
+        algorithm: SunX509
+        store_type: JKS
+        cipher_suites: [TLS_RSA_WITH_AES_256_CBC_SHA]
+        require_client_auth: true
+    client_encryption_options:
+        enabled: true
+        keystore: /tmp/user-secret-config/keystore.jks
+        keystore_password: changeit
+        truststore: /tmp/user-secret-config/truststore.jks
+        truststore_password: changeit
+        protocol: TLSv1.2
+        store_type: JKS
+        algorithm: SunX509
+        require_client_auth: false
+        cipher_suites: [TLS_RSA_WITH_AES_128_CBC_SHA, TLS_RSA_WITH_AES_256_CBC_SHA]
+    authenticator: PasswordAuthenticator
+    authorizer: CassandraAuthorizer
+  jvm_debug: |
+    JVM_OPTS="\${JVM_OPTS} -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"
+    #JVM_OPTS="\${JVM_OPTS} -Djavax.net.debug=ssl"
+  cqlshrc: |
+    [connection]
+    factory = cqlshlib.ssl.ssl_transport_factory
+    ssl = true
+
+    [ssl]
+    certfile = /tmp/user-secret-config/cacert.pem
+    validate = true
+
+    [authentication]
+    username = cassandra
+    password = cassandra
+  install_cqlshrc: |
+    mkdir -p ~/.cassandra
+    cp \${CASSANDRA_CONF}/cqlshrc ~/.cassandra/cqlshrc
+    echo "cacert = /tmp/user-secret-config/cacert.pem"  > ~/.curlrc
+    echo "user = cassandra:cassandra"  >> ~/.curlrc
+EOF
+
+

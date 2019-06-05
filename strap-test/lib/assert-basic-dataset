@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+cd `dirname "$BASH_SOURCE"`/../..
+source strap-test/config
+
+name=${1:-dc1}
+replicas=${2:-1}
+size=${3:-10}
+
+defer() {
+  [ -t 1 ] && reset || true # sometimes strange things happen to tty
+}
+
+trap defer EXIT
+
+assert_count() {
+  local pod=$1
+  local count=$2
+  local cql=$3
+  local v=$(kubectl exec -it ${pod} -c ${ELASSANDRA} -- cqlsh ${pod} ${CQL_CRED} --no-color -e "$cql" | sed '4q;d' | tr -d '[:space:]')
+  if [ "$v" = "$count" ]; then
+    return 0
+  else
+    echo "assert error: '$cql' = $v, expected $count"
+    return 1
+  fi
+}
+
+for ((i=0; i < ${replicas}; i++)); do
+  assert_count ${name}-elassandra-${i} ${size} "SELECT count(*) FROM ks.t;"
+done
+
+for ((i=0; i < ${size}; i++)); do
+  node_index=$(shuf -i 0-$((${replicas}-1)) -n 1)
+  assert_count ${name}-elassandra-${node_index} 1 "SELECT count(*) FROM ks.t WHERE id=${i};"
+done

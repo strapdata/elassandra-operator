@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+cd `dirname "$BASH_SOURCE"`/../..
+source strap-test/config
+
+index=${1:-ks}
+type=${2:-t}
+name=${3:-dc1}
+replicas=${4:-1}
+
+node_0=${name}-elassandra-0
+
+if [ "$ELASTICSEARCH_ENABLED" = "true" ]; then
+
+  es_resp=$(kubectl exec ${node_0} -c ${ELASSANDRA} -- curl -X PUT -H 'Content-Type: application/json' ${CURL_CRED} ${PROTOCOL}://localhost:9200/${index} -d'
+  {
+    "mappings": {
+      "'${type}'": {
+        "discover": ".*"
+      }
+    }
+  }')
+  echo "$es_resp"
+
+  if ! echo "$es_resp" | grep '"acknowledged":true'; then
+    echo "$es_resp" | grep resource_already_exists_exception || exit 1
+  fi
+fi

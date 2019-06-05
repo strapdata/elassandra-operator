@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+cd `dirname "$BASH_SOURCE"`/..
+source strap-test/config
+
+name=${1:-dc1}
+replicas=${2:-1}
+backup_name=${3:-testbackup-${name}-$(date +'%s')}
+rf=${4:-1}
+size=${5:-10}
+
+# requirement : azure storage created
+
+./strap-test/aks/create-storage-secret
+./strap-test/lib/deploy-operator
+./strap-test/lib/deploy-elassandra-with-storage ${name} ${replicas}
+./strap-test/lib/wait-dc-ready ${name} ${replicas}
+./strap-test/lib/check-dc-ok ${name} ${replicas}
+
+./strap-test/lib/insert-basic-dataset ${name} ${replicas} ${rf} ${size}
+./strap-test/lib/create-backup ${name} ${replicas} ${backup_name}
+
+./strap-test/lib/undeploy-elassandra ${name} ${replicas}
+./strap-test/lib/wait-dc-undeploy ${name} ${replicas}
+./strap-test/lib/delete-dc-pvc ${name} ${replicas}
+
+./strap-test/lib/deploy-elassandra-from-backup ${name} ${replicas} ${backup_name}
+./strap-test/lib/wait-dc-ready ${name} ${replicas}
+./strap-test/lib/check-dc-ok ${name} ${replicas}
+
+./strap-test/lib/assert-basic-dataset ${name} ${replicas} ${size}
+
+./strap-test/lib/undeploy-elassandra ${name}
+./strap-test/lib/wait-dc-undeploy ${name} ${replicas}
+./strap-test/lib/delete-dc-pvc ${name} ${replicas}
+kubectl delete eback ${backup_name}
+
+./strap-test/lib/undeploy-operator

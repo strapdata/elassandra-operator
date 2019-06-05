@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+cd `dirname "$BASH_SOURCE"`/../..
+source strap-test/config
+
+ helm install \
+    --name cert-manager \
+    --namespace kube-system \
+    stable/cert-manager

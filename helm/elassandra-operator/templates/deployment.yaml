@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ template "elassandra-operator.name" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    heritage: {{ .Release.Service }}
+    operator: elassandra
+    release: {{ .Release.Name }}
+  name: {{ template "elassandra-operator.fullname" . }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ template "elassandra-operator.name" . }}
+      operator: elassandra
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "elassandra-operator.name" . }}
+        operator: elassandra
+        release: {{ .Release.Name }}
+    spec:
+      {{- with .Values.imagePullSecret }}
+      imagePullSecrets:
+        - name: {{ . }}
+      {{- end }}
+      containers:
+        - name: {{ template "elassandra-operator.name" . }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+#          Uncomment and modify to change operator behaviour via start up flags
+#          command: ["java"]
+#          args: ["-jar", "/opt/lib/elassandra-operator/elassandra-operator.jar", "--no-version-check=false"]
+          ports:
+            - containerPort: 8080
+              name: http
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+          {{- if .Values.env }}
+          env:
+{{ toYaml .Values.env | indent 12 }}
+          {{- end }}
+    {{- if .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+    {{- end }}
+    {{- if .Values.rbacEnable }}
+      serviceAccountName: {{ template "elassandra-operator.fullname" . }}
+    {{- end }}
+    {{- if .Values.tolerations }}
+      tolerations:
+{{ toYaml .Values.tolerations | indent 8 }}
+      securityContext:
+{{ toYaml .Values.securityContext | indent 8 }}
+{{- end }}
+

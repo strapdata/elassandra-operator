@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+
+set -xe
+
+#
+# To be sourced by other scripts
+#
+
+if [ "$_CONFIG_SOURCED" != "true" ]; then
+  export _CONFIG_SOURCED="true"
+else
+  return 0
+fi
+
+export RESOURCE_GROUP=${RESOURCE_GROUP:-ci-staging}
+export AZURE_REGION=${AZURE_REGION:-westeurope}
+
+export AKS_NAME=${AKS_NAME:-testcluster2}
+export AKS_NODE_COUNT=${AKS_NODE_COUNT:-3}
+# the az service principal that will be used by the aks cluster, not the one used to create it.
+export AKS_SP_ID=${AKS_SP_ID:-}
+export AKS_SP_PASSWORD=${AKS_SP_PASSWORD:-}
+export AKS_K8S_VERSION=${AKS_K8S_VERSION:-1.12.7}
+
+export PULL_SECRET=${PULL_SECRET:-""}
+export REGISTRY=${REGISTRY:-docker.repo.strapdata.com}
+[[ "${REGISTRY}" != */ ]] && REGISTRY="${REGISTRY}/" # add a trailing slash if necessary
+
+export SUFFIX=${SUFFIX:-""}
+export ELASSANDRA=${ELASSANDRA:-elassandra}
+export REGISTRY_BASE_PATH=${REGISTRY_BASE_PATH:-${ELASSANDRA}-operator}${SUFFIX}
+export REGISTRY_USER=${REGISTRY_USER:-""}
+export REGISTRY_PASSWORD=${REGISTRY_PASSWORD:-""}
+
+SHA1=`git rev-parse --short HEAD`
+export TAG="${TAG:-${SHA1}}"
+#export TAG="${TAG:-latest}"
+
+export SSL=${SSL:-true}
+export AUTHENTICATION=${AUTHENTICATION:-true}
+export AUTHORIZATION=${AUTHENTICATION:-true}
+
+export ENTERPRISE=${ENTERPRISE:-true}
+export ELASSANDRA_IMAGE=${REGISTRY}${REGISTRY_BASE_PATH}/${ELASSANDRA}
+export ENTERPRISE_IMAGE=${REGISTRY}${REGISTRY_BASE_PATH}/enterprise
+export OPERATOR_IMAGE=${REGISTRY}${REGISTRY_BASE_PATH}/${ELASSANDRA}-operator
+export SIDECAR_IMAGE=${REGISTRY}${REGISTRY_BASE_PATH}/${ELASSANDRA}-sidecar
+
+[ "$AUTHENTICATION" = "true" ] && export CQL_CRED="-u cassandra -p cassandra"
+[ "$AUTHENTICATION" = "true" ] && [ "$ENTERPRISE" = "true" ] && export CURL_CRED="-u cassandra:cassandra" || export CURL_CRED=""
+[ "$SSL" = "true" ] && [ "$ENTERPRISE" = "true" ] && export PROTOCOL="https" || export PROTOCOL="http"
+
+# Azure storage
+export AZURE_STORAGE_ACCOUNT=${AZURE_STORAGE_ACCOUNT:-$(echo ${AKS_NAME} | sed 's/-//g')}
+export AZURE_STORAGE_CONTAINER=${AZURE_STORAGE_CONTAINER:-testcontainer}
+export AZURE_STORAGE_SECRET=${AZURE_STORAGE_SECRET:-azure-storage}
+
+export ELASTICSEARCH_ENABLED=${ELASTICSEARCH_ENABLED:-true}

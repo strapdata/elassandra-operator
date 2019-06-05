@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+cd `dirname "$BASH_SOURCE"`/../..
+source strap-test/config
+
+az aks create \
+  -g ${RESOURCE_GROUP} \
+  -n ${AKS_NAME} \
+  --node-count ${AKS_NODE_COUNT} \
+  --generate-ssh-keys \
+  --kubernetes-version ${AKS_K8S_VERSION} \
+  -l ${AZURE_REGION} \
+  --service-principal ${AKS_SP_ID} \
+  --client-secret ${AKS_SP_PASSWORD} \
+  --verbose

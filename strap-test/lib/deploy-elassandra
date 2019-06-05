@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+
+cd `dirname "$BASH_SOURCE"`/../..
+source strap-test/config
+
+name=${1:-dc1}
+replicas=${2:-1}
+values_file=${3:-""}
+
+helm_cmd="install --wait -n ${name}"
+[ "${UPGRADE}" = "true" ] && helm_cmd="upgrade ${name}"
+
+helm ${helm_cmd} \
+    ${values_file:+-f ${values_file}} \
+    --set image.elassandraRepository=${ELASSANDRA_IMAGE} \
+    --set image.enterpriseRepository=${ENTERPRISE_IMAGE} \
+    --set image.sidecarRepository=${SIDECAR_IMAGE} \
+    --set image.tag=${TAG} \
+    --set imagePullSecret=${PULL_SECRET} \
+    --set replicaCount=${replicas} \
+    --set imagePullPolicy=IfNotPresent \
+    --set elasticsearchEnabled=${ELASTICSEARCH_ENABLED} \
+    --set ssl=${SSL} \
+    --set authentication=${AUTHENTICATION} \
+    --set authorization=${AUTHORIZATION} \
+    --set enterprise.enabled=${ENTERPRISE} \
+    --set enterprise.jmx=true \
+    --set enterprise.https=${SSL} \
+    --set enterprise.ssl=${SSL} \
+    --set enterprise.aaa.enabled=${AUTHENTICATION} \
+    --set enterprise.aaa.audit=${AUTHENTICATION} \
+    --set enterprise.cbs=${AUTHORIZATION} \
+    helm/elassandra
+
+#    --set userSecretVolumeSource.secretName=${name} \
+#    --set userConfigMapVolumeSource.name=${name} \
+#    --set userConfigMapVolumeSource.items[0].key=cassandra_ssl \
+#    --set userConfigMapVolumeSource.items[0].path=cassandra.yaml.d/003-ssl.yaml \
+#    --set userConfigMapVolumeSource.items[1].key=jvm_debug \
+#    --set userConfigMapVolumeSource.items[1].path=cassandra-env.sh.d/jvm-debug.sh \
+#    --set userConfigMapVolumeSource.items[2].key=cqlshrc \
+#    --set userConfigMapVolumeSource.items[2].path=cqlshrc \
+#    --set userConfigMapVolumeSource.items[3].key=install_cqlshrc \
+#    --set userConfigMapVolumeSource.items[3].path=cassandra-env.sh.d/003-install-cqlshrc.sh \

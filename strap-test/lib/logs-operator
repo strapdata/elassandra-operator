@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+cd `dirname "$BASH_SOURCE"`/../..
+source strap-test/config
+
+kubectl logs $(./strap-test/lib/get-operator-pod-name) $@

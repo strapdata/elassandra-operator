@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+cd `dirname "$BASH_SOURCE"`/../..
+source strap-test/config
+
+pod_name=$(strap-test/lib/get-operator-pod-name)
+
+helm delete elassandra-operator --purge
+
+for ((i=60; i > 0; i--)); do
+  echo "waiting for $pod_name to be terminated (#$i)"
+  kubectl get pods
+  if ! kubectl get pod ${pod_name}; then
+    exit 0
+  fi
+  sleep 1
+done
+
+exit 1
