@@ -18,7 +18,7 @@ Build the docker images :
 
 Publish the docker images :
 ```bash
-./gradlew dockerBuild -PregistryUsername=barth -PregistryPassword=viande1994 -PregistryEmail=barth@strapdata.com
+./gradlew dockerPush -PregistryUsername=barth -PregistryPassword=viande1994 -PregistryEmail=barth@strapdata.com
 ```
 
 Build parameters are located in `gradle.properties`.
