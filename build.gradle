@@ -24,3 +24,16 @@ configure(subprojects.findAll {it.name.contains("docker")}) {
     }
   }
 }
+
+task dockerBuild {
+  dependsOn ':java:operator:jibDockerBuild'
+  dependsOn ':java:sidecar:jibDockerBuild'
+  dependsOn ':docker:dockerBuildImage'
+}
+
+task dockerPush {
+  dependsOn ':java:operator:jib'
+  dependsOn ':java:sidecar:jib'
+  dependsOn ':docker:dockerPushImage'
+}
+

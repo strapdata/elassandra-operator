@@ -22,9 +22,16 @@ jib {
         image = 'openjdk:alpine'
     }
     to {
-        image = project.image
-        credHelper = 'osxkeychain'
-        tags = [ project.version, 'latest']
+        image = image = dockerImagePrefix + "/" + project.dockerImageSuffix
+        tags = [ version, 'latest']
+
+        // osxkeychain does not work on linux and CI environments
+        // credHelper = 'osxkeychain'
+
+        auth {
+            username = registryUsername
+            password = registryPassword
+        }
     }
     container {
         jvmFlags = ['-Xmx512m',
