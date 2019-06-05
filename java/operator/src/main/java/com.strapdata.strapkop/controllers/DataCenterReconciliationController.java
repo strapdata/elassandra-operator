@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
+import javax.swing.text.html.Option;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -791,7 +792,7 @@ public class DataCenterReconciliationController {
             final ImmutableMultimap.Builder<NodeStatus, V1Pod> builder = ImmutableMultimap.builder();
             Object[] nodeStatus = Single.zip(
                 StreamSupport.stream(pods.spliterator(), false).map(pod -> {
-                    return sidecarClientFactory.clientForPod(pod).status()
+                    return sidecarClientFactory.clientForPodNullable(pod).status()
                         .map(status -> {
                             builder.put(status, pod);
                             return status;
@@ -851,7 +852,7 @@ public class DataCenterReconciliationController {
             if (decommissionedPods.isEmpty()) {
                 logger.debug("No Cassandra nodes have been decommissioned. Decommissioning the newest node.");
 
-                sidecarClientFactory.clientForPod(newestPod).decommission();
+                sidecarClientFactory.clientForPodNullable(newestPod).decommission();
 
             } else if (decommissionedPods.size() == 1) {
                 final V1Pod decommissionedPod = Iterables.getOnlyElement(podsByCassandraOperationMode.get(NodeStatus.DECOMMISSIONED));

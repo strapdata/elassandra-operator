@@ -1,0 +1,13 @@
+plugins {
+  id 'idea'
+}
+
+ allprojects {
+   repositories {
+       mavenLocal()
+       mavenCentral()
+       maven { url "https://jcenter.bintray.com" }
+       maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
+       jcenter() // or Maven central, required for Lombok dependency
+   }
+ }

@@ -7,9 +7,11 @@ import io.micronaut.context.annotation.Factory;
 import io.micronaut.http.client.LoadBalancer;
 
 import javax.inject.Singleton;
+import javax.swing.text.html.Option;
 import java.net.InetAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.Optional;
 
 @Factory
 @Singleton
@@ -27,5 +29,15 @@ public class SidecarClientFactory {
 
     public SidecarClient clientForPod(final V1Pod pod) throws MalformedURLException {
         return clientForAddress(InetAddresses.forString(pod.getStatus().getPodIP()));
+    }
+    
+    // TODO: this is a temporary fix
+    public SidecarClient clientForPodNullable(final V1Pod pod) {
+        try {
+            return clientForAddress(InetAddresses.forString(pod.getStatus().getPodIP()));
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 }

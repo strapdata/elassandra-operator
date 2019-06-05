@@ -64,7 +64,7 @@ public class CassandraHealthCheckService extends AbstractScheduledService {
 
             Single.zip(
                 StreamSupport.stream(pods.spliterator(), false).map(pod -> {
-                    return sidecarClientFactory.clientForPod(pod).status().map(status -> {
+                    return sidecarClientFactory.clientForPodNullable(pod).status().map(status -> {
                         final InetAddress podIp = InetAddresses.forString(pod.getStatus().getPodIP());
                         final NodeStatus previousMode = cassandraNodeStatus.get(podIp);
                         final NodeStatus mode = status;

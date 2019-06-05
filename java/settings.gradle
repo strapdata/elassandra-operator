@@ -1,7 +1,0 @@
-rootProject.name="strapkop"
-include 'model'
-include 'backup'
-include 'sidecar'
-include 'operator'
-include 'k8s-addson'
-
