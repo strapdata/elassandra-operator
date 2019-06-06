@@ -25,15 +25,15 @@ public class CreateCustomResourceDefinitions implements Callable<Void> {
 
     @Override
     public Void call() throws Exception {
-        createCrdFromResource("/com/instaclustr/datacenter-crd.yaml");
+        createCrdFromResource("/crd/datacenter-crd.yaml");
         //createCrdFromResource("/com/com/cluster-crd.yaml");
-        createCrdFromResource("/com/instaclustr/backup-crd.yaml");
+        createCrdFromResource("/crd/backup-crd.yaml");
         return null;
     }
 
     private void createCrdFromResource(final String resourceName) throws ApiException, IOException {
         try (final InputStream resourceStream = CreateCustomResourceDefinitions.class.getResourceAsStream(resourceName);
-             final InputStreamReader resourceReader = new InputStreamReader(resourceStream);) {
+             final InputStreamReader resourceReader = new InputStreamReader(resourceStream)) {
 
             final V1beta1CustomResourceDefinition crdDefinition = Yaml.loadAs(resourceReader, V1beta1CustomResourceDefinition.class);
 
