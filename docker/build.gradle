@@ -1,3 +1,6 @@
+// for the moment we build only one version of Elassandra
+// maybe we should always rebuild all N past releases
+
 // Import task types
 import com.bmuschko.gradle.docker.tasks.image.*
 
@@ -7,19 +10,42 @@ task copyJar(type: Copy) {
   into        'build'
 }
 
+def baseImage = dockerImagePrefix + "/elassandra"
+
 // Use task types
 task dockerBuildImage(type: DockerBuildImage) {
   dependsOn 'copyJar'
   inputDir = file('.')
-  tags.add(dockerImagePrefix + "/elassandra:" + elassandraVersion)
+  tags.add(baseImage + ":" + elassandraVersion)
+  tags.add(baseImage + ":" + project.gitCommitHash)
+  tags.add(baseImage + ":" + "latest")
+
   buildArgs = [
           'base_image': dockerBaseImage,
           'cassandra_k8s_addons_jar': './build/k8s-addons.jar'
   ]
 }
 
-task dockerPushImage(type: DockerPushImage) {
+task dockerPushImageLatest(type: DockerPushImage) {
+  dependsOn 'dockerBuildImage'
+  imageName = dockerImagePrefix + "/elassandra"
+  tag = "latest"
+}
+
+task dockerPushImageOperatorGitCommitHash(type: DockerPushImage) {
+  dependsOn 'dockerBuildImage'
+  imageName = dockerImagePrefix + "/elassandra"
+  tag = project.gitCommitHash
+}
+
+task dockerPushImageElassandraVersion(type: DockerPushImage) {
   dependsOn 'dockerBuildImage'
   imageName = dockerImagePrefix + "/elassandra"
   tag = elassandraVersion
+}
+
+task dockerPushImage {
+  dependsOn 'dockerPushImageLatest'
+  dependsOn 'dockerPushImageOperatorGitCommitHash'
+  dependsOn 'dockerPushImageElassandraVersion'
 }

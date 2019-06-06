@@ -3,17 +3,29 @@ plugins {
   id 'com.bmuschko.docker-remote-api' version '4.9.0' apply false
 }
 
- allprojects {
-   repositories {
-       mavenLocal()
-       mavenCentral()
-       maven { url "https://jcenter.bintray.com" }
-       maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
-       jcenter() // or Maven central, required for Lombok dependency
-   }
- }
+def getGitCommitHash = { ->
+  def stdout = new ByteArrayOutputStream()
+  exec {
+    commandLine 'git', 'rev-parse', '--short', 'HEAD'
+    standardOutput = stdout
+  }
+  return stdout.toString().trim()
+}
 
-configure(subprojects.findAll {it.name.contains("docker")}) {
+ext.gitCommitHash = getGitCommitHash()
+
+allprojects {
+  repositories {
+    mavenLocal()
+    mavenCentral()
+    maven { url "https://jcenter.bintray.com" }
+    maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
+    jcenter() // or Maven central, required for Lombok dependency
+  }
+
+}
+
+configure(subprojects.findAll { it.name.contains("docker") }) {
   apply plugin: 'com.bmuschko.docker-remote-api'
   docker {
     registryCredentials {

@@ -28,7 +28,7 @@ export REGISTRY=${REGISTRY:-docker.repo.strapdata.com}
 
 export SUFFIX=${SUFFIX:-""}
 export ELASSANDRA=${ELASSANDRA:-elassandra}
-export REGISTRY_BASE_PATH=${REGISTRY_BASE_PATH:-${ELASSANDRA}-operator}${SUFFIX}
+export REGISTRY_BASE_PATH=${REGISTRY_BASE_PATH:-elassandra-operator}${SUFFIX}
 export REGISTRY_USER=${REGISTRY_USER:-""}
 export REGISTRY_PASSWORD=${REGISTRY_PASSWORD:-""}
 
@@ -41,10 +41,9 @@ export AUTHENTICATION=${AUTHENTICATION:-true}
 export AUTHORIZATION=${AUTHENTICATION:-true}
 
 export ENTERPRISE=${ENTERPRISE:-true}
-export ELASSANDRA_IMAGE=${REGISTRY}${REGISTRY_BASE_PATH}/${ELASSANDRA}
-export ENTERPRISE_IMAGE=${REGISTRY}${REGISTRY_BASE_PATH}/enterprise
-export OPERATOR_IMAGE=${REGISTRY}${REGISTRY_BASE_PATH}/${ELASSANDRA}-operator
-export SIDECAR_IMAGE=${REGISTRY}${REGISTRY_BASE_PATH}/${ELASSANDRA}-sidecar
+export ELASSANDRA_IMAGE=${REGISTRY}${REGISTRY_BASE_PATH}/elassandra
+export OPERATOR_IMAGE=${REGISTRY}${REGISTRY_BASE_PATH}/elassandra-operator
+export SIDECAR_IMAGE=${REGISTRY}${REGISTRY_BASE_PATH}/elassandra-sidecar
 
 [ "$AUTHENTICATION" = "true" ] && export CQL_CRED="-u cassandra -p cassandra"
 [ "$AUTHENTICATION" = "true" ] && [ "$ENTERPRISE" = "true" ] && export CURL_CRED="-u cassandra:cassandra" || export CURL_CRED=""

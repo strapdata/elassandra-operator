@@ -23,7 +23,7 @@ jib {
     }
     to {
         image = dockerImagePrefix + "/" + project.dockerImageSuffix
-        tags = [ version, 'latest']
+        tags = [ version, project.gitCommitHash, 'latest']
         // osxkeychain does not work on linux and CI environments
         // credHelper = 'osxkeychain'
 
