@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
 cd `dirname "$BASH_SOURCE"`/../..
-source strap-test/config
+source test/config
 
 dc=${1:-dc1}
 replicas=${2:-1}
 backup_name=${3:-testbackup-${dc}}
 
-cat <<EOF | ./strap-test/lib/deploy-elassandra  "$dc" "$replicas" -
+cat <<EOF | ./test/lib/deploy-elassandra  "$dc" "$replicas" -
 env:
   - name: JVM_OPTS
     value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5001"

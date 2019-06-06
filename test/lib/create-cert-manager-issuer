@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
 cd `dirname "$BASH_SOURCE"`/../..
-source strap-test/config
+source test/config
 
-cacert=strap-test/resources/gen/cacert.pem
-cakey=strap-test/resources/gen/cakey.pem
+cacert=test/resources/gen/cacert.pem
+cakey=test/resources/gen/cakey.pem
 
 
 openssl rsa -in ${cakey} -out ${cakey}-unc -passin pass:changeit

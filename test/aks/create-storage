@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 cd `dirname "$BASH_SOURCE"`/../..
-source strap-test/config
+source test/config
 
 account_name=${AZURE_STORAGE_ACCOUNT:-strapdataoperatortest}
 container_name=${AZURE_STORAGE_CONTAINER:-testcontainer}
@@ -17,4 +17,4 @@ az storage account create \
 export access_key=$(az storage account keys list --account-name ${account_name} --resource-group ${RESOURCE_GROUP} --output json | jq -r '.[0].value')
 az storage container create --name ${container_name} --account-name ${account_name} --account-key=${access_key}
 
-./strap-test/aks/create-storage-secret
+./test/aks/create-storage-secret

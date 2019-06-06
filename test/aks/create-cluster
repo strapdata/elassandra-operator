@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 cd `dirname "$BASH_SOURCE"`/../..
-source strap-test/config
+source test/config
 
 az aks create \
   -g ${RESOURCE_GROUP} \

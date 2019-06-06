@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
 cd `dirname "$BASH_SOURCE"`/../..
-source strap-test/config
+source test/config
 
-rm -rf strap-test/resources/gen
-mkdir -p strap-test/resources/gen
+rm -rf test/resources/gen
+mkdir -p test/resources/gen
 
 # create root ca
 openssl_conf=$(mktemp)
@@ -31,20 +31,20 @@ EOF
 openssl req \
     -config ${openssl_conf} \
     -new -x509 -extensions v3_ca \
-    -keyout strap-test/resources/gen/cakey.pem \
-    -out strap-test/resources/gen/cacert.pem \
+    -keyout test/resources/gen/cakey.pem \
+    -out test/resources/gen/cacert.pem \
     -days 3650
 
-openssl x509 -in strap-test/resources/gen/cacert.pem -text -noout
+openssl x509 -in test/resources/gen/cacert.pem -text -noout
 
 # create trustore.jks
-keytool -importcert -file strap-test/resources/gen/cacert.pem -alias ca -keystore strap-test/resources/gen/truststore.jks -keypass changeit -storepass changeit -noprompt
+keytool -importcert -file test/resources/gen/cacert.pem -alias ca -keystore test/resources/gen/truststore.jks -keypass changeit -storepass changeit -noprompt
 
 # create root p12
 openssl pkcs12 \
   -export \
-  -in strap-test/resources/gen/cacert.pem \
-  -inkey strap-test/resources/gen/cakey.pem \
-  -out strap-test/resources/gen/ca.p12 \
+  -in test/resources/gen/cacert.pem \
+  -inkey test/resources/gen/cakey.pem \
+  -out test/resources/gen/ca.p12 \
   -name ca -caname ca \
   -passin pass:changeit -passout pass:changeit

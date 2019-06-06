@@ -1,29 +1,29 @@
 #!/usr/bin/env bash
 
 cd `dirname "$BASH_SOURCE"`/..
-source strap-test/config
+source test/config
 
 name=${1:-dc1}
 from=${2:-1}
 to=${3:-2}
 
 
-./strap-test/lib/deploy-operator
+./test/lib/deploy-operator
 
 
-./strap-test/lib/deploy-elassandra ${name} ${from}
-./strap-test/lib/wait-dc-ready ${name} ${from}
-./strap-test/lib/check-dc-ok ${name} ${from}
-./strap-test/lib/insert-basic-dataset ${name} ${from}
-./strap-test/lib/assert-basic-dataset ${name} ${from}
+./test/lib/deploy-elassandra ${name} ${from}
+./test/lib/wait-dc-ready ${name} ${from}
+./test/lib/check-dc-ok ${name} ${from}
+./test/lib/insert-basic-dataset ${name} ${from}
+./test/lib/assert-basic-dataset ${name} ${from}
 
-./strap-test/lib/scale-elassandra ${name} ${to}
-./strap-test/lib/wait-dc-ready ${name} ${to}
-./strap-test/lib/check-dc-ok ${name} ${to}
-./strap-test/lib/assert-basic-dataset ${name} ${to}
+./test/lib/scale-elassandra ${name} ${to}
+./test/lib/wait-dc-ready ${name} ${to}
+./test/lib/check-dc-ok ${name} ${to}
+./test/lib/assert-basic-dataset ${name} ${to}
 
-./strap-test/lib/undeploy-elassandra ${name}
-./strap-test/lib/wait-dc-undeploy ${name} ${to}
-./strap-test/lib/delete-dc-pvc ${name} ${to}
+./test/lib/undeploy-elassandra ${name}
+./test/lib/wait-dc-undeploy ${name} ${to}
+./test/lib/delete-dc-pvc ${name} ${to}
 
-./strap-test/lib/undeploy-operator
+./test/lib/undeploy-operator

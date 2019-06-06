@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 cd `dirname "$BASH_SOURCE"`/../..
-source strap-test/config
+source test/config
 
 name=${1:-dc1}
 replicas=${2:-1}
@@ -18,6 +18,6 @@ for ((i=0; i < ${size}; i++)); do
 done
 
 if [ "$ELASTICSEARCH_ENABLED" = "true" ]; then
-  ./strap-test/lib/create-index-if-not-exists ks t ${name} ${replicas}
+  ./test/lib/create-index-if-not-exists ks t ${name} ${replicas}
   sleep 2 # wait for building index
 fi

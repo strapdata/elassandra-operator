@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
 cd `dirname "$BASH_SOURCE"`/../..
-source strap-test/config
+source test/config
 
 kubectl --namespace default get pods -l "app=elassandra-operator,release=elassandra-operator" -o jsonpath='{.items[*].metadata.name}'

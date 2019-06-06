@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 cd `dirname "$BASH_SOURCE"`/../..
-source strap-test/config
+source test/config
 
 name=${1:-dc1}
 index=${2:-0}

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 cd `dirname "$BASH_SOURCE"`/../..
-source strap-test/config
+source test/config
 
-pod_name=$(strap-test/lib/get-operator-pod-name)
+pod_name=$(test/lib/get-operator-pod-name)
 
 helm delete elassandra-operator --purge
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 cd `dirname "$BASH_SOURCE"`/..
-source strap-test/config
+source test/config
 
-./strap-test/lib/undeploy-operator || true
+./test/lib/undeploy-operator || true
 kubectl delete sts --all --force --grace-period=0
 kubectl delete pod --all --force --grace-period=0
 kubectl delete svc --all --force --grace-period=0

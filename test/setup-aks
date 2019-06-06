@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
 cd `dirname "$BASH_SOURCE"`/..
-source strap-test/config
+source test/config
 
-./strap-test/aks/create-cluster
-./strap-test/aks/get-credentials
-./strap-test/lib/configure-helm
-./strap-test/lib/create-pull-secret
-./strap-test/aks/create-storage
+./test/aks/create-cluster
+./test/aks/get-credentials
+./test/lib/configure-helm
+./test/lib/create-pull-secret
+./test/aks/create-storage
 

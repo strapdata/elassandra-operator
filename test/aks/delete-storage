@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
 cd `dirname "$BASH_SOURCE"`/../..
-source strap-test/config
+source test/config
 
 account_name=${AZURE_STORAGE_ACCOUNT:-strapdataoperatortest}
 container_name=${AZURE_STORAGE_CONTAINER:-testcontainer}
 
 az storage account delete --yes --name ${account_name} ||
-./strap-test/aks/delete-storage-secret
+./test/aks/delete-storage-secret

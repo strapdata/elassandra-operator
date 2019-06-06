@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 cd `dirname "$BASH_SOURCE"`/../..
-source strap-test/config
+source test/config
 
-cat <<EOF | ./strap-test/lib/deploy-elassandra  "$1" "$2" -
+cat <<EOF | ./test/lib/deploy-elassandra  "$1" "$2" -
 env:
   - name: JVM_OPTS
     value: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5001"

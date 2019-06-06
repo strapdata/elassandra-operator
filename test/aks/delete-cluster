@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
 cd `dirname "$BASH_SOURCE"`/../..
-source strap-test/config
+source test/config
 
 az aks delete -g ${RESOURCE_GROUP} -n ${AKS_NAME} --no-wait --yes
