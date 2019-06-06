@@ -1,0 +1,25 @@
+task cleanUp(type: Exec) {
+  commandLine "./full-cleanup"
+}
+
+task testScale(type: Exec) {
+  commandLine "./test-scale", project.scaleDc, project.scaleFrom, project.scaleTo
+}
+
+task testBasic(type: Exec) {
+  commandLine "./test-basic", project.basicDc, project.basicReplicas
+}
+
+task testBackup(type: Exec) {
+  commandLine "./test-backup", project.backupDc, project.backupReplicas
+}
+
+task test {
+  dependsOn 'testBasic'
+  dependsOn 'testScale'
+  dependsOn 'testBackup'
+}
+
+task basicSetup(type: Exec) {
+  commandLine "./basic-setup", project.basicSetupDc, project.basicSetupReplicas
+}
