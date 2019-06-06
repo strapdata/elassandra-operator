@@ -12,11 +12,7 @@ metadata:
 {{- end }}
 spec:
   replicas: {{ .Values.replicaCount }}
-  {{- if and .Values.enterprise (eq .Values.enterprise.enabled true) }}
-  elassandraImage: "{{ .Values.image.enterpriseRepository }}:{{ .Values.image.elassandraTag }}"
-  {{-  else }}
   elassandraImage: "{{ .Values.image.elassandraRepository }}:{{ .Values.image.elassandraTag }}"
-  {{- end }}
   sidecarImage: "{{ .Values.image.sidecarRepository }}:{{ .Values.image.sidecarTag }}"
   imagePullPolicy: {{ .Values.imagePullPolicy }}
   elasticsearchEnabled: {{ .Values.elasticsearchEnabled }}
