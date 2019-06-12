@@ -34,11 +34,13 @@ jib {
         }
     }
     container {
-        jvmFlags = ['-Xmx512m',
+        jvmFlags = ['-Xmx256m',
                     '-XX:+UnlockExperimentalVMOptions',
                     '-XX:+UseCGroupMemoryLimitForHeap',
                     '-XX:MaxRAMFraction=2',
-                    '-XX:+ExitOnOutOfMemoryError' ]
+                    '-XX:+ExitOnOutOfMemoryError',
+                    '-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005' // TODO: make this optional
+        ]
         mainClass = mainClassName
         ports = ['8080']
         labels = [ description:'Strapkop Elassandra sidecar']
