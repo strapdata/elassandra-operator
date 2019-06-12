@@ -2,6 +2,8 @@ plugins {
   id 'base'
   id 'com.google.cloud.tools.jib' version '1.2.0' apply false
   id "io.spring.dependency-management" version "1.0.6.RELEASE" apply false
+  id "com.github.johnrengelman.shadow" version "4.0.2" apply false
+  id "net.ltgt.apt-idea" version "0.21" apply false
 }
 
 // plugins {
@@ -77,89 +79,92 @@ plugins {
 //
 subprojects {
 
-    apply plugin: 'java-library'
-    apply plugin: "jacoco"
-    apply plugin: 'io.spring.dependency-management'
+  apply plugin: 'java-library'
+  apply plugin: "jacoco"
+  apply plugin: 'io.spring.dependency-management'
+  apply plugin: 'com.github.johnrengelman.shadow'
+  apply plugin: "net.ltgt.apt-idea"
 
-    dependencyManagement {
-        imports {
-            mavenBom 'io.micronaut:micronaut-bom:1.1.2'
-        }
+  dependencyManagement {
+    imports {
+      mavenBom 'io.micronaut:micronaut-bom:1.1.2'
     }
+  }
 
-    dependencies {
-        compile group: 'io.vavr', name: 'vavr', version: '0.9.2'
-        compile "args4j:args4j:2.33"
-        compile "com.google.guava:guava:27.1-jre"
-        compile group: 'com.google.code.gson', name: 'gson', version: '2.3.1'
-        compile group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: '2.9.4'
-        compile group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: '2.9.4'
-        compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.9.4'
+  dependencies {
+    compile group: 'io.vavr', name: 'vavr', version: '0.9.2'
+    compile "args4j:args4j:2.33"
+    compile "com.google.guava:guava:27.1-jre"
+    //compile group: 'com.google.code.gson', name: 'gson', version: '2.3.1'
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: '2.9.4'
+    compile group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: '2.9.4'
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.9.4'
 
-        compile(group: 'com.datastax.cassandra', name: 'cassandra-driver-core', version: '3.7.1') {
-            exclude group: 'com.google.guava', module: 'guava'
-        }
-        compile "io.kubernetes:client-java:4.0.0"
-        compile "javax.inject:javax.inject:1"
-
-        runtime "ch.qos.logback:logback-classic:1.2.3"
-        testCompile "org.slf4j:jul-to-slf4j:1.7.16"
-        testCompile "org.junit.jupiter:junit-jupiter-api"
-        testCompile "io.micronaut.test:micronaut-test-junit5"
-        testRuntime "org.junit.jupiter:junit-jupiter-engine"
+    compile(group: 'com.datastax.cassandra', name: 'cassandra-driver-core', version: '3.7.1') {
+      exclude group: 'com.google.guava', module: 'guava'
     }
+    compile "io.kubernetes:client-java:4.0.0"
+    compile "javax.inject:javax.inject:1"
 
-    buildscript {
-        repositories {
-            mavenCentral()
-            jcenter()
-        }
+    runtime "ch.qos.logback:logback-classic:1.2.3"
+    testCompile "org.slf4j:jul-to-slf4j:1.7.16"
+    testCompile "org.junit.jupiter:junit-jupiter-api"
+    testCompile "io.micronaut.test:micronaut-test-junit5"
+    testRuntime "org.junit.jupiter:junit-jupiter-engine"
+  }
+
+  buildscript {
+    repositories {
+      mavenCentral()
+      jcenter()
     }
+  }
 
-    jacoco {
-        toolVersion = "0.8.1"
+  jacoco {
+    toolVersion = "0.8.1"
+  }
+
+  // use JUnit 5 platform
+  test {
+    useJUnitPlatform()
+    testLogging {
+      exceptionFormat = 'full'
     }
+  }
 
-    // use JUnit 5 platform
-    test {
-        useJUnitPlatform()
-        testLogging {
-            exceptionFormat = 'full'
-        }
+  compileJava {
+    sourceCompatibility = 8
+    targetCompatibility = 8
+    options.encoding = 'UTF-8'
+  }
+
+  compileTestJava {
+    options.compilerArgs += '-parameters'
+  }
+
+  jacocoTestReport {
+    additionalSourceDirs = files(sourceSets.main.allSource.srcDirs)
+    sourceDirectories = files(sourceSets.main.allSource.srcDirs)
+    classDirectories = files(sourceSets.main.output)
+    reports {
+      html.enabled = true
+      xml.enabled = true
+      csv.enabled = false
     }
+  }
 
-    compileJava {
-        sourceCompatibility = 8
-        targetCompatibility = 8
-        options.encoding = 'UTF-8'
-    }
-
-    compileTestJava {
-        options.compilerArgs += '-parameters'
-    }
-
-    jacocoTestReport {
-        additionalSourceDirs = files(sourceSets.main.allSource.srcDirs)
-        sourceDirectories = files(sourceSets.main.allSource.srcDirs)
-        classDirectories = files(sourceSets.main.output)
-        reports {
-            html.enabled = true
-            xml.enabled = true
-            csv.enabled = false
-        }
-      }
+  shadowJar {
+    append 'reference.conf'
+    classifier = null
+    version = null
+    zip64 = true
+    mergeServiceFiles()
+  }
 }
-//
-// shadowJar {
-//     append 'reference.conf'
-//     classifier = null
-//     version = null
-//     mergeServiceFiles()
-// }
-//
-// idea {
-//     module {
-//         downloadJavadoc = true
-//         downloadSources = true
-//     }
-// }
+
+idea {
+  module {
+    downloadJavadoc = true
+    downloadSources = true
+  }
+}
