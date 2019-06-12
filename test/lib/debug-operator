@@ -3,4 +3,4 @@
 cd `dirname "$BASH_SOURCE"`/../..
 source test/config
 
-kubectl port-forward $(./test/lib/get-operator-pod-name) 5000:5000
+kubectl port-forward $(./test/lib/get-operator-pod-name) 5005:5005
