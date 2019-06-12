@@ -1,6 +1,7 @@
 package com.strapdata.strapkop.watch;
 
 import com.google.common.util.concurrent.AbstractExecutionThreadService;
+import com.strapdata.strapkop.CassandraHealthCheckService;
 import com.strapdata.strapkop.preflight.PreflightService;
 import io.micronaut.runtime.event.annotation.EventListener;
 import io.micronaut.scheduling.annotation.Async;
@@ -18,9 +19,14 @@ public class WatchServicesStarter {
     @Inject
     private List<WatchService<Object, Object>> watchServices;
     
+    // TODO: K8s Watch and cassandra health check will all implement the same abstract class
+    @Inject
+    private CassandraHealthCheckService cassandraHealthCheckService;
+    
     @EventListener
     @Async
     public void onPreflightCompleted(PreflightService.PreflightCompletedEvent event) {
         watchServices.forEach(AbstractExecutionThreadService::startAsync);
+        cassandraHealthCheckService.startAsync();
     }
 }

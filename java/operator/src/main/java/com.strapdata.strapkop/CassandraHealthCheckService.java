@@ -34,7 +34,7 @@ public class CassandraHealthCheckService extends AbstractScheduledService {
     private static final Logger logger = LoggerFactory.getLogger(CassandraHealthCheckService.class);
 
     private final K8sResourceUtils k8sResourceUtils;
-    private final Map<Key<DataCenter>, DataCenter> dataCenterCache = new HashMap<>();
+    private final Map<Key<DataCenter>, DataCenter> dataCenterCache = new HashMap<>(); // TODO: this cache is never populated
     private final Map<InetAddress, NodeStatus> cassandraNodeStatus = new ConcurrentHashMap<>();
     private final BehaviorSubject<CassandraNodeStatusEvent> behaviorSubject = BehaviorSubject.create();
     private final SidecarClientFactory sidecarClientFactory;
@@ -69,13 +69,12 @@ public class CassandraHealthCheckService extends AbstractScheduledService {
                     return sidecarClientFactory.clientForPodNullable(pod).status().map(status -> {
                         final InetAddress podIp = InetAddresses.forString(pod.getStatus().getPodIP());
                         final NodeStatus previousMode = cassandraNodeStatus.get(podIp);
-                        final NodeStatus mode = status;
-                        logger.debug("Cassandra node {} has OperationMode = {current: {}, previous: {}}.", podIp, mode, previousMode);
-                        cassandraNodeStatus.put(podIp, mode);
-                        if (previousMode == null || !previousMode.equals(mode)) {
-                            behaviorSubject.onNext(new CassandraNodeStatusEvent(pod, dataCenterKey, previousMode, mode));
+                        logger.debug("Cassandra node {} has OperationMode = {current: {}, previous: {}}.", podIp, status, previousMode);
+                        cassandraNodeStatus.put(podIp, status);
+                        if (previousMode == null || !previousMode.equals(status)) {
+                            behaviorSubject.onNext(new CassandraNodeStatusEvent(pod, dataCenterKey, previousMode, status));
                         }
-                        return mode;
+                        return status;
                     });
                 }).collect(Collectors.toList()),
                 modes -> {
