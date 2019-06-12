@@ -6,6 +6,7 @@ import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.instaclustr.model.k8s.cassandra.DataCenter;
 import com.instaclustr.model.Key;
 import io.kubernetes.client.ApiException;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,17 +17,15 @@ import javax.inject.Inject;
 public class DataCenterDeletionController {
     private static final Logger logger = LoggerFactory.getLogger(DataCenterDeletionController.class);
     
-    @Inject
-    private K8sResourceUtils k8sResourceUtils;
+    private final K8sResourceUtils k8sResourceUtils;
+    private final Key<DataCenter> dataCenterKey;
     
-    private Key<DataCenter> dataCenterKey;
-    
-    private void initialize(final Key<DataCenter> dataCenterKey) {
+    public DataCenterDeletionController(K8sResourceUtils k8sResourceUtils, @Parameter("dataCenterKey") Key<DataCenter> dataCenterKey) {
+        this.k8sResourceUtils = k8sResourceUtils;
         this.dataCenterKey = dataCenterKey;
     }
     
-    public void deleteDataCenter(final Key<DataCenter> dataCenterKey) throws Exception {
-        initialize(dataCenterKey);
+    public void deleteDataCenter() throws Exception {
         logger.info("Deleting DataCenter {}.", dataCenterKey.name);
         
         final String labelSelector = OperatorLabels.toSelector(OperatorLabels.datacenter(dataCenterKey.name));

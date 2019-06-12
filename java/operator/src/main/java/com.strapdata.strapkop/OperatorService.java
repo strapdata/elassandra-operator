@@ -2,9 +2,10 @@ package com.strapdata.strapkop;
 
 import com.google.common.collect.Sets;
 import com.instaclustr.model.Key;
+import com.instaclustr.model.k8s.cassandra.DataCenter;
 import com.instaclustr.model.sidecar.NodeStatus;
+import com.strapdata.strapkop.controllers.DataCenterControllerFactory;
 import com.strapdata.strapkop.controllers.DataCenterDeletionController;
-import com.strapdata.strapkop.controllers.DataCenterReconciliationController;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.watch.DataCenterWatchService;
 import com.strapdata.strapkop.watch.StatefulSetWatchService;
@@ -36,26 +37,28 @@ public class OperatorService {
     private final DataCenterWatchService dataCenterWatchService;
     private final StatefulSetWatchService statefulSetWatchService;
     private final CassandraHealthCheckService cassandraHealthCheckService;
+    private final DataCenterControllerFactory dataCenterControllerFactory;
 
     public OperatorService(DataCenterWatchService dataCenterWatchService,
                            StatefulSetWatchService statefulSetWatchService,
                            BackupControllerService backupControllerService,
                            CassandraHealthCheckService cassandraHealthCheckService,
-                           ApplicationContext beanContext) {
+                           ApplicationContext beanContext, DataCenterControllerFactory dataCenterControllerFactory) {
         logger.info("Initializing OperatorService");
+        this.dataCenterControllerFactory = dataCenterControllerFactory;
         this.dataCenterWatchService = dataCenterWatchService;
         this.dataCenterWatchService.getSubject()
             .subscribe(event -> {
                 logger.debug("Received DataCenterWatchEvent {}.", event);
                 if (event instanceof WatchEvent.IDeleted) {
                     try {
-                        beanContext.getBean(DataCenterDeletionController.class).deleteDataCenter(new Key<>(event.t.getMetadata()));
+                        dataCenterControllerFactory.createDeletionController(new Key<>(event.t.getMetadata())).deleteDataCenter();
                     } catch (final Exception e) {
                         logger.warn("Failed to delete Data Center.", e);
                     }
                 } else {
                     try {
-                        beanContext.getBean(DataCenterReconciliationController.class).reconcileDataCenter(event.t);
+                        dataCenterControllerFactory.createReconciliationController(event.t).reconcileDataCenter();
                     } catch (final Exception e) {
                         logger.warn("Failed to reconcile Data Center.", e);
                     }
@@ -67,16 +70,16 @@ public class OperatorService {
         statefulSetWatchService.getSubject()
             .subscribe(event -> {
                 logger.debug("Received StatefulSetWatchEvent {}.", event);
-                if (event instanceof WatchEvent.Added) {
-                    return;
-                }
-
-                // Trigger a dc reconciliation event if changes to the stateful set has finished.
-                if (event.t.getStatus().getReplicas().equals(event.t.getStatus().getReadyReplicas()) && event.t.getStatus().getCurrentReplicas().equals(event.t.getStatus().getReplicas())) {
-                    String datacenterName = event.t.getMetadata().getLabels().get(OperatorLabels.DATACENTER);
-                    if (datacenterName != null) {
-                        beanContext.getBean(DataCenterReconciliationController.class)
-                                .reconcileDataCenter(dataCenterWatchService.get(new Key<>(event.t.getMetadata())));
+                if (event instanceof WatchEvent.Modified) {
+                    // Trigger a dc reconciliation event if changes to the stateful set has finished.
+                    if (event.t.getStatus().getReplicas().equals(event.t.getStatus().getReadyReplicas()) && event.t.getStatus().getCurrentReplicas().equals(event.t.getStatus().getReplicas())) {
+                        String datacenterName = event.t.getMetadata().getLabels().get(OperatorLabels.DATACENTER);
+                        if (datacenterName != null) {
+                            DataCenter dataCenter = dataCenterWatchService.get(new Key<>(datacenterName, event.t.getMetadata().getNamespace()));
+                            if (dataCenter != null) {
+                                dataCenterControllerFactory.createReconciliationController(dataCenter).reconcileDataCenter();
+                            }
+                        }
                     }
                 }
             });
@@ -89,7 +92,7 @@ public class OperatorService {
                 if (!RECONCILE_OPERATION_MODES.contains(event.currentMode))
                     return;
                 try {
-                    beanContext.getBean(DataCenterReconciliationController.class).reconcileDataCenter(dataCenterWatchService.get(event.dataCenterKey));
+                    dataCenterControllerFactory.createReconciliationController(dataCenterWatchService.get(event.dataCenterKey)).reconcileDataCenter();
                 } catch (final Exception e) {
                     logger.warn("Failed to reconcile Data Center.", e);
                 }

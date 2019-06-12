@@ -10,6 +10,7 @@ import com.instaclustr.model.k8s.cassandra.Enterprise;
 import com.instaclustr.model.sidecar.NodeStatus;
 import com.squareup.okhttp.Call;
 import com.strapdata.strapkop.CassandraHealthCheckService;
+import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
@@ -46,20 +47,33 @@ import java.util.stream.StreamSupport;
 public class DataCenterReconciliationController {
     private static final Logger logger = LoggerFactory.getLogger(DataCenterReconciliationController.class);
     
-    @Inject private CoreV1Api coreApi;
-    @Inject private AppsV1beta2Api appsApi;
-    @Inject private CustomObjectsApi customObjectsApi;
-    @Inject private SidecarClientFactory sidecarClientFactory;
-    @Inject private K8sResourceUtils k8sResourceUtils;
-    @Inject private SecretIssuer secretIssuer;
-    @Named("namespace")
-    @Inject private String namespace;
+    private final CoreV1Api coreApi;
+    private final AppsV1beta2Api appsApi;
+    private final CustomObjectsApi customObjectsApi;
+    private final SidecarClientFactory sidecarClientFactory;
+    private final K8sResourceUtils k8sResourceUtils;
+    private final SecretIssuer secretIssuer;
+    private final OperatorConfig config;
+    private String namespace;
     
     private V1ObjectMeta dataCenterMetadata;
     private DataCenterSpec dataCenterSpec;
     private Map<String, String> dataCenterLabels;
     
-    private void initialize(final DataCenter dataCenter) {
+    public DataCenterReconciliationController(CoreV1Api coreApi, AppsV1beta2Api appsApi,
+                                              CustomObjectsApi customObjectsApi, SidecarClientFactory sidecarClientFactory,
+                                              K8sResourceUtils k8sResourceUtils, SecretIssuer secretIssuer, OperatorConfig config,
+                                              @Parameter("dataCenter") DataCenter dataCenter
+    ) {
+        this.coreApi = coreApi;
+        this.appsApi = appsApi;
+        this.customObjectsApi = customObjectsApi;
+        this.sidecarClientFactory = sidecarClientFactory;
+        this.k8sResourceUtils = k8sResourceUtils;
+        this.secretIssuer = secretIssuer;
+        this.config = config;
+        this.namespace = config.getNamespace();
+
         this.dataCenterMetadata = dataCenter.getMetadata();
         this.dataCenterSpec = dataCenter.getSpec();
     
@@ -73,9 +87,9 @@ public class DataCenterReconciliationController {
     
         this.dataCenterLabels = OperatorLabels.datacenter(dataCenter.getMetadata().getName());
     }
-
-    public void reconcileDataCenter(DataCenter dataCenter) throws Exception {
-        initialize(dataCenter);
+    
+    
+    public void reconcileDataCenter() throws Exception {
         logger.info("Reconciling DataCenter {}.", dataCenterMetadata.getName());
 
         // create the public service (what clients use to discover the data center)
