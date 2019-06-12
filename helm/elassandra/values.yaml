@@ -7,7 +7,7 @@ replicaCount: 1
 image:
   elassandraRepository: docker.repo.strapdata.com/elassandra-operator/elassandra
   sidecarRepository: docker.repo.strapdata.com/elassandra-operator/elassandra-sidecar
-  elassandraTag: 6.2.3.13
+  elassandraTag: latest
   sidecarTag: latest
 
 imagePullPolicy: IfNotPresent
