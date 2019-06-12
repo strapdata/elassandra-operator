@@ -9,18 +9,20 @@ import io.kubernetes.client.models.V1ConfigMap;
 import io.kubernetes.client.models.V1ConfigMapList;
 import io.kubernetes.client.models.V1ListMeta;
 import io.kubernetes.client.models.V1ObjectMeta;
+import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Infrastructure;
 
+import javax.inject.Named;
 import java.util.Collection;
 
-@Infrastructure
+@Context
 public class ConfigMapWatchService extends WatchService<V1ConfigMap, V1ConfigMapList> {
     private final CoreV1Api coreApi;
     private final String namespace;
 
     public ConfigMapWatchService(final ApiClient apiClient,
                                  final CoreV1Api coreApi,
-                                 final String namespace) {
+                                 @Named("namespace") final String namespace) {
         super(apiClient);
         this.coreApi = coreApi;
         this.namespace = namespace;

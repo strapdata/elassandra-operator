@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.Collection;
 import java.util.Iterator;
@@ -19,17 +20,13 @@ import java.util.Iterator;
 @Singleton
 public class K8sResourceUtils {
     private static final Logger logger = LoggerFactory.getLogger(K8sResourceUtils.class);
-
-    private final ApiClient apiClient;
-    private final CoreV1Api coreApi;
-    private final AppsV1beta2Api appsApi;
-
-    public K8sResourceUtils(final K8sModule k8sModule) {
-        this.apiClient = k8sModule.getApiClient();
-        this.coreApi = k8sModule.provideCoreV1Api();
-        this.appsApi = k8sModule.provideAppsV1beta2Api();
-    }
-
+    
+    @Inject
+    private CoreV1Api coreApi;
+    
+    @Inject
+    private AppsV1beta2Api appsApi;
+    
     @FunctionalInterface
     public interface ApiCallable {
         void call() throws ApiException;

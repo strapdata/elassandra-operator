@@ -2,6 +2,7 @@ package com.strapdata.strapkop.preflight;
 
 import com.strapdata.strapkop.k8s.K8sModule;
 import com.strapdata.strapkop.ssl.AuthorityManager;
+import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.discovery.event.ServiceStartedEvent;
 import io.micronaut.runtime.event.annotation.EventListener;
 import io.micronaut.scheduling.annotation.Async;
@@ -20,12 +21,18 @@ public class PreflightService {
     static final Logger logger = LoggerFactory.getLogger(PreflightService.class);
 
     @Inject
+    ApplicationEventPublisher eventPublisher;
+    
+    @Inject
     K8sModule k8sModule;
 
     @Inject
     AuthorityManager authorityManager;
 
     public PreflightService() {
+    }
+    
+    public static class PreflightCompletedEvent {
     }
     
     @EventListener
@@ -44,6 +51,8 @@ public class PreflightService {
         } catch (Exception e) {
             logger.error("Unexpected error:", e);
         }
+    
+        eventPublisher.publishEvent(new PreflightCompletedEvent());
     }
-
+    
 }

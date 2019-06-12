@@ -10,6 +10,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.instaclustr.model.Key;
 import com.squareup.okhttp.Call;
+import com.strapdata.strapkop.preflight.PreflightService;
 import io.kubernetes.client.ApiClient;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.ApiResponse;
@@ -17,6 +18,8 @@ import io.kubernetes.client.models.V1ListMeta;
 import io.kubernetes.client.models.V1ObjectMeta;
 import io.kubernetes.client.models.V1Status;
 import io.kubernetes.client.util.Watch;
+import io.micronaut.runtime.event.annotation.EventListener;
+import io.micronaut.scheduling.annotation.Async;
 import io.reactivex.subjects.BehaviorSubject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,14 +48,14 @@ public abstract class WatchService<ResourceT, ResourceListT> extends AbstractExe
     private final BehaviorSubject<WatchEvent<ResourceT>> behaviorSubject = BehaviorSubject.create();
     private final Map<Key<ResourceT>, ResourceT> cache = new HashMap<>();
     private final CountDownLatch latch = new CountDownLatch(1);
-
+    
     private enum ResponseType {
         ADDED,
         MODIFIED,
         DELETED,
         ERROR
     }
-
+    
     public WatchService(final ApiClient apiClient) {
         this.apiClient = apiClient;
         this.gson = apiClient.getJSON().getGson();
@@ -62,7 +65,7 @@ public abstract class WatchService<ResourceT, ResourceListT> extends AbstractExe
     public BehaviorSubject<WatchEvent<ResourceT>> getSubject() {
         return this.behaviorSubject;
     }
-
+    
     @Override
     protected String serviceName() {
         return WatchService.class.getSimpleName() + " (" + resourceType.getRawType().getSimpleName() + ")";
@@ -75,7 +78,7 @@ public abstract class WatchService<ResourceT, ResourceListT> extends AbstractExe
             watchResourceList(listResourceVersion);
         }
     }
-
+    
     private void watchResourceList(final String listResourceVersion) throws ApiException, IOException {
         logger.debug("Watching resource list.");
 

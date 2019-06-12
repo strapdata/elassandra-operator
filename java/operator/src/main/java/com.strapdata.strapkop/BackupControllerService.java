@@ -20,6 +20,7 @@ import com.strapdata.strapkop.watch.WatchEvent;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CustomObjectsApi;
 import io.kubernetes.client.models.V1Pod;
+import io.micronaut.context.annotation.Context;
 import io.reactivex.Single;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +34,7 @@ import java.util.stream.Collectors;
 /**
  * Listen for Backup events from the BackupWatchService and call sidecar to execute backup.
  */
+@Context
 public class BackupControllerService {
     private static final Logger logger = LoggerFactory.getLogger(BackupControllerService.class);
     private static final Key<Backup> POISON = new Key<Backup>(null, null);
@@ -50,6 +52,7 @@ public class BackupControllerService {
                                    final K8sResourceUtils k8sResourceUtils,
                                    final BackupWatchService backupWatchService,
                                    final SidecarClientFactory sidecarClientFactory) {
+        logger.info("initializing backup service");
 
         this.k8sResourceUtils = k8sResourceUtils;
         this.customObjectsApi = k8sModule.provideCustomObjectsApi();

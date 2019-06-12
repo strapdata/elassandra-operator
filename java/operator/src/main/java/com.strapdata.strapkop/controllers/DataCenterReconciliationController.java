@@ -20,12 +20,16 @@ import io.kubernetes.client.apis.AppsV1beta2Api;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.apis.CustomObjectsApi;
 import io.kubernetes.client.models.*;
+import io.micronaut.context.annotation.Parameter;
+import io.micronaut.context.annotation.Prototype;
 import io.reactivex.Single;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
+import javax.inject.Inject;
+import javax.inject.Named;
 import javax.swing.text.html.Option;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -38,46 +42,27 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 
+@Prototype
 public class DataCenterReconciliationController {
     private static final Logger logger = LoggerFactory.getLogger(DataCenterReconciliationController.class);
     
-    private final CoreV1Api coreApi;
-    private final AppsV1beta2Api appsApi;
-    private final CustomObjectsApi customObjectsApi;
-    private final SidecarClientFactory sidecarClientFactory;
-
-    private final K8sResourceUtils k8sResourceUtils;
-
-    private final V1ObjectMeta dataCenterMetadata;
-    private final DataCenterSpec dataCenterSpec;
-
-    private final Map<String, String> dataCenterLabels;
-
-    private final SecretIssuer secretIssuer;
+    @Inject private CoreV1Api coreApi;
+    @Inject private AppsV1beta2Api appsApi;
+    @Inject private CustomObjectsApi customObjectsApi;
+    @Inject private SidecarClientFactory sidecarClientFactory;
+    @Inject private K8sResourceUtils k8sResourceUtils;
+    @Inject private SecretIssuer secretIssuer;
+    @Named("namespace")
+    @Inject private String namespace;
     
-    private final String namespace;
-
-    private final CassandraHealthCheckService cassandraHealthCheckService;
-
-    public DataCenterReconciliationController(final CassandraHealthCheckService cassandraHealthCheckService,
-                                              final CoreV1Api coreApi,
-                                              final AppsV1beta2Api appsApi,
-                                              final CustomObjectsApi customObjectsApi,
-                                              final SidecarClientFactory sidecarClientFactory,
-                                              final K8sResourceUtils k8sResourceUtils,
-                                              final SecretIssuer secretIssuer,
-                                              final DataCenter dataCenter,
-                                              final String namespace) {
-        this.cassandraHealthCheckService = cassandraHealthCheckService;
-        this.coreApi = coreApi;
-        this.appsApi = appsApi;
-        this.customObjectsApi = customObjectsApi;
-        this.sidecarClientFactory = sidecarClientFactory;
-        this.k8sResourceUtils = k8sResourceUtils;
-
+    private V1ObjectMeta dataCenterMetadata;
+    private DataCenterSpec dataCenterSpec;
+    private Map<String, String> dataCenterLabels;
+    
+    private void initialize(final DataCenter dataCenter) {
         this.dataCenterMetadata = dataCenter.getMetadata();
         this.dataCenterSpec = dataCenter.getSpec();
-        
+    
         // normalize Enterprise object
         if (this.dataCenterSpec.getEnterprise() == null) {
             this.dataCenterSpec.setEnterprise(new Enterprise());
@@ -85,14 +70,13 @@ public class DataCenterReconciliationController {
         else if (!this.dataCenterSpec.getEnterprise().getEnabled()) {
             this.dataCenterSpec.setEnterprise(new Enterprise());
         }
-        
+    
         this.dataCenterLabels = OperatorLabels.datacenter(dataCenter.getMetadata().getName());
-        this.secretIssuer = secretIssuer;
-        this.namespace = namespace;
     }
 
-    public void reconcileDataCenter() throws Exception {
-        logger.info("Reconciling DataCenter.");
+    public void reconcileDataCenter(DataCenter dataCenter) throws Exception {
+        initialize(dataCenter);
+        logger.info("Reconciling DataCenter {}.", dataCenterMetadata.getName());
 
         // create the public service (what clients use to discover the data center)
         createOrReplaceNodesService();
@@ -176,7 +160,7 @@ public class DataCenterReconciliationController {
                         ))))
                 .readinessProbe(new V1Probe()
                         .exec(new V1ExecAction()
-                                .addCommandItem("/usr/bin/tcp-readiness-probe")
+                                .addCommandItem("/ready-probe.sh")
                                 .addCommandItem(dataCenterSpec.getElasticsearchEnabled() ? "9200" : "9042")
                         )
                         .initialDelaySeconds(15)
@@ -237,6 +221,7 @@ public class DataCenterReconciliationController {
         final V1PodSpec podSpec = new V1PodSpec()
                 .securityContext(new V1PodSecurityContext().fsGroup(999L))
                 .addInitContainersItem(fileLimitInit())
+                .addInitContainersItem(vmMaxMapCountInit())
                 .addContainersItem(cassandraContainer)
                 .addContainersItem(sidecarContainer)
                 .addVolumesItem(new V1Volume()
@@ -395,13 +380,21 @@ public class DataCenterReconciliationController {
     private V1Container fileLimitInit() {
         return new V1Container()
                 .securityContext(new V1SecurityContext().privileged(dataCenterSpec.getPrivilegedSupported()))
-                .name("sidecar-file-limits")
-                .image(dataCenterSpec.getSidecarImage())
-                .imagePullPolicy(dataCenterSpec.getImagePullPolicy())
-                .command(ImmutableList.of("bash", "-c", "sysctl -w vm.max_map_count=1048575 ; limit -l unlimited ; true"));
+                .name("increase-ulimit")
+                .image("busybox")
+                .imagePullPolicy("IfNotPresent")
+                .command(ImmutableList.of("sh", "-c", "ulimit -l unlimited"));
     }
-
-
+    
+    private V1Container vmMaxMapCountInit() {
+        return new V1Container()
+                .securityContext(new V1SecurityContext().privileged(dataCenterSpec.getPrivilegedSupported()))
+                .name("increase-vm-max-map-count")
+                .image("busybox")
+                .imagePullPolicy("IfNotPresent")
+                .command(ImmutableList.of("sysctl", "-w", "vm.max_map_count=1048575"));
+    }
+    
     private static void configMapVolumeAddFile(final V1ConfigMap configMap, final V1ConfigMapVolumeSource volumeSource, final String path, final String content) {
         final String encodedKey = path.replaceAll("\\W", "_");
 
@@ -437,7 +430,7 @@ public class DataCenterReconciliationController {
             
             // messy -- constructs via org.apache.cassandra.config.ParameterizedClass.ParameterizedClass(java.util.Map<java.lang.String,?>)
             config.put("seed_provider", ImmutableList.of(ImmutableMap.of(
-                    "class_name", "com.com.cassandra.k8s.SeedProvider",
+                    "class_name", "com.strapdata.cassandra.k8s.SeedProvider",
                     "parameters", ImmutableList.of(ImmutableMap.of("service", seedNodesService.getMetadata().getName()))
             )));
             

@@ -9,18 +9,20 @@ import io.kubernetes.client.models.V1ListMeta;
 import io.kubernetes.client.models.V1ObjectMeta;
 import io.kubernetes.client.models.V1beta2StatefulSet;
 import io.kubernetes.client.models.V1beta2StatefulSetList;
+import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Infrastructure;
 
+import javax.inject.Named;
 import java.util.Collection;
 
-@Infrastructure
+@Context
 public class StatefulSetWatchService extends WatchService<V1beta2StatefulSet, V1beta2StatefulSetList> {
     private final AppsV1beta2Api appsApi;
     private final String namespace;
 
     public StatefulSetWatchService(final ApiClient apiClient,
                                    final AppsV1beta2Api appsApi,
-                                   final String namespace) {
+                                   @Named("namespace") final String namespace) {
         super(apiClient);
         this.appsApi = appsApi;
         this.namespace = namespace;

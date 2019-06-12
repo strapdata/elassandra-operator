@@ -8,18 +8,20 @@ import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CustomObjectsApi;
 import io.kubernetes.client.models.V1ListMeta;
 import io.kubernetes.client.models.V1ObjectMeta;
+import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Infrastructure;
 
+import javax.inject.Named;
 import java.util.Collection;
 
-@Infrastructure
+@Context
 public class BackupWatchService extends WatchService<Backup, BackupList> {
     private final CustomObjectsApi customObjectsApi;
     private final String namespace;
 
     public BackupWatchService(final ApiClient apiClient,
                               final CustomObjectsApi customObjectsApi,
-                              final String namespace) {
+                              @Named("namespace") final String namespace) {
         super(apiClient);
         this.customObjectsApi = customObjectsApi;
         this.namespace = namespace;

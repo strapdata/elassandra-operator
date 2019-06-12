@@ -9,6 +9,7 @@ import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import io.kubernetes.client.models.V1Pod;
+import io.micronaut.context.annotation.Context;
 import io.reactivex.Single;
 import io.reactivex.subjects.BehaviorSubject;
 import io.reactivex.subjects.Subject;
@@ -28,7 +29,7 @@ import java.util.stream.StreamSupport;
 /**
  * Pool nodes status every minutes
  */
-@Singleton
+@Context
 public class CassandraHealthCheckService extends AbstractScheduledService {
     private static final Logger logger = LoggerFactory.getLogger(CassandraHealthCheckService.class);
 
@@ -41,6 +42,7 @@ public class CassandraHealthCheckService extends AbstractScheduledService {
     @Inject
     public CassandraHealthCheckService(final K8sResourceUtils k8sResourceUtils,
                                        final SidecarClientFactory sidecarClientFactory) {
+        logger.debug("Initializing CassandraHealthCheckService");
         this.k8sResourceUtils = k8sResourceUtils;
         this.sidecarClientFactory = sidecarClientFactory;
     }

@@ -1,5 +1,5 @@
 micronaut:
     application:
-        name: sidecar
+        name: operator
 jackson:
     module-scan: false
