@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import java.net.MalformedURLException;
+import java.net.UnknownHostException;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.stream.Collectors;
@@ -99,7 +100,7 @@ public class BackupControllerService {
            backupArguments.backupId = pod.getSpec().getHostname();
            backupArguments.speed = CommonBackupArguments.Speed.LUDICROUS;
            return sidecarClientFactory.clientForPod(pod).backup(backupArguments);
-        } catch (MalformedURLException e) {
+        } catch (MalformedURLException | UnknownHostException e) {
            return Single.error(e);
         }
     }
