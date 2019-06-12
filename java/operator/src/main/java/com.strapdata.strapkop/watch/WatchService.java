@@ -10,7 +10,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.instaclustr.model.Key;
 import com.squareup.okhttp.Call;
-import com.strapdata.strapkop.preflight.PreflightService;
+import com.strapdata.strapkop.OperatorConfig;
 import io.kubernetes.client.ApiClient;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.ApiResponse;
@@ -18,8 +18,6 @@ import io.kubernetes.client.models.V1ListMeta;
 import io.kubernetes.client.models.V1ObjectMeta;
 import io.kubernetes.client.models.V1Status;
 import io.kubernetes.client.util.Watch;
-import io.micronaut.runtime.event.annotation.EventListener;
-import io.micronaut.scheduling.annotation.Async;
 import io.reactivex.subjects.BehaviorSubject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,8 +38,10 @@ public abstract class WatchService<ResourceT, ResourceListT> extends AbstractExe
 
     private final TypeToken<ResourceT> resourceType = new TypeToken<ResourceT>(getClass()) {};
     private final TypeToken<ResourceListT> resourceListType = new TypeToken<ResourceListT>(getClass()) {};
-
+    
     private final ApiClient apiClient;
+    protected final OperatorConfig config;
+
     private final Gson gson;
     private Call currentCall;
 
@@ -56,8 +56,9 @@ public abstract class WatchService<ResourceT, ResourceListT> extends AbstractExe
         ERROR
     }
     
-    public WatchService(final ApiClient apiClient) {
+    public WatchService(final ApiClient apiClient, final OperatorConfig config) {
         this.apiClient = apiClient;
+        this.config = config;
         this.gson = apiClient.getJSON().getGson();
         apiClient.getHttpClient().setReadTimeout(1, TimeUnit.MINUTES);
     }

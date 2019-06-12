@@ -3,21 +3,16 @@ package com.strapdata.strapkop.watch;
 import com.instaclustr.model.k8s.cassandra.DataCenter;
 import com.instaclustr.model.k8s.cassandra.DataCenterList;
 import com.squareup.okhttp.Call;
-import com.strapdata.strapkop.preflight.PreflightService;
+import com.strapdata.strapkop.OperatorConfig;
 import io.kubernetes.client.ApiClient;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CustomObjectsApi;
 import io.kubernetes.client.models.V1ListMeta;
 import io.kubernetes.client.models.V1ObjectMeta;
 import io.micronaut.context.annotation.Context;
-import io.micronaut.context.annotation.Infrastructure;
-import io.micronaut.runtime.event.annotation.EventListener;
-import io.micronaut.scheduling.annotation.Async;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.PostConstruct;
-import javax.inject.Named;
 import java.util.Collection;
 
 // NOTE: Using @Infrastructure was causing a lot of issues with beans instantiated twice...
@@ -26,20 +21,16 @@ public class DataCenterWatchService extends WatchService<DataCenter, DataCenterL
 
     private final Logger logger = LoggerFactory.getLogger(DataCenterWatchService.class);
     
-    private final CustomObjectsApi customObjectsApi;
-    private final String namespace;
-
-    public DataCenterWatchService(final ApiClient apiClient,
-                                  final CustomObjectsApi customObjectsApi,
-                                  @Named("namespace") final String namespace) {
-        super(apiClient);
+    private CustomObjectsApi customObjectsApi;
+    
+    public DataCenterWatchService(final ApiClient apiClient, final OperatorConfig config, final CustomObjectsApi customObjectsApi) {
+        super(apiClient, config);
         this.customObjectsApi = customObjectsApi;
-        this.namespace = namespace;
     }
-
+    
     @Override
     protected Call listResources(final String continueToken, final String resourceVersion, final boolean watch) throws ApiException {
-        return customObjectsApi.listNamespacedCustomObjectCall("stable.strapdata.com", "v1", namespace, "elassandra-datacenters", null, null, resourceVersion, watch, null, null);
+        return customObjectsApi.listNamespacedCustomObjectCall("stable.strapdata.com", "v1", config.getNamespace(), "elassandra-datacenters", null, null, resourceVersion, watch, null, null);
     }
 
     @Override

@@ -3,3 +3,6 @@ micronaut:
         name: operator
 jackson:
     module-scan: false
+
+operator:
+    namespace: default

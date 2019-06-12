@@ -1,19 +1,17 @@
 package com.strapdata.strapkop;
 
-import io.micronaut.context.annotation.Bean;
-import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.ConfigurationProperties;
+import lombok.Getter;
 
-import javax.inject.Named;
-import javax.inject.Singleton;
+import javax.validation.constraints.NotBlank;
 
-@Factory
+/**
+ * This class holds a type-safe representation of the configuration gathered from props file (application.yaml)
+ */
+@ConfigurationProperties("operator")
+@Getter
 public class OperatorConfig {
     
-    //TODO: operator should take a namespace to watch as parameter
-    @Bean
-    @Singleton
-    @Named("namespace")
-    public String provideNamespace() {
-        return "default";
-    }
+    @NotBlank
+    String namespace;
 }
