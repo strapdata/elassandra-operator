@@ -1,4 +1,4 @@
-package com.instaclustr.cassandra.k8s;
+package com.strapdata.cassandra.k8s;
 
 import com.google.common.collect.ImmutableList;
 import org.slf4j.Logger;

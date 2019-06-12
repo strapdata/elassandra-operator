@@ -1,4 +1,4 @@
-package com.instaclustr.cassandra.k8s;
+package com.strapdata.cassandra.k8s;
 
 
 import java.io.IOException;

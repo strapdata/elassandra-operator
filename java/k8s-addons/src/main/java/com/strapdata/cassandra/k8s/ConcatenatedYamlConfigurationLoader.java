@@ -1,11 +1,9 @@
-package com.instaclustr.cassandra.k8s;
+package com.strapdata.cassandra.k8s;
 
 import com.google.common.base.Splitter;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 
-import com.google.common.io.CharSource;
-import com.google.common.io.CharStreams;
 import org.apache.cassandra.config.Config;
 import org.apache.cassandra.config.ConfigurationLoader;
 import org.apache.cassandra.exceptions.ConfigurationException;
