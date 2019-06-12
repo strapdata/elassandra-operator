@@ -6,12 +6,13 @@ import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.instaclustr.model.k8s.cassandra.DataCenter;
 import com.instaclustr.model.Key;
 import io.kubernetes.client.ApiException;
+import io.micronaut.context.annotation.Prototype;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 
-
+@Prototype
 public class DataCenterDeletionController {
     private static final Logger logger = LoggerFactory.getLogger(DataCenterDeletionController.class);
     
