@@ -11,10 +11,12 @@ import io.kubernetes.client.models.V1ObjectMeta;
 import io.kubernetes.client.models.V1beta2StatefulSet;
 import io.kubernetes.client.models.V1beta2StatefulSetList;
 import io.micronaut.context.annotation.Context;
+import io.micronaut.context.annotation.Infrastructure;
 
 import java.util.Collection;
 
 @Context
+@Infrastructure
 public class StatefulSetWatchService extends WatchService<V1beta2StatefulSet, V1beta2StatefulSetList> {
 
     private final AppsV1beta2Api appsApi;

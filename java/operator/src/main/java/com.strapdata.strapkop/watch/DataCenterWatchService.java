@@ -10,13 +10,14 @@ import io.kubernetes.client.apis.CustomObjectsApi;
 import io.kubernetes.client.models.V1ListMeta;
 import io.kubernetes.client.models.V1ObjectMeta;
 import io.micronaut.context.annotation.Context;
+import io.micronaut.context.annotation.Infrastructure;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
 
-// NOTE: Using @Infrastructure was causing a lot of issues with beans instantiated twice...
 @Context
+@Infrastructure
 public class DataCenterWatchService extends WatchService<DataCenter, DataCenterList> {
 
     private final Logger logger = LoggerFactory.getLogger(DataCenterWatchService.class);

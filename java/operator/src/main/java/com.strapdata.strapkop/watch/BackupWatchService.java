@@ -10,10 +10,12 @@ import io.kubernetes.client.apis.CustomObjectsApi;
 import io.kubernetes.client.models.V1ListMeta;
 import io.kubernetes.client.models.V1ObjectMeta;
 import io.micronaut.context.annotation.Context;
+import io.micronaut.context.annotation.Infrastructure;
 
 import java.util.Collection;
 
 @Context
+@Infrastructure
 public class BackupWatchService extends WatchService<Backup, BackupList> {
     
     private final CustomObjectsApi customObjectsApi;
