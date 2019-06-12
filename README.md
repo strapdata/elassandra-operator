@@ -18,7 +18,7 @@ Build the docker images :
 
 Publish the docker images :
 ```bash
-./gradlew dockerPush -PregistryUsername=barth -PregistryPassword=viande1994 -PregistryEmail=barth@strapdata.com
+./gradlew dockerPush -PregistryUsername=user -PregistryPassword=password -PregistryEmail=user@example.com
 ```
 
 Build parameters are located in `gradle.properties`.
@@ -45,4 +45,15 @@ This scripts are parameterized (see `./test/gradle.properties`) :
 To cleanup all resources created in the k8s cluster :
 ```bash
 ./gradlew :test:cleanup
+```
+
+This command are executed from gradle for convenience and self-documentation.
+But test scripts can also be executed from the bash directly, which provides more possibilities.
+
+
+## Debugging
+
+The operator image can be build we debug enabled :
+```bash
+./gradlew dockerBuild -PoperatorEnabledDebug=true -PoperatorDebugSuspend=true
 ```
