@@ -10,7 +10,7 @@ import com.bmuschko.gradle.docker.tasks.image.*
 
 task copyJar(type: Copy) {
   dependsOn   ':java:k8s-addons:jar'
-  from        "../java/k8s-addons/build/libs/k8s-addons.jar"
+  from        "../java/k8s-addons/build/libs/k8s-addons-${project.version}.jar"
   into        'build'
 }
 
@@ -26,7 +26,7 @@ task dockerBuildImage(type: DockerBuildImage) {
 
   buildArgs = [
           'base_image': elassandraParentImage + ":" + elassandraVersion,
-          'cassandra_k8s_addons_jar': './build/k8s-addons.jar'
+          'cassandra_k8s_addons_jar': "./build/k8s-addons-${project.version}.jar"
   ]
 }
 
