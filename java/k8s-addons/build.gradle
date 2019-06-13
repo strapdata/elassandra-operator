@@ -2,6 +2,6 @@ plugins {
 }
 
 dependencies {
-    compile group: 'com.strapdata.elasticsearch', name:'elasticsearch', version: '6.2.3'
+    compile group: 'com.strapdata.elasticsearch', name:'elasticsearch', version: elassandraVersion
     compile group: 'com.strapdata.cassandra', name:'cassandra-all', version: '3.11.4.2'
 }
