@@ -3,17 +3,14 @@ task cleanUp(type: Exec) {
 }
 
 task testScale(type: Exec) {
-  dependsOn ':dockerBuild'
   commandLine "./test-scale", project.scaleDc, project.scaleFrom, project.scaleTo
 }
 
 task testBasic(type: Exec) {
-  dependsOn ':dockerBuild'
   commandLine "./test-basic", project.basicDc, project.basicReplicas
 }
 
 task testBackup(type: Exec) {
-  dependsOn ':dockerBuild'
   commandLine "./test-backup", project.backupDc, project.backupReplicas
 }
 
@@ -24,7 +21,6 @@ task test {
 }
 
 task basicSetup(type: Exec) {
-  dependsOn ':dockerBuild'
   commandLine "./basic-setup", project.basicSetupDc, project.basicSetupReplicas
 }
 
