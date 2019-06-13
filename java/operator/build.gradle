@@ -35,9 +35,9 @@ jib {
     container {
         jvmFlags = ['-Xmx1024m',
                     '-XX:+UnlockExperimentalVMOptions', '-XX:+UseCGroupMemoryLimitForHeap', '-XX:MaxRAMFraction=2',
-                    '-XX:+ExitOnOutOfMemoryError',
-                    operatorEnableDebug.toBoolean() ? ('-agentlib:jdwp=transport=dt_socket,server=y,suspend='+(project.operatorDebugSuspend.toBoolean() ? "y" : "n")+',address=' + project.operatorDebugPort) : ""
-        ]
+                    '-XX:+ExitOnOutOfMemoryError'
+        ] + (operatorEnableDebug.toBoolean() ? ('-agentlib:jdwp=transport=dt_socket,server=y,suspend='+(project.operatorDebugSuspend.toBoolean() ? "y" : "n")+',address=' + project.operatorDebugPort) : [])
+
         mainClass = mainClassName
         ports = ['8080']
         labels = [ description:'Strapkop Elassandra operator for K8S']
