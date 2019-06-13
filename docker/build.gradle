@@ -14,7 +14,7 @@ task copyJar(type: Copy) {
   into        'build'
 }
 
-def elassandraImageName = dockerImagePrefix + "/elassandra"
+def elassandraImageName = dockerImagePrefix + "/elassandra" + dockerImageSuffix
 
 // Use task types
 task dockerBuildImage(type: DockerBuildImage) {

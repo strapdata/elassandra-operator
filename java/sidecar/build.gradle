@@ -22,7 +22,7 @@ jib {
         image = 'openjdk:alpine'
     }
     to {
-        image = image = dockerImagePrefix + "/" + project.dockerImageSuffix
+        image = image = dockerImagePrefix + "/elassandra-sidecar" + dockerImageSuffix
         tags = [ version, project.gitCommitHash, 'latest']
 
         // osxkeychain does not work on linux and CI environments

@@ -28,4 +28,7 @@ task basicSetup(type: Exec) {
   commandLine "./basic-setup", project.basicSetupDc, project.basicSetupReplicas
 }
 
+tasks.withType(Exec) {
+  environment "SUFFIX", dockerImageSuffix
+}
 
