@@ -3,15 +3,13 @@ package com.strapdata.strapkop.controllers;
 import com.google.gson.JsonSyntaxException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
-import com.instaclustr.model.k8s.cassandra.DataCenter;
-import com.instaclustr.model.Key;
+import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.model.Key;
 import io.kubernetes.client.ApiException;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.inject.Inject;
 
 @Prototype
 public class DataCenterDeletionController {

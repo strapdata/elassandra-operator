@@ -1,11 +1,10 @@
 package com.strapdata.strapkop;
 
 import com.google.common.collect.Sets;
-import com.instaclustr.model.Key;
-import com.instaclustr.model.k8s.cassandra.DataCenter;
-import com.instaclustr.model.sidecar.NodeStatus;
+import com.strapdata.model.Key;
+import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.model.sidecar.NodeStatus;
 import com.strapdata.strapkop.controllers.DataCenterControllerFactory;
-import com.strapdata.strapkop.controllers.DataCenterDeletionController;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.watch.DataCenterWatchService;
 import com.strapdata.strapkop.watch.StatefulSetWatchService;

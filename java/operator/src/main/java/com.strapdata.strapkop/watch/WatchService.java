@@ -8,7 +8,7 @@ import com.google.common.reflect.TypeToken;
 import com.google.common.util.concurrent.AbstractExecutionThreadService;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
-import com.instaclustr.model.Key;
+import com.strapdata.model.Key;
 import com.squareup.okhttp.Call;
 import com.strapdata.strapkop.OperatorConfig;
 import io.kubernetes.client.ApiClient;

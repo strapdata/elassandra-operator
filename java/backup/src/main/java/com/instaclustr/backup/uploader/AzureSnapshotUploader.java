@@ -1,6 +1,6 @@
 package com.instaclustr.backup.uploader;
 
-import com.instaclustr.model.backup.BackupArguments;
+import com.strapdata.model.backup.BackupArguments;
 import com.instaclustr.backup.common.AzureRemoteObjectReference;
 import com.instaclustr.backup.common.RemoteObjectReference;
 import com.microsoft.azure.storage.StorageException;

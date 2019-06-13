@@ -2,15 +2,15 @@ package com.strapdata.strapkop;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.Streams;
-import com.instaclustr.model.Key;
-import com.instaclustr.model.backup.BackupArguments;
-import com.instaclustr.model.backup.CommonBackupArguments;
-import com.instaclustr.model.backup.RestoreArguments;
-import com.instaclustr.model.backup.StorageProvider;
-import com.instaclustr.model.k8s.backup.Backup;
-import com.instaclustr.model.k8s.backup.BackupSpec;
-import com.instaclustr.model.k8s.backup.BackupStatus;
-import com.instaclustr.model.sidecar.BackupResponse;
+import com.strapdata.model.Key;
+import com.strapdata.model.backup.BackupArguments;
+import com.strapdata.model.backup.CommonBackupArguments;
+import com.strapdata.model.backup.RestoreArguments;
+import com.strapdata.model.backup.StorageProvider;
+import com.strapdata.model.k8s.backup.Backup;
+import com.strapdata.model.k8s.backup.BackupSpec;
+import com.strapdata.model.k8s.backup.BackupStatus;
+import com.strapdata.model.sidecar.BackupResponse;
 import com.strapdata.strapkop.k8s.K8sModule;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
@@ -67,7 +67,7 @@ public class BackupControllerService {
                 try {
                     logger.debug("Reconciling Backup.");
                     createOrReplaceBackup(event.t).map(success -> {
-                        event.t.setStatus(new BackupStatus().withProgress(success ? "PROCESSED" : "FAILED" ));
+                        event.t.setStatus(new BackupStatus().setProgress(success ? "PROCESSED" : "FAILED" ));
                         logger.info("Backcup name={} namespace={} success={}",
                             event.t.getMetadata().getName(), event.t.getMetadata().getNamespace(), success);
 

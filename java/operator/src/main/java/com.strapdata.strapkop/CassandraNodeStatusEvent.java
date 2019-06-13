@@ -1,8 +1,8 @@
 package com.strapdata.strapkop;
 
-import com.instaclustr.model.Key;
-import com.instaclustr.model.k8s.cassandra.DataCenter;
-import com.instaclustr.model.sidecar.NodeStatus;
+import com.strapdata.model.Key;
+import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.model.sidecar.NodeStatus;
 import io.kubernetes.client.models.V1Pod;
 
 @SuppressWarnings("WeakerAccess")

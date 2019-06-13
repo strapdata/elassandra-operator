@@ -1,6 +1,6 @@
 package com.strapdata.strapkop.sidecar.controllers;
 
-import com.instaclustr.model.sidecar.NodeStatus;
+import com.strapdata.model.sidecar.NodeStatus;
 import com.strapdata.strapkop.sidecar.cassandra.CassandraModule;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;

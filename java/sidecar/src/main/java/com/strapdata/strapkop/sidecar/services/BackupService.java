@@ -1,7 +1,7 @@
 package com.strapdata.strapkop.sidecar.services;
 
 import com.google.common.util.concurrent.AbstractIdleService;
-import com.instaclustr.model.backup.BackupArguments;
+import com.strapdata.model.backup.BackupArguments;
 import com.instaclustr.backup.task.BackupTask;
 import com.instaclustr.backup.util.GlobalLock;
 import com.microsoft.azure.storage.StorageException;

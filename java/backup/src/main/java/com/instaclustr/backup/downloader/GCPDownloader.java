@@ -5,7 +5,7 @@ import com.google.cloud.ReadChannel;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.Storage;
-import com.instaclustr.model.backup.RestoreArguments;
+import com.strapdata.model.backup.RestoreArguments;
 import com.instaclustr.backup.common.GCPRemoteObjectReference;
 import com.instaclustr.backup.common.RemoteObjectReference;
 import org.slf4j.Logger;

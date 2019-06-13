@@ -10,7 +10,7 @@ import com.amazonaws.services.s3.transfer.TransferManager;
 import com.amazonaws.services.s3.transfer.Upload;
 import com.google.common.base.Optional;
 import com.instaclustr.backup.common.RemoteObjectReference;
-import com.instaclustr.model.backup.BackupArguments;
+import com.strapdata.model.backup.BackupArguments;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

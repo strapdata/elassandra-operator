@@ -4,7 +4,7 @@ import com.google.cloud.WriteChannel;
 import com.google.cloud.storage.*;
 import com.google.common.io.ByteStreams;
 import com.google.inject.Inject;
-import com.instaclustr.model.backup.BackupArguments;
+import com.strapdata.model.backup.BackupArguments;
 import com.instaclustr.backup.common.GCPRemoteObjectReference;
 import com.instaclustr.backup.common.RemoteObjectReference;
 import org.slf4j.Logger;

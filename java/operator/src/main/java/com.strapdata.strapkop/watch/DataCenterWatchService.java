@@ -1,7 +1,7 @@
 package com.strapdata.strapkop.watch;
 
-import com.instaclustr.model.k8s.cassandra.DataCenter;
-import com.instaclustr.model.k8s.cassandra.DataCenterList;
+import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.model.k8s.cassandra.DataCenterList;
 import com.squareup.okhttp.Call;
 import com.strapdata.strapkop.OperatorConfig;
 import io.kubernetes.client.ApiClient;

@@ -2,9 +2,9 @@ package com.strapdata.strapkop;
 
 import com.google.common.net.InetAddresses;
 import com.google.common.util.concurrent.AbstractScheduledService;
-import com.instaclustr.model.Key;
-import com.instaclustr.model.k8s.cassandra.DataCenter;
-import com.instaclustr.model.sidecar.NodeStatus;
+import com.strapdata.model.Key;
+import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.model.sidecar.NodeStatus;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
@@ -17,7 +17,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
-import javax.inject.Singleton;
 import java.net.InetAddress;
 import java.util.HashMap;
 import java.util.Map;

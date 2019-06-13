@@ -10,7 +10,7 @@ import com.instaclustr.backup.util.Directories;
 import com.instaclustr.backup.util.FileUtils;
 import com.instaclustr.backup.util.GlobalLock;
 import com.microsoft.azure.storage.StorageException;
-import com.instaclustr.model.backup.RestoreArguments;
+import com.strapdata.model.backup.RestoreArguments;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

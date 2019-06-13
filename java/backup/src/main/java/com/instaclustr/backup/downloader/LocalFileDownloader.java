@@ -2,7 +2,7 @@ package com.instaclustr.backup.downloader;
 
 import com.instaclustr.backup.common.LocalFileObjectReference;
 import com.instaclustr.backup.common.RemoteObjectReference;
-import com.instaclustr.model.backup.RestoreArguments;
+import com.strapdata.model.backup.RestoreArguments;
 
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;

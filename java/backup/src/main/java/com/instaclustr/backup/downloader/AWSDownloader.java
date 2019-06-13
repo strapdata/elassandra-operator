@@ -8,7 +8,7 @@ import com.amazonaws.services.s3.model.ObjectListing;
 import com.amazonaws.services.s3.transfer.PersistableTransfer;
 import com.amazonaws.services.s3.transfer.TransferManager;
 import com.amazonaws.services.s3.transfer.internal.S3ProgressListener;
-import com.instaclustr.model.backup.RestoreArguments;
+import com.strapdata.model.backup.RestoreArguments;
 import com.instaclustr.backup.common.RemoteObjectReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

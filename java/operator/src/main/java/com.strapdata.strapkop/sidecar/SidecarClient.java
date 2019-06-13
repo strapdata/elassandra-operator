@@ -1,8 +1,8 @@
 package com.strapdata.strapkop.sidecar;
 
-import com.instaclustr.model.backup.BackupArguments;
-import com.instaclustr.model.sidecar.BackupResponse;
-import com.instaclustr.model.sidecar.NodeStatus;
+import com.strapdata.model.backup.BackupArguments;
+import com.strapdata.model.sidecar.BackupResponse;
+import com.strapdata.model.sidecar.NodeStatus;
 import io.micronaut.http.client.RxHttpClient;
 import io.reactivex.Completable;
 import io.reactivex.Single;

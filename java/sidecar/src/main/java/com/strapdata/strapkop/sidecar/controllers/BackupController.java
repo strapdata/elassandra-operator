@@ -1,7 +1,7 @@
 package com.strapdata.strapkop.sidecar.controllers;
 
-import com.instaclustr.model.backup.BackupArguments;
-import com.instaclustr.model.sidecar.BackupResponse;
+import com.strapdata.model.backup.BackupArguments;
+import com.strapdata.model.sidecar.BackupResponse;
 import com.microsoft.azure.storage.StorageException;
 import com.strapdata.strapkop.sidecar.services.BackupService;
 import io.micronaut.http.MediaType;

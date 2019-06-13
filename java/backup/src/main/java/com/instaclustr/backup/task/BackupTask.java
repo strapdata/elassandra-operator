@@ -4,7 +4,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
-import com.instaclustr.model.backup.BackupArguments;
+import com.strapdata.model.backup.BackupArguments;
 import com.instaclustr.backup.BackupException;
 import com.instaclustr.backup.jmx.CassandraObjectNames;
 import com.instaclustr.backup.uploader.FilesUploader;

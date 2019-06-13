@@ -2,7 +2,7 @@ package com.instaclustr.backup;
 
 import com.instaclustr.backup.task.BackupTask;
 import com.instaclustr.backup.util.GlobalLock;
-import com.instaclustr.model.backup.BackupArguments;
+import com.strapdata.model.backup.BackupArguments;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

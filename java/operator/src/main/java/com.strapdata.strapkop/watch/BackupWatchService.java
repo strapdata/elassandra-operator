@@ -1,7 +1,7 @@
 package com.strapdata.strapkop.watch;
 
-import com.instaclustr.model.backup.BackupList;
-import com.instaclustr.model.k8s.backup.Backup;
+import com.strapdata.model.backup.BackupList;
+import com.strapdata.model.k8s.backup.Backup;
 import com.squareup.okhttp.Call;
 import com.strapdata.strapkop.OperatorConfig;
 import io.kubernetes.client.ApiClient;

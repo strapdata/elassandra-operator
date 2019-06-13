@@ -3,7 +3,7 @@ package com.instaclustr.backup.task;
 import com.instaclustr.backup.uploader.FilesUploader;
 import com.instaclustr.backup.util.Directories;
 import com.instaclustr.backup.util.GlobalLock;
-import com.instaclustr.model.backup.CommitLogBackupArguments;
+import com.strapdata.model.backup.CommitLogBackupArguments;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
