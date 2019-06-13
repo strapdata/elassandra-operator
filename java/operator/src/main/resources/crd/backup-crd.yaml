@@ -20,21 +20,3 @@ spec:
     # shortNames allow shorter string to match your resource on the CLI
     shortNames:
     - eback
-  validation:
-    openAPIV3Schema:
-      properties:
-        spec:
-          required:
-          - backupType
-          - selector
-          - target
-          properties:
-            selector:
-              type: object
-              description: match the pods to backup
-            backupType:
-              type: string
-              description: The backup mechanism type e.g. S3, FILE
-            target:
-              type: string
-              description: The uri for the backup target location e.g. s3 bucket, filepath

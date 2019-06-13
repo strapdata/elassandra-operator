@@ -26,7 +26,6 @@ public class CreateCustomResourceDefinitions implements Callable<Void> {
     @Override
     public Void call() throws Exception {
         createCrdFromResource("/crd/datacenter-crd.yaml");
-        //createCrdFromResource("/com/com/cluster-crd.yaml");
         createCrdFromResource("/crd/backup-crd.yaml");
         return null;
     }
