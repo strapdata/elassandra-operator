@@ -17,7 +17,7 @@ task testBackup(type: Exec) {
 task test {
   dependsOn 'testBasic'
   dependsOn 'testScale'
-  dependsOn 'testBackup'
+  //dependsOn 'testBackup'
 }
 
 task basicSetup(type: Exec) {

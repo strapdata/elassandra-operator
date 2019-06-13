@@ -110,7 +110,7 @@ podTemplate(
                 sh 'kubectl get crd -o yaml'
                 sh 'kubectl get pvc -o yaml'
                 sh 'kubectl get cm -o yaml'
-                sh 'kubectl get cdc -o yaml'
+                sh 'kubectl get edc -o yaml'
               }
             }
           }
