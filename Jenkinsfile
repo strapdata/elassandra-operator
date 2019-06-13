@@ -46,7 +46,7 @@ podTemplate(
             usernamePassword(credentialsId: "nexus-jenkins-deployer", usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD'),
             usernamePassword(credentialsId: 'nexus-jenkins-deployer', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASSWORD')
     ]) {
-      withEnv(["AKS_NAME=${aksName}", "PULL_SECRET=nexus-registry"]) {
+      withEnv(["AKS_NAME=${aksName}", "SUFFIX=-staging", "PULL_SECRET=nexus-registry"]) {
 
         try {
           stage('init') {
