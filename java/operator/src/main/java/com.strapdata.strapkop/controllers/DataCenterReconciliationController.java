@@ -334,8 +334,8 @@ public class DataCenterReconciliationController {
                             .securityContext(new V1SecurityContext().runAsUser(999L).runAsGroup(999L))
                             .command(ImmutableList.of(
                                     "java", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseCGroupMemoryLimitForHeap",
-                                    "-cp", "/opt/lib/cassandra-sidecar/cassandra-sidecar.jar",
-                                    "com.com.cassandra.sidecar.SidecarRestore",
+                                    "-cp",  "/app/resources:/app/classes:/app/libs/*",
+                                    "com.strapdata.strapkop.sidecar.SidecarRestore",
                                     "-bb", backup.getSpec().getTarget(), // bucket name
                                     "-c", dataCenterMetadata.getName(), // clusterID == DcName. Backup dc and restore dc must have the same name
                                     "-bi", dataCenterChildObjectName("%s"), // pod name prefix
