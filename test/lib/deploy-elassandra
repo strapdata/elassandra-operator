@@ -13,9 +13,9 @@ helm_cmd="install --wait -n ${name}"
 helm ${helm_cmd} \
     ${values_file:+-f ${values_file}} \
     --set image.elassandraRepository=${ELASSANDRA_IMAGE} \
-    --set image.enterpriseRepository=${ENTERPRISE_IMAGE} \
     --set image.sidecarRepository=${SIDECAR_IMAGE} \
-    --set image.tag=${TAG} \
+    --set image.elassandraTag=${TAG} \
+    --set image.sidecarTag=${TAG} \
     --set imagePullSecret=${PULL_SECRET} \
     --set replicaCount=${replicas} \
     --set imagePullPolicy=IfNotPresent \
