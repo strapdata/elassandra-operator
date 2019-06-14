@@ -201,7 +201,7 @@ public class DataCenterReconciliationController {
             // if enterprise JMX is enabled, stop search with a pre-stop hook
             if (dataCenterSpec.getEnterprise().getJmx()) {
                 cassandraContainer.lifecycle(new V1Lifecycle().preStop(new V1Handler().exec(new V1ExecAction()
-                                .addCommandItem("curl -X POST http://localhost:4567/enterprise/search/disable"))));
+                                .addCommandItem("curl -X POST http://localhost:8080/enterprise/search/disable"))));
             }
         } else {
             cassandraContainer.addEnvItem(new V1EnvVar().name("CASSANDRA_DAEMON").value("org.apache.cassandra.service.CassandraDaemon"));
@@ -217,7 +217,7 @@ public class DataCenterReconciliationController {
                 .image(dataCenterSpec.getSidecarImage())
                 .imagePullPolicy(dataCenterSpec.getImagePullPolicy())
                 .securityContext(new V1SecurityContext().runAsUser(999L).runAsGroup(999L))
-                .addPortsItem(new V1ContainerPort().name("http").containerPort(4567))
+                .addPortsItem(new V1ContainerPort().name("http").containerPort(8080))
                 .addVolumeMountsItem(new V1VolumeMount()
                         .name("elassandra-data-volume")
                         .mountPath("/var/lib/cassandra")
