@@ -106,6 +106,8 @@ podTemplate(
             container('buildenv') {
               if (aksCreated) {
                 sh './test/lib/logs-operator || true'
+                sh 'kubectl logs dc1-elassandra-0  sidecar || true'
+                sh 'kubectl logs dc1-elassandra-0  elassandra || true'
                 sh 'kubectl get all -o yaml'
                 sh 'kubectl get crd -o yaml'
                 sh 'kubectl get pvc -o yaml'
