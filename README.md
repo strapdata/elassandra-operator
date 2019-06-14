@@ -48,7 +48,7 @@ They are parameterized from env variables with consistent default (see `./test/c
 
 ## Debugging
 
-The operator image can be build we debug enabled :
+The operator image can be built we debug enabled :
 ```bash
 ./gradlew dockerBuild -PoperatorEnabledDebug=true -PoperatorDebugSuspend=false
 ```
