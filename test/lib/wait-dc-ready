@@ -11,7 +11,7 @@ is_pod_ready() {
 }
 
 wait_pod_ready(){
-  for ((i=300; i>=1; i--)); do
+  for ((i=800; i>=1; i--)); do
     echo "waiting for pod $1 to be ready (#$i)"
     kubectl get pods
     is_pod_ready $1 && return 0
