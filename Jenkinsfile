@@ -103,7 +103,7 @@ podTemplate(
 
           if (scm.branches[0].name == "master") {
             stage('release') {
-              sh './gradlew -s dockerBuild dockerPush -PdockerImageSuffix=""'
+              sh './gradlew -s dockerPushAllVersions -PdockerImageSuffix=""'
             }
           }
         }
