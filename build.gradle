@@ -13,6 +13,7 @@ def getGitCommitHash = { ->
 }
 
 ext.gitCommitHash = getGitCommitHash()
+ext.latestElassandraVersion = (new File('./docker/supportedElassandraVersions.txt') as String[])[0]
 
 allprojects {
   repositories {
@@ -22,7 +23,6 @@ allprojects {
     maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
     jcenter() // or Maven central, required for Lombok dependency
   }
-
 }
 
 configure(subprojects.findAll { it.name.contains("docker") }) {
@@ -49,3 +49,14 @@ task dockerPush {
   dependsOn ':docker:dockerPushImage'
 }
 
+task dockerBuildAllVersions {
+  dependsOn ':java:operator:jibDockerBuild'
+  dependsOn ':java:sidecar:jibDockerBuild'
+  dependsOn ':docker:dockerBuildAllVersions'
+}
+
+task dockerPushAllVersions {
+  dependsOn ':java:operator:jib'
+  dependsOn ':java:sidecar:jib'
+  dependsOn ':docker:dockerPushAllVersions'
+}

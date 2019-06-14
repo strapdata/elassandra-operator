@@ -100,6 +100,12 @@ podTemplate(
               sh './gradlew -s :test:test'
             }
           }
+
+          if (scm.branches[0].name == "master") {
+            stage('release') {
+              sh './gradlew -s dockerPushAllVersions -PdockerImageSuffix=""'
+            }
+          }
         }
         catch (exc) {
           stage('print logs') {

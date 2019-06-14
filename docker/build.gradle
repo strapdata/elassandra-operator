@@ -16,18 +16,19 @@ task copyJar(type: Copy) {
 
 def elassandraImageName = dockerImagePrefix + dockerImageSuffix + "/elassandra" 
 
-// Use task types
-task dockerBuildImage(type: DockerBuildImage) {
-  dependsOn 'copyJar'
-  inputDir = file('.')
-  tags.add(elassandraImageName + ":" + elassandraVersion)
-  tags.add(elassandraImageName + ":" + project.gitCommitHash)
-  tags.add(elassandraImageName + ":" + "latest")
+def elassandraVersions = new File('./docker/supportedElassandraVersions.txt') as String[]
+println "Supported Elassandra versions :"
+elassandraVersions.each {
+  println it
+}
 
-  buildArgs = [
-          'base_image': elassandraParentImage + ":" + elassandraVersion,
-          'cassandra_k8s_addons_jar': "./build/k8s-addons-${project.version}.jar"
-  ]
+def normalizeVersion = {
+  v -> v.replaceAll('\\.', '_')
+}
+
+// basic tasks used usually
+task dockerBuildImage {
+  dependsOn "dockerBuildImage${normalizeVersion(elassandraVersions[0])}"
 }
 
 task dockerPushImageLatest(type: DockerPushImage) {
@@ -45,11 +46,45 @@ task dockerPushImageOperatorGitCommitHash(type: DockerPushImage) {
 task dockerPushImageElassandraVersion(type: DockerPushImage) {
   dependsOn 'dockerBuildImage'
   imageName = elassandraImageName
-  tag = elassandraVersion
+  tag = elassandraVersions[0]
 }
 
 task dockerPushImage {
   dependsOn 'dockerPushImageLatest'
   dependsOn 'dockerPushImageOperatorGitCommitHash'
   dependsOn 'dockerPushImageElassandraVersion'
+}
+
+// releases tasks used to build many versions of elassandra
+elassandraVersions.each { v ->
+  task "dockerBuildImage${normalizeVersion(v)}" (type: DockerBuildImage) {
+      dependsOn 'copyJar'
+      inputDir = file('.')
+      tags.add(elassandraImageName + ":" + v)
+      if (v == elassandraVersions[0]) {
+        tags.add(elassandraImageName + ":" + "latest")
+        tags.add(elassandraImageName + ":" + project.gitCommitHash)
+      }
+
+      buildArgs = [
+              'base_image': elassandraParentImage + ":" + v,
+              'cassandra_k8s_addons_jar': "./build/k8s-addons-${project.version}.jar"
+      ]
+  }
+
+  task "dockerPushImage${normalizeVersion(v)}" (type: DockerPushImage) {
+    dependsOn "dockerBuildImage${normalizeVersion(v)}"
+    imageName = elassandraImageName
+    tag = v
+  }
+}
+
+task dockerBuildAllVersions {
+  dependsOn elassandraVersions.collect { v -> "dockerBuildImage${normalizeVersion(v)}" }
+}
+
+task dockerPushAllVersions {
+  dependsOn elassandraVersions.collect { v -> "dockerPushImage${normalizeVersion(v)}" }
+  dependsOn 'dockerPushImageLatest'
+  dependsOn 'dockerPushImageOperatorGitCommitHash'
 }

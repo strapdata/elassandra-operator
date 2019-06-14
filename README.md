@@ -9,14 +9,14 @@ Compile the java module :
 ./gradlew build
 ```
 
-Build the docker images :
+Build the docker images (operator + sidecar + latest elassandra):
 ```bash
 ./gradlew dockerBuild
 ```
 
-Publish the docker images :
+Publish the docker images (operator + sidecar + latest elassandra):
 ```bash
-./gradlew dockerPush -PregistryUsername=user -PregistryPassword=password -PregistryEmail=user@example.com
+./gradlew dockerPush -PregistryUsername=user -PregistryPassword=password
 ```
 
 Build parameters are located in `gradle.properties`.
@@ -55,24 +55,16 @@ The operator image can be built we debug enabled :
 
 The sidecar image is by now build with debug enable on port 5005.
 
-## CI/CD
+## Release & CI/CD
 
 Check-out the [Jenkins CI](https://jenkins.azure.strapcloud.com/blue/organizations/jenkins/strapkop/activity).
 
-Currently we use Jenkins CI only for building staging image and testing. We do not build release images yet.
+### Docker images
 
-## Backlogs... (move this to github trello-like)
+When building manually, the images are created under `docker.repo.strapdata.com/elassandra-operator-dev` (jenkins use the suffix `-staging`).
 
-- [] Migrate existing to Micronaut / RxJava
-- [] Refactoring of the watch / controller logic according to specs
-- [] Refactoring of CRD interface
-- [] Implement ElassandraTask mechanism
-- [] Using NodePort, public broadcast addr and, hard anti-affinity to prepare for multi-dc
-- [] Operator Peering, cross-cluster discovery and custom seed service
-- [] Backup using ElassandraTasks and sstableloader
-- [] Secure sidecar
+To remove the suffix, use the cli option `-PdockerImageSuffix=""`.
 
-
-
-
-
+When building the images with `./gradlew dockerBuild`, only the latest elassandra version is built.
+There is also `dockerBuildAllVersions` and `dockerPushAllVersions` that build and push images for all supported
+elassandra version, according to the file `docker/supportedElassandraVersions.txt` (first line should be the latest).
