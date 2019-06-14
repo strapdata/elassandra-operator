@@ -105,12 +105,13 @@ podTemplate(
           stage('print logs') {
             container('buildenv') {
               if (aksCreated) {
-                sh './test/lib/logs-operator'
+                sh './test/lib/logs-operator || true'
                 sh 'kubectl get all -o yaml'
                 sh 'kubectl get crd -o yaml'
                 sh 'kubectl get pvc -o yaml'
                 sh 'kubectl get cm -o yaml'
-                sh 'kubectl get edc -o yaml'
+                sh 'kubectl get edc -o yaml || true'
+                sh 'kubectl get eback -o yaml || true'
               }
             }
           }
