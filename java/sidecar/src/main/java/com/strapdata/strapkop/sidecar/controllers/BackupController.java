@@ -27,18 +27,9 @@ public class BackupController {
     @Inject
     private BackupService backupService;
 
-    @Post(value = "/", consumes = MediaType.APPLICATION_JSON)
-    public Single<BackupResponse> createBackup(@Body BackupArguments backupArguments) throws URISyntaxException, StorageException, ConfigurationException, IOException, InvalidKeyException {
-        return Single.create(emitter -> {
-            logger.info("received backup request for {}", backupArguments.backupId);
-            try {
-                backupService.enqueueBackup(backupArguments);
-                logger.info("enqueued backup request for {}", backupArguments.backupId);
-                emitter.onSuccess(new BackupResponse("success"));
-            } catch(Exception e) {
-                logger.warn("Failed to get backup resonse", e);
-                emitter.onError(e);
-            }
-         });
+    @Post(consumes = MediaType.APPLICATION_JSON)
+    public BackupResponse createBackup(@Body BackupArguments backupArguments) {
+        backupService.enqueueBackup(backupArguments);
+        return new BackupResponse("success");
     }
 }

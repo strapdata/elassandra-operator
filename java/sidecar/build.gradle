@@ -46,7 +46,9 @@ jib {
         labels = [ description:'Strapkop Elassandra sidecar']
     }
 }
-tasks.jib.dependsOn project(':java:backup').jar
+
+tasks.jibDockerBuild.dependsOn project(':java:backup').jar
+tasks.jibDockerBuild.dependsOn project(':java:model').jar
 
 compileJava {
     sourceCompatibility = 8

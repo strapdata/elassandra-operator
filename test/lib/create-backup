@@ -24,7 +24,7 @@ for ((i=0; i<${replicas}; i++)); do
   while true; do
     echo "waiting for pod backups to finish on node $i"
     kubectl logs ${dc}-elassandra-${i} sidecar --tail=10
-    if kubectl logs ${dc}-elassandra-${i} sidecar --tail=1 | grep "Cleared snapshot \"$backup_name\""; then
+    if kubectl logs ${dc}-elassandra-${i} sidecar --tail=10 | grep "Cleared snapshot \"$backup_name\""; then
       break;
     elif kubectl logs ${dc}-elassandra-${i} sidecar --tail=20 | grep "ERROR"; then
       exit 1

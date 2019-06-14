@@ -354,4 +354,8 @@ public class BackupTask implements Callable<Void> {
                 .map((KeyspaceColumnFamilySnapshot::new))
                 .collect(Collectors.groupingBy(k -> k.snapshotDirectory.getFileName().toString()));
     }
+    
+    public BackupArguments getArguments() {
+        return arguments;
+    }
 }

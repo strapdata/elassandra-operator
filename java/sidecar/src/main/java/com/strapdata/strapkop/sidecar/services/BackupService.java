@@ -1,34 +1,46 @@
 package com.strapdata.strapkop.sidecar.services;
 
-import com.google.common.util.concurrent.AbstractIdleService;
-import com.strapdata.model.backup.BackupArguments;
 import com.instaclustr.backup.task.BackupTask;
 import com.instaclustr.backup.util.GlobalLock;
-import com.microsoft.azure.storage.StorageException;
+import com.strapdata.model.backup.BackupArguments;
+import io.micronaut.context.annotation.Context;
+import io.micronaut.context.annotation.Infrastructure;
+import io.reactivex.Completable;
+import io.reactivex.disposables.Disposable;
+import io.reactivex.schedulers.Schedulers;
+import io.reactivex.subjects.BehaviorSubject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import javax.inject.Singleton;
-import javax.naming.ConfigurationException;
-import java.io.IOException;
-import java.net.URISyntaxException;
-import java.security.InvalidKeyException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
-@Singleton
-public class BackupService extends AbstractIdleService {
-    private final ExecutorService executorService = Executors.newSingleThreadExecutor();
-
-    public void enqueueBackup(final BackupArguments arguments) throws IOException, StorageException, ConfigurationException, URISyntaxException, InvalidKeyException {
-        final BackupTask backupTask = new BackupTask(arguments, new GlobalLock("/tmp"));
-        executorService.submit(backupTask);
+@Context
+@Infrastructure
+public class BackupService {
+    
+    private static final Logger logger = LoggerFactory.getLogger(BackupService.class);
+    
+    private BehaviorSubject<BackupArguments> subject = BehaviorSubject.create();
+    private Disposable disposable;
+    
+    public BackupService() {
+        logger.info("Initializing BackupService");
+        disposable = subject.observeOn(Schedulers.newThread())
+                .doOnNext(backupArguments -> logger.info("received backup request for {}", backupArguments.snapshotTag))
+                .doOnNext(backupArguments -> logger.debug("processing backup on thread {}", Thread.currentThread().getName()))
+                .map(backupArguments -> new BackupTask(backupArguments, new GlobalLock("/tmp")))
+                .doOnNext(BackupTask::call)
+                .retry()
+                .subscribe(
+                        backupTask -> logger.info("backup {} has completed", backupTask.getArguments().snapshotTag),
+                        Throwable::printStackTrace);
+    }
+    
+    // NOTE: When using BehaviorSubject, the operators and subscribers are called on the same thread than the one
+    //       that feed the subject by calling onNext(), discarding what's in subscribeOn(). ObserveOn() is respected however.
+    //       the call to onNext is in fact synchronous (wait for all the subscribers to finished in the same thread)
+    //       That's why we create a Completable to submit the backup task asynchronously
+    public void enqueueBackup(final BackupArguments arguments) {
+        Completable.fromRunnable(() -> subject.onNext(arguments)).subscribeOn(Schedulers.single()).subscribe();
     }
 
-    @Override
-    protected void startUp() throws Exception {
-    }
-
-    @Override
-    protected void shutDown() throws Exception {
-        // TODO: gracefully stop any running backups
-    }
+    // TODO: bind stop event to gracefully shutdown backups
 }

@@ -10,7 +10,6 @@ import com.strapdata.model.backup.StorageProvider;
 import com.strapdata.model.k8s.backup.Backup;
 import com.strapdata.model.k8s.backup.BackupSpec;
 import com.strapdata.model.k8s.backup.BackupStatus;
-import com.strapdata.model.sidecar.BackupResponse;
 import com.strapdata.strapkop.k8s.K8sModule;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
@@ -29,6 +28,7 @@ import javax.inject.Inject;
 import java.net.MalformedURLException;
 import java.net.UnknownHostException;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.stream.Collectors;
 
@@ -62,19 +62,18 @@ public class BackupControllerService {
         backupWatchService.getSubject().subscribe(event -> {
             logger.info("Received BackupWatchEvent {}.", event);
             if(event.t.getStatus() == null ||
-                Strings.isNullOrEmpty(event.t.getStatus().getProgress()) ||
-                !event.t.getStatus().getProgress().equals("PROCESSED")) {
+                Strings.isNullOrEmpty(event.t.getStatus().getProgress()) /* do not retry backup ||
+                !event.t.getStatus().getProgress().equals("PROCESSED") */) {
                 try {
                     logger.debug("Reconciling Backup.");
-                    createOrReplaceBackup(event.t).map(success -> {
+                    callBackupApiAllPods(event.t).onErrorReturnItem(false).subscribe(success -> {
                         event.t.setStatus(new BackupStatus().setProgress(success ? "PROCESSED" : "FAILED" ));
-                        logger.info("Backcup name={} namespace={} success={}",
+                        logger.info("Backup name={} namespace={} success={}",
                             event.t.getMetadata().getName(), event.t.getMetadata().getNamespace(), success);
 
                         customObjectsApi.patchNamespacedCustomObject("stable.strapdata.com", "v1",
                             event.t.getMetadata().getNamespace(), "elassandra-backups",
                             event.t.getMetadata().getName(), event.t);
-                        return success;
                     });
                 } catch (final Exception e) {
                     logger.warn("Failed to reconcile Backup. This will be an exception in the future.", e);
@@ -88,7 +87,7 @@ public class BackupControllerService {
     }
 
 
-    private Single<BackupResponse> callBackupApi(final V1Pod pod, Backup backup)  {
+    private Single<Boolean> callBackupApi(final V1Pod pod, Backup backup)  {
        try {
            BackupArguments backupArguments = generateBackupArguments(pod.getStatus().getPodIP(),
                7199,
@@ -99,7 +98,15 @@ public class BackupControllerService {
 
            backupArguments.backupId = pod.getSpec().getHostname();
            backupArguments.speed = CommonBackupArguments.Speed.LUDICROUS;
-           return sidecarClientFactory.clientForPod(pod).backup(backupArguments);
+           return sidecarClientFactory.clientForPod(pod)
+                   .backup(backupArguments)
+                   .doOnSuccess(backupResponse -> logger.debug("received backup response with status = {}", backupResponse.getStatus()))
+                   .map(backupResponse -> backupResponse.getStatus().equalsIgnoreCase("success"))
+                   .onErrorReturn(throwable -> {
+                       logger.warn("error occured from sidecar backup");
+                       throwable.printStackTrace();
+                       return false;
+                   });
         } catch (MalformedURLException | UnknownHostException e) {
            return Single.error(e);
         }
@@ -108,10 +115,12 @@ public class BackupControllerService {
 
     /**
      * Update the k8s backup status.
+     *
+     * TODO: this method name is insane
      * @param backup
      * @throws ApiException
      */
-    private Single<Boolean> createOrReplaceBackup(final Backup backup) throws ApiException {
+    private Single<Boolean> callBackupApiAllPods(final Backup backup) throws ApiException {
         final BackupSpec backupSpec = backup.getSpec();
 
         final String dataCenterPodsLabelSelector = backupSpec.getSelector().getMatchLabels().entrySet().stream()
@@ -119,19 +128,10 @@ public class BackupControllerService {
                 .collect(Collectors.joining(","));
         
         final Iterable<V1Pod> pods = k8sResourceUtils.listNamespacedPods(backup.getMetadata().getNamespace(), null, dataCenterPodsLabelSelector);
-        return Single.zip(Streams.stream(pods)
-                .map(pod -> callBackupApi(pod, backup))
-                .collect(Collectors.toList()),
-            responses -> {
-                boolean success = true;
-                for(int i=0; i< responses.length; i++) {
-                    if (responses[i] instanceof BackupResponse && !((BackupResponse)responses[i]).getStatus().equalsIgnoreCase("FAILED")) {
-                        success = false;
-                        break;
-                    }
-                }
-                return success;
-            });
+        return Single.zip(
+                Streams.stream(pods).map(pod -> callBackupApi(pod, backup)).collect(Collectors.toList()),
+                successes -> Arrays.stream((Boolean[])successes).allMatch(s -> s)
+        );
     }
 
     private void deleteBackup(Backup backup) {
