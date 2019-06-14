@@ -62,24 +62,28 @@ public class OperatorService {
                         logger.warn("Failed to reconcile Data Center.", e);
                     }
                 }
-
             });
 
         this.statefulSetWatchService = statefulSetWatchService;
         statefulSetWatchService.getSubject()
             .subscribe(event -> {
                 logger.debug("Received StatefulSetWatchEvent {}.", event);
-                if (event instanceof WatchEvent.Modified) {
-                    // Trigger a dc reconciliation event if changes to the stateful set has finished.
-                    if (event.t.getStatus().getReplicas().equals(event.t.getStatus().getReadyReplicas()) && event.t.getStatus().getCurrentReplicas().equals(event.t.getStatus().getReplicas())) {
-                        String datacenterName = event.t.getMetadata().getLabels().get(OperatorLabels.DATACENTER);
-                        if (datacenterName != null) {
-                            DataCenter dataCenter = dataCenterWatchService.get(new Key<>(datacenterName, event.t.getMetadata().getNamespace()));
-                            if (dataCenter != null) {
-                                dataCenterControllerFactory.createReconciliationController(dataCenter).reconcileDataCenter();
+                try {
+                    if (event instanceof WatchEvent.Modified) {
+                        // Trigger a dc reconciliation event if changes to the stateful set has finished.
+                        if (event.t.getStatus().getReplicas().equals(event.t.getStatus().getReadyReplicas()) && event.t.getStatus().getCurrentReplicas().equals(event.t.getStatus().getReplicas())) {
+                            String datacenterName = event.t.getMetadata().getLabels().get(OperatorLabels.DATACENTER);
+                            if (datacenterName != null) {
+                                DataCenter dataCenter = dataCenterWatchService.get(new Key<>(datacenterName, event.t.getMetadata().getNamespace()));
+                                if (dataCenter != null) {
+                                    dataCenterControllerFactory.createReconciliationController(dataCenter).reconcileDataCenter();
+                                }
                             }
                         }
                     }
+                }
+                catch (final Exception e) {
+                    logger.warn("Failed to reconcile Statefulset.", e);
                 }
             });
 
