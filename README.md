@@ -4,9 +4,7 @@ Elassandra Kubernetes Operator
 
 ## Build
 
-Everything is now managed by gradle.
-
-Compile the java projects :
+Compile the java module :
 ```bash
 ./gradlew build
 ```
@@ -27,33 +25,54 @@ Build parameters are located in `gradle.properties`.
 
 Deploy the operator and a datacenter (3 nodes) for manual experimentation :
 ```bash
-./gradlew :test:basicSetup -PbasicSetupDc=dc1 -PbasicSetupReplicas=3
+./test/basic-setup dc1 3
 ```
 
-Examples of running the test scripts from gradle :
+Run a full test that spawn a 1-node dc, scale to 3 nodes then cleanup everything :
 ```bash
-./gradlew :test:testBasic
-./gradlew :test:testScale
-./gradlew :test:testBackup
-```
-
-This scripts are parameterized (see `./test/gradle.properties`) :
-```bash
-./gradlew test:testScale -PscaleFrom=1 -PscaleTo=3 -PscaleDc=dc1
+./test/test-scale dc1 1 3
 ```
 
 To cleanup all resources created in the k8s cluster :
 ```bash
-./gradlew :test:cleanup
+./test/full-cleanup
 ```
 
-This command are executed from gradle for convenience and self-documentation.
-But test scripts can also be executed from the bash directly, which provides more possibilities.
+Running all the main test scenarios from gradle :
+```bash
+./gradlew :test:test
+```
 
+There are plenty of test and helpers script located in `./test`, `./test/lib` and `./test/aks`.
+They are parameterized from env variables with consistent default (see `./test/config`).
 
 ## Debugging
 
 The operator image can be build we debug enabled :
 ```bash
-./gradlew dockerBuild -PoperatorEnabledDebug=true -PoperatorDebugSuspend=true
+./gradlew dockerBuild -PoperatorEnabledDebug=true -PoperatorDebugSuspend=false
 ```
+
+The sidecar image is by now build with debug enable on port 5005.
+
+## CI/CD
+
+Check-out the [Jenkins CI](https://jenkins.azure.strapcloud.com/blue/organizations/jenkins/strapkop/activity).
+
+Currently we use Jenkins CI only for building staging image and testing. We do not build release images yet.
+
+## Backlogs... (move this to github trello-like)
+
+- [] Migrate existing to Micronaut / RxJava
+- [] Refactoring of the watch / controller logic according to specs
+- [] Refactoring of CRD interface
+- [] Implement ElassandraTask mechanism
+- [] Using NodePort, public broadcast addr and, hard anti-affinity to prepare for multi-dc
+- [] Operator Peering, cross-cluster discovery and custom seed service
+- [] Backup using ElassandraTasks and sstableloader
+- [] Secure sidecar
+
+
+
+
+
