@@ -2,6 +2,7 @@ plugins {
 }
 
 dependencies {
-    compile group: 'com.strapdata.elasticsearch', name:'elasticsearch', version: elassandraVersion
+    // TODO: we should build one k8s-addons per supported Elassandra version
+    compile group: 'com.strapdata.elasticsearch', name:'elasticsearch', version: latestElassandraVersion
     compile group: 'com.strapdata.cassandra', name:'cassandra-all', version: '3.11.4.2'
 }
