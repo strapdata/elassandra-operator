@@ -7,6 +7,14 @@ podTemplate(
         name: podLabel,
         containers: [
                 containerTemplate(
+                        name: 'docker-tricks',
+                        alwaysPullImage: true,
+                        image: "bobrik/socat",
+                        command: 'TCP-LISTEN:1234,fork UNIX-CONNECT:/var/run/docker.sock',
+                        ttyEnabled: false,
+                        workingDir: "/home/jenkins"
+                ),
+                containerTemplate(
                         name: 'buildenv',
                         alwaysPullImage: true,
                         image: "docker.repo.strapdata.com/elassandra-operator/jenkins-buildenv:latest",
@@ -46,7 +54,7 @@ podTemplate(
             usernamePassword(credentialsId: "nexus-jenkins-deployer", usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD'),
             usernamePassword(credentialsId: 'nexus-jenkins-deployer', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASSWORD')
     ]) {
-      withEnv(["AKS_NAME=${aksName}", "SUFFIX=-staging", "PULL_SECRET=nexus-registry"]) {
+      withEnv(["AKS_NAME=${aksName}", "SUFFIX=-staging", "PULL_SECRET=nexus-registry", "DOCKER_HOST=tcp://localhost:1234"]) {
 
         try {
           stage('init') {
