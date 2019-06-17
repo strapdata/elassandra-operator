@@ -10,7 +10,7 @@ podTemplate(
                         name: 'docker-tricks',
                         alwaysPullImage: true,
                         image: "bobrik/socat",
-                        command: 'TCP-LISTEN:1234,fork UNIX-CONNECT:/var/run/docker.sock',
+                        command: 'socat TCP-LISTEN:1234,fork UNIX-CONNECT:/var/run/docker.sock',
                         ttyEnabled: false,
                         workingDir: "/home/jenkins"
                 ),
