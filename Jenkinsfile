@@ -105,7 +105,7 @@ podTemplate(
             container('buildenv') {
               sh "az login --service-principal -u ${AZ_APP_ID} -p ${AZ_PASSWORD} --tenant ${AZ_TENANT_ID}"
               sh "./test/aks/get-credentials"
-              //sh './gradlew -s :test:test'
+              sh './gradlew -s :test:test'
             }
           }
 
