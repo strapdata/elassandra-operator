@@ -4,13 +4,12 @@ import com.google.common.collect.Sets;
 import com.strapdata.model.Key;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.sidecar.NodeStatus;
-import com.strapdata.strapkop.controllers.DataCenterControllerFactory;
+import com.strapdata.strapkop.controllers.DataCenterActionFactory;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.watch.DataCenterWatchService;
 import com.strapdata.strapkop.watch.StatefulSetWatchService;
 import com.strapdata.strapkop.watch.WatchEvent;
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.annotation.Context;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,7 +18,7 @@ import java.util.Set;
 /**
  * Listen for datacenter, statefulset and Cassandra node status events to trigger DC deletion or reconciliation
  */
-@Context
+//@Context
 public class OperatorService {
     private static final Logger logger = LoggerFactory.getLogger(OperatorService.class);
     
@@ -36,13 +35,13 @@ public class OperatorService {
     private final DataCenterWatchService dataCenterWatchService;
     private final StatefulSetWatchService statefulSetWatchService;
     private final CassandraHealthCheckService cassandraHealthCheckService;
-    private final DataCenterControllerFactory dataCenterControllerFactory;
+    private final DataCenterActionFactory dataCenterControllerFactory;
 
     public OperatorService(DataCenterWatchService dataCenterWatchService,
                            StatefulSetWatchService statefulSetWatchService,
                            BackupControllerService backupControllerService,
                            CassandraHealthCheckService cassandraHealthCheckService,
-                           ApplicationContext beanContext, DataCenterControllerFactory dataCenterControllerFactory) {
+                           ApplicationContext beanContext, DataCenterActionFactory dataCenterControllerFactory) {
         logger.info("Initializing OperatorService");
         this.dataCenterControllerFactory = dataCenterControllerFactory;
         this.dataCenterWatchService = dataCenterWatchService;
@@ -51,13 +50,13 @@ public class OperatorService {
                 logger.debug("Received DataCenterWatchEvent {}.", event);
                 if (event instanceof WatchEvent.IDeleted) {
                     try {
-                        dataCenterControllerFactory.createDeletionController(new Key<>(event.t.getMetadata())).deleteDataCenter();
+                        dataCenterControllerFactory.createDeletion(new Key(event.t.getMetadata())).deleteDataCenter();
                     } catch (final Exception e) {
                         logger.warn("Failed to delete Data Center.", e);
                     }
                 } else {
                     try {
-                        dataCenterControllerFactory.createReconciliationController(event.t).reconcileDataCenter();
+                        dataCenterControllerFactory.createReconciliation(event.t).reconcileDataCenter();
                     } catch (final Exception e) {
                         logger.warn("Failed to reconcile Data Center.", e);
                     }
@@ -74,9 +73,9 @@ public class OperatorService {
                         if (event.t.getStatus().getReplicas().equals(event.t.getStatus().getReadyReplicas()) && event.t.getStatus().getCurrentReplicas().equals(event.t.getStatus().getReplicas())) {
                             String datacenterName = event.t.getMetadata().getLabels().get(OperatorLabels.DATACENTER);
                             if (datacenterName != null) {
-                                DataCenter dataCenter = dataCenterWatchService.get(new Key<>(datacenterName, event.t.getMetadata().getNamespace()));
+                                DataCenter dataCenter = dataCenterWatchService.get(new Key(datacenterName, event.t.getMetadata().getNamespace()));
                                 if (dataCenter != null) {
-                                    dataCenterControllerFactory.createReconciliationController(dataCenter).reconcileDataCenter();
+                                    dataCenterControllerFactory.createReconciliation(dataCenter).reconcileDataCenter();
                                 }
                             }
                         }
@@ -95,7 +94,7 @@ public class OperatorService {
                 if (!RECONCILE_OPERATION_MODES.contains(event.currentMode))
                     return;
                 try {
-                    dataCenterControllerFactory.createReconciliationController(dataCenterWatchService.get(event.dataCenterKey)).reconcileDataCenter();
+                    dataCenterControllerFactory.createReconciliation(dataCenterWatchService.get(event.dataCenterKey)).reconcileDataCenter();
                 } catch (final Exception e) {
                     logger.warn("Failed to reconcile Data Center.", e);
                 }

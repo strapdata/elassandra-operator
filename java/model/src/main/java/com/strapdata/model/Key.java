@@ -1,12 +1,12 @@
 package com.strapdata.model;
 
 import io.kubernetes.client.models.V1ObjectMeta;
+import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
-@EqualsAndHashCode
-@Getter
-public class Key<T> {
+@Data
+public class Key {
     public final String namespace;
     public final String name;
 

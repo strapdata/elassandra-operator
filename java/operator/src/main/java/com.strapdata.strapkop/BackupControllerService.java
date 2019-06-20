@@ -38,10 +38,10 @@ import java.util.stream.Collectors;
 @Context
 public class BackupControllerService {
     private static final Logger logger = LoggerFactory.getLogger(BackupControllerService.class);
-    private static final Key<Backup> POISON = new Key<Backup>(null, null);
+    private static final Key POISON = new Key(null, null);
 
     private final K8sResourceUtils k8sResourceUtils;
-    private final HashMap<Key<Backup>, Backup> backupCache = new HashMap<>();
+    private final HashMap<Key, Backup> backupCache = new HashMap<>();
     private final CustomObjectsApi customObjectsApi;
     private final SidecarClientFactory sidecarClientFactory;
 

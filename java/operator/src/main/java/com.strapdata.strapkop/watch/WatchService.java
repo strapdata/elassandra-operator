@@ -46,7 +46,7 @@ public abstract class WatchService<ResourceT, ResourceListT> extends AbstractExe
     private Call currentCall;
 
     private final BehaviorSubject<WatchEvent<ResourceT>> behaviorSubject = BehaviorSubject.create();
-    private final Map<Key<ResourceT>, ResourceT> cache = new HashMap<>();
+    private final Map<Key, ResourceT> cache = new HashMap<>();
     private final CountDownLatch latch = new CountDownLatch(1);
     
     private enum ResponseType {
@@ -122,7 +122,7 @@ public abstract class WatchService<ResourceT, ResourceListT> extends AbstractExe
     protected abstract V1ListMeta resourceListMetadata(final ResourceListT resourceList);
 
     protected abstract V1ObjectMeta resourceMetadata(final ResourceT resource);
-    public Key<ResourceT> resourceKey(final ResourceT t) { return new Key<ResourceT>(resourceMetadata(t)); }
+    public Key resourceKey(final ResourceT t) { return new Key(resourceMetadata(t)); }
 
     /**
      * Collect k8s objects to initialize the cache
@@ -153,7 +153,7 @@ public abstract class WatchService<ResourceT, ResourceListT> extends AbstractExe
     }
 
     void sync(final List<ResourceT> resourceList) {
-        final Map<Key<ResourceT>, ResourceT> remoteResources = resourceList.stream()
+        final Map<Key, ResourceT> remoteResources = resourceList.stream()
             .collect(ImmutableMap.toImmutableMap(this::resourceKey, Function.identity()));
 
         // remove non-existent resources from local cache
@@ -166,7 +166,7 @@ public abstract class WatchService<ResourceT, ResourceListT> extends AbstractExe
         latch.countDown();
     }
 
-    private void put(final Key<ResourceT> key, final ResourceT resource) {
+    private void put(final Key key, final ResourceT resource) {
         final ResourceT oldResource = cache.put(key, resource);
         if (oldResource == null) {
             // new resource (previously not in cache)
@@ -183,13 +183,13 @@ public abstract class WatchService<ResourceT, ResourceListT> extends AbstractExe
         }
     }
 
-    private void remove(final Key<ResourceT> key) {
+    private void remove(final Key key) {
         logger.debug("Removing resource from local cache. Will post deleted event.");
         final ResourceT resource = cache.remove(key);
         behaviorSubject.onNext(new WatchEvent.Deleted<ResourceT>(resource));
     }
 
-    public ResourceT get(final Key<ResourceT> key) {
+    public ResourceT get(final Key key) {
         return cache.get(key);
     }
 

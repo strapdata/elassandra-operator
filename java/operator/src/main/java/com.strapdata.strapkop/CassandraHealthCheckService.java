@@ -33,7 +33,7 @@ public class CassandraHealthCheckService extends AbstractScheduledService {
     private static final Logger logger = LoggerFactory.getLogger(CassandraHealthCheckService.class);
 
     private final K8sResourceUtils k8sResourceUtils;
-    private final Map<Key<DataCenter>, DataCenter> dataCenterCache = new HashMap<>(); // TODO: this cache is never populated
+    private final Map<Key, DataCenter> dataCenterCache = new HashMap<>(); // TODO: this cache is never populated
     private final Map<InetAddress, NodeStatus> cassandraNodeStatus = new ConcurrentHashMap<>();
     private final BehaviorSubject<CassandraNodeStatusEvent> behaviorSubject = BehaviorSubject.create();
     private final SidecarClientFactory sidecarClientFactory;
@@ -58,8 +58,8 @@ public class CassandraHealthCheckService extends AbstractScheduledService {
     protected void runOneIteration() throws Exception {
         logger.debug("Checking health of Cassandra instances.");
 
-        for (final Map.Entry<Key<DataCenter>, DataCenter> cacheEntry : dataCenterCache.entrySet()) {
-            final Key<DataCenter> dataCenterKey = cacheEntry.getKey();
+        for (final Map.Entry<Key, DataCenter> cacheEntry : dataCenterCache.entrySet()) {
+            final Key dataCenterKey = cacheEntry.getKey();
             final String labelSelector = String.format("%s=%s", OperatorLabels.DATACENTER, dataCenterKey.name);
             final Iterable<V1Pod> pods = k8sResourceUtils.listNamespacedPods(dataCenterKey.namespace, "status.phase=Running", labelSelector);
 
