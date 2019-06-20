@@ -7,9 +7,11 @@ import io.kubernetes.client.ApiException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.inject.Singleton;
 import java.util.concurrent.Callable;
 
-public class GenerateDefaultCA implements Callable<X509CertificateAndPrivateKey> {
+@Singleton
+public class GenerateDefaultCA implements Preflight<X509CertificateAndPrivateKey> {
     static final Logger logger = LoggerFactory.getLogger(GenerateDefaultCA.class);
     
     private final AuthorityManager authorityManager;

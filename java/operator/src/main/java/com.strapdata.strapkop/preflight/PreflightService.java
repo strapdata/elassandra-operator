@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.util.Collection;
 
 /**
  * Creates CRD defintion and defaultCA
@@ -20,16 +21,12 @@ public class PreflightService {
 
     static final Logger logger = LoggerFactory.getLogger(PreflightService.class);
 
-    @Inject
-    ApplicationEventPublisher eventPublisher;
+    private final ApplicationEventPublisher eventPublisher;
+    private final Collection<Preflight<?>> preflights;
     
-    @Inject
-    K8sModule k8sModule;
-
-    @Inject
-    AuthorityManager authorityManager;
-
-    public PreflightService() {
+    public PreflightService(ApplicationEventPublisher eventPublisher, Collection<Preflight<?>> preflights) {
+        this.eventPublisher = eventPublisher;
+        this.preflights = preflights;
     }
     
     public static class PreflightCompletedEvent {
@@ -38,20 +35,17 @@ public class PreflightService {
     @EventListener
     @Async
     void onStartup(ServiceStartedEvent event) {
-        try {
-            CreateCustomResourceDefinitions CreateCustomResourceDefinitions = new CreateCustomResourceDefinitions(this.k8sModule.providesApiExtensionsV1beta1Api());
-            CreateCustomResourceDefinitions.call();
-        } catch (Exception e) {
-            logger.error("Unexpected error:", e);
-        }
-
-        try {
-            GenerateDefaultCA generateDefaultCA = new GenerateDefaultCA(authorityManager);
-            generateDefaultCA.call();
-        } catch (Exception e) {
-            logger.error("Unexpected error:", e);
-        }
+        
+        for (Preflight<?> preflight : preflights) {
     
+            try {
+                preflight.call();
+            } catch (Exception e) {
+                e.printStackTrace();
+                // TODO: should we refuse to start here ?
+            }
+        }
+        
         eventPublisher.publishEvent(new PreflightCompletedEvent());
     }
     

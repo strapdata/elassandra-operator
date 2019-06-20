@@ -8,12 +8,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
+import javax.inject.Singleton;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.concurrent.Callable;
 
-public class CreateCustomResourceDefinitions implements Callable<Void> {
+@Singleton
+public class CreateCustomResourceDefinitions implements Preflight<Void> {
     static final Logger logger = LoggerFactory.getLogger(CreateCustomResourceDefinitions.class);
 
     private final ApiextensionsV1beta1Api apiExtensionsApi;
