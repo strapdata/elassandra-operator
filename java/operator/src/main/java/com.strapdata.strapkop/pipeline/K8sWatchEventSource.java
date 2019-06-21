@@ -8,9 +8,9 @@ import io.kubernetes.client.ApiClient;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.ApiResponse;
 import io.kubernetes.client.util.Watch;
+import io.reactivex.Observable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import rx.Observable;
 
 import static com.strapdata.strapkop.pipeline.K8sWatchEventData.Type.ERROR;
 import static com.strapdata.strapkop.pipeline.K8sWatchEventData.Type.INITIAL;
@@ -45,7 +45,7 @@ public class K8sWatchEventSource<ResourceT, ResourceListT>
      */
     @Override
     public Observable<Event<Key, K8sWatchEventData<ResourceT>>> createObservable() throws ApiException {
-        
+        logger.info("(re)creating k8s event observable for {}", this.getClass().getSimpleName());
         final Observable<Event<Key, K8sWatchEventData<ResourceT>>> initialObservable = createInitialObservable();
         final Observable<Event<Key, K8sWatchEventData<ResourceT>>> watchObservable = createWatchObservable();
         return Observable.concat(initialObservable, watchObservable);
@@ -63,7 +63,7 @@ public class K8sWatchEventSource<ResourceT, ResourceListT>
         final ResourceListT resourceList = apiResponse.getData();
         logger.info("Fetched {} existing {}", adapter.getListItems(resourceList).size(), adapter.getName());
         lastResourceVersion = adapter.getListMetadata(resourceList).getResourceVersion();
-        return Observable.from(adapter.getListItems(resourceList)).map(resource ->
+        return Observable.fromIterable(adapter.getListItems(resourceList)).map(resource ->
                 new Event<>(adapter.getGroupingKey(resource), new K8sWatchEventData<>(INITIAL, resource)));
     }
     
@@ -76,7 +76,7 @@ public class K8sWatchEventSource<ResourceT, ResourceListT>
         logger.info("Creating k8s watch for resource : {}", adapter.getName());
         final Watch<JsonObject> watch = Watch.createWatch(apiClient, adapter.createApiCall(true, lastResourceVersion),
                 new TypeToken<Watch.Response<JsonObject>>() {}.getType());
-        return Observable.from(watch).map(this::objectJsonToEvent);
+        return Observable.fromIterable(watch).map(this::objectJsonToEvent);
     }
     
     /**

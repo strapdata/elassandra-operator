@@ -53,4 +53,11 @@ public class K8sModule {
     public ApiClient provideApiClient() {
         return this.apiClient;
     }
+    
+    
+    @Bean
+    @Singleton
+    public AppsV1Api provideAppsV1Api() {
+        return new AppsV1Api(apiClient);
+    }
 }

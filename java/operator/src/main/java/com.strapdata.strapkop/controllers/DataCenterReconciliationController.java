@@ -1,31 +1,18 @@
 package com.strapdata.strapkop.controllers;
 
 import com.strapdata.model.k8s.cassandra.DataCenter;
-import com.strapdata.strapkop.pipeline.K8sWatchEventData;
 
-import javax.inject.Singleton;
-import java.util.EnumSet;
-
-import static com.strapdata.strapkop.pipeline.K8sWatchEventData.Type.*;
-
-@Singleton
-public class DataCenterReconciliationController
-        implements Controller<K8sWatchEventData<DataCenter>> {
+@PipelineController
+public class DataCenterReconciliationController extends TerminalController<DataCenter> {
     
-    private static final EnumSet<K8sWatchEventData.Type> acceptedEventTypes = EnumSet.of(ADDED, MODIFIED, INITIAL);
-
-    private final DataCenterActionFactory dataCenterControllerFactory;
+    private DataCenterActionFactory dataCenterActionFactory;
     
-    public DataCenterReconciliationController(final DataCenterActionFactory dataCenterControllerFactory) {
-        this.dataCenterControllerFactory = dataCenterControllerFactory;
+    public DataCenterReconciliationController(DataCenterActionFactory dataCenterActionFactory) {
+        this.dataCenterActionFactory = dataCenterActionFactory;
     }
     
     @Override
-    public void accept(K8sWatchEventData<DataCenter> data) throws Exception {
-        if (!acceptedEventTypes.contains(data.getType())) {
-            return ;
-        }
-    
-        dataCenterControllerFactory.createReconciliation(data.getResource()).reconcileDataCenter();
+    protected void accept(DataCenter dc) throws Exception {
+        dataCenterActionFactory.createReconciliation(dc).reconcileDataCenter();
     }
 }

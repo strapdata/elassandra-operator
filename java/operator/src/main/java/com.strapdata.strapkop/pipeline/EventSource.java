@@ -1,6 +1,7 @@
 package com.strapdata.strapkop.pipeline;
 
-import rx.Observable;
+
+import io.reactivex.Observable;
 
 public interface EventSource<KeyT, DataT> {
     
