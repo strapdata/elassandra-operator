@@ -28,7 +28,7 @@ import java.util.stream.StreamSupport;
 /**
  * Pool nodes status every minutes
  */
-@Context
+//@Context
 public class CassandraHealthCheckService extends AbstractScheduledService {
     private static final Logger logger = LoggerFactory.getLogger(CassandraHealthCheckService.class);
 
