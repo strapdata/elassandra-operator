@@ -19,6 +19,7 @@ public class OperationController {
     }
 
     @Post("/decommission")
+    @Produces(MediaType.TEXT_PLAIN)
     public Completable decommissionNode() {
         return Completable.fromCallable( () -> {
             storageServiceMBean.decommission();

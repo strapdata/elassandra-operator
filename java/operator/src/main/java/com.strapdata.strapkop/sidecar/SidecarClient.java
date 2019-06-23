@@ -29,7 +29,7 @@ public class SidecarClient {
     }
     
     public Completable decommission() {
-        return httpClient.exchange(POST("/decommission", "")).ignoreElements();
+        return httpClient.exchange(POST("/operations/decommission", "")).ignoreElements();
     }
     
     public Single<BackupResponse> backup(BackupArguments backupArguments) {

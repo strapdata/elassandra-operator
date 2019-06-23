@@ -5,11 +5,11 @@ import com.google.common.util.concurrent.AbstractScheduledService;
 import com.strapdata.model.Key;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.sidecar.NodeStatus;
+import com.strapdata.strapkop.event.NodeStatusEvent;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import io.kubernetes.client.models.V1Pod;
-import io.micronaut.context.annotation.Context;
 import io.reactivex.Single;
 import io.reactivex.subjects.BehaviorSubject;
 import io.reactivex.subjects.Subject;
@@ -35,7 +35,7 @@ public class CassandraHealthCheckService extends AbstractScheduledService {
     private final K8sResourceUtils k8sResourceUtils;
     private final Map<Key, DataCenter> dataCenterCache = new HashMap<>(); // TODO: this cache is never populated
     private final Map<InetAddress, NodeStatus> cassandraNodeStatus = new ConcurrentHashMap<>();
-    private final BehaviorSubject<CassandraNodeStatusEvent> behaviorSubject = BehaviorSubject.create();
+    private final BehaviorSubject<NodeStatusEvent> behaviorSubject = BehaviorSubject.create();
     private final SidecarClientFactory sidecarClientFactory;
 
     @Inject
@@ -46,7 +46,7 @@ public class CassandraHealthCheckService extends AbstractScheduledService {
         this.sidecarClientFactory = sidecarClientFactory;
     }
 
-    public Subject<CassandraNodeStatusEvent> getSubject() {
+    public Subject<NodeStatusEvent> getSubject() {
         return this.behaviorSubject;
     }
 
@@ -71,7 +71,7 @@ public class CassandraHealthCheckService extends AbstractScheduledService {
                         logger.debug("Cassandra node {} has OperationMode = {current: {}, previous: {}}.", podIp, status, previousMode);
                         cassandraNodeStatus.put(podIp, status);
                         if (previousMode == null || !previousMode.equals(status)) {
-                            behaviorSubject.onNext(new CassandraNodeStatusEvent(pod, dataCenterKey, previousMode, status));
+                            behaviorSubject.onNext(new NodeStatusEvent(pod, dataCenterKey, previousMode, status));
                         }
                         return status;
                     });
