@@ -5,8 +5,16 @@
       <profile default="true" name="Default" enabled="true" />
     </annotationProcessing>
     <bytecodeTargetLevel>
-      <module name="strapkop.java.k8s-addson.main" target="8" />
-      <module name="strapkop.java.k8s-addson.test" target="1.8" />
+      <module name="backup_main" target="8" />
+      <module name="backup_test" target="1.8" />
+      <module name="k8s-addons_main" target="8" />
+      <module name="k8s-addons_test" target="1.8" />
+      <module name="model_main" target="8" />
+      <module name="model_test" target="1.8" />
+      <module name="operator_main" target="8" />
+      <module name="operator_test" target="1.8" />
+      <module name="sidecar_main" target="8" />
+      <module name="sidecar_test" target="1.8" />
     </bytecodeTargetLevel>
   </component>
 </project>
