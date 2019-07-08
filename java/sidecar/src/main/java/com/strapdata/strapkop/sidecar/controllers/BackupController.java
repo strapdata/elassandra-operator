@@ -30,6 +30,6 @@ public class BackupController {
     @Post(consumes = MediaType.APPLICATION_JSON)
     public BackupResponse createBackup(@Body BackupArguments backupArguments) {
         backupService.enqueueBackup(backupArguments);
-        return new BackupResponse("success");
+        return new BackupResponse().setStatus("success");
     }
 }

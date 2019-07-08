@@ -29,17 +29,14 @@ public class BackupService {
                 .map(backupArguments -> new BackupTask(backupArguments, new GlobalLock("/tmp")))
                 .doOnNext(BackupTask::call)
                 .retry()
+                .subscribeOn(Schedulers.io())
                 .subscribe(
                         backupTask -> logger.info("backup {} has completed", backupTask.getArguments().snapshotTag),
                         Throwable::printStackTrace);
     }
     
-    // NOTE: When using BehaviorSubject, the operators and subscribers are called on the same thread than the one
-    //       that feed the subject by calling onNext(), discarding what's in subscribeOn(). ObserveOn() is respected however.
-    //       the call to onNext is in fact synchronous (wait for all the subscribers to finished in the same thread)
-    //       That's why we create a Completable to submit the backup task asynchronously
     public void enqueueBackup(final BackupArguments arguments) {
-        Completable.fromRunnable(() -> subject.onNext(arguments)).subscribeOn(Schedulers.single()).subscribe();
+        subject.onNext(arguments);
     }
 
     // TODO: bind stop event to gracefully shutdown backups

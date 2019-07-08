@@ -1,10 +1,7 @@
 package com.strapdata.strapkop.preflight;
 
 import com.strapdata.strapkop.handler.*;
-import com.strapdata.strapkop.pipeline.DataCenterPipeline;
-import com.strapdata.strapkop.pipeline.EventPipeline;
-import com.strapdata.strapkop.pipeline.NodeStatusPipeline;
-import com.strapdata.strapkop.pipeline.StatefulsetPipeline;
+import com.strapdata.strapkop.pipeline.*;
 import io.reactivex.Observer;
 
 import javax.inject.Singleton;
@@ -29,6 +26,7 @@ public class RegisterHandlers implements Preflight<Void> {
         bind(DataCenterPipeline.class, DataCenterHandler.class);
         bind(StatefulsetPipeline.class, StatefulsetHandler.class);
         bind(NodeStatusPipeline.class, NodeStatusHandler.class);
+        bind(TaskPipeline.class, TaskHandler.class);
         return null;
     }
     

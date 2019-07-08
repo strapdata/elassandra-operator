@@ -30,6 +30,8 @@ rules:
   - elassandra-datacenters
   - elassandra-backup
   - elassandra-backups
+  - elassandra-task
+  - elassandra-tasks
   verbs:
   - '*'
 - apiGroups:
