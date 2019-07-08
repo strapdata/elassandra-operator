@@ -28,10 +28,14 @@ public class GenerateDefaultCA implements Preflight<X509CertificateAndPrivateKey
 
     @Override
     public X509CertificateAndPrivateKey call() throws Exception {
+        String caSecretName = System.getenv("CA_SECRET_NAME");
+        if (caSecretName == null)
+            caSecretName = AuthorityManager.DEFAULT_SECRET_NAME;
+
         X509CertificateAndPrivateKey ca;
         try {
-            ca = authorityManager.loadFromSecret(AuthorityManager.DEFAULT_SECRET_NAME, namespace);
-            logger.info("Operator default CA already exists");
+            ca = authorityManager.loadFromSecret(caSecretName, namespace);
+            logger.info("Operator default CA secret name={} already exists", caSecretName);
             return ca;
         }
         catch (ApiException e) {
@@ -40,10 +44,10 @@ public class GenerateDefaultCA implements Preflight<X509CertificateAndPrivateKey
             }
         }
 
-        logger.info("Generating operator default CA");
+        logger.info("Generating operator default CA as secret name={}", caSecretName);
 
         ca = authorityManager.generate();
-        authorityManager.storeAsSecret(AuthorityManager.DEFAULT_SECRET_NAME, namespace, ca);
+        authorityManager.storeAsSecret(caSecretName, namespace, ca);
         return ca;
     }
 }
