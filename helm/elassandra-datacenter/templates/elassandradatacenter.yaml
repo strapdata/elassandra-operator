@@ -11,6 +11,7 @@ metadata:
 {{ toYaml .Values.labels | indent 4 }}
 {{- end }}
 spec:
+  clusterName: {{ .Values.clusterName }}
   replicas: {{ .Values.replicaCount }}
   elassandraImage: "{{ .Values.image.elassandraRepository }}:{{ .Values.image.elassandraTag }}"
   sidecarImage: "{{ .Values.image.sidecarRepository }}:{{ .Values.image.sidecarTag }}"

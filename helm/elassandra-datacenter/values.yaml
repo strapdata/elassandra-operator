@@ -1,16 +1,16 @@
 # Default values for elassandra.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
-
+clusterName: Elassandra
 replicaCount: 1
 
 image:
-  elassandraRepository: docker.repo.strapdata.com/elassandra-operator/elassandra
-  sidecarRepository: docker.repo.strapdata.com/elassandra-operator/elassandra-sidecar
+  elassandraRepository: strapdata/strapkop-elassandra-dev
+  sidecarRepository: strapdata/strapkop-sidecar-dev
   elassandraTag: latest
   sidecarTag: latest
 
-imagePullPolicy: IfNotPresent
+imagePullPolicy: Always
 imagePullSecret: ""
 
 privilegedSupported: true
@@ -28,15 +28,15 @@ dataVolumeClaim:
       storage: 500Mi
 
 enterprise:
-  enabled: false
-  jmx: false
-  https: false
-  ssl: false
+  enabled: true
+  jmx: true
+  https: true
+  ssl: true
   aaa:
-    enabled: false
+    enabled: true
     shared_secret:
-    audit: false
-  cbs: false
+    audit: true
+  cbs: true
 
 #Example authentication for AWS S3 based backups
 #env:

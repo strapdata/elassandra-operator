@@ -1,5 +1,0 @@
-apiVersion: v1
-appVersion: "0.1"
-description: A Helm chart for creating Elassandra clusters using the Elassandra operator
-name: elassandra
-version: 0.1.0
