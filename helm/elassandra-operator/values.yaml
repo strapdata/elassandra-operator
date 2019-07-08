@@ -7,9 +7,9 @@ replicaCount: 1
 apiVersion: stable.strapdata.com/v1
 
 image:
-  repository: docker.repo.strapdata.com/elassandra-operator/elassandra-operator
+  repository: strapdata/strapkop-operator-dev
   tag: latest
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 
 resources: {}
   # Suggested resource limits for the operator itself (not elassandra), works with a reasonable sized minikube.
