@@ -22,7 +22,7 @@ jib {
         image = 'openjdk:alpine'
     }
     to {
-        image = dockerImagePrefix + dockerImageSuffix + "/elassandra-operator"
+        image = dockerImagePrefix + "operator" + dockerImageSuffix
         tags = [ version, project.gitCommitHash, 'latest']
         // osxkeychain does not work on linux and CI environments
         // credHelper = 'osxkeychain'

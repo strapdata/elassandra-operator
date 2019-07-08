@@ -14,7 +14,8 @@ task copyJar(type: Copy) {
   into        'build'
 }
 
-def elassandraImageName = dockerImagePrefix + dockerImageSuffix + "/elassandra" 
+// Strapkop elassandra docker image
+def elassandraImageName = dockerImagePrefix + 'elassandra' + dockerImageSuffix
 
 def elassandraVersions = new File('./docker/supportedElassandraVersions.txt') as String[]
 println "Supported Elassandra versions :"
