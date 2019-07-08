@@ -8,7 +8,7 @@ out/
 *.iml
 *.ipr
 *.iws
+*.tgz
 .project
 .settings
 .classpath
-gradle-wrapper.jar
