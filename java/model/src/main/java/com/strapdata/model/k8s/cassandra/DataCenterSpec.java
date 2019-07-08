@@ -25,21 +25,27 @@ public class DataCenterSpec {
     @SerializedName("replicas")
     @Expose
     private int replicas;
+
     @SerializedName("elassandraImage")
     @Expose
     private java.lang.String elassandraImage;
-    @SerializedName("enterpriseImage")
-    @Expose
-    private java.lang.String enterpriseImage;
+
     @SerializedName("sidecarImage")
     @Expose
     private java.lang.String sidecarImage;
+
     @SerializedName("imagePullPolicy")
     @Expose
     private java.lang.String imagePullPolicy;
+
     @SerializedName("imagePullSecret")
     @Expose
     private java.lang.String imagePullSecret;
+
+    @SerializedName("clusterName")
+    @Expose
+    private java.lang.String clusterName;
+
     /**
      * List of environment variables to inject in the Cassandra & Sidecar container.
      * 
@@ -54,6 +60,7 @@ public class DataCenterSpec {
     @SerializedName("resources")
     @Expose
     private V1ResourceRequirements resources;
+
     @SerializedName("dataVolumeClaim")
     @Expose
     private V1PersistentVolumeClaimSpec dataVolumeClaim;

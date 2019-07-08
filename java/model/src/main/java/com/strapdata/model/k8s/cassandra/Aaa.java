@@ -6,17 +6,30 @@ import com.google.gson.annotations.SerializedName;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
+
 @Data
 @NoArgsConstructor
 public class Aaa {
-    
+
+    /**
+     * Enable Elasticsearch authentication
+     */
     @SerializedName("enabled")
     @Expose
-    private Boolean enabled = false;
+    private Boolean enabled = true;
+
+    /**
+     * Enable Elasticsearch audit
+     */
     @SerializedName("audit")
     @Expose
-    private Boolean audit = false;
+    private Boolean audit = true;
+
+    /**
+     * Elasticsearch internode shared secret
+     */
     @SerializedName("sharedSecret")
     @Expose
-    private String sharedSecret;
+    private String sharedSecret = UUID.randomUUID().toString();
 }

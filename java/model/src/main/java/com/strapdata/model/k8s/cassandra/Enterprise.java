@@ -12,20 +12,25 @@ public class Enterprise {
 
     @SerializedName("enabled")
     @Expose
-    private Boolean enabled = false;
+    private Boolean enabled = true;
+
     @SerializedName("jmx")
     @Expose
-    private Boolean jmx = false;
+    private Boolean jmx = true;
+
     @SerializedName("https")
     @Expose
-    private Boolean https = false;
+    private Boolean https = true;
+
     @SerializedName("ssl")
     @Expose
-    private Boolean ssl = false;
+    private Boolean ssl = true;
+    
     @SerializedName("aaa")
     @Expose
     private Aaa aaa;
+
     @SerializedName("cbs")
     @Expose
-    private Boolean cbs = false;
+    private Boolean cbs = true;
 }
