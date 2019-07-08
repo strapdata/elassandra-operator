@@ -7,8 +7,6 @@
 -XX:+UseThreadPriorities
 -XX:ThreadPriorityPolicy=42
 
--Xss256k
-
 -XX:StringTableSize=1000003
 
 -XX:+AlwaysPreTouch
@@ -23,6 +21,30 @@
 -Djava.net.preferIPv4Stack=true
 
 
+-XX:+ExitOnOutOfMemoryError
+-XX:MaxDirectMemorySize=18G
+
+-Xss1m
+-Djava.awt.headless=true
+-Dfile.encoding=UTF-8
+-Djna.nosys=true
+
+# flags to configure Netty
+-Dio.netty.noUnsafe=true
+-Dio.netty.noKeySetOptimization=true
+-Dio.netty.recycler.maxCapacityPerThread=0
+
+# log4j 2
+-Dlog4j.shutdownHookEnabled=false
+-Dlog4j2.disable.jmx=true
+-Dlog4j.skipJansi=true
+
+# Docker tunning
+-XX:+UnlockExperimentalVMOptions
+-XX:+UseCGroupMemoryLimitForHeap
+-XX:MaxRAMFraction=2
+
+# GC settings are not defined here -- they are chosen by the operator at runtime
 # GC logging
 -XX:+PrintGCDetails
 -XX:+PrintGCDateStamps
@@ -34,10 +56,3 @@
 -XX:+UseGCLogFileRotation
 -XX:NumberOfGCLogFiles=10
 -XX:GCLogFileSize=10M
-
--XX:+HeapDumpOnOutOfMemoryError
-
--XX:MaxDirectMemorySize=18G
-
-
-# GC settings are not defined here -- they are chosen by the operator at runtime
