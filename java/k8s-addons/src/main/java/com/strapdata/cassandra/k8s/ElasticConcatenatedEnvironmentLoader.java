@@ -26,7 +26,7 @@ import com.google.common.base.Splitter;
 
 // TODO: could be refactored with ConcatenatedYamlConfigurationLoader to avoid duplicate code
 public class ElasticConcatenatedEnvironmentLoader implements EnvironmentLoader  {
-    private static final Logger logger = LoggerFactory.getLogger(ConcatenatedYamlConfigurationLoader.class);
+    private static final Logger logger = LoggerFactory.getLogger(ElasticConcatenatedEnvironmentLoader.class);
     
     private static final PathMatcher YAML_PATH_MATCHER = FileSystems.getDefault().getPathMatcher("glob:**/*.{yaml,yml}");
     
