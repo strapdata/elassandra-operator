@@ -27,12 +27,13 @@ public class RegisterHandlers implements Preflight<Void> {
         bind(StatefulsetPipeline.class, StatefulsetHandler.class);
         bind(NodeStatusPipeline.class, NodeStatusHandler.class);
         bind(TaskPipeline.class, TaskHandler.class);
+        bind(BackupPipeline.class, TaskHandler.class);
         return null;
     }
     
     @SuppressWarnings("unchecked")
-    private <DataT> void bind(Class<? extends EventPipeline<DataT>> pipeline,
-                                    Class<? extends Observer<DataT>> handler) {
+    private <DataT> void bind(Class<? extends EventPipeline<? extends DataT>> pipeline,
+                                    Class<? extends Observer<? extends DataT>> handler) {
         pipelines.get(pipeline).subscribe(handlers.get(handler));
     }
     

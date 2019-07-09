@@ -39,7 +39,7 @@ public class TaskEventSource implements EventSource<K8sWatchEvent<Task<?,?>>> {
     
     private final Logger logger = LoggerFactory.getLogger(TaskEventSource.class);
     
-    
+    // to add a new kind of task this map should be edited
     private static Map<String, Type> taskTypeMap = ImmutableMap.of("backup", BackupTask.class);
     
     private final ApiClient apiClient;

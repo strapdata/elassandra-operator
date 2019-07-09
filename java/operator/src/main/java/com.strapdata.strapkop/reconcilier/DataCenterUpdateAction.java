@@ -4,12 +4,12 @@ import com.google.common.base.Strings;
 import com.google.common.collect.*;
 import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
-import com.strapdata.model.k8s.backup.Backup;
+import com.squareup.okhttp.Call;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.k8s.cassandra.DataCenterSpec;
 import com.strapdata.model.k8s.cassandra.Enterprise;
+import com.strapdata.model.k8s.task.BackupTask;
 import com.strapdata.model.sidecar.NodeStatus;
-import com.squareup.okhttp.Call;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
@@ -319,10 +319,10 @@ public class DataCenterUpdateAction {
             logger.debug("Restore requested.");
             
             // custom objects api doesn't give us a nice way to pass in the type we want so we do it manually
-            final Backup backup;
+            final BackupTask backup;
             {
                 final Call call = customObjectsApi.getNamespacedCustomObjectCall("stable.strapdata.com", "v1", "default", "elassandra-backups", dataCenterSpec.getRestoreFromBackup(), null, null);
-                backup = customObjectsApi.getApiClient().<Backup>execute(call, new TypeToken<Backup>() {
+                backup = customObjectsApi.getApiClient().<BackupTask>execute(call, new TypeToken<BackupTask>() {
                 }.getType()).getData();
             }
             
