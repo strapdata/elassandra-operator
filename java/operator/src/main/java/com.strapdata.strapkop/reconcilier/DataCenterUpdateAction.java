@@ -157,9 +157,9 @@ public class DataCenterUpdateAction {
                 .image(dataCenterSpec.getElassandraImage())
                 .imagePullPolicy(dataCenterSpec.getImagePullPolicy())
                 .terminationMessagePolicy("FallbackToLogsOnError")
-                .addPortsItem(new V1ContainerPort().name("internode").containerPort(7000))
-                .addPortsItem(new V1ContainerPort().name("internode-ssl").containerPort(7001))
-                .addPortsItem(new V1ContainerPort().name("cql").containerPort(9042))
+                .addPortsItem(new V1ContainerPort().name("internode").containerPort(37000).hostPort(37000))
+                .addPortsItem(new V1ContainerPort().name("internode-ssl").containerPort(37001).hostPort(37001))
+                .addPortsItem(new V1ContainerPort().name("cql").containerPort(39042).hostPort(39042))
                 .addPortsItem(new V1ContainerPort().name("jmx").containerPort(7199))
                 .resources(dataCenterSpec.getResources())
                 .securityContext(new V1SecurityContext()
@@ -171,7 +171,7 @@ public class DataCenterUpdateAction {
                 .readinessProbe(new V1Probe()
                         .exec(new V1ExecAction()
                                 .addCommandItem("/ready-probe.sh")
-                                .addCommandItem(dataCenterSpec.getElasticsearchEnabled() ? "9200" : "9042")
+                                .addCommandItem(dataCenterSpec.getElasticsearchEnabled() ? "9200" : "39042")
                         )
                         .initialDelaySeconds(15)
                         .timeoutSeconds(5)
@@ -179,6 +179,10 @@ public class DataCenterUpdateAction {
                 .addVolumeMountsItem(new V1VolumeMount()
                         .name("elassandra-data-volume")
                         .mountPath("/var/lib/cassandra")
+                )
+                .addVolumeMountsItem(new V1VolumeMount()
+                        .name("nodeinfo")
+                        .mountPath("/nodeinfo")
                 )
                 .addVolumeMountsItem(new V1VolumeMount()
                         .name("pod-info")
@@ -191,7 +195,18 @@ public class DataCenterUpdateAction {
                 .addArgsItem("/tmp/sidecar-config-volume")
                 .addEnvItem(new V1EnvVar().name("NAMESPACE").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.namespace"))))
                 .addEnvItem(new V1EnvVar().name("POD_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.name"))))
-                .addEnvItem(new V1EnvVar().name("POD_IP").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("status.podIP"))));
+                .addEnvItem(new V1EnvVar().name("POD_IP").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("status.podIP"))))
+                .addEnvItem(new V1EnvVar().name("NODE_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("spec.nodeName"))));
+    
+        for(V1EnvVar envVar : this.dataCenterSpec.getEnv()) {
+            if (envVar.getName().equals("NODEINFO_SECRET")) {
+                cassandraContainer.addEnvItem(new V1EnvVar()
+                        .name("NODEINFO_TOKEN")
+                        .valueFrom(new V1EnvVarSource().secretKeyRef(new V1SecretKeySelector().name(envVar.getValue()).key("token"))));
+            
+                break;
+            }
+        }
         
         if (dataCenterSpec.getElasticsearchEnabled()) {
             cassandraContainer.addPortsItem(new V1ContainerPort().name("elasticsearch").containerPort(9200));
@@ -232,6 +247,7 @@ public class DataCenterUpdateAction {
                 .securityContext(new V1PodSecurityContext().fsGroup(999L))
                 .addInitContainersItem(fileLimitInit())
                 .addInitContainersItem(vmMaxMapCountInit())
+                .addInitContainersItem(nodeInfoInit())
                 .addContainersItem(cassandraContainer)
                 .addContainersItem(sidecarContainer)
                 .addVolumesItem(new V1Volume()
@@ -258,14 +274,16 @@ public class DataCenterUpdateAction {
                 .addVolumesItem(new V1Volume()
                         .name("sidecar-config-volume")
                         .emptyDir(new V1EmptyDirVolumeSource())
+                )
+                .addVolumesItem(new V1Volume()
+                        .name("nodeinfo")
+                        .emptyDir(new V1EmptyDirVolumeSource())
                 );
         
         {
             final String secret = dataCenterSpec.getImagePullSecret();
             if (!Strings.isNullOrEmpty(secret)) {
-                final V1LocalObjectReference pullSecret = new V1LocalObjectReference()
-                        .name(secret);
-                
+                final V1LocalObjectReference pullSecret = new V1LocalObjectReference().name(secret);
                 podSpec.addImagePullSecretsItem(pullSecret);
             }
         }
@@ -402,7 +420,27 @@ public class DataCenterUpdateAction {
                 .name("increase-vm-max-map-count")
                 .image("busybox")
                 .imagePullPolicy("IfNotPresent")
+                .terminationMessagePolicy("FallbackToLogsOnError")
                 .command(ImmutableList.of("sysctl", "-w", "vm.max_map_count=1048575"));
+    }
+    
+    // Nodeinfo init container
+    private V1Container nodeInfoInit() {
+        return new V1Container()
+                .securityContext(new V1SecurityContext().privileged(dataCenterSpec.getPrivilegedSupported()))
+                .name("nodeinfo")
+                .image("bitnami/kubectl")
+                .imagePullPolicy("IfNotPresent")
+                .terminationMessagePolicy("FallbackToLogsOnError")
+                .command(ImmutableList.of("sh", "-c",
+                        "kubectl get no -Lfailure-domain.beta.kubernetes.io/zone --token=\"$NODEINFO_TOKEN\" | grep ${NODE_NAME} | awk '{printf(\"%s\",$6)}' > /nodeinfo/zone && " +
+                                "kubectl get no -Lbeta.kubernetes.io/instance-type --token=\"$NODEINFO_TOKEN\" | grep ${NODE_NAME} | awk '{printf(\"%s\",$6)}' > /nodeinfo/instance-type && " +
+                                "kubectl get no -Lstoragetier --token=\"$NODEINFO_TOKEN\" | grep ${NODEINFO_TOKEN} | awk '{printf(\"%s\",$6)}' > /nodeinfo/storagetier && " +
+                                "kubectl get no -Lkubernetes.strapdata.com/public-ip --token=\"$NODEINFO_TOKEN\" | grep ${NODE_NAME} | awk '{printf(\"%s\",$6)}' > /nodeinfo/public-ip"))
+                .addVolumeMountsItem(new V1VolumeMount()
+                        .name("nodeinfo")
+                        .mountPath("/nodeinfo")
+                );
     }
     
     private static void configMapVolumeAddFile(final V1ConfigMap configMap, final V1ConfigMapVolumeSource volumeSource, final String path, final String content) {
@@ -431,8 +469,9 @@ public class DataCenterUpdateAction {
         // cassandra.yaml overrides
         {
             final Map<String, Object> config = new HashMap<>(); // can't use ImmutableMap as some values are null
-            
-            config.put("cluster_name", dataCenterMetadata.getName()); // TODO: support multi-DC & cluster names
+    
+            config.put("cluster_name", dataCenterSpec.getClusterName());
+            config.put("num_tokens", "16");
             
             config.put("listen_address", null); // let C* discover the listen address
             // broadcast_rpc is set dynamically from entry-point.sh according to env $POD_IP
@@ -446,6 +485,10 @@ public class DataCenterUpdateAction {
             
             
             config.put("endpoint_snitch", "org.apache.cassandra.locator.GossipingPropertyFileSnitch");
+    
+            config.put("storage_port", "37000");
+            config.put("ssl_storage_port", "37001");
+            config.put("native_transport_port","39042");
             
             
             configMapVolumeAddFile(configMap, volumeSource, "cassandra.yaml.d/001-operator-overrides.yaml", toYamlString(config));
@@ -456,7 +499,7 @@ public class DataCenterUpdateAction {
             final Properties rackDcProperties = new Properties();
             
             rackDcProperties.setProperty("dc", dataCenterMetadata.getName());
-            rackDcProperties.setProperty("rack", "the-rack"); // TODO: support multiple racks - Can't proceed until https://github.com/kubernetes/kubernetes/issues/41598 is fixed
+            rackDcProperties.setProperty("rack", "R0");
             rackDcProperties.setProperty("prefer_local", "true"); // TODO: support multiple racks
             
             final StringWriter writer = new StringWriter();
