@@ -3,6 +3,7 @@ package com.strapdata.strapkop.reconcilier;
 import com.google.common.base.Strings;
 import com.google.common.collect.*;
 import com.google.gson.JsonSyntaxException;
+import com.google.common.net.InetAddresses;
 import com.google.gson.reflect.TypeToken;
 import com.squareup.okhttp.Call;
 import com.strapdata.model.k8s.cassandra.DataCenter;
@@ -15,7 +16,7 @@ import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import com.strapdata.strapkop.ssl.AuthorityManager;
-import com.strapdata.strapkop.ssl.SecretIssuer;
+import com.strapdata.strapkop.ssl.utils.CertManager;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1beta2Api;
 import io.kubernetes.client.apis.CoreV1Api;
@@ -32,7 +33,6 @@ import org.yaml.snakeyaml.Yaml;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.net.InetAddress;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -49,7 +49,8 @@ public class DataCenterUpdateAction {
     private final CustomObjectsApi customObjectsApi;
     private final SidecarClientFactory sidecarClientFactory;
     private final K8sResourceUtils k8sResourceUtils;
-    private final SecretIssuer secretIssuer;
+    private final CertManager certManager;
+    private final AuthorityManager authorityManager;
     private final OperatorConfig config;
     private String namespace;
     
@@ -57,17 +58,22 @@ public class DataCenterUpdateAction {
     private DataCenterSpec dataCenterSpec;
     private Map<String, String> dataCenterLabels;
     
-    public DataCenterUpdateAction(CoreV1Api coreApi, AppsV1beta2Api appsApi,
-                                  CustomObjectsApi customObjectsApi, SidecarClientFactory sidecarClientFactory,
-                                  K8sResourceUtils k8sResourceUtils, SecretIssuer secretIssuer, OperatorConfig config,
-                                  @Parameter("dataCenter") DataCenter dataCenter
+    public DataCenterReconciliationController(CoreV1Api coreApi, AppsV1beta2Api appsApi,
+                                              CustomObjectsApi customObjectsApi,
+                                              SidecarClientFactory sidecarClientFactory,
+                                              K8sResourceUtils k8sResourceUtils,
+                                              CertManager certManager,
+                                              AuthorityManager authorityManager,
+                                              OperatorConfig config,
+                                              @Parameter("dataCenter") DataCenter dataCenter
     ) {
         this.coreApi = coreApi;
         this.appsApi = appsApi;
         this.customObjectsApi = customObjectsApi;
         this.sidecarClientFactory = sidecarClientFactory;
         this.k8sResourceUtils = k8sResourceUtils;
-        this.secretIssuer = secretIssuer;
+        this.certManager = certManager;
+        this.authorityManager = authorityManager;
         this.config = config;
         this.namespace = config.getNamespace();
         
@@ -112,7 +118,7 @@ public class DataCenterUpdateAction {
         }
         
         if (dataCenterSpec.getSsl()) {
-            createCertificatesIfNotExists();
+            createKeystoreIfNotExists();
         }
         
         // create the StatefulSet for the DC nodes
@@ -337,14 +343,17 @@ public class DataCenterUpdateAction {
         }
         
         if (dataCenterSpec.getSsl()) {
-            cassandraContainer.addVolumeMountsItem(new V1VolumeMount()
-                    .name("operator-certificates")
-                    .mountPath("/tmp/operator-certificates"));
-            
-            podSpec.addVolumesItem(new V1Volume()
-                    .name("operator-certificates")
-                    .secret(new V1SecretVolumeSource()
-                            .secretName(dataCenterChildObjectName("%s-certificates"))));
+            cassandraContainer.addVolumeMountsItem(new V1VolumeMount().name("operator-keystore").mountPath("/tmp/operator-keystore"));
+            podSpec.addVolumesItem(new V1Volume().name("operator-keystore")
+                    .secret(new V1SecretVolumeSource().secretName(dataCenterChildObjectName("%s-keystore"))
+                    .addItemsItem(new V1KeyToPath().key("keystore.p12").path("keystore.p12"))));
+
+            cassandraContainer.addVolumeMountsItem(new V1VolumeMount().name("operator-truststore").mountPath("/tmp/operator-truststore"));
+            podSpec.addVolumesItem(new V1Volume().name("operator-truststore")
+                .secret(new V1SecretVolumeSource()
+                    .secretName(dataCenterChildObjectName(this.authorityManager.getPublicCaSecretName()))
+                    .addItemsItem(new V1KeyToPath().key(AuthorityManager.SECRET_CACERT_PEM).path(AuthorityManager.SECRET_CACERT_PEM))
+                    .addItemsItem(new V1KeyToPath().key(AuthorityManager.SECRET_TRUSTSTORE_P12).path(AuthorityManager.SECRET_TRUSTSTORE_P12))));
         }
         
         
@@ -499,7 +508,6 @@ public class DataCenterUpdateAction {
                     "parameters", ImmutableList.of(ImmutableMap.of("service", seedNodesService.getMetadata().getName()))
             )));
 
-
             config.put("storage_port", dataCenterSpec.getStoragePort());
             config.put("ssl_storage_port", dataCenterSpec.getSslStoragePort());
             config.put("native_transport_port",dataCenterSpec.getNativePort());
@@ -625,9 +633,9 @@ public class DataCenterUpdateAction {
         
         cassandraConfig.put("server_encryption_options", ImmutableMap.builder()
                 .put("internode_encryption", "all")
-                .put("keystore", "/tmp/operator-certificates/keystore.p12")
+                .put("keystore", "/tmp/operator-keystore/keystore.p12")
                 .put("keystore_password", "changeit")
-                .put("truststore", "/tmp/operator-certificates/truststore.p12")
+                .put("truststore", "/tmp/operator-truststore/truststore.p12")
                 .put("truststore_password", "changeit")
                 .put("protocol", "TLSv1.2")
                 .put("algorithm", "SunX509")
@@ -639,9 +647,9 @@ public class DataCenterUpdateAction {
         
         cassandraConfig.put("client_encryption_options", ImmutableMap.builder()
                 .put("enabled", true)
-                .put("keystore", "/tmp/operator-certificates/keystore.p12")
+                .put("keystore", "/tmp/operator-keystore/keystore.p12")
                 .put("keystore_password", "changeit")
-                .put("truststore", "/tmp/operator-certificates/truststore.p12")
+                .put("truststore", "/tmp/operator-truststore/truststore.p12")
                 .put("truststore_password", "changeit")
                 .put("protocol", "TLSv1.2")
                 .put("store_type", "PKCS12")
@@ -660,16 +668,16 @@ public class DataCenterUpdateAction {
                         "ssl = true\n" +
                         "\n" +
                         "[ssl]\n" +
-                        "certfile = /tmp/operator-certificates/cacert.pem\n" +
+                        "certfile = /tmp/operator-truststore/cacert.pem\n" +
                         "validate = true\n";
         
         configMapVolumeAddFile(configMap, volumeSource, "cqlshrc", cqlshrc);
-        
-        configMapVolumeAddFile(configMap, volumeSource, "curlrc", "cacert = /tmp/operator-certificates/cacert.pem");
-        
-        final String envScript = "" +
-                "mkdir -p ~/.cassandra\n" +
-                "cp ${CASSANDRA_CONF}/cqlshrc ~/.cassandra/cqlshrc\n" +
+   
+        configMapVolumeAddFile(configMap, volumeSource, "curlrc", "cacert = /tmp/operator-truststore/cacert.pem");
+    
+        final String envScript = ""+
+                "mkdir -p ~/.cassandra\n"+
+                "cp ${CASSANDRA_CONF}/cqlshrc ~/.cassandra/cqlshrc\n"+
                 "cp ${CASSANDRA_CONF}/curlrc ~/.curlrc";
         
         configMapVolumeAddFile(configMap, volumeSource, "cassandra-env.sh.d/002-ssl.sh", envScript);
@@ -985,10 +993,10 @@ public class DataCenterUpdateAction {
                 () -> customObjectsApi.replaceNamespacedCustomObject("monitoring.coreos.com", "v1", dataCenterMetadata.getNamespace(), "servicemonitors", name, prometheusServiceMonitor)
         );
     }
-    
-    private void createCertificatesIfNotExists() throws Exception {
-        final V1ObjectMeta certificatesMetadata = dataCenterChildObjectMetadata("%s-certificates");
-        
+
+    private void createKeystoreIfNotExists() throws Exception {
+        final V1ObjectMeta certificatesMetadata = dataCenterChildObjectMetadata("%s-keystore");
+
         // check if secret exists
         try {
             coreApi.readNamespacedSecret(certificatesMetadata.getName(), certificatesMetadata.getNamespace(), null, null, null);
@@ -998,21 +1006,22 @@ public class DataCenterUpdateAction {
                 throw e;
             }
         }
-        
-        final String wildcardName = "*." + dataCenterChildObjectName("%s") + "." + dataCenterMetadata.getNamespace() + ".svc.local";
-        final V1Secret certificatesSecret = secretIssuer.issue(
-                certificatesMetadata,
-                SecretIssuer.Attributes.builder()
-                        .caSecretName(AuthorityManager.DEFAULT_SECRET_NAME)
-                        .caSecretNamespace(namespace)
-                        .alias(dataCenterMetadata.getName())
-                        .password("changeit")
-                        .commonName(wildcardName)
-                        .domains(ImmutableList.of(wildcardName, "localhost"))
-                        .addresses(ImmutableList.of(InetAddress.getByName("127.0.0.1")))
-                        .build()
-        );
-        
-        coreApi.createNamespacedSecret(dataCenterMetadata.getNamespace(), certificatesSecret, null, null, null);
+
+        // generate statefulset wilcard certificate in a PKCS12 keystore
+        final String wildcardStatefulsetName = "*." + dataCenterChildObjectName("%s") + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local";
+        final String headlessServiceName = dataCenterChildObjectName("%s") + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local";
+        final String elasticsearchServiceName = dataCenterChildObjectName("%s") + "-elasticsearch." + dataCenterMetadata.getNamespace() + ".svc.cluster.local";
+        final V1Secret certificatesSecret = new V1Secret()
+            .metadata(certificatesMetadata)
+            .putDataItem("keystore.p12",
+                authorityManager.issueCertificateKeystore(
+                    wildcardStatefulsetName,
+                    ImmutableList.of(wildcardStatefulsetName, headlessServiceName, elasticsearchServiceName, "localhost"),
+                    ImmutableList.of(InetAddresses.forString("127.0.0.1")),
+                    dataCenterMetadata.getName(),
+                    "changeit"
+            ));
+
+        coreApi.createNamespacedSecret(dataCenterMetadata.getNamespace(), certificatesSecret,null, null, null);
     }
 }
