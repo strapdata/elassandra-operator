@@ -9,11 +9,11 @@ rf=${3:-1}
 size=${4:-10}
 
 node_0=${name}-elassandra-0
-kubectl exec ${node_0} -c ${ELASSANDRA} --  cqlsh ${node_0} ${CQL_CRED} -e "CREATE KEYSPACE IF NOT EXISTS ks WITH replication = {'class': 'NetworkTopologyStrategy', '${name}-elassandra': ${rf} };"
+kubectl exec ${node_0} -c ${ELASSANDRA} --  cqlsh ${node_0} ${CQL_CRED} -e "CREATE KEYSPACE IF NOT EXISTS ks WITH replication = {'class': 'NetworkTopologyStrategy', '${name}-${CHART_NAME}': ${rf} };"
 kubectl exec ${node_0} -c ${ELASSANDRA} --  cqlsh ${node_0} ${CQL_CRED} -e "CREATE TABLE IF NOT EXISTS ks.t (id int PRIMARY KEY );"
 
 for ((i=0; i < ${size}; i++)); do
-  node=${name}-elassandra-$(shuf -i 0-$((${replicas}-1)) -n 1)
+  node=${name}-${CHART_NAME}-$(shuf -i 0-$((${replicas}-1)) -n 1)
   kubectl exec ${node} -c ${ELASSANDRA} -- cqlsh ${node} ${CQL_CRED} -e "INSERT INTO ks.t (id ) VALUES ( $i) ;"
 done
 

@@ -15,7 +15,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      elassandra-operator.strapdata.com/datacenter: ${dc}-elassandra
+      elassandra-operator.strapdata.com/datacenter: ${dc}-${CHART_NAME}
   backupType: "AZURE_BLOB"
   target: ${AZURE_STORAGE_CONTAINER}
 EOF
@@ -23,10 +23,10 @@ EOF
 for ((i=0; i<${replicas}; i++)); do
   while true; do
     echo "waiting for pod backups to finish on node $i"
-    kubectl logs ${dc}-elassandra-${i} sidecar --tail=10
-    if kubectl logs ${dc}-elassandra-${i} sidecar --tail=10 | grep "Cleared snapshot \"$backup_name\""; then
+    kubectl logs ${dc}-${CHART_NAME}-${i} sidecar --tail=10
+    if kubectl logs ${dc}-${CHART_NAME}-${i} sidecar --tail=10 | grep "Cleared snapshot \"$backup_name\""; then
       break;
-    elif kubectl logs ${dc}-elassandra-${i} sidecar --tail=20 | grep "ERROR"; then
+    elif kubectl logs ${dc}-${CHART_NAME}-${i} sidecar --tail=20 | grep "ERROR"; then
       exit 1
     fi
     sleep 1

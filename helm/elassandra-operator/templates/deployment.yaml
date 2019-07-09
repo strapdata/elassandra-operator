@@ -29,7 +29,7 @@ spec:
       containers:
         - name: {{ template "elassandra-operator.name" . }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+          imagePullPolicy: "{{ .Values.imagePullPolicy }}"
           terminationMessagePolicy: "FallbackToLogsOnError"
 #          Uncomment and modify to change operator behaviour via start up flags
 #          command: ["java"]

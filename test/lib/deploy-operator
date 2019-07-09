@@ -6,14 +6,17 @@ source test/config
 helm install -n elassandra-operator --wait \
     --set image.repository=${OPERATOR_IMAGE} \
     --set image.tag=${TAG} \
+    --set imagePullPolicy=IfNotPresent \
     --set imagePullSecret=${PULL_SECRET} \
     $@ \
     helm/elassandra-operator
 
 
+
 for ((i=10; i>=1; i--)); do
 
   if kubectl get crd elassandra-datacenters.stable.strapdata.com; then
+    test/lib/wait-pod-ready $(test/lib/get-operator-pod-name)
     sleep 5 # some magic
     exit 0
   fi
@@ -23,5 +26,5 @@ done
 
 
 
-echo "ERROR: operator didn't create CRD"
+echo "ERROR: helm didn't create CRD"
 exit 1

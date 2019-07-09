@@ -16,21 +16,20 @@ helm ${helm_cmd} \
     --set image.sidecarRepository=${SIDECAR_IMAGE} \
     --set image.elassandraTag=${TAG} \
     --set image.sidecarTag=${TAG} \
+    --set imagePullPolicy=IfNotPresent \
     --set imagePullSecret=${PULL_SECRET} \
     --set replicaCount=${replicas} \
-    --set imagePullPolicy=IfNotPresent \
     --set elasticsearchEnabled=${ELASTICSEARCH_ENABLED} \
     --set ssl=${SSL} \
     --set authentication=${AUTHENTICATION} \
-    --set authorization=${AUTHORIZATION} \
     --set enterprise.enabled=${ENTERPRISE} \
     --set enterprise.jmx=true \
     --set enterprise.https=${SSL} \
     --set enterprise.ssl=${SSL} \
-    --set enterprise.aaa.enabled=${AUTHENTICATION} \
-    --set enterprise.aaa.audit=${AUTHENTICATION} \
-    --set enterprise.cbs=${AUTHORIZATION} \
-    helm/elassandra
+    --set enterprise.aaa.enabled=$([[ "${AUTHENTICATION}" != "NONE" ]] && echo "true" || echo "false") \
+    --set enterprise.aaa.audit=$([[ "${AUTHENTICATION}" != "NONE" ]] && echo "true" || echo "false") \
+    --set enterprise.cbs=$([[ "${AUTHENTICATION}" != "NONE" ]] && echo "true" || echo "false") \
+    helm/elassandra-datacenter
 
 #    --set userSecretVolumeSource.secretName=${name} \
 #    --set userConfigMapVolumeSource.name=${name} \

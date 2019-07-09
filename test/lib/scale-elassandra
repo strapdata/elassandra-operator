@@ -6,4 +6,4 @@ source test/config
 name=${1:-dc1}
 replicas=${2:-1}
 
-helm upgrade --reuse-values --set replicaCount=${replicas} ${name} helm/elassandra
+helm upgrade --reuse-values --set replicaCount=${replicas} ${name} helm/elassandra-datacenter

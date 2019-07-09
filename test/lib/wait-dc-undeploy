@@ -29,5 +29,5 @@ wait_pod_removed(){
 # TODO: consistent naming
 
 for ((x=$((${replicas} - 1)); x>=0; x--)); do
-  wait_pod_removed ${dc_name}-elassandra-${x}
+  wait_pod_removed ${dc_name}-${CHART_NAME}-${x}
 done

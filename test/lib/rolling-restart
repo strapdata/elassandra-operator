@@ -5,4 +5,4 @@ source test/config
 
 name=${1:-dc1}
 
-kubectl patch sts ${name}-elassandra -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"`date +'%s'`\"}}}}}"
+kubectl patch sts ${name}-${CHART_NAME} -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"`date +'%s'`\"}}}}}"

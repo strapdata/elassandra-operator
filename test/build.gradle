@@ -26,5 +26,6 @@ task basicSetup(type: Exec) {
 
 tasks.withType(Exec) {
   environment "SUFFIX", dockerImageSuffix
+  environment "REGISTRY", registryUrl
 }
 

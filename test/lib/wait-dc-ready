@@ -23,6 +23,6 @@ wait_pod_ready(){
 # TODO: consistent naming
 
 for ((x=0; x<${replicas}; x++)); do
-  wait_pod_ready ${dc_name}-elassandra-${x}
+  wait_pod_ready ${dc_name}-${CHART_NAME}-${x}
 done
 

@@ -8,7 +8,7 @@ type=${2:-t}
 name=${3:-dc1}
 replicas=${4:-1}
 
-node_0=${name}-elassandra-0
+node_0=${name}-${CHART_NAME}-0
 
 if [ "$ELASTICSEARCH_ENABLED" = "true" ]; then
 

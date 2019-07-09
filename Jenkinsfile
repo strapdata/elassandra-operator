@@ -72,6 +72,7 @@ podTemplate(
               sh 'java -version'
 
               sh "sed -i 's/dockerImageSuffix=.*/dockerImageSuffix=-staging/' gradle.properties"
+              sh "sed -i 's/registryUrl=.*/registryUrl=docker.repo.strapdata.com/' gradle.properties"
               sh "sed -i 's/registryUsername=.*/registryUsername=${REGISTRY_USER}/' gradle.properties"
               sh "sed -i 's/registryPassword=.*/registryPassword=${REGISTRY_PASSWORD}/' gradle.properties"
               sh "sed -i 's/registryEmail=.*/registryEmail=barth@strapdata.com/' gradle.properties"

@@ -9,7 +9,8 @@ apiVersion: stable.strapdata.com/v1
 image:
   repository: strapdata/strapkop-operator-dev
   tag: latest
-  pullPolicy: Always
+
+imagePullPolicy: Always
 
 resources: {}
   # Suggested resource limits for the operator itself (not elassandra), works with a reasonable sized minikube.
