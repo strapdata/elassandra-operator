@@ -4,11 +4,11 @@ import com.bmuschko.gradle.docker.tasks.image.*
 // Use task types
 task dockerBuildImage(type: DockerBuildImage) {
   inputDir = file('.')
-  tags.add(dockerImagePrefix + '/jenkins-buildenv:latest')
+  tags.add(dockerImagePrefix + 'jenkins-buildenv:latest')
 }
 
 task dockerPushImage(type: DockerPushImage) {
   dependsOn 'dockerBuildImage'
-  imageName = dockerImagePrefix + "/jenkins-buildenv"
+  imageName = dockerImagePrefix + "jenkins-buildenv"
   tag = "latest"
 }

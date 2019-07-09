@@ -17,7 +17,7 @@ podTemplate(
                 containerTemplate(
                         name: 'buildenv',
                         alwaysPullImage: true,
-                        image: "docker.repo.strapdata.com/elassandra-operator/jenkins-buildenv:latest",
+                        image: "docker.repo.strapdata.com/strapkop/jenkins-buildenv:latest",
                         command: 'cat',
                         ttyEnabled: true,
                         workingDir: "/home/jenkins"
@@ -25,7 +25,7 @@ podTemplate(
                 containerTemplate(
                         name: 'azure',
                         alwaysPullImage: true,
-                        image: "docker.repo.strapdata.com/elassandra-operator/jenkins-buildenv:latest",
+                        image: "docker.repo.strapdata.com/strapkop/jenkins-buildenv:latest",
                         command: 'cat',
                         ttyEnabled: true,
                         workingDir: "/home/jenkins"
@@ -87,7 +87,8 @@ podTemplate(
                       container('azure') {
                         sh "az login --service-principal -u ${AZ_APP_ID} -p ${AZ_PASSWORD} --tenant ${AZ_TENANT_ID}"
                         aksCreating = true
-                        sh '././gradlew :test:setupAks'
+                        sh 'printenv'
+                        sh './gradlew :test:setupAks'
                         aksCreated = true
                         aksCreating = false
                       }
