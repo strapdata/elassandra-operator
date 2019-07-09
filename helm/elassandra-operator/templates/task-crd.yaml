@@ -3,6 +3,9 @@ kind: CustomResourceDefinition
 metadata:
   # name must match the spec fields below, and be in the form: <plural>.<group>
   name: elassandra-tasks.stable.strapdata.com
+  annotations:
+    "helm.sh/hook": crd-install
+    "helm.sh/hook-delete-policy": before-hook-creation
 spec:
   # group name to use for REST API: /apis/<group>/<version>
   group: stable.strapdata.com
