@@ -23,14 +23,14 @@ export AKS_SP_PASSWORD=${AKS_SP_PASSWORD:-}
 export AKS_K8S_VERSION=${AKS_K8S_VERSION:-1.12.7}
 
 export PULL_SECRET=${PULL_SECRET:-""}
-export REGISTRY=${REGISTRY:-""}
-[[ -n "${REGISTRY}" ]] && [[ "${REGISTRY}" != */ ]] && REGISTRY="${REGISTRY}/" # add a trailing slash if necessary
-
-export SUFFIX=${SUFFIX:-""}
+export IMAGE_PREFIX=${IMAGE_PREFIX:-"strapdata/strapkop-"}
+export IMAGE_SUFFIX=${IMAGE_SUFFIX:-""}
 export ELASSANDRA=${ELASSANDRA:-elassandra}
-export REGISTRY_BASE_PATH=${REGISTRY_BASE_PATH:-strapdata}
 export REGISTRY_USER=${REGISTRY_USER:-""}
 export REGISTRY_PASSWORD=${REGISTRY_PASSWORD:-""}
+export ELASSANDRA_IMAGE=${IMAGE_PREFIX}elassandra${IMAGE_SUFFIX}
+export OPERATOR_IMAGE=${IMAGE_PREFIX}operator${IMAGE_SUFFIX}
+export SIDECAR_IMAGE=${IMAGE_PREFIX}sidecar${IMAGE_SUFFIX}
 
 SHA1=`git rev-parse --short HEAD`
 export TAG="${TAG:-${SHA1}}"
@@ -38,11 +38,7 @@ export TAG="${TAG:-${SHA1}}"
 
 export SSL=${SSL:-true}
 export AUTHENTICATION=${AUTHENTICATION:-CASSANDRA}
-
 export ENTERPRISE=${ENTERPRISE:-true}
-export ELASSANDRA_IMAGE=${REGISTRY}${REGISTRY_BASE_PATH}/strapkop-elassandra${SUFFIX}
-export OPERATOR_IMAGE=${REGISTRY}${REGISTRY_BASE_PATH}/strapkop-operator${SUFFIX}
-export SIDECAR_IMAGE=${REGISTRY}${REGISTRY_BASE_PATH}/strapkop-sidecar${SUFFIX}
 
 [ "$AUTHENTICATION" != "NONE" ] && export CQL_CRED="-u cassandra -p cassandra"
 [ "$AUTHENTICATION" != "NONE" ] && [ "$ENTERPRISE" = "true" ] && export CURL_CRED="-u cassandra:cassandra" || export CURL_CRED=""

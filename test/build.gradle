@@ -14,6 +14,10 @@ task testBackup(type: Exec) {
   commandLine "./test-backup", project.backupDc, project.backupReplicas
 }
 
+task setupAks(type: Exec) {
+  commandLine "./setup-aks"
+}
+
 task test {
   dependsOn 'testBasic'
   dependsOn 'testScale'
@@ -25,7 +29,6 @@ task basicSetup(type: Exec) {
 }
 
 tasks.withType(Exec) {
-  environment "SUFFIX", project.dockerImageSuffix
-  environment "REGISTRY", project.registryUrl
+  environment = [IMAGE_SUFFIX: project.dockerImageSuffix, IMAGE_PREFIX: project.dockerImagePrefix]
 }
 

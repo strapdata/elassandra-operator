@@ -76,7 +76,7 @@ podTemplate(
               sh "sed -i 's/registryUsername=.*/registryUsername=${REGISTRY_USER}/' gradle.properties"
               sh "sed -i 's/registryPassword=.*/registryPassword=${REGISTRY_PASSWORD}/' gradle.properties"
               sh "sed -i 's/registryEmail=.*/registryEmail=barth@strapdata.com/' gradle.properties"
-              sh "sed -i 's@dockerImagePrefix=.*@dockerImagePrefix=docker.repo.strapdata.com/strapdata/strapkop-@' gradle.properties"
+              sh "sed -i 's@dockerImagePrefix=.*@dockerImagePrefix=docker.repo.strapdata.com/strapkop/@' gradle.properties"
               sh "cat gradle.properties"
             }
           }
@@ -87,7 +87,7 @@ podTemplate(
                       container('azure') {
                         sh "az login --service-principal -u ${AZ_APP_ID} -p ${AZ_PASSWORD} --tenant ${AZ_TENANT_ID}"
                         aksCreating = true
-                        sh './test/setup-aks'
+                        sh '././gradlew :test:setupAks'
                         aksCreated = true
                         aksCreating = false
                       }
