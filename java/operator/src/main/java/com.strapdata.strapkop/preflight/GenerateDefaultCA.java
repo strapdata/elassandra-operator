@@ -9,33 +9,27 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 
+/**
+ * Generates a CA as secret if not exists
+ */
 @Singleton
 public class GenerateDefaultCA implements Preflight<X509CertificateAndPrivateKey> {
+
     static final Logger logger = LoggerFactory.getLogger(GenerateDefaultCA.class);
     
     private final AuthorityManager authorityManager;
-    private final String namespace;
 
     public GenerateDefaultCA(final AuthorityManager authorityManager) {
-        this(authorityManager, "default");
-    }
-
-    public GenerateDefaultCA(final AuthorityManager authorityManager,
-                             final String namespace) {
         this.authorityManager = authorityManager;
-        this.namespace = namespace;
     }
 
     @Override
     public X509CertificateAndPrivateKey call() throws Exception {
-        String caSecretName = System.getenv("CA_SECRET_NAME");
-        if (caSecretName == null)
-            caSecretName = AuthorityManager.DEFAULT_SECRET_NAME;
-
         X509CertificateAndPrivateKey ca;
         try {
-            ca = authorityManager.loadFromSecret(caSecretName, namespace);
-            logger.info("Operator default CA secret name={} already exists", caSecretName);
+            ca = authorityManager.loadFromSecret();
+            logger.info("Operator default CA secret name public/private={}/{} already exists",
+                authorityManager.getPublicCaSecretName(), authorityManager.getPrivateCaSecretName());
             return ca;
         }
         catch (ApiException e) {
@@ -44,10 +38,11 @@ public class GenerateDefaultCA implements Preflight<X509CertificateAndPrivateKey
             }
         }
 
-        logger.info("Generating operator default CA as secret name={}", caSecretName);
+        logger.info("Generating operator default CA as secret public/private={}/{}",
+            authorityManager.getPublicCaSecretName(), authorityManager.getPrivateCaSecretName());
 
         ca = authorityManager.generate();
-        authorityManager.storeAsSecret(caSecretName, namespace, ca);
+        authorityManager.storeAsSecret(ca);
         return ca;
     }
 }

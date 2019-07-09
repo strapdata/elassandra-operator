@@ -32,7 +32,6 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.*;
-import java.security.cert.Certificate;
 
 @Singleton
 public class CertManager {
@@ -82,7 +81,7 @@ public class CertManager {
     }
     
     @SuppressWarnings("deprecation")
-    private Pair<X509Certificate, PrivateKey> generateCertificate(X509CertificateAndPrivateKey caCertAndKey, X500Name subject, BigInteger serial, List<String> dnsNames, List<InetAddress> addresses) throws IOException, GeneralSecurityException, OperatorCreationException {
+    private Pair<X509Certificate, PrivateKey> generateCertificate(X509CertificateAndPrivateKey caCertAndKey, Option<String> caPassword, X500Name subject, BigInteger serial, List<String> dnsNames, List<InetAddress> addresses) throws IOException, GeneralSecurityException, OperatorCreationException {
         Calendar cal = GregorianCalendar.getInstance();
         cal.add(Calendar.SECOND, -1);
         Date notBefore = cal.getTime();
@@ -124,7 +123,7 @@ public class CertManager {
         }
         
         KeyFactory kf = KeyFactory.getInstance(config.keyAlgorithm);
-        PrivateKey privKey = kf.generatePrivate(caCertAndKey.getPrivateKey(Option.none()));
+        PrivateKey privKey = kf.generatePrivate(caCertAndKey.getPrivateKey(caPassword));
         
         ContentSigner signer = new JcaContentSignerBuilder(config.signatureAlgorithm).build(privKey);
         X509CertificateHolder holder = builder.build(signer);
@@ -136,21 +135,25 @@ public class CertManager {
         return Pair.create(new JcaX509CertificateConverter().getCertificate(holder), keyPair.getPrivate());
     }
     
-    public ByteBuffer generateClientKeystoreByteBuffer(X509CertificateAndPrivateKey caCertAndKey, String projectName, String alias, String password) throws GeneralSecurityException, IOException, OperatorCreationException {
-        return generateClientKeystoreByteBuffer(caCertAndKey, projectName, Collections.emptyList(), Collections.emptyList(), alias, password);
+    public ByteBuffer generateClientKeystoreByteBuffer(X509CertificateAndPrivateKey caCertAndKey, Option<String> caPassword, String projectName, String alias, String password) throws GeneralSecurityException, IOException, OperatorCreationException {
+        return generateClientKeystoreByteBuffer(caCertAndKey, caPassword, projectName, Collections.emptyList(), Collections.emptyList(), alias, password);
     }
-    
-    public ByteBuffer generateClientKeystoreByteBuffer(X509CertificateAndPrivateKey caCertAndKey, String projectName, List<String> dnsNames, List<InetAddress> addresses, String alias, String password) throws GeneralSecurityException, IOException, OperatorCreationException {
-        KeyStore keyStore = generateClientKeystore(caCertAndKey, projectName, dnsNames, addresses, alias, password);
+
+    public byte[] generateClientKeystoreBytes(X509CertificateAndPrivateKey caCertAndKey, Option<String> caPassword, String projectName, List<String> dnsNames, List<InetAddress> addresses, String alias, String password) throws GeneralSecurityException, IOException, OperatorCreationException {
+        KeyStore keyStore = generateClientKeystore(caCertAndKey, caPassword, projectName, dnsNames, addresses, alias, password);
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             keyStore.store(baos, password.toCharArray());
-            return ByteBuffer.wrap(baos.toByteArray());
+            return baos.toByteArray();
         }
     }
-    
-    public KeyStore generateClientKeystore(X509CertificateAndPrivateKey caCertAndKey, String projectName, List<String> dnsNames, List<InetAddress> addresses, String alias, String password) throws GeneralSecurityException, IOException, OperatorCreationException {
+
+    public ByteBuffer generateClientKeystoreByteBuffer(X509CertificateAndPrivateKey caCertAndKey, Option<String> caPassword, String projectName, List<String> dnsNames, List<InetAddress> addresses, String alias, String password) throws GeneralSecurityException, IOException, OperatorCreationException {
+        return ByteBuffer.wrap(generateClientKeystoreBytes(caCertAndKey, caPassword, projectName, dnsNames, addresses, alias, password));
+    }
+
+    public KeyStore generateClientKeystore(X509CertificateAndPrivateKey caCertAndKey, Option<String> caPassword, String projectName, List<String> dnsNames, List<InetAddress> addresses, String alias, String password) throws GeneralSecurityException, IOException, OperatorCreationException {
         X500Name subject = new X500Name("cn=" + projectName + ", " + config.subjectSuffix);
-        Pair<X509Certificate, PrivateKey> pair = generateCertificate(caCertAndKey, subject, getSerial(), dnsNames, addresses);
+        Pair<X509Certificate, PrivateKey> pair = generateCertificate(caCertAndKey, caPassword, subject, getSerial(), dnsNames, addresses);
         return generateKeystore(caCertAndKey.getCertificateChain(), pair.left, pair.right, alias, password);
     }
     
@@ -197,7 +200,15 @@ public class CertManager {
         Random rnd = new Random(System.currentTimeMillis());
         return BigInteger.valueOf(Math.abs(rnd.nextLong()) + 1);
     }
-    
+
+    public byte[] generateTruststoreBytes(X509CertificateAndPrivateKey caCertAndKey, String password) throws GeneralSecurityException, IOException, OperatorCreationException {
+        KeyStore keyStore = PemConverter.loadTrustStore(caCertAndKey.getCertificateChain());
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            keyStore.store(baos, password.toCharArray());
+            return baos.toByteArray();
+        }
+    }
+
     public ByteBuffer generateTruststoreByteBuffer(X509CertificateAndPrivateKey caCertAndKey, String password) throws GeneralSecurityException, IOException, OperatorCreationException {
         KeyStore keyStore = PemConverter.loadTrustStore(caCertAndKey.getCertificateChain());
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
