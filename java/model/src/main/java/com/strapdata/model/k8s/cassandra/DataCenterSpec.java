@@ -53,6 +53,7 @@ public class DataCenterSpec {
     @SerializedName("env")
     @Expose
     private List<V1EnvVar> env = new ArrayList<V1EnvVar>();
+
     /**
      * Resource requirements for the Cassandra container.
      * 
@@ -64,6 +65,7 @@ public class DataCenterSpec {
     @SerializedName("dataVolumeClaim")
     @Expose
     private V1PersistentVolumeClaimSpec dataVolumeClaim;
+
     /**
      * Name of the CassandraBackup to restore from
      * 
@@ -71,6 +73,7 @@ public class DataCenterSpec {
     @SerializedName("restoreFromBackup")
     @Expose
     private java.lang.String restoreFromBackup;
+
     /**
      * Name of an optional config map that contains cassandra configuration in the form of yaml fragments
      * 
@@ -78,6 +81,7 @@ public class DataCenterSpec {
     @SerializedName("userConfigMapVolumeSource")
     @Expose
     private V1ConfigMapVolumeSource userConfigMapVolumeSource;
+
     /**
      * Name of an optional secret that contains cassandra related secrets
      * 
@@ -85,6 +89,7 @@ public class DataCenterSpec {
     @SerializedName("userSecretVolumeSource")
     @Expose
     private V1SecretVolumeSource userSecretVolumeSource;
+
     /**
      * Enable Prometheus support.
      * 
@@ -92,6 +97,7 @@ public class DataCenterSpec {
     @SerializedName("prometheusSupport")
     @Expose
     private Boolean prometheusSupport;
+
     /**
      * Labels to attach to the Prometheus ServiceMonitor for this data center.
      * 
@@ -99,6 +105,7 @@ public class DataCenterSpec {
     @SerializedName("prometheusServiceMonitorLabels")
     @Expose
     private Map<String, String> prometheusServiceMonitorLabels;
+
     /**
      * Attempt to run privileged configuration options for better performance
      * 
@@ -106,22 +113,56 @@ public class DataCenterSpec {
     @SerializedName("privilegedSupported")
     @Expose
     private Boolean privilegedSupported;
+
     /**
      * Enable elasticsearch service
-     * 
      */
     @SerializedName("elasticsearchEnabled")
     @Expose
     private Boolean elasticsearchEnabled = true;
+
+    /**
+     * Enable hostPort for nativePort, storagePort and sslStoragePort
+     */
+    @SerializedName("hostPortEnabled")
+    @Expose
+    private Boolean hostPortEnabled = true;
+
+    /**
+     * CQL native port (also hostPort)
+     */
+    @SerializedName("nativePort")
+    @Expose
+    private Integer nativePort = 39042;
+
+    /**
+     * Cassandra storage port (also hostPort)
+     */
+    @SerializedName("storagePort")
+    @Expose
+    private Integer storagePort = 37000;
+
+    /**
+     * Cassandra storage port (also hostPort)
+     */
+    @SerializedName("sslStoragePort")
+    @Expose
+    private Integer sslStoragePort = 37001;
+
+    /**
+     * Enable SSL support
+     */
     @SerializedName("ssl")
     @Expose
     private Boolean ssl = false;
+
+    /**
+     * Enable cassandra/ldap authentication and authorization
+     */
     @SerializedName("authentication")
     @Expose
-    private Boolean authentication = false;
-    @SerializedName("authorization")
-    @Expose
-    private Boolean authorization = false;
+    private Authentication authentication = Authentication.CASSANDRA;
+
     @SerializedName("enterprise")
     @Expose
     private Enterprise enterprise;

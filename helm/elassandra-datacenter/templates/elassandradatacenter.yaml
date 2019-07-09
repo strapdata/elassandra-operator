@@ -43,6 +43,10 @@ spec:
 {{- end }}
   prometheusSupport: {{ .Values.prometheusEnabled }}
   privilegedSupported: {{ .Values.privilegedSupported }}
+  hostPortEnabled: {{ default "true" .Values.hostPortEnabled }}
+  nativePort : {{ default "39042" .Values.nativePort }}
+  storagePort : {{ default "37000" .Values.storagePort }}
+  sslStoragePort : {{ default "37001" .Values.sslStoragePort }}
 {{- if .Values.ssl }}
   ssl:
 {{ toYaml .Values.ssl | indent 4 }}
@@ -50,10 +54,6 @@ spec:
 {{- if .Values.authentication }}
   authentication:
 {{ toYaml .Values.authentication | indent 4 }}
-{{- end }}
-{{- if .Values.authorization }}
-  authorization:
-{{ toYaml .Values.authorization | indent 4 }}
 {{- end }}
 {{- if .Values.enterprise }}
   enterprise:

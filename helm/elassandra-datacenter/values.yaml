@@ -79,6 +79,5 @@ enterprise:
 
 prometheusEnabled: false
 elasticsearchEnabled: true
-ssl: false
-authentication: false
-authorization: false
+ssl: true
+authentication: CASSANDRA

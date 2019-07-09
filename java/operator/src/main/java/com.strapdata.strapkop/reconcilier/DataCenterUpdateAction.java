@@ -147,7 +147,22 @@ public class DataCenterUpdateAction {
             this.volumeSource = volumeSource;
         }
     }
-    
+
+    private V1ContainerPort interNodePort() {
+        V1ContainerPort port = new V1ContainerPort().name("internode").containerPort(dataCenterSpec.getStoragePort());
+        return (dataCenterSpec.getHostPortEnabled()) ? port.hostPort(dataCenterSpec.getStoragePort()) : port;
+    }
+
+    private V1ContainerPort interNodeSslPort() {
+        V1ContainerPort port = new V1ContainerPort().name("internode-ssl").containerPort(dataCenterSpec.getSslStoragePort());
+        return (dataCenterSpec.getHostPortEnabled()) ? port.hostPort(dataCenterSpec.getSslStoragePort()) : port;
+    }
+
+    private V1ContainerPort nativePort() {
+        V1ContainerPort port = new V1ContainerPort().name("cql").containerPort(dataCenterSpec.getNativePort());
+        return (dataCenterSpec.getHostPortEnabled()) ? port.hostPort(dataCenterSpec.getNativePort()) : port;
+    }
+
     private void createOrReplaceStateNodesStatefulSet(final Iterable<ConfigMapVolumeMount> configMapVolumeMounts,
                                                       final V1SecretVolumeSource secretVolumeSource) throws ApiException {
         final V1ObjectMeta statefulSetMetadata = dataCenterChildObjectMetadata("%s");
@@ -157,9 +172,9 @@ public class DataCenterUpdateAction {
                 .image(dataCenterSpec.getElassandraImage())
                 .imagePullPolicy(dataCenterSpec.getImagePullPolicy())
                 .terminationMessagePolicy("FallbackToLogsOnError")
-                .addPortsItem(new V1ContainerPort().name("internode").containerPort(37000).hostPort(37000))
-                .addPortsItem(new V1ContainerPort().name("internode-ssl").containerPort(37001).hostPort(37001))
-                .addPortsItem(new V1ContainerPort().name("cql").containerPort(39042).hostPort(39042))
+                .addPortsItem(interNodePort())
+                .addPortsItem(interNodeSslPort())
+                .addPortsItem(nativePort())
                 .addPortsItem(new V1ContainerPort().name("jmx").containerPort(7199))
                 .resources(dataCenterSpec.getResources())
                 .securityContext(new V1SecurityContext()
@@ -171,7 +186,7 @@ public class DataCenterUpdateAction {
                 .readinessProbe(new V1Probe()
                         .exec(new V1ExecAction()
                                 .addCommandItem("/ready-probe.sh")
-                                .addCommandItem(dataCenterSpec.getElasticsearchEnabled() ? "9200" : "39042")
+                                .addCommandItem(dataCenterSpec.getElasticsearchEnabled() ? "9200" : dataCenterSpec.getNativePort().toString())
                         )
                         .initialDelaySeconds(15)
                         .timeoutSeconds(5)
@@ -478,19 +493,17 @@ public class DataCenterUpdateAction {
             config.put("rpc_address", "0.0.0.0"); // bind rpc to all addresses (allow localhost access)
             
             // messy -- constructs via org.apache.cassandra.config.ParameterizedClass.ParameterizedClass(java.util.Map<java.lang.String,?>)
+            config.put("endpoint_snitch", "org.apache.cassandra.locator.GossipingPropertyFileSnitch");
             config.put("seed_provider", ImmutableList.of(ImmutableMap.of(
                     "class_name", "com.strapdata.cassandra.k8s.SeedProvider",
                     "parameters", ImmutableList.of(ImmutableMap.of("service", seedNodesService.getMetadata().getName()))
             )));
-            
-            
-            config.put("endpoint_snitch", "org.apache.cassandra.locator.GossipingPropertyFileSnitch");
-    
-            config.put("storage_port", "37000");
-            config.put("ssl_storage_port", "37001");
-            config.put("native_transport_port","39042");
-            
-            
+
+
+            config.put("storage_port", dataCenterSpec.getStoragePort());
+            config.put("ssl_storage_port", dataCenterSpec.getSslStoragePort());
+            config.put("native_transport_port",dataCenterSpec.getNativePort());
+
             configMapVolumeAddFile(configMap, volumeSource, "cassandra.yaml.d/001-operator-overrides.yaml", toYamlString(config));
         }
         
@@ -593,11 +606,6 @@ public class DataCenterUpdateAction {
             addAuthenticationConfig(configMap, volumeSource);
         }
         
-        //strapdata authorization support
-        {
-            addAuthorizationConfig(configMap, volumeSource);
-        }
-        
         // strapdata enterprise support
         {
             addEnterpriseConfig(configMap, volumeSource);
@@ -648,6 +656,7 @@ public class DataCenterUpdateAction {
         final String cqlshrc =
                 "[connection]\n" +
                         "factory = cqlshlib.ssl.ssl_transport_factory\n" +
+                        "port = " + dataCenterSpec.getNativePort() + "\n" +
                         "ssl = true\n" +
                         "\n" +
                         "[ssl]\n" +
@@ -667,25 +676,28 @@ public class DataCenterUpdateAction {
     }
     
     private void addAuthenticationConfig(V1ConfigMap configMap, V1ConfigMapVolumeSource volumeSource) {
-        if (!dataCenterSpec.getAuthentication()) {
-            return;
+        switch(dataCenterSpec.getAuthentication()) {
+            case NONE:
+                return;
+            case CASSANDRA:
+                configMapVolumeAddFile(configMap, volumeSource, "cassandra.yaml.d/002-authentication.yaml",
+                    toYamlString(ImmutableMap.of(
+                        "authenticator", "PasswordAuthenticator",
+                        "authorizer", "CassandraAuthorizer")));
+                return;
+            case LDAP:
+                configMapVolumeAddFile(configMap, volumeSource, "cassandra.yaml.d/002-authentication.yaml",
+                    toYamlString(ImmutableMap.of(
+                        "authenticator", "com.strapdata.cassandra.ldap.LDAPAuthenticator",
+                        "authorizer", "CassandraAuthorizer",
+                        "role_manager", "com.strapdata.cassandra.ldap.LDAPRoleManager")));
+                //TODO: Add ldap.properties + ldap.pem +
+                // -Dldap.properties.file=/usr/share/cassandra/conf/ldap.properties
+                // -Dcom.sun.jndi.ldap.object.disableEndpointIdentification=true"
+                return;
         }
-        
-        final Map<String, Object> cassandraConfig = ImmutableMap.of("authenticator", "PasswordAuthenticator");
-        
-        configMapVolumeAddFile(configMap, volumeSource, "cassandra.yaml.d/002-authentication.yaml", toYamlString(cassandraConfig));
     }
-    
-    private void addAuthorizationConfig(V1ConfigMap configMap, V1ConfigMapVolumeSource volumeSource) {
-        if (!dataCenterSpec.getAuthorization()) {
-            return;
-        }
-        
-        final Map<String, Object> cassandraConfig = ImmutableMap.of("authorizer", "CassandraAuthorizer");
-        
-        configMapVolumeAddFile(configMap, volumeSource, "cassandra.yaml.d/002-authorization.yaml", toYamlString(cassandraConfig));
-    }
-    
+
     private void addEnterpriseConfig(V1ConfigMap configMap, V1ConfigMapVolumeSource volumeSource) {
         final Enterprise enterprise = dataCenterSpec.getEnterprise();
         if (enterprise.getEnabled()) {
@@ -708,10 +720,8 @@ public class DataCenterUpdateAction {
             } else {
                 esConfig.put("aaa", ImmutableMap.of(
                         "enabled", enterprise.getAaa().getEnabled(),
-                        "shared_secret", Optional.ofNullable(enterprise.getAaa().getSharedSecret()).orElse("toto-generate-shared-secret"),
-                        "audit", ImmutableMap.of(
-                                "enabled", enterprise.getAaa().getAudit()
-                        )
+                        "shared_secret", Optional.ofNullable(enterprise.getAaa().getSharedSecret()).orElse("dummy-generated-shared-secret"),
+                        "audit", ImmutableMap.of("enabled", enterprise.getAaa().getAudit())
                 ));
             }
             
@@ -738,7 +748,9 @@ public class DataCenterUpdateAction {
                         .publishNotReadyAddresses(true)
                         .clusterIP("None")
                         // a port needs to be defined for the service to be resolvable (#there-was-a-bug-ID-and-now-I-cant-find-it)
-                        .ports(ImmutableList.of(new V1ServicePort().name("internode").port(7000)))
+                        .ports(ImmutableList.of(
+                            new V1ServicePort().name("internode").port(
+                                dataCenterSpec.getSsl() ? dataCenterSpec.getSslStoragePort() : dataCenterSpec.getStoragePort())))
                         // only select the pod number 0 as seed
                         .selector(OperatorLabels.pod(dataCenterMetadata.getName(), dataCenterChildObjectName("%s-0")))
                 );
@@ -754,7 +766,7 @@ public class DataCenterUpdateAction {
                 .metadata(serviceMetadata)
                 .spec(new V1ServiceSpec()
                         .clusterIP("None")
-                        .addPortsItem(new V1ServicePort().name("cql").port(9042))
+                        .addPortsItem(new V1ServicePort().name("cql").port(dataCenterSpec.getNativePort()))
                         .addPortsItem(new V1ServicePort().name("jmx").port(7199))
                         .selector(dataCenterLabels)
                 );
