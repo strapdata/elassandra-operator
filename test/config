@@ -26,6 +26,8 @@ export PULL_SECRET=${PULL_SECRET:-""}
 export IMAGE_PREFIX=${IMAGE_PREFIX:-"strapdata/strapkop-"}
 export IMAGE_SUFFIX=${IMAGE_SUFFIX:-""}
 export ELASSANDRA=${ELASSANDRA:-elassandra}
+# used for pull-secret registry
+export REGISTRY=${REGISTRY:-docker.repo.strapdata.com}
 export REGISTRY_USER=${REGISTRY_USER:-""}
 export REGISTRY_PASSWORD=${REGISTRY_PASSWORD:-""}
 export ELASSANDRA_IMAGE=${IMAGE_PREFIX}elassandra${IMAGE_SUFFIX}
