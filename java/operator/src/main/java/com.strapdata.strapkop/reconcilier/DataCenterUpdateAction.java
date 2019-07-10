@@ -667,7 +667,7 @@ public class DataCenterUpdateAction {
         final String envScript = ""+
                 "mkdir -p ~/.cassandra\n"+
                 "cp ${CASSANDRA_CONF}/cqlshrc ~/.cassandra/cqlshrc\n"+
-                "cp ${CASSANDRA_CONF}/curlrc ~/.curlrc";
+                "cp ${CASSANDRA_CONF}/curlrc ~/.curlrc\n";
         
         configMapVolumeAddFile(configMap, volumeSource, "cassandra-env.sh.d/002-ssl.sh", envScript);
     }
