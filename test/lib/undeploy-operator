@@ -18,4 +18,6 @@ if [[ "$pod_name" != "" ]]; then
   done
 fi
 
+kubectl delete crd --all
+
 exit 1
