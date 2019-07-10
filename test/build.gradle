@@ -18,6 +18,10 @@ task setupAks(type: Exec) {
   commandLine "./setup-aks"
 }
 
+task execCommand(type: Exec) {
+  commandLine "./${project.testCommand}"
+}
+
 task test {
   dependsOn 'testBasic'
   dependsOn 'testScale'

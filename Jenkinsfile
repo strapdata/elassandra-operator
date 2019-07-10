@@ -88,7 +88,7 @@ podTemplate(
                         sh "az login --service-principal -u ${AZ_APP_ID} -p ${AZ_PASSWORD} --tenant ${AZ_TENANT_ID}"
                         aksCreating = true
                         sh 'printenv'
-                        sh './gradlew :test:setupAks'
+                        sh './gradlew -s :test:setupAks'
                         aksCreated = true
                         aksCreating = false
                       }
@@ -107,7 +107,7 @@ podTemplate(
           stage('integration tests') {
             container('buildenv') {
               sh "az login --service-principal -u ${AZ_APP_ID} -p ${AZ_PASSWORD} --tenant ${AZ_TENANT_ID}"
-              sh "./test/aks/get-credentials"
+              sh "./gradlew -s :test:execCommand -PtestCommand=aks/get-credentials"
               sh './gradlew -s :test:test'
             }
           }
@@ -124,9 +124,9 @@ podTemplate(
           stage('print logs') {
             container('buildenv') {
               if (aksCreated) {
-                sh './test/lib/logs-operator || true'
-                sh 'kubectl logs dc1-elassandra-0  sidecar || true'
-                sh 'kubectl logs dc1-elassandra-0  elassandra || true'
+                sh './gradlew -s :test:execCommand -PtestCommand=lib/logs-operator || true'
+                sh 'kubectl logs dc1-elassandra-datacenter-0  sidecar || true'
+                sh 'kubectl logs dc1-elassandra-datacenter-0  elassandra || true'
                 sh 'kubectl get all -o yaml'
                 sh 'kubectl get crd -o yaml'
                 sh 'kubectl get pvc -o yaml'
@@ -142,7 +142,7 @@ podTemplate(
           stage('cleanup aks') {
             if (aksCreated || aksCreating) {
               container('buildenv') {
-                sh './test/cleanup-aks'
+                sh './gradlew -s :test:execCommand -PtestCommand=cleanup-aks'
               }
             }
           }
