@@ -29,6 +29,6 @@ task basicSetup(type: Exec) {
 }
 
 tasks.withType(Exec) {
-  environment = [IMAGE_SUFFIX: project.dockerImageSuffix, IMAGE_PREFIX: project.dockerImagePrefix]
+  environment << [IMAGE_SUFFIX: project.dockerImageSuffix, IMAGE_PREFIX: project.dockerImagePrefix]
 }
 
