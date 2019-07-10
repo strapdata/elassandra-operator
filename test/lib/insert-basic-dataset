@@ -8,7 +8,7 @@ replicas=${2:-1}
 rf=${3:-1}
 size=${4:-10}
 
-node_0=${name}-elassandra-0
+node_0=${name}-${CHART_NAME}-0
 kubectl exec ${node_0} -c ${ELASSANDRA} --  cqlsh ${node_0} ${CQL_CRED} -e "CREATE KEYSPACE IF NOT EXISTS ks WITH replication = {'class': 'NetworkTopologyStrategy', '${name}-${CHART_NAME}': ${rf} };"
 kubectl exec ${node_0} -c ${ELASSANDRA} --  cqlsh ${node_0} ${CQL_CRED} -e "CREATE TABLE IF NOT EXISTS ks.t (id int PRIMARY KEY );"
 
