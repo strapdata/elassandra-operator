@@ -778,10 +778,10 @@ public class DataCenterUpdateAction {
         configMapVolumeAddFile(configMap, volumeSource, "cqlshrc", cqlshrc);
         
         configMapVolumeAddFile(configMap, volumeSource, "curlrc", "cacert = /tmp/operator-truststore/cacert.pem");
-        
-        final String envScript = "" +
-                "mkdir -p ~/.cassandra\n" +
-                "cp ${CASSANDRA_CONF}/cqlshrc ~/.cassandra/cqlshrc\n" +
+    
+        final String envScript = ""+
+                "mkdir -p ~/.cassandra\n"+
+                "cp ${CASSANDRA_CONF}/cqlshrc ~/.cassandra/cqlshrc\n"+
                 "cp ${CASSANDRA_CONF}/curlrc ~/.curlrc\n";
         
         configMapVolumeAddFile(configMap, volumeSource, "cassandra-env.sh.d/002-ssl.sh", envScript);
