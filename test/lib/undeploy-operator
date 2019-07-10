@@ -12,12 +12,11 @@ if [[ "$pod_name" != "" ]]; then
     echo "waiting for $pod_name to be terminated (#$i)"
     kubectl get pods
     if ! kubectl get pod ${pod_name}; then
+      kubectl delete crd --all
       exit 0
     fi
     sleep 1
   done
 fi
-
-kubectl delete crd --all
 
 exit 1
