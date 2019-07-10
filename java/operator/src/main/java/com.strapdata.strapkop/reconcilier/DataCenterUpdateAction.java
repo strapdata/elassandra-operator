@@ -2,8 +2,8 @@ package com.strapdata.strapkop.reconcilier;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.*;
-import com.google.gson.JsonSyntaxException;
 import com.google.common.net.InetAddresses;
+import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
 import com.squareup.okhttp.Call;
 import com.strapdata.model.k8s.cassandra.DataCenter;
@@ -11,12 +11,10 @@ import com.strapdata.model.k8s.cassandra.DataCenterSpec;
 import com.strapdata.model.k8s.cassandra.Enterprise;
 import com.strapdata.model.k8s.task.BackupTask;
 import com.strapdata.model.sidecar.NodeStatus;
-import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import com.strapdata.strapkop.ssl.AuthorityManager;
-import com.strapdata.strapkop.ssl.utils.CertManager;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1beta2Api;
 import io.kubernetes.client.apis.CoreV1Api;
@@ -37,7 +35,6 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 
 @Prototype
@@ -49,34 +46,26 @@ public class DataCenterUpdateAction {
     private final CustomObjectsApi customObjectsApi;
     private final SidecarClientFactory sidecarClientFactory;
     private final K8sResourceUtils k8sResourceUtils;
-    private final CertManager certManager;
     private final AuthorityManager authorityManager;
-    private final OperatorConfig config;
-    private String namespace;
     
     private V1ObjectMeta dataCenterMetadata;
     private DataCenterSpec dataCenterSpec;
     private Map<String, String> dataCenterLabels;
     
-    public DataCenterReconciliationController(CoreV1Api coreApi, AppsV1beta2Api appsApi,
-                                              CustomObjectsApi customObjectsApi,
-                                              SidecarClientFactory sidecarClientFactory,
-                                              K8sResourceUtils k8sResourceUtils,
-                                              CertManager certManager,
-                                              AuthorityManager authorityManager,
-                                              OperatorConfig config,
-                                              @Parameter("dataCenter") DataCenter dataCenter
+    public DataCenterUpdateAction(CoreV1Api coreApi, AppsV1beta2Api appsApi,
+                                  CustomObjectsApi customObjectsApi,
+                                  SidecarClientFactory sidecarClientFactory,
+                                  K8sResourceUtils k8sResourceUtils,
+                                  AuthorityManager authorityManager,
+                                  @Parameter("dataCenter") DataCenter dataCenter
     ) {
         this.coreApi = coreApi;
         this.appsApi = appsApi;
         this.customObjectsApi = customObjectsApi;
         this.sidecarClientFactory = sidecarClientFactory;
         this.k8sResourceUtils = k8sResourceUtils;
-        this.certManager = certManager;
         this.authorityManager = authorityManager;
-        this.config = config;
-        this.namespace = config.getNamespace();
-        
+    
         this.dataCenterMetadata = dataCenter.getMetadata();
         this.dataCenterSpec = dataCenter.getSpec();
         
@@ -857,7 +846,7 @@ public class DataCenterUpdateAction {
         {
             final ImmutableMultimap.Builder<NodeStatus, V1Pod> builder = ImmutableMultimap.builder();
             Object[] nodeStatus = Single.zip(
-                    StreamSupport.stream(pods.spliterator(), false).map(pod -> {
+                    pods.stream().map(pod -> {
                         return sidecarClientFactory.clientForPodNullable(pod).status()
                                 .map(status -> {
                                     builder.put(status, pod);
