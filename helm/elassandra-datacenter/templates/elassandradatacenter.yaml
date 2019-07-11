@@ -13,6 +13,7 @@ metadata:
 spec:
   clusterName: {{ .Values.clusterName }}
   replicas: {{ .Values.replicaCount }}
+  racks: {{ .Values.racks }}
   elassandraImage: "{{ .Values.image.elassandraRepository }}:{{ .Values.image.elassandraTag }}"
   sidecarImage: "{{ .Values.image.sidecarRepository }}:{{ .Values.image.sidecarTag }}"
   imagePullPolicy: {{ .Values.imagePullPolicy }}
@@ -43,7 +44,7 @@ spec:
 {{- end }}
   prometheusSupport: {{ .Values.prometheusEnabled }}
   privilegedSupported: {{ .Values.privilegedSupported }}
-  hostPortEnabled: {{ default "true" .Values.hostPortEnabled }}
+  hostPortEnabled: {{ .Values.hostPortEnabled }}
   nativePort : {{ default "39042" .Values.nativePort }}
   storagePort : {{ default "37000" .Values.storagePort }}
   sslStoragePort : {{ default "37001" .Values.sslStoragePort }}

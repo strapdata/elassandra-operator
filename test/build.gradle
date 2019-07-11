@@ -22,10 +22,12 @@ task execCommand(type: Exec) {
   commandLine "./${project.testCommand}"
 }
 
+task testAllScenarios(type: Exec) {
+  commandLine "./test-all-scenarios"
+}
+
 task test {
-  dependsOn 'testBasic'
-  dependsOn 'testScale'
-  dependsOn 'testBackup'
+  dependsOn 'testAllScenarios'
 }
 
 task basicSetup(type: Exec) {

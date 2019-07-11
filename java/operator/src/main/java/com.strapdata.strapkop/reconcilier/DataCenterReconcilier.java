@@ -45,17 +45,20 @@ public class DataCenterReconcilier {
     }
     
     private void process(final Tuple2<Action, DataCenter> task) throws Exception {
-        
         final DataCenter dc = task._2;
-        
-        if (task._1.equals(Action.UPDATE)) {
-            logger.debug("processing a dc reconciliation request for {} in thread {}", dc.getMetadata().getName(), Thread.currentThread().getName());
-            context.createBean(DataCenterUpdateAction.class, dc).reconcileDataCenter();
-        }
 
-        else if (task._1.equals(Action.DELETE)) {
-            logger.debug("processing a dc deletion for {} in thread {}", dc.getMetadata().getName(), Thread.currentThread().getName());
-            context.createBean(DataCenterDeteteAction.class, new Key(dc.getMetadata())).deleteDataCenter();
+        try {
+    
+            if (task._1.equals(Action.UPDATE)) {
+                logger.debug("processing a dc reconciliation request for {} in thread {}", dc.getMetadata().getName(), Thread.currentThread().getName());
+                context.createBean(DataCenterUpdateAction.class, dc).reconcileDataCenter();
+            } else if (task._1.equals(Action.DELETE)) {
+                logger.debug("processing a dc deletion for {} in thread {}", dc.getMetadata().getName(), Thread.currentThread().getName());
+                context.createBean(DataCenterDeteteAction.class, new Key(dc.getMetadata())).deleteDataCenter();
+            }
+        }
+        catch (Exception e) {
+            logger.error("an error occurred while processing DataCenter reconciliation {} for {}", task._1, dc.getMetadata().getName(), e);
         }
     }
 }

@@ -47,8 +47,7 @@ public class K8sWatchEventSource<ResourceT, ResourceListT>
      * @throws ApiException
      */
     @Override
-    public Observable<K8sWatchEvent<ResourceT>> createObservable() throws ApiException {
-        logger.info("(re)creating k8s event observable for {}", this.getClass().getSimpleName());
+    public Observable<K8sWatchEvent<ResourceT>> createObservable() throws ApiException { logger.info("(re)creating k8s event observable for {}", this.getClass().getSimpleName());
         
         // if last resource version is not null, restart watching where we stopped
         if (lastResourceVersion != null) {

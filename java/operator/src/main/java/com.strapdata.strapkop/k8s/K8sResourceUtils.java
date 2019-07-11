@@ -3,9 +3,8 @@ package com.strapdata.strapkop.k8s;
 import com.google.common.base.Strings;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.Iterators;
-import io.kubernetes.client.ApiClient;
 import io.kubernetes.client.ApiException;
-import io.kubernetes.client.apis.AppsV1beta2Api;
+import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.models.*;
 import org.slf4j.Logger;
@@ -25,7 +24,7 @@ public class K8sResourceUtils {
     private CoreV1Api coreApi;
     
     @Inject
-    private AppsV1beta2Api appsApi;
+    private AppsV1Api appsApi;
     
     @FunctionalInterface
     public interface ApiCallable {
@@ -91,7 +90,7 @@ public class K8sResourceUtils {
         coreApi.deleteNamespacedConfigMap(configMapMetadata.getName(), configMapMetadata.getNamespace(), new V1DeleteOptions(), null, null, null, null, null);
     }
 
-    public void deleteStatefulSet(final V1beta2StatefulSet statefulSet) throws ApiException {
+    public void deleteStatefulSet(final V1StatefulSet statefulSet) throws ApiException {
         V1DeleteOptions deleteOptions = new V1DeleteOptions()
                 .propagationPolicy("Foreground");
 
@@ -199,31 +198,31 @@ public class K8sResourceUtils {
         return new ResourceListIterable<>(firstPage);
     }
 
-    public Iterable<V1beta2StatefulSet> listNamespacedStatefulSets(final String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) throws ApiException {
-        class V1beta2StatefulSetPage implements ResourceListIterable.Page<V1beta2StatefulSet> {
-            private final V1beta2StatefulSetList statefulSetList;
+    public Iterable<V1StatefulSet> listNamespacedStatefulSets(final String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) throws ApiException {
+        class V1StatefulSetPage implements ResourceListIterable.Page<V1StatefulSet> {
+            private final V1StatefulSetList statefulSetList;
 
-            private V1beta2StatefulSetPage(final String continueToken) throws ApiException {
+            private V1StatefulSetPage(final String continueToken) throws ApiException {
                 statefulSetList = appsApi.listNamespacedStatefulSet(namespace, null, null, continueToken, fieldSelector, labelSelector, null, null, null, null);
             }
 
             @Override
-            public Collection<V1beta2StatefulSet> items() {
+            public Collection<V1StatefulSet> items() {
                 return statefulSetList.getItems();
             }
 
             @Override
-            public ResourceListIterable.Page<V1beta2StatefulSet> nextPage() throws ApiException {
+            public ResourceListIterable.Page<V1StatefulSet> nextPage() throws ApiException {
                 final String continueToken = statefulSetList.getMetadata().getContinue();
 
                 if (Strings.isNullOrEmpty(continueToken))
                     return null;
 
-                return new V1beta2StatefulSetPage(continueToken);
+                return new V1StatefulSetPage(continueToken);
             }
         }
 
-        final V1beta2StatefulSetPage firstPage = new V1beta2StatefulSetPage(null);
+        final V1StatefulSetPage firstPage = new V1StatefulSetPage(null);
 
         return new ResourceListIterable<>(firstPage);
     }

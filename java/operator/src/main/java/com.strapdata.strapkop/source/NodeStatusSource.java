@@ -2,11 +2,10 @@ package com.strapdata.strapkop.source;
 
 import com.strapdata.model.Key;
 import com.strapdata.strapkop.OperatorConfig;
-import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.cache.NodeStatusCache;
 import com.strapdata.strapkop.event.NodeStatusEvent;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import com.strapdata.strapkop.k8s.OperatorLabels;
+import com.strapdata.strapkop.k8s.OperatorMetadata;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.models.V1Pod;
@@ -44,7 +43,7 @@ public class NodeStatusSource implements EventSource<NodeStatusEvent> {
                 .flatMap(i -> Observable.fromIterable(listPods()))
                 .map(pod -> new NodeStatusEvent()
                         .setPod(pod)
-                        .setDataCenterKey(new Key(pod.getMetadata().getLabels().get(OperatorLabels.DATACENTER), config.getNamespace()))
+                        .setDataCenterKey(new Key(pod.getMetadata().getLabels().get(OperatorMetadata.DATACENTER), config.getNamespace()))
                 )
                 .flatMapSingle(event -> sidecarClientFactory.clientForPod(event.getPod()).status()
                         .doOnSubscribe(d -> logger.debug("requesting pod {} sidecar for health check on thread {}", event.getPod().getMetadata().getName(), Thread.currentThread().getName()))
@@ -59,6 +58,6 @@ public class NodeStatusSource implements EventSource<NodeStatusEvent> {
     
     private Iterable<V1Pod> listPods() throws ApiException {
         return k8sResourceUtils.listNamespacedPods(config.getNamespace(), null,
-                OperatorLabels.toSelector(OperatorLabels.MANAGED));
+                OperatorMetadata.toSelector(OperatorMetadata.MANAGED));
     }
 }
