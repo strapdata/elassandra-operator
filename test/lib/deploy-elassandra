@@ -14,8 +14,8 @@ helm ${helm_cmd} \
     ${values_file:+-f ${values_file}} \
     --set image.elassandraRepository=${ELASSANDRA_IMAGE} \
     --set image.sidecarRepository=${SIDECAR_IMAGE} \
-    --set image.elassandraTag=${TAG} \
-    --set image.sidecarTag=${TAG} \
+    --set-string image.elassandraTag=${TAG} \
+    --set-string image.sidecarTag=${TAG} \
     --set imagePullPolicy=IfNotPresent \
     --set imagePullSecret=${PULL_SECRET} \
     --set replicaCount=${replicas} \
@@ -29,6 +29,7 @@ helm ${helm_cmd} \
     --set enterprise.aaa.enabled=$([[ "${AUTHENTICATION}" != "NONE" ]] && echo "true" || echo "false") \
     --set enterprise.aaa.audit=$([[ "${AUTHENTICATION}" != "NONE" ]] && echo "true" || echo "false") \
     --set enterprise.cbs=$([[ "${AUTHENTICATION}" != "NONE" ]] && echo "true" || echo "false") \
+    --set hostPortEnabled=false \
     helm/elassandra-datacenter
 
 #    --set userSecretVolumeSource.secretName=${name} \
