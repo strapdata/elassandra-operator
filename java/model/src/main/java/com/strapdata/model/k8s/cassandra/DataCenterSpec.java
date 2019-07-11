@@ -26,6 +26,10 @@ public class DataCenterSpec {
     @Expose
     private int replicas;
 
+    @SerializedName("racks")
+    @Expose
+    private int racks;
+    
     @SerializedName("elassandraImage")
     @Expose
     private java.lang.String elassandraImage;

@@ -3,6 +3,7 @@
 # Declare variables to be passed into your templates.
 clusterName: Elassandra
 replicaCount: 1
+racks: 3
 
 image:
   elassandraRepository: strapdata/strapkop-elassandra-dev
@@ -81,3 +82,5 @@ prometheusEnabled: false
 elasticsearchEnabled: true
 ssl: true
 authentication: CASSANDRA
+
+hostPortEnabled: true

@@ -8,7 +8,7 @@ import com.strapdata.model.k8s.task.BackupTask;
 import com.strapdata.model.k8s.task.BackupTaskSpec;
 import com.strapdata.model.k8s.task.TaskStatus;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import com.strapdata.strapkop.k8s.OperatorLabels;
+import com.strapdata.strapkop.k8s.OperatorMetadata;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CustomObjectsApi;
@@ -85,7 +85,7 @@ public class BackupTaskReconcilier extends TaskReconcilier<BackupTask> {
                     backupTask.getMetadata().getName(),
                     StorageProvider.valueOf(backupTask.getSpec().getBackupType()),
                     backupTask.getSpec().getTarget(),
-                    pod.getMetadata().getLabels().get(OperatorLabels.DATACENTER));
+                    pod.getMetadata().getLabels().get(OperatorMetadata.DATACENTER));
             
             backupArguments.backupId = pod.getSpec().getHostname();
             backupArguments.speed = CommonBackupArguments.Speed.LUDICROUS;

@@ -29,7 +29,14 @@ public abstract class TaskReconcilier<TaskT extends Task<?, ?>> {
                     throwable.printStackTrace();
                 })
                 .retryWhen(errors -> errors.delay(1, TimeUnit.SECONDS))
-                .subscribe(this::process);
+                .subscribe(t -> {
+                    try {
+                        process(t);
+                    }
+                    catch (Exception e) {
+                        logger.error("an error occurred while processing task {}", t, e);
+                    }
+                });
     }
     
     

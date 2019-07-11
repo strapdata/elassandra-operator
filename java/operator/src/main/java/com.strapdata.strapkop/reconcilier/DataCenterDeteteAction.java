@@ -2,7 +2,7 @@ package com.strapdata.strapkop.reconcilier;
 
 import com.google.gson.JsonSyntaxException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import com.strapdata.strapkop.k8s.OperatorLabels;
+import com.strapdata.strapkop.k8s.OperatorMetadata;
 import com.strapdata.model.Key;
 import io.kubernetes.client.ApiException;
 import io.micronaut.context.annotation.Parameter;
@@ -25,7 +25,7 @@ public class DataCenterDeteteAction {
     public void deleteDataCenter() throws Exception {
         logger.info("Deleting DataCenter {}.", dataCenterKey.name);
         
-        final String labelSelector = OperatorLabels.toSelector(OperatorLabels.datacenter(dataCenterKey.name));
+        final String labelSelector = OperatorMetadata.toSelector(OperatorMetadata.datacenter(dataCenterKey.name));
         
         // delete persistent volumes & persistent volume claims
         // TODO: this is disabled for now for safety. Perhaps add a flag or something to control this.
