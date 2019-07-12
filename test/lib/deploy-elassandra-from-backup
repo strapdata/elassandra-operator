@@ -3,7 +3,7 @@
 cd `dirname "$BASH_SOURCE"`/../..
 source test/config
 
-dc=${1:-dc1}
+dc=${1:-${DEFAULT_NAME}}
 replicas=${2:-1}
 backup_name=${3:-testbackup-${dc}}
 

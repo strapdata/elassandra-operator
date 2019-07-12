@@ -54,7 +54,7 @@ public class DataCenterReconcilier {
                 context.createBean(DataCenterUpdateAction.class, dc).reconcileDataCenter();
             } else if (task._1.equals(Action.DELETE)) {
                 logger.debug("processing a dc deletion for {} in thread {}", dc.getMetadata().getName(), Thread.currentThread().getName());
-                context.createBean(DataCenterDeteteAction.class, new Key(dc.getMetadata())).deleteDataCenter();
+                context.createBean(DataCenterDeteteAction.class, dc).deleteDataCenter();
             }
         }
         catch (Exception e) {

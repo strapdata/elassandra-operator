@@ -3,9 +3,9 @@
 cd `dirname "$BASH_SOURCE"`/../..
 source test/config
 
-name=${1:-dc1}
+name=${1:-${DEFAULT_NAME}}
 
 for i in {1..${NUM_RACKS}}; do
   # TODO: add the possibility to pass label from DataCenterSpec to sts and pods
-  kubectl patch sts ${name}-${CHART_NAME}-rack${i} -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"`date +'%s'`\"}}}}}"
+  kubectl patch sts elassandra-${name}-rack${i} -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"`date +'%s'`\"}}}}}"
 done

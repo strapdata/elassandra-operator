@@ -81,8 +81,8 @@ class StatefulSetsReplacer {
             modes.put(mode, new TreeSet<>(RACK_NAME_COMPARATOR));
         }
         
-        // some replace modes are cumulative (UP or DOWN) imply UPDATE
-        // some other are exclusive (UP and DOWN, or UPDATE and NOTHING)
+        // some replace modes are cumulative (UP or DOWN imply UPDATE)
+        // some others are exclusive (UP and DOWN, or UPDATE and NOTHING)
         newtStsMap.forEach((rack, sts) -> {
             
             // compare the datacenter fingerprint to see if we need an update
@@ -106,7 +106,7 @@ class StatefulSetsReplacer {
     
     private List<V1Pod> fetchPods() throws Exception {
         // next step is to check the current k8s phase of every pods
-        final String allPodsSelector = OperatorMetadata.toSelector(OperatorMetadata.datacenter(dataCenter.getMetadata().getName()));
+        final String allPodsSelector = OperatorMetadata.toSelector(OperatorMetadata.datacenter(dataCenter));
         return ImmutableList.sortedCopyOf(STATEFUL_SET_POD_NEWEST_FIRST_COMPARATOR,
                 k8sResourceUtils.listNamespacedPods(dataCenter.getMetadata().getNamespace(), null, allPodsSelector)
         );
