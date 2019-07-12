@@ -5,4 +5,7 @@ source test/config
 
 name=${1:-dc1}
 
-kubectl patch sts ${name}-${CHART_NAME} -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"`date +'%s'`\"}}}}}"
+for i in {1..${NUM_RACKS}}; do
+  # TODO: add the possibility to pass label from DataCenterSpec to sts and pods
+  kubectl patch sts ${name}-${CHART_NAME}-rack${i} -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"`date +'%s'`\"}}}}}"
+done

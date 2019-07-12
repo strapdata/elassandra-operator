@@ -8,5 +8,8 @@ replicas=${2:-1}
 
 # delete zombies pvc
 for ((i=0; i<${replicas}; i++)); do
-  kubectl delete pvc elassandra-data-volume-${name}-${CHART_NAME}-${i}
+  kubectl delete pvc elassandra-data-volume-$(./test/lib/get-pod-name ${name} ${i}) || true
 done
+
+# hopefully this will only delete pv that are Released...
+kubectl delete pv --all || true

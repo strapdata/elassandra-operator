@@ -27,10 +27,10 @@ assert_count() {
 }
 
 for ((i=0; i < ${replicas}; i++)); do
-  assert_count ${name}-${CHART_NAME}-${i} ${size} "SELECT count(*) FROM ks.t;"
+  assert_count $(./test/lib/get-pod-name ${name} ${i}) ${size} "SELECT count(*) FROM ks.t;"
 done
 
 for ((i=0; i < ${size}; i++)); do
   node_index=$(shuf -i 0-$((${replicas}-1)) -n 1)
-  assert_count ${name}-${CHART_NAME}-${node_index} 1 "SELECT count(*) FROM ks.t WHERE id=${i};"
+  assert_count $(./test/lib/get-pod-name ${name} ${node_index}) 1 "SELECT count(*) FROM ks.t WHERE id=${i};"
 done

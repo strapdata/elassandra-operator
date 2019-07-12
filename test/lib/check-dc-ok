@@ -7,7 +7,7 @@ dc_name=${1:-dc1}
 replicas=${2:-1}
 
 for ((i=0; i<${replicas}; i++)); do
-  node=${dc_name}-${CHART_NAME}-${i}
+  node=$(./test/lib/get-pod-name ${dc_name} ${i})
   kubectl exec ${node} -c ${ELASSANDRA} -- cqlsh ${node} ${CQL_CRED} -e 'SHOW HOST'
   [ "$ELASTICSEARCH_ENABLED" = "true" ] && kubectl exec ${node} -c ${ELASSANDRA} -- curl ${CURL_CRED} ${PROTOCOL}://localhost:9200
   kubectl exec ${node} -c ${ELASSANDRA} -- nodetool status

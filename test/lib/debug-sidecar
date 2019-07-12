@@ -6,4 +6,4 @@ source test/config
 name=${1:-dc1}
 index=${2:-0}
 
-kubectl port-forward ${name}-${CHART_NAME}-${index} 5001:5001
+kubectl port-forward $(./test/lib/get-pod-name ${name} ${index}) 5001:5001
