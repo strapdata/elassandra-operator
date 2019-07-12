@@ -87,7 +87,7 @@ public class K8sWatchEventSource<ResourceT, ResourceListT>
         final Watch<JsonObject> watch = Watch.createWatch(apiClient, adapter.createApiCall(true, lastResourceVersion),
                 new TypeToken<Watch.Response<JsonObject>>() {
                 }.getType());
-        return Observable.fromIterable(watch).map(this::objectJsonToEvent);
+        return Observable.fromIterable(watch).map(this::objectJsonToEvent).doFinally(watch::close);
     }
     
     /**

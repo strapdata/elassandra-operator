@@ -106,7 +106,7 @@ public class TaskEventSource implements EventSource<K8sWatchEvent<Task<?,?>>> {
         final Watch<JsonObject> watch = Watch.createWatch(apiClient, createApiCall(true, lastResourceVersion),
                 new TypeToken<Watch.Response<JsonObject>>() {
                 }.getType());
-        return Observable.fromIterable(watch).map(this::objectJsonToEvent);
+        return Observable.fromIterable(watch).map(this::objectJsonToEvent).doFinally(watch::close);
     }
     
     /**
