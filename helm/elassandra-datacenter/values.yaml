@@ -3,8 +3,8 @@
 # Declare variables to be passed into your templates.
 clusterName: Elassandra
 replicaCount: 1
-racks: 3
 
+racks: 1
 rackNodeSelectors: {}
 #rackNodeSelectors:
 #  rack1:
