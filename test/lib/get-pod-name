@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+cd `dirname "$BASH_SOURCE"`/../..
+source test/config
+
+name=${1:-dc1}
+index=${2:-0}
+
+rack_name="rack$((index % ${NUM_RACKS} + 1))"
+pod_index_in_rack="$(($index / ${NUM_RACKS}))"
+
+echo "${name}-${CHART_NAME}-${rack_name}-${pod_index_in_rack}"
