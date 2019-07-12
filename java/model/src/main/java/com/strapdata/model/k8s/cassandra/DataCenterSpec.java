@@ -13,7 +13,15 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 public class DataCenterSpec {
-
+    
+    @SerializedName("clusterName")
+    @Expose
+    private String clusterName;
+    
+    @SerializedName("datacenterName")
+    @Expose
+    private String datacenterName;
+    
     /**
      * Number of Cassandra nodes in this data center.
      * 
@@ -45,11 +53,7 @@ public class DataCenterSpec {
     @SerializedName("imagePullSecret")
     @Expose
     private java.lang.String imagePullSecret;
-
-    @SerializedName("clusterName")
-    @Expose
-    private java.lang.String clusterName;
-
+    
     /**
      * List of environment variables to inject in the Cassandra & Sidecar container.
      * 

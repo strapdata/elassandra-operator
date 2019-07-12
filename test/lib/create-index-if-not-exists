@@ -5,7 +5,7 @@ source test/config
 
 index=${1:-ks}
 type=${2:-t}
-name=${3:-dc1}
+name=${3:-${DEFAULT_NAME}}
 replicas=${4:-1}
 
 node_0=$(./test/lib/get-pod-name ${name} 0)

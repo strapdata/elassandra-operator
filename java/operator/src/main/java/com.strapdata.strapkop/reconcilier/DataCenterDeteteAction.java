@@ -1,9 +1,9 @@
 package com.strapdata.strapkop.reconcilier;
 
 import com.google.gson.JsonSyntaxException;
+import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorMetadata;
-import com.strapdata.model.Key;
 import io.kubernetes.client.ApiException;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
@@ -15,17 +15,17 @@ public class DataCenterDeteteAction {
     private static final Logger logger = LoggerFactory.getLogger(DataCenterDeteteAction.class);
     
     private final K8sResourceUtils k8sResourceUtils;
-    private final Key dataCenterKey;
+    private final DataCenter dataCenter;
     
-    public DataCenterDeteteAction(K8sResourceUtils k8sResourceUtils, @Parameter("dataCenterKey") Key dataCenterKey) {
+    public DataCenterDeteteAction(K8sResourceUtils k8sResourceUtils, @Parameter("dataCenter") DataCenter dataCenter) {
         this.k8sResourceUtils = k8sResourceUtils;
-        this.dataCenterKey = dataCenterKey;
+        this.dataCenter = dataCenter;
     }
     
     public void deleteDataCenter() throws Exception {
-        logger.info("Deleting DataCenter {}.", dataCenterKey.name);
+        logger.info("Deleting DataCenter {}.", dataCenter.getMetadata().getName());
         
-        final String labelSelector = OperatorMetadata.toSelector(OperatorMetadata.datacenter(dataCenterKey.name));
+        final String labelSelector = OperatorMetadata.toSelector(OperatorMetadata.datacenter(dataCenter));
         
         // delete persistent volumes & persistent volume claims
         // TODO: this is disabled for now for safety. Perhaps add a flag or something to control this.
@@ -42,7 +42,7 @@ public class DataCenterDeteteAction {
 //        });
         
         // delete StatefulSets
-        k8sResourceUtils.listNamespacedStatefulSets(dataCenterKey.namespace, null, labelSelector).forEach(statefulSet -> {
+        k8sResourceUtils.listNamespacedStatefulSets(dataCenter.getMetadata().getNamespace(), null, labelSelector).forEach(statefulSet -> {
             try {
                 k8sResourceUtils.deleteStatefulSet(statefulSet);
                 logger.debug("Deleted StatefulSet.");
@@ -56,7 +56,7 @@ public class DataCenterDeteteAction {
         });
         
         // delete ConfigMaps
-        k8sResourceUtils.listNamespacedConfigMaps(dataCenterKey.namespace, null, labelSelector).forEach(configMap -> {
+        k8sResourceUtils.listNamespacedConfigMaps(dataCenter.getMetadata().getNamespace(), null, labelSelector).forEach(configMap -> {
             try {
                 k8sResourceUtils.deleteConfigMap(configMap);
                 logger.debug("Deleted ConfigMap.");
@@ -70,7 +70,7 @@ public class DataCenterDeteteAction {
         });
         
         // delete Services
-        k8sResourceUtils.listNamespacedServices(dataCenterKey.namespace, null, labelSelector).forEach(service -> {
+        k8sResourceUtils.listNamespacedServices(dataCenter.getMetadata().getNamespace(), null, labelSelector).forEach(service -> {
             try {
                 k8sResourceUtils.deleteService(service);
                 logger.debug("Deleted Service.");
