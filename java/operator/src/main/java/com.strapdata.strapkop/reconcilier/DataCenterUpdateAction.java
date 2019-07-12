@@ -1,9 +1,11 @@
 package com.strapdata.strapkop.reconcilier;
 
 import com.google.common.base.Strings;
-import com.google.common.collect.*;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 import com.google.common.net.InetAddresses;
-import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
 import com.squareup.okhttp.Call;
 import com.strapdata.model.k8s.cassandra.DataCenter;
@@ -22,7 +24,6 @@ import io.kubernetes.client.apis.CustomObjectsApi;
 import io.kubernetes.client.models.*;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
-import io.reactivex.Single;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,7 +36,6 @@ import java.io.StringWriter;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 
 @Prototype
@@ -88,7 +88,7 @@ public class DataCenterUpdateAction {
         this.dataCenterLabels = OperatorMetadata.datacenter(dataCenter.getMetadata().getName());
     }
     
-    public void reconcileDataCenter() throws Exception {
+    void reconcileDataCenter() throws Exception {
         logger.info("Reconciling DataCenter {}.", dataCenterMetadata.getName());
         
         // create the public service (what clients use to discover the data center)
@@ -107,14 +107,13 @@ public class DataCenterUpdateAction {
         // sorted map of rack -> statefulset
         TreeMap<String, V1StatefulSet> statefulSetMap = new TreeMap<>(RACK_NAME_COMPARATOR);
         // TODO: ensure validation of racks > 0
-        for (int rackIdx = 1; rackIdx <= dataCenterSpec.getRacks(); rackIdx++) {
+        for (int rackIdx = 0; rackIdx < dataCenterSpec.getRacks(); rackIdx++) {
             int numPods = dataCenterSpec.getReplicas() / dataCenterSpec.getRacks();
-            if (dataCenterSpec.getReplicas() % dataCenterSpec.getRacks() >= rackIdx) {
+            if (dataCenterSpec.getReplicas() % dataCenterSpec.getRacks() > rackIdx) {
                 numPods++;
             }
             
-            final String rack = rackName(rackIdx);
-            statefulSetMap.put(rack, reconcileRack(rack, numPods, seedNodesService));
+            statefulSetMap.put(rackName(rackIdx), reconcileRack(rackIdx, numPods, seedNodesService));
         }
         
         createOrScaleAllStatefulsets(statefulSetMap);
@@ -126,13 +125,13 @@ public class DataCenterUpdateAction {
         logger.info("Reconciled DataCenter.");
     }
     
-    private V1StatefulSet reconcileRack(final String rack, final int numPods, final V1Service seedNodesService) throws Exception {
+    private V1StatefulSet reconcileRack(final int rackIdx, final int numPods, final V1Service seedNodesService) throws Exception {
         // create configmaps and their volume mounts (operator-defined config, and user overrides)
         final List<ConfigMapVolumeMount> configMapVolumeMounts;
         {
             final ImmutableList.Builder<ConfigMapVolumeMount> builder = ImmutableList.builder();
             
-            builder.add(createOrReplaceOperatorConfigMap(seedNodesService, rack));
+            builder.add(createOrReplaceOperatorConfigMap(seedNodesService, rackName(rackIdx)));
             
             if (dataCenterSpec.getUserConfigMapVolumeSource() != null) {
                 builder.add(new ConfigMapVolumeMount("user-config-volume", "/tmp/user-config", dataCenterSpec.getUserConfigMapVolumeSource()));
@@ -143,7 +142,7 @@ public class DataCenterUpdateAction {
         
         logger.info("Reconciled DataCenter.");
         // create the StatefulSet for the Rack nodes
-        return constructRackStatefulSet(rack, numPods, configMapVolumeMounts);
+        return constructRackStatefulSet(rackIdx, numPods, configMapVolumeMounts);
     }
     
     private String dataCenterChildObjectName(final String nameFormat) {
@@ -171,7 +170,7 @@ public class DataCenterUpdateAction {
     }
     
     private String rackName(final int rackIdx) {
-        return "rack" + rackIdx;
+        return "rack" + (rackIdx+1);
     }
     
     private static class ConfigMapVolumeMount {
@@ -201,7 +200,8 @@ public class DataCenterUpdateAction {
         return (dataCenterSpec.getHostPortEnabled()) ? port.hostPort(dataCenterSpec.getNativePort()) : port;
     }
     
-    private V1StatefulSet constructRackStatefulSet(final String rack, final int numPods, final Iterable<ConfigMapVolumeMount> configMapVolumeMounts) throws ApiException {
+    private V1StatefulSet constructRackStatefulSet(final int rackIdx, final int numPods, final Iterable<ConfigMapVolumeMount> configMapVolumeMounts) throws ApiException {
+        final String rack = rackName(rackIdx);
         final V1ObjectMeta statefulSetMetadata = rackChildObjectMetadata(rack, "%s");
         
         final V1Container cassandraContainer = new V1Container()
@@ -340,6 +340,12 @@ public class DataCenterUpdateAction {
             }
         }
         
+        // add node affinity for rack
+        if (dataCenterSpec.getRackNodeSelectors() != null && dataCenterSpec.getRackNodeSelectors().containsKey(rack)) {
+            podSpec.affinity(new V1Affinity()
+                    .nodeAffinity(new V1NodeAffinity()
+                            .requiredDuringSchedulingIgnoredDuringExecution(dataCenterSpec.getRackNodeSelectors().get(rack))));
+        }
         
         // add configmap volumes
         for (final ConfigMapVolumeMount configMapVolumeMount : configMapVolumeMounts) {
@@ -432,8 +438,8 @@ public class DataCenterUpdateAction {
         }
         
         final Map<String, String> rackLabels = OperatorMetadata.rack(dataCenterMetadata.getName(), rack);
-        
-        final V1StatefulSet statefulSet = new V1StatefulSet()
+    
+        return new V1StatefulSet()
                 .metadata(statefulSetMetadata)
                 .spec(new V1StatefulSetSpec()
                         // if the serviceName references a headless service, kubeDNS to create an A record for
@@ -450,18 +456,6 @@ public class DataCenterUpdateAction {
                                 .spec(dataCenterSpec.getDataVolumeClaim())
                         )
                 );
-        
-        return statefulSet;
-
-//        // if the StatefulSet doesn't exist, create it. Otherwise scale it safely
-//        logger.debug("Creating/replacing namespaced StatefulSet.");
-//        K8sResourceUtils.createOrReplaceResource(
-//                () -> {
-//                    appsApi.createNamespacedStatefulSet(statefulSet.getMetadata().getNamespace(), statefulSet, null, null, null);
-//                    logger.info("Created namespaced StatefulSet.");
-//                },
-//                () -> replaceStatefulSet(statefulSet)
-//        );
     }
     
     private V1Container fileLimitInit() {
@@ -721,13 +715,13 @@ public class DataCenterUpdateAction {
     private void addAuthenticationConfig(V1ConfigMap configMap, V1ConfigMapVolumeSource volumeSource) {
         switch (dataCenterSpec.getAuthentication()) {
             case NONE:
-                return;
+                break;
             case CASSANDRA:
                 configMapVolumeAddFile(configMap, volumeSource, "cassandra.yaml.d/002-authentication.yaml",
                         toYamlString(ImmutableMap.of(
                                 "authenticator", "PasswordAuthenticator",
                                 "authorizer", "CassandraAuthorizer")));
-                return;
+                break;
             case LDAP:
                 configMapVolumeAddFile(configMap, volumeSource, "cassandra.yaml.d/002-authentication.yaml",
                         toYamlString(ImmutableMap.of(
@@ -737,7 +731,7 @@ public class DataCenterUpdateAction {
                 //TODO: Add ldap.properties + ldap.pem +
                 // -Dldap.properties.file=/usr/share/cassandra/conf/ldap.properties
                 // -Dcom.sun.jndi.ldap.object.disableEndpointIdentification=true"
-                return;
+                break;
         }
     }
     
@@ -795,7 +789,7 @@ public class DataCenterUpdateAction {
                                 new V1ServicePort().name("internode").port(
                                         dataCenterSpec.getSsl() ? dataCenterSpec.getSslStoragePort() : dataCenterSpec.getStoragePort())))
                         // only select the pod number 0 as seed
-                        .selector(OperatorMetadata.pod(dataCenterMetadata.getName(), rackName(1), rackChildObjectName(rackName(1), "%s-0")))
+                        .selector(OperatorMetadata.pod(dataCenterMetadata.getName(), rackName(0), rackChildObjectName(rackName(0), "%s-0")))
                 );
         k8sResourceUtils.createOrReplaceNamespacedService(service);
         
@@ -855,11 +849,6 @@ public class DataCenterUpdateAction {
     
     static final Comparator<String> RACK_NAME_COMPARATOR = Comparator.comparingInt((String rack) -> Integer.valueOf(rack.substring("rack".length())));
     
-    
-    private static final ImmutableSet<NodeStatus> SCALE_UP_OPERATION_MODES = Sets.immutableEnumSet(NodeStatus.NORMAL);
-    private static final ImmutableSet<NodeStatus> SCALE_DOWN_OPERATION_MODES = Sets.immutableEnumSet(NodeStatus.NORMAL, NodeStatus.DECOMMISSIONED);
-    
-    @SuppressWarnings("Duplicates")
     private void createOrScaleAllStatefulsets(final TreeMap<String, V1StatefulSet> statefulSetMap) throws Exception {
         
         // construct a map of existing statefulset
@@ -884,144 +873,8 @@ public class DataCenterUpdateAction {
             return;
         }
         
-        final StatefulSetsReplacer statefulSetsReplacer = new StatefulSetsReplacer(appsApi, k8sResourceUtils, sidecarClientFactory, dataCenter, statefulSetMap, existingStatefulSetMap);
+        final StatefulSetsReplacer statefulSetsReplacer = new StatefulSetsReplacer(coreApi, appsApi, k8sResourceUtils, sidecarClientFactory, dataCenter, statefulSetMap, existingStatefulSetMap);
         statefulSetsReplacer.replace();
-    }
-    
-    private void replaceStatefulSet(final V1StatefulSet statefulSet) throws ApiException {
-        final V1ObjectMeta statefulSetMetadata = statefulSet.getMetadata();
-        
-        final V1StatefulSet existingStatefulSet = appsApi.readNamespacedStatefulSet(statefulSetMetadata.getName(), statefulSetMetadata.getNamespace(), null, null, null);
-        
-        final int currentReplicas = existingStatefulSet.getSpec().getReplicas();
-        final int desiredReplicas = statefulSet.getSpec().getReplicas();
-        
-        logger.debug("StatefulSet {} currentReplicas = {}, desiredReplicas = {}.", statefulSetMetadata.getName(), currentReplicas, desiredReplicas);
-        
-        // ideally this should use the same selector as the StatefulSet.
-        // why does listNamespacedPod take a string for the selector when V1LabelSelector exists?
-        final String labelSelector = OperatorMetadata.toSelector(statefulSetMetadata.getLabels());
-        
-        
-        final List<V1Pod> pods = ImmutableList.sortedCopyOf(STATEFUL_SET_POD_NEWEST_FIRST_COMPARATOR,
-                k8sResourceUtils.listNamespacedPods(statefulSetMetadata.getNamespace(), null, labelSelector)
-        );
-        
-        logger.debug("Found {} pods.", pods.size());
-        
-        // check that all pods are running
-        {
-            final Multimap<String, V1Pod> podsByPhase = Multimaps.index(pods, pod -> pod.getStatus().getPhase());
-            final Multimap<String, V1Pod> notRunningPodsByPhase = Multimaps.filterKeys(podsByPhase, k -> !k.equals("Running"));
-            
-            if (notRunningPodsByPhase.size() > 0) {
-                logger.warn("Skipping StatefulSet reconciliation as some Pods are not in the Running phase: {}.",
-                        Multimaps.transformValues(notRunningPodsByPhase, (V1Pod p) -> p.getMetadata().getName())
-                );
-                return;
-            }
-        }
-        
-        // check node status
-        final Multimap<NodeStatus, V1Pod> podsByCassandraOperationMode;
-        {
-            final ImmutableMultimap.Builder<NodeStatus, V1Pod> builder = ImmutableMultimap.builder();
-            Object[] nodeStatus = Single.zip(
-                    pods.stream().map(pod -> {
-                        return sidecarClientFactory.clientForPodNullable(pod).status()
-                                .map(status -> {
-                                    builder.put(status, pod);
-                                    return status;
-                                });
-                    }).collect(Collectors.toList()),
-                    x -> x)
-                    .blockingGet();
-            logger.debug("pod status for datacenter={} status={}", this.dataCenterMetadata.getName(), Arrays.toString(nodeStatus));
-            
-            for (int i = 0; i < nodeStatus.length; i++) {
-                if (nodeStatus[i] == null || nodeStatus.length != pods.size()) {
-                    logger.warn("Skipping StatefulSet reconciliation as the status of some Cassandra nodes could not be queried.");
-                    return;
-                }
-            }
-            podsByCassandraOperationMode = builder.build();
-        }
-        
-        // check that all Cassandra nodes are in the right state
-        // TODO: extend this to a full "health check"
-        {
-            final Multimap<NodeStatus, V1Pod> incorrectStatePodsByCassandraOperationMode = Multimaps.filterKeys(podsByCassandraOperationMode, mode -> {
-                if (desiredReplicas >= currentReplicas) {
-                    return !SCALE_UP_OPERATION_MODES.contains(mode);
-                    
-                } else {
-                    return !SCALE_DOWN_OPERATION_MODES.contains(mode);
-                }
-            });
-            
-            if (incorrectStatePodsByCassandraOperationMode.size() > 0) {
-                logger.warn("Skipping StatefulSet reconciliation as some Cassandra Pods are not in the correct mode: {}.",
-                        Multimaps.transformValues(incorrectStatePodsByCassandraOperationMode, (V1Pod p) -> p.getMetadata().getName())
-                );
-                
-                return;
-            }
-        }
-        
-        
-        if (desiredReplicas > currentReplicas) {
-            logger.debug("Scaling StatefulSet up.");
-            
-            existingStatefulSet.getSpec().setReplicas(currentReplicas + 1);
-            appsApi.replaceNamespacedStatefulSet(statefulSetMetadata.getName(), statefulSetMetadata.getNamespace(), existingStatefulSet, null, null);
-            
-        } else if (desiredReplicas < currentReplicas) {
-            logger.debug("Scaling StatefulSet down.");
-            
-            // if all nodes are NORMAL, kick off a decommission
-            // if all nodes except the "newest" are NORMAL, and the newest is DECOMMISSIONED, scale the statefulset
-            
-            final V1Pod newestPod = pods.get(0);
-            
-            final Collection<V1Pod> decommissionedPods = podsByCassandraOperationMode.get(NodeStatus.DECOMMISSIONED);
-            
-            if (decommissionedPods.isEmpty()) {
-                logger.debug("No Cassandra nodes have been decommissioned. Decommissioning the newest node.");
-                
-                sidecarClientFactory.clientForPodNullable(newestPod).decommission().blockingGet();
-                
-            } else if (decommissionedPods.size() == 1) {
-                final V1Pod decommissionedPod = Iterables.getOnlyElement(podsByCassandraOperationMode.get(NodeStatus.DECOMMISSIONED));
-                
-                if (decommissionedPod != newestPod) {
-                    logger.error("Skipping StatefulSet reconciliation as the DataCenter contains one decommissioned Cassandra node, but it isn't the newest. Decommissioned Pod = {}, expecting Pod = {}.",
-                            decommissionedPod.getMetadata().getName(), newestPod.getMetadata().getName());
-                    
-                    return;
-                }
-                
-                existingStatefulSet.getSpec().setReplicas(currentReplicas - 1);
-                appsApi.replaceNamespacedStatefulSet(statefulSetMetadata.getName(), statefulSetMetadata.getNamespace(), existingStatefulSet, null, null);
-                
-                // TODO: this is disabled for now for safety. Perhaps add a flag or something to control this.
-                try {
-                    k8sResourceUtils.deletePersistentVolumeAndPersistentVolumeClaim(decommissionedPod);
-                    
-                } catch (final JsonSyntaxException e) {
-                    logger.debug("Caught JSON exception while deleting Persistent Volume claim. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
-                    
-                }
-            } else {
-                logger.error("Skipping StatefulSet reconciliation as the DataCenter contains more than one decommissioned Cassandra node: {}.",
-                        Iterables.transform(decommissionedPods, (V1Pod p) -> p.getMetadata().getName()));
-            }
-            
-        } else {
-            
-            appsApi.replaceNamespacedStatefulSet(statefulSetMetadata.getName(), statefulSetMetadata.getNamespace(), statefulSet, null, null);
-            logger.debug("Replaced namespaced StatefulSet.");
-        }
-        
     }
     
     private void createOrReplacePrometheusServiceMonitor() throws ApiException {
@@ -1081,6 +934,7 @@ public class DataCenterUpdateAction {
         final String wildcardStatefulsetName = "*." + dataCenterChildObjectName("%s") + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local";
         final String headlessServiceName = dataCenterChildObjectName("%s") + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local";
         final String elasticsearchServiceName = dataCenterChildObjectName("%s") + "-elasticsearch." + dataCenterMetadata.getNamespace() + ".svc.cluster.local";
+        @SuppressWarnings("UnstableApiUsage")
         final V1Secret certificatesSecret = new V1Secret()
                 .metadata(certificatesMetadata)
                 .putDataItem("keystore.p12",

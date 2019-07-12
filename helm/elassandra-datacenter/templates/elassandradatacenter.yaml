@@ -14,6 +14,8 @@ spec:
   clusterName: {{ .Values.clusterName }}
   replicas: {{ .Values.replicaCount }}
   racks: {{ .Values.racks }}
+  rackNodeSelectors:
+{{ toYaml .Values.rackNodeSelectors | indent 4 }}
   elassandraImage: "{{ .Values.image.elassandraRepository }}:{{ .Values.image.elassandraTag }}"
   sidecarImage: "{{ .Values.image.sidecarRepository }}:{{ .Values.image.sidecarTag }}"
   imagePullPolicy: {{ .Values.imagePullPolicy }}
