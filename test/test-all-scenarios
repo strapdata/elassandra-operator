@@ -3,7 +3,7 @@
 cd `dirname "$BASH_SOURCE"`/..
 source test/config
 
-./test/test-basic dc1 3
-./test/test-scale dc1 1 3
-./test/test-scale dc1 3 1
-./test/test-backup dc1 3
+./test/test-basic ${DEFAULT_NAME} 3
+./test/test-scale ${DEFAULT_NAME} 1 3
+./test/test-scale ${DEFAULT_NAME} 3 1
+./test/test-backup ${DEFAULT_NAME} 3
