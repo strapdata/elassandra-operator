@@ -6,11 +6,7 @@ import java.util.List;
 import java.util.Map;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
-import io.kubernetes.client.models.V1ConfigMapVolumeSource;
-import io.kubernetes.client.models.V1EnvVar;
-import io.kubernetes.client.models.V1PersistentVolumeClaimSpec;
-import io.kubernetes.client.models.V1ResourceRequirements;
-import io.kubernetes.client.models.V1SecretVolumeSource;
+import io.kubernetes.client.models.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -29,6 +25,10 @@ public class DataCenterSpec {
     @SerializedName("racks")
     @Expose
     private int racks;
+    
+    @SerializedName("rackNodeSelectors")
+    @Expose
+    private Map<String, V1NodeSelector> rackNodeSelectors;
     
     @SerializedName("elassandraImage")
     @Expose

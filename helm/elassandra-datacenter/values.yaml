@@ -5,6 +5,30 @@ clusterName: Elassandra
 replicaCount: 1
 racks: 3
 
+rackNodeSelectors: {}
+#rackNodeSelectors:
+#  rack1:
+#    nodeSelectorTerms:
+#      - matchExpressions:
+#        - key: failure-domain.beta.kubernetes.io/zone
+#          operator: In
+#          values:
+#            - europe-west1-b
+#  rack2:
+#    nodeSelectorTerms:
+#      - matchExpressions:
+#          - key: failure-domain.beta.kubernetes.io/zone
+#            operator: In
+#            values:
+#              - europe-west1-c
+#  rack3:
+#    nodeSelectorTerms:
+#      - matchExpressions:
+#          - key: failure-domain.beta.kubernetes.io/zone
+#            operator: In
+#            values:
+#              - europe-west1-d
+
 image:
   elassandraRepository: strapdata/strapkop-elassandra-dev
   sidecarRepository: strapdata/strapkop-sidecar-dev
