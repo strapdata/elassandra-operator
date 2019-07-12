@@ -1,6 +1,7 @@
 package com.strapdata.strapkop.pipeline;
 
 
+import com.google.common.collect.ImmutableSet;
 import com.strapdata.strapkop.source.EventSource;
 import io.reactivex.Observable;
 import io.reactivex.Observer;
@@ -10,8 +11,10 @@ import io.reactivex.schedulers.Schedulers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -19,6 +22,7 @@ import java.util.concurrent.TimeUnit;
  * @param <DataT> the event payload data
  */
 public class EventPipeline<DataT> {
+    
     private final Logger logger = LoggerFactory.getLogger(EventPipeline.class);
     
     private EventSource<DataT> source;
@@ -34,6 +38,9 @@ public class EventPipeline<DataT> {
         this.source = source;
         //this.cache = new EventCache<>();
     }
+
+    // we silent exceptions that are periodically triggered by k8s watch
+    private static final Set<Class<?>> skippedExceptions = ImmutableSet.of(SocketTimeoutException.class);
     
     /**
      * Create the actual rx observable and start emitting events (on the io scheduler).
@@ -44,7 +51,11 @@ public class EventPipeline<DataT> {
         
         // the defer operator combined with retry and repeat is used to recreate the observable after each complete or error.
         final Observable<DataT> coldObservable = Observable.defer(() -> source.createObservable())
-                .doOnError(throwable -> logger.debug("error in pipeline {}, recreating the observable in 1 second", this.getClass().getSimpleName()))
+                .doOnError(throwable -> {
+                    if (!(throwable instanceof RuntimeException) || !skippedExceptions.contains(throwable.getCause().getClass())) {
+                        logger.debug("error in pipeline {}, recreating the observable in 1 second", this.getClass().getSimpleName(), throwable);
+                    }
+                })
                 .doOnComplete(() -> logger.debug("pipeline {} completed, recreating observable in 1 second", this.getClass().getSimpleName()))
                 .retryWhen(errors -> errors.delay(1, TimeUnit.SECONDS))
                 .repeatWhen(completed -> completed.delay(1, TimeUnit.SECONDS))
