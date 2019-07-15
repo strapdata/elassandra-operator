@@ -50,7 +50,7 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
     
         logger.info("sts is ready, triggering a dc reconciliation");
         
-        final String dcName = sts.getMetadata().getLabels().get(OperatorMetadata.DATACENTER);
+        final String dcName = sts.getMetadata().getLabels().get(OperatorMetadata.PARENT);
         final DataCenter dc = dataCenterCache.get(new Key(dcName, sts.getMetadata().getNamespace()));
         if (dc == null) {
             logger.warn("triggering the dc reconciliation failed because the dc missed from the cache");

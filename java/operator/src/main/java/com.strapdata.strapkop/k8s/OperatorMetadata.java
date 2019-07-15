@@ -3,10 +3,12 @@ package com.strapdata.strapkop.k8s;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.strapdata.model.k8s.cassandra.DataCenter;
+import io.kubernetes.client.models.V1ObjectMeta;
 
 import java.util.Map;
 
 public final class OperatorMetadata {
+    public static final String PARENT = "elassandra-operator.strapdata.com/parent"; // parent datacenter resource name
     public static final String CLUSTER = "elassandra-operator.strapdata.com/cluster";
     public static final String DATACENTER = "elassandra-operator.strapdata.com/datacenter";
     public static final String RACK = "elassandra-operator.strapdata.com/rack";
@@ -21,8 +23,9 @@ public final class OperatorMetadata {
 
     private OperatorMetadata() {}
     
-    public static Map<String, String> datacenter(String clusterName, String dcName) {
+    public static Map<String, String> datacenter(String parent, String clusterName, String dcName) {
         return ImmutableMap.<String, String>builder()
+                .put(PARENT, parent)
                 .put(CLUSTER, clusterName)
                 .put(DATACENTER, dcName)
                 .putAll(MANAGED)
@@ -30,7 +33,7 @@ public final class OperatorMetadata {
     }
     
     public static Map<String, String> datacenter(DataCenter dataCenter) {
-        return datacenter(dataCenter.getSpec().getClusterName(), dataCenter.getSpec().getDatacenterName());
+        return datacenter(dataCenter.getMetadata().getName(), dataCenter.getSpec().getClusterName(), dataCenter.getSpec().getDatacenterName());
     }
     
     public static Map<String, String> rack(DataCenter dataCenter, String rackName) {
