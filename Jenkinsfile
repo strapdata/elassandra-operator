@@ -125,8 +125,8 @@ podTemplate(
             container('buildenv') {
               if (aksCreated) {
                 sh './gradlew -s :test:execCommand -PtestCommand=lib/logs-operator || true'
-                sh 'kubectl logs dc1-elassandra-datacenter-0  sidecar || true'
-                sh 'kubectl logs dc1-elassandra-datacenter-0  elassandra || true'
+                sh 'kubectl logs elassandra-cluster-dc1-rack1-0  sidecar || true'
+                sh 'kubectl logs elassandra-cluster-dc1-rack1-0  elassandra || true'
                 sh 'kubectl get all -o yaml'
                 sh 'kubectl get crd -o yaml'
                 sh 'kubectl get pvc -o yaml'
