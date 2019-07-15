@@ -7,21 +7,21 @@ import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.k8s.OperatorMetadata;
 import com.strapdata.strapkop.reconcilier.DataCenterReconcilier;
 import io.kubernetes.client.models.V1StatefulSet;
+import org.apache.commons.lang3.ObjectUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.EnumSet;
 import java.util.Objects;
 
-import static com.strapdata.strapkop.event.K8sWatchEvent.Type.INITIAL;
-import static com.strapdata.strapkop.event.K8sWatchEvent.Type.MODIFIED;
+import static com.strapdata.strapkop.event.K8sWatchEvent.Type.*;
 
 @Handler
 public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1StatefulSet>> {
     
     private final Logger logger = LoggerFactory.getLogger(StatefulsetHandler.class);
     
-    private static final EnumSet<K8sWatchEvent.Type> acceptedEventTypes = EnumSet.of(MODIFIED, INITIAL);
+    private static final EnumSet<K8sWatchEvent.Type> acceptedEventTypes = EnumSet.of(MODIFIED, INITIAL, DELETED);
     
     private final DataCenterCache dataCenterCache;
     private final DataCenterReconcilier dataCenterReconcilier;
@@ -42,8 +42,9 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
         final V1StatefulSet sts = data.getResource();
 
         // abort if the sts scaling up/down replicas
-        if (!Objects.equals(sts.getStatus().getReplicas(), sts.getStatus().getReadyReplicas())
-                || !Objects.equals(sts.getStatus().getCurrentReplicas(), sts.getStatus().getReplicas())) {
+        if (!data.getType().equals(DELETED) &&
+                (!Objects.equals(sts.getStatus().getReplicas(), ObjectUtils.defaultIfNull(sts.getStatus().getReadyReplicas(), 0))
+                || !Objects.equals(ObjectUtils.defaultIfNull(sts.getStatus().getCurrentReplicas(), 0), sts.getStatus().getReplicas()))) {
             logger.info("sts is not ready, skipping");
             return ;
         }

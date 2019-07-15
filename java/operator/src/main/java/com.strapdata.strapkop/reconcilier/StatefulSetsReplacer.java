@@ -85,20 +85,22 @@ class StatefulSetsReplacer {
         // some others are exclusive (UP and DOWN, or UPDATE and NOTHING)
         newtStsMap.forEach((rack, sts) -> {
             
-            // compare the datacenter fingerprint to see if we need an update
-            if (sts.getMetadata().getAnnotations().get(OperatorMetadata.DATACENTER_FINGERPRINT)
-                    .equals(existingStsMap.get(rack).getMetadata().getAnnotations().get(OperatorMetadata.DATACENTER_FINGERPRINT))) {
-                modes.get(ReplaceMode.NOTHING).add(rack);
-                return;
-            }
-            
-            modes.get(ReplaceMode.UPDATE).add(rack);
-            
             if (sts.getSpec().getReplicas() > existingStsMap.get(rack).getSpec().getReplicas()) {
                 modes.get(ReplaceMode.UP).add(rack);
+                modes.get(ReplaceMode.UPDATE).add(rack);
             } else if (sts.getSpec().getReplicas() < existingStsMap.get(rack).getSpec().getReplicas()) {
                 modes.get(ReplaceMode.DOWN).add(rack);
+                modes.get(ReplaceMode.UPDATE).add(rack);
             }
+            // compare the datacenter fingerprint to see if we need an update
+            else if (!sts.getMetadata().getAnnotations().get(OperatorMetadata.DATACENTER_FINGERPRINT)
+                    .equals(existingStsMap.get(rack).getMetadata().getAnnotations().get(OperatorMetadata.DATACENTER_FINGERPRINT))) {
+                modes.get(ReplaceMode.UPDATE).add(rack);
+            }
+            else {
+                modes.get(ReplaceMode.NOTHING).add(rack);
+            }
+    
         });
         
         return modes;
