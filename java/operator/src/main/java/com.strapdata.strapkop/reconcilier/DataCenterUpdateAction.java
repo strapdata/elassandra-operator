@@ -3,8 +3,6 @@ package com.strapdata.strapkop.reconcilier;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Sets;
 import com.google.common.net.InetAddresses;
 import com.google.gson.reflect.TypeToken;
 import com.squareup.okhttp.Call;
@@ -12,7 +10,6 @@ import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.k8s.cassandra.DataCenterSpec;
 import com.strapdata.model.k8s.cassandra.Enterprise;
 import com.strapdata.model.k8s.task.BackupTask;
-import com.strapdata.model.sidecar.NodeStatus;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorMetadata;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
@@ -863,7 +860,8 @@ public class DataCenterUpdateAction {
                 existingStatefulSetMap.put(rack, appsApi.readNamespacedStatefulSet(sts.getMetadata().getName(), sts.getMetadata().getNamespace(), null, null, null));
             } catch (ApiException e) {
                 if (e.getCode() != 404) throw e;
-                // otherwise create it
+                // otherwise create it with 0 replicas
+                sts.getSpec().setReplicas(0);
                 appsApi.createNamespacedStatefulSet(sts.getMetadata().getNamespace(), sts, null, null, null);
             }
         }
