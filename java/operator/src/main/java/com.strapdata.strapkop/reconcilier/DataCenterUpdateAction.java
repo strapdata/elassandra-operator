@@ -103,6 +103,19 @@ public class DataCenterUpdateAction {
             createKeystoreIfNotExists();
         }
         
+        // create configmaps and their volume mounts (operator-defined config, and user overrides)
+        // vavr.List is used here because it allows multiple head singly linked list (heads contain the rack-specific config map)
+        io.vavr.collection.List<ConfigMapVolumeMount> configMapVolumeMounts = io.vavr.collection.List.empty();
+        Tuple2<ConfigMapVolumeMount, String> tuple = createOrReplaceSpecConfigMap();
+        configMapVolumeMounts = configMapVolumeMounts.prepend(tuple._1);
+        // the hash of the spec config map used to trigger automatic rolling restart when config map changed
+        final String configFingerprint = tuple._2;
+        configMapVolumeMounts = configMapVolumeMounts.prepend(createOrReplaceVarConfigMap(seedNodesService));
+        if (dataCenterSpec.getUserConfigMapVolumeSource() != null) {
+            configMapVolumeMounts = configMapVolumeMounts.prepend
+                    (new ConfigMapVolumeMount("user-config-volume", "/tmp/user-config", dataCenterSpec.getUserConfigMapVolumeSource()));
+        }
+        
         // sorted map of rack -> statefulset
         TreeMap<String, V1StatefulSet> statefulSetMap = new TreeMap<>(RACK_NAME_COMPARATOR);
         // TODO: ensure validation of racks > 0
@@ -112,7 +125,8 @@ public class DataCenterUpdateAction {
                 numPods++;
             }
             
-            statefulSetMap.put(rackName(rackIdx), reconcileRack(rackIdx, numPods, seedNodesService));
+            statefulSetMap.put(rackName(rackIdx), constructRackStatefulSet(
+                    rackIdx, numPods, configMapVolumeMounts.prepend(createOrReplaceRackConfigMap(rackName(rackIdx))), configFingerprint));
         }
         
         createOrScaleAllStatefulsets(statefulSetMap);
@@ -123,35 +137,7 @@ public class DataCenterUpdateAction {
         
         logger.info("Reconciled DataCenter.");
     }
-    
-    private V1StatefulSet reconcileRack(final int rackIdx, final int numPods, final V1Service seedNodesService) throws Exception {
-        
-        // the hash of the spec config map used to trigger automatic rolling restart when config map changed
-        final String configFingerprint;
-        
-        // create configmaps and their volume mounts (operator-defined config, and user overrides)
-        final List<ConfigMapVolumeMount> configMapVolumeMounts;
-        {
-            final ImmutableList.Builder<ConfigMapVolumeMount> builder = ImmutableList.builder();
-    
-            Tuple2<ConfigMapVolumeMount, String> tuple = createOrReplaceSpecConfigMap(rackName(rackIdx));
-            builder.add(tuple._1);
-            configFingerprint = tuple._2;
-    
-            builder.add(createOrReplaceVarConfigMap(seedNodesService, rackName(rackIdx)));
-            
-            if (dataCenterSpec.getUserConfigMapVolumeSource() != null) {
-                builder.add(new ConfigMapVolumeMount("user-config-volume", "/tmp/user-config", dataCenterSpec.getUserConfigMapVolumeSource()));
-            }
-            
-            configMapVolumeMounts = builder.build();
-        }
-        
-        logger.info("Reconciled DataCenter.");
-        // create the StatefulSet for the Rack nodes
-        return constructRackStatefulSet(rackIdx, numPods, configMapVolumeMounts, configFingerprint);
-    }
-    
+
     private String dataCenterChildObjectName(final String nameFormat) {
         return String.format(nameFormat, dataCenterMetadata.getName());
     }
@@ -523,9 +509,9 @@ public class DataCenterUpdateAction {
     private static final long GB = MB * 1024;
     
     // configuration that is supposed to be variable over the cluster life and does not require a rolling restart when changed
-    private ConfigMapVolumeMount createOrReplaceVarConfigMap(final V1Service seedNodesService, final String rack) throws IOException, ApiException {
+    private ConfigMapVolumeMount createOrReplaceVarConfigMap(final V1Service seedNodesService) throws IOException, ApiException {
         final V1ConfigMap configMap = new V1ConfigMap()
-                .metadata(rackChildObjectMetadata(rack, "%s-operator-var-config"));
+                .metadata(dataCenterChildObjectMetadata("%s-operator-var-config"));
     
         final V1ConfigMapVolumeSource volumeSource = new V1ConfigMapVolumeSource().name(configMap.getMetadata().getName());
     
@@ -547,13 +533,38 @@ public class DataCenterUpdateAction {
         k8sResourceUtils.createOrReplaceNamespacedConfigMap(configMap);
     
         return new ConfigMapVolumeMount("operator-var-config-volume", "/tmp/operator-var-config", volumeSource);
+    }
     
+    // configuration that is specific to rack. For the moment, an update of it does not trigger a restart
+    private ConfigMapVolumeMount createOrReplaceRackConfigMap(final String rack) throws IOException, ApiException {
+        final V1ConfigMap configMap = new V1ConfigMap()
+                .metadata(rackChildObjectMetadata(rack, "%s-operator-config"));
+    
+        final V1ConfigMapVolumeSource volumeSource = new V1ConfigMapVolumeSource().name(configMap.getMetadata().getName());
+    
+        // GossipingPropertyFileSnitch config
+        {
+            final Properties rackDcProperties = new Properties();
+        
+            rackDcProperties.setProperty("dc", dataCenterSpec.getDatacenterName());
+            rackDcProperties.setProperty("rack", rack);
+            rackDcProperties.setProperty("prefer_local", "true");
+        
+            final StringWriter writer = new StringWriter();
+            rackDcProperties.store(writer, "generated by cassandra-operator");
+        
+            configMapVolumeAddFile(configMap, volumeSource, "cassandra-rackdc.properties", writer.toString());
+        }
+    
+        k8sResourceUtils.createOrReplaceNamespacedConfigMap(configMap);
+        
+        return new ConfigMapVolumeMount("operator-rack-config-volume", "/tmp/operator-rack-config", volumeSource);
     }
     
     // configuration that should trigger a rolling restart when modified
-    private Tuple2<ConfigMapVolumeMount, String> createOrReplaceSpecConfigMap(final String rack) throws IOException, ApiException {
+    private Tuple2<ConfigMapVolumeMount, String> createOrReplaceSpecConfigMap() throws ApiException {
         final V1ConfigMap configMap = new V1ConfigMap()
-                .metadata(rackChildObjectMetadata(rack, "%s-operator-spec-config"));
+                .metadata(dataCenterChildObjectMetadata("%s-operator-spec-config"));
         
         final V1ConfigMapVolumeSource volumeSource = new V1ConfigMapVolumeSource().name(configMap.getMetadata().getName());
         
@@ -575,31 +586,11 @@ public class DataCenterUpdateAction {
             configMapVolumeAddFile(configMap, volumeSource, "cassandra.yaml.d/001-operator-spec-overrides.yaml", toYamlString(config));
         }
         
-        // GossipingPropertyFileSnitch config
-        {
-            final Properties rackDcProperties = new Properties();
-            
-            rackDcProperties.setProperty("dc", dataCenterSpec.getDatacenterName());
-            rackDcProperties.setProperty("rack", rack);
-            rackDcProperties.setProperty("prefer_local", "true");
-            
-            final StringWriter writer = new StringWriter();
-            rackDcProperties.store(writer, "generated by cassandra-operator");
-            
-            configMapVolumeAddFile(configMap, volumeSource, "cassandra-rackdc.properties", writer.toString());
-        }
-        
         // prometheus support
         if (dataCenterSpec.getPrometheusSupport()) {
             configMapVolumeAddFile(configMap, volumeSource, "cassandra-env.sh.d/001-cassandra-exporter.sh",
                     "JVM_OPTS=\"${JVM_OPTS} -javaagent:${CASSANDRA_HOME}/agents/cassandra-exporter-agent.jar=@${CASSANDRA_CONF}/cassandra-exporter.conf\"");
         }
-        
-        // this does not work with elassandra because it needs to run as root. It has been moved to the init container
-        // tune ulimits
-        // configMapVolumeAddFile(configMap, volumeSource, "cassandra-env.sh.d/002-cassandra-limits.sh",
-        //        "ulimit -l unlimited\n" // unlimited locked memory
-        //);
         
         // heap size and GC settings
         // TODO: tune
