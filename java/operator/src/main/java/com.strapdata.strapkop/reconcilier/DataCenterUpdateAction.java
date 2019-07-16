@@ -21,6 +21,8 @@ import io.kubernetes.client.apis.CustomObjectsApi;
 import io.kubernetes.client.models.*;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
+import io.vavr.Tuple;
+import io.vavr.Tuple2;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -123,12 +125,20 @@ public class DataCenterUpdateAction {
     }
     
     private V1StatefulSet reconcileRack(final int rackIdx, final int numPods, final V1Service seedNodesService) throws Exception {
+        
+        // the hash of the spec config map used to trigger automatic rolling restart when config map changed
+        final String configFingerprint;
+        
         // create configmaps and their volume mounts (operator-defined config, and user overrides)
         final List<ConfigMapVolumeMount> configMapVolumeMounts;
         {
             final ImmutableList.Builder<ConfigMapVolumeMount> builder = ImmutableList.builder();
-            
-            builder.add(createOrReplaceOperatorConfigMap(seedNodesService, rackName(rackIdx)));
+    
+            Tuple2<ConfigMapVolumeMount, String> tuple = createOrReplaceSpecConfigMap(rackName(rackIdx));
+            builder.add(tuple._1);
+            configFingerprint = tuple._2;
+    
+            builder.add(createOrReplaceVarConfigMap(seedNodesService, rackName(rackIdx)));
             
             if (dataCenterSpec.getUserConfigMapVolumeSource() != null) {
                 builder.add(new ConfigMapVolumeMount("user-config-volume", "/tmp/user-config", dataCenterSpec.getUserConfigMapVolumeSource()));
@@ -139,7 +149,7 @@ public class DataCenterUpdateAction {
         
         logger.info("Reconciled DataCenter.");
         // create the StatefulSet for the Rack nodes
-        return constructRackStatefulSet(rackIdx, numPods, configMapVolumeMounts);
+        return constructRackStatefulSet(rackIdx, numPods, configMapVolumeMounts, configFingerprint);
     }
     
     private String dataCenterChildObjectName(final String nameFormat) {
@@ -197,7 +207,7 @@ public class DataCenterUpdateAction {
         return (dataCenterSpec.getHostPortEnabled()) ? port.hostPort(dataCenterSpec.getNativePort()) : port;
     }
     
-    private V1StatefulSet constructRackStatefulSet(final int rackIdx, final int numPods, final Iterable<ConfigMapVolumeMount> configMapVolumeMounts) throws ApiException {
+    private V1StatefulSet constructRackStatefulSet(final int rackIdx, final int numPods, final Iterable<ConfigMapVolumeMount> configMapVolumeMounts, String configmapFingerprint) throws ApiException {
         final String rack = rackName(rackIdx);
         final V1ObjectMeta statefulSetMetadata = rackChildObjectMetadata(rack, "%s");
         
@@ -445,7 +455,9 @@ public class DataCenterUpdateAction {
                         .replicas(numPods)
                         .selector(new V1LabelSelector().matchLabels(rackLabels))
                         .template(new V1PodTemplateSpec()
-                                .metadata(new V1ObjectMeta().labels(rackLabels))
+                                .metadata(new V1ObjectMeta()
+                                        .labels(rackLabels)
+                                        .putAnnotationsItem(OperatorMetadata.CONFIGMAP_FINGERPRINT, configmapFingerprint))
                                 .spec(podSpec)
                         )
                         .addVolumeClaimTemplatesItem(new V1PersistentVolumeClaim()
@@ -510,9 +522,38 @@ public class DataCenterUpdateAction {
     private static final long MB = 1024 * 1024;
     private static final long GB = MB * 1024;
     
-    private ConfigMapVolumeMount createOrReplaceOperatorConfigMap(final V1Service seedNodesService, final String rack) throws IOException, ApiException {
+    // configuration that is supposed to be variable over the cluster life and does not require a rolling restart when changed
+    private ConfigMapVolumeMount createOrReplaceVarConfigMap(final V1Service seedNodesService, final String rack) throws IOException, ApiException {
         final V1ConfigMap configMap = new V1ConfigMap()
-                .metadata(rackChildObjectMetadata(rack, "%s-operator-config"));
+                .metadata(rackChildObjectMetadata(rack, "%s-operator-var-config"));
+    
+        final V1ConfigMapVolumeSource volumeSource = new V1ConfigMapVolumeSource().name(configMap.getMetadata().getName());
+    
+        // cassandra.yaml overrides
+        {
+            final Map<String, Object> config = new HashMap<>(); // can't use ImmutableMap as some values are null
+        
+            config.put("seed_provider", ImmutableList.of(ImmutableMap.of(
+                    "class_name", "com.strapdata.cassandra.k8s.SeedProvider",
+                    //TODO: put a list of dns record (one per datacenter seed service), need an update of the seed provider
+                    "parameters", ImmutableList.of(ImmutableMap.of("service", seedNodesService.getMetadata().getName()))
+            )));
+        
+            configMapVolumeAddFile(configMap, volumeSource, "cassandra.yaml.d/001-operator-var-overrides.yaml", toYamlString(config));
+        }
+    
+        // GossipingPropertyFileSnitch config
+    
+        k8sResourceUtils.createOrReplaceNamespacedConfigMap(configMap);
+    
+        return new ConfigMapVolumeMount("operator-var-config-volume", "/tmp/operator-var-config", volumeSource);
+    
+    }
+    
+    // configuration that should trigger a rolling restart when modified
+    private Tuple2<ConfigMapVolumeMount, String> createOrReplaceSpecConfigMap(final String rack) throws IOException, ApiException {
+        final V1ConfigMap configMap = new V1ConfigMap()
+                .metadata(rackChildObjectMetadata(rack, "%s-operator-spec-config"));
         
         final V1ConfigMapVolumeSource volumeSource = new V1ConfigMapVolumeSource().name(configMap.getMetadata().getName());
         
@@ -527,18 +568,11 @@ public class DataCenterUpdateAction {
             // broadcast_rpc is set dynamically from entry-point.sh according to env $POD_IP
             config.put("rpc_address", "0.0.0.0"); // bind rpc to all addresses (allow localhost access)
             
-            // messy -- constructs via org.apache.cassandra.config.ParameterizedClass.ParameterizedClass(java.util.Map<java.lang.String,?>)
-            config.put("endpoint_snitch", "org.apache.cassandra.locator.GossipingPropertyFileSnitch");
-            config.put("seed_provider", ImmutableList.of(ImmutableMap.of(
-                    "class_name", "com.strapdata.cassandra.k8s.SeedProvider",
-                    "parameters", ImmutableList.of(ImmutableMap.of("service", seedNodesService.getMetadata().getName()))
-            )));
-            
             config.put("storage_port", dataCenterSpec.getStoragePort());
             config.put("ssl_storage_port", dataCenterSpec.getSslStoragePort());
             config.put("native_transport_port", dataCenterSpec.getNativePort());
             
-            configMapVolumeAddFile(configMap, volumeSource, "cassandra.yaml.d/001-operator-overrides.yaml", toYamlString(config));
+            configMapVolumeAddFile(configMap, volumeSource, "cassandra.yaml.d/001-operator-spec-overrides.yaml", toYamlString(config));
         }
         
         // GossipingPropertyFileSnitch config
@@ -646,8 +680,10 @@ public class DataCenterUpdateAction {
         }
         
         k8sResourceUtils.createOrReplaceNamespacedConfigMap(configMap);
+    
+        final String configMapFingerprint = DigestUtils.sha1Hex(appsApi.getApiClient().getJSON().getGson().toJson(configMap.getData()));
         
-        return new ConfigMapVolumeMount("operator-config-volume", "/tmp/operator-config", volumeSource);
+        return Tuple.of(new ConfigMapVolumeMount("operator-spec-config-volume", "/tmp/operator-spec-config", volumeSource), configMapFingerprint);
     }
     
     private void addSslConfig(V1ConfigMap configMap, V1ConfigMapVolumeSource volumeSource) {

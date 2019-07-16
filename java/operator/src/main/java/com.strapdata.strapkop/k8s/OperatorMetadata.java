@@ -17,6 +17,10 @@ public final class OperatorMetadata {
     // this is an annotation attached to datacenter child object that store a fingerprint of the datacenter spec
     public static final String DATACENTER_FINGERPRINT = "elassandra-operator.strapdata.com/datacenter-fingerprint";
     
+    // this annotation is used to store a hash of the config map in the pod so that statefulset trigger a rolling restart
+    // when the config map change
+    public static final String CONFIGMAP_FINGERPRINT = "elassandra-operator.strapdata.com/configmap-fingerprint";
+    
     public static final Map<String, String> MANAGED = ImmutableMap.of(
             "app.kubernetes.io/managed-by", "elassandra-operator"
     );
