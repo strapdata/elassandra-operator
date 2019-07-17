@@ -264,10 +264,10 @@ class StatefulSetsReplacer {
                 .map(existingStsMap::get)
                 .get(); // should always contain an item
         
-        logger.info("Scaling up sts {}", statefulSetToScale.getMetadata().getName());
+        logger.info("Scaling down sts {}", statefulSetToScale.getMetadata().getName());
         
-        // when scaling up, we can't modify the entire spec of the existing sts because it could accidentally trigger a rolling restart
-        statefulSetToScale.getSpec().setReplicas(statefulSetToScale.getSpec().getReplicas() + 1);
+        // when scaling down, we can't modify the entire spec of the existing sts because it could accidentally trigger a rolling restart
+        statefulSetToScale.getSpec().setReplicas(statefulSetToScale.getSpec().getReplicas() - 1);
         appsApi.replaceNamespacedStatefulSet(statefulSetToScale.getMetadata().getName(), statefulSetToScale.getMetadata().getNamespace(), statefulSetToScale, null, null);
     }
     
