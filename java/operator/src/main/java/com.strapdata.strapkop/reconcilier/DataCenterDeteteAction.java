@@ -5,6 +5,7 @@ import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorMetadata;
 import io.kubernetes.client.ApiException;
+import io.kubernetes.client.apis.CoreV1Api;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
 import org.slf4j.Logger;
@@ -15,10 +16,12 @@ public class DataCenterDeteteAction {
     private static final Logger logger = LoggerFactory.getLogger(DataCenterDeteteAction.class);
     
     private final K8sResourceUtils k8sResourceUtils;
+    private final CoreV1Api coreV1Api;
     private final DataCenter dataCenter;
     
-    public DataCenterDeteteAction(K8sResourceUtils k8sResourceUtils, @Parameter("dataCenter") DataCenter dataCenter) {
+    public DataCenterDeteteAction(K8sResourceUtils k8sResourceUtils, CoreV1Api coreV1Api, @Parameter("dataCenter") DataCenter dataCenter) {
         this.k8sResourceUtils = k8sResourceUtils;
+        this.coreV1Api = coreV1Api;
         this.dataCenter = dataCenter;
     }
     
@@ -62,12 +65,23 @@ public class DataCenterDeteteAction {
                 logger.debug("Deleted ConfigMap.");
                 
             } catch (final JsonSyntaxException e) {
-                logger.debug("Caught JSON exception while deleting ConfigMap. Iignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
+                logger.debug("Caught JSON exception while deleting ConfigMap. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
                 
             } catch (final ApiException e) {
                 logger.error("Failed to delete ConfigMap.", e);
             }
         });
+        
+        try {
+            // delete secrets
+            coreV1Api.deleteCollectionNamespacedSecret(dataCenter.getMetadata().getNamespace(), false,
+                    null, null, null, labelSelector, null, null, null, null);
+        } catch (final JsonSyntaxException e) {
+            logger.debug("Caught JSON exception while deleting ConfigMap. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
+            
+        } catch (final ApiException e) {
+            logger.error("Failed to delete ConfigMap.", e);
+        }
         
         // delete Services
         k8sResourceUtils.listNamespacedServices(dataCenter.getMetadata().getNamespace(), null, labelSelector).forEach(service -> {
