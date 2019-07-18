@@ -16,7 +16,7 @@ helm ${helm_cmd} \
     --set image.sidecarRepository=${SIDECAR_IMAGE} \
     --set-string image.elassandraTag=${TAG} \
     --set-string image.sidecarTag=${TAG} \
-    --set imagePullPolicy=IfNotPresent \
+    --set imagePullPolicy=${PULL_POLICY_ELASSANDRA} \
     --set imagePullSecret=${PULL_SECRET} \
     --set replicaCount=${replicas} \
     --set elasticsearchEnabled=${ELASTICSEARCH_ENABLED} \

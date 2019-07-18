@@ -6,7 +6,7 @@ source test/config
 helm install -n elassandra-operator --wait \
     --set image.repository=${OPERATOR_IMAGE} \
     --set-string image.tag=${TAG} \
-    --set imagePullPolicy=IfNotPresent \
+    --set imagePullPolicy=${PULL_POLICY_OPERATOR} \
     --set imagePullSecret=${PULL_SECRET} \
     $@ \
     helm/elassandra-operator
