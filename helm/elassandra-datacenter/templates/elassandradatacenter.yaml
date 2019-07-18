@@ -1,9 +1,7 @@
-{{- $clusterName := (split "-" .Release.Name)._0 -}}
-{{- $datacenterName := (split "-" .Release.Name)._1 | required "Release name has to be clustername-dcname (in lowercase)" -}}
 apiVersion: stable.strapdata.com/v1
 kind: ElassandraDataCenter
 metadata:
-  name: {{ printf "elassandra-%s-%s" $clusterName $datacenterName | trunc 63 | trimSuffix "-" }}
+  name: {{ template "elassandra.resourceName" . }}
   labels:
     app: {{ template "elassandra.name" . }}
     chart: {{ template "elassandra.chart" . }}
@@ -13,8 +11,8 @@ metadata:
 {{ toYaml .Values.labels | indent 4 }}
 {{- end }}
 spec:
-  clusterName: {{ $clusterName }}
-  datacenterName: {{ $datacenterName }}
+  clusterName: {{ template "elassandra.clusterName" . }}
+  datacenterName: {{ template "elassandra.datacenterName" . }}
   replicas: {{ .Values.replicaCount }}
   racks: {{ .Values.racks }}
   rackNodeSelectors:
