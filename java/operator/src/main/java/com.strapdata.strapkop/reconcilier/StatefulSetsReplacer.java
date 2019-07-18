@@ -10,6 +10,7 @@ import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
+import io.kubernetes.client.models.V1ContainerStatus;
 import io.kubernetes.client.models.V1DeleteOptions;
 import io.kubernetes.client.models.V1Pod;
 import io.kubernetes.client.models.V1StatefulSet;
@@ -20,6 +21,8 @@ import io.vavr.Tuple2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.MalformedURLException;
+import java.net.UnknownHostException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -44,12 +47,13 @@ class StatefulSetsReplacer {
     private final TreeMap<String, V1StatefulSet> newtStsMap;
     private final TreeMap<String, V1StatefulSet> existingStsMap;
     
-    private List<V1Pod> pods;
-    private Map<PodPhase, List<V1Pod>> podsByPhase;
-    private Map<NodeStatus, List<V1Pod>> podsByStatus;
+    private final List<V1Pod> pods;
+    private final Map<PodPhase, List<V1Pod>> podsByPhase;
+    private final Map<Boolean, List<V1Pod>> podsByReadiness;
+    private final Map<NodeStatus, List<V1Pod>> podsByStatus;
     
     // tree set is ordered by rack ascending (rack1, rack2, ...)
-    private Map<ReplaceMode, TreeSet<String>> racksByReplaceMode;
+    private final Map<ReplaceMode, TreeSet<String>> racksByReplaceMode;
     
     private enum ReplaceMode {
         UP, DOWN, UPDATE, NOTHING
@@ -67,10 +71,11 @@ class StatefulSetsReplacer {
         this.dataCenter = dataCenter;
         this.newtStsMap = newtStsMap;
         this.existingStsMap = existingStsMap;
-        
+    
         this.racksByReplaceMode = fetchReplaceModes();
         this.pods = fetchPods();
         this.podsByPhase = fetchPhases();
+        this.podsByReadiness = fetchReadinesses();
         this.podsByStatus = fetchStatuses();
     }
     
@@ -96,6 +101,7 @@ class StatefulSetsReplacer {
             else if (!sts.getMetadata().getAnnotations().get(OperatorMetadata.DATACENTER_FINGERPRINT)
                     .equals(existingStsMap.get(rack).getMetadata().getAnnotations().get(OperatorMetadata.DATACENTER_FINGERPRINT))) {
                 modes.get(ReplaceMode.UPDATE).add(rack);
+                logger.debug("sts {} has to be updated\nold:{}\nnew:{}", sts.getMetadata().getName(), existingStsMap.get(rack), sts);
             }
             else {
                 modes.get(ReplaceMode.NOTHING).add(rack);
@@ -128,6 +134,20 @@ class StatefulSetsReplacer {
         return phases;
     }
     
+    private Map<Boolean, List<V1Pod>> fetchReadinesses() {
+        Map<Boolean, List<V1Pod>> readinesses = new HashMap<>();
+        readinesses.put(true, new ArrayList<>());
+        readinesses.put(false, new ArrayList<>());
+        
+        for (V1Pod pod : pods) {
+            final Boolean readiness =
+                    pod.getStatus().getInitContainerStatuses().stream().allMatch(V1ContainerStatus::isReady) &&
+                    pod.getStatus().getContainerStatuses().stream().allMatch(V1ContainerStatus::isReady);
+            readinesses.get(readiness).add(pod);
+        }
+    
+        return readinesses;
+    }
     
     private Map<NodeStatus, List<V1Pod>> fetchStatuses() {
         
@@ -142,7 +162,7 @@ class StatefulSetsReplacer {
                         .status()
                         .toObservable()
                         .doOnError(e -> logger.info("can't get pod status of {}", pod.getMetadata().getName(), e))
-                        .onErrorResumeNext(Observable.empty())
+                        .onErrorReturnItem(NodeStatus.UNKNOWN)
                         .map(s -> Tuple.of(s, pod))
                         .subscribeOn(Schedulers.io()))
                 .toMultimap(Tuple2::_1, Tuple2::_2)
@@ -153,11 +173,11 @@ class StatefulSetsReplacer {
     }
     
     private static Set<NodeStatus> MOVING_NODE_STATUSES = ImmutableSet.of(
-            NodeStatus.JOINING, NodeStatus.DRAINING, NodeStatus.LEAVING, NodeStatus.MOVING, NodeStatus.STARTING);
+            NodeStatus.JOINING, NodeStatus.DRAINING, NodeStatus.LEAVING, NodeStatus.MOVING, NodeStatus.STARTING, NodeStatus.UNKNOWN);
     
 
     
-    void replace() throws ApiException {
+    void replace() throws ApiException, MalformedURLException, UnknownHostException {
         
         if (racksByReplaceMode.get(ReplaceMode.UP).size() > 0 && racksByReplaceMode.get(ReplaceMode.DOWN).size() > 0) {
             // here we have some racks to scale-up and some racks to scale-down... it should not happens
@@ -177,6 +197,11 @@ class StatefulSetsReplacer {
             // there is maybe unschedulable pods in out-of-date racks, so we try to recover from that situation
             tryRecoverUnschedulablePods();
             return;
+        }
+    
+        if (podsByReadiness.get(false).size() > 0) {
+            logger.debug("some pods are not ready, skipping sts replacement : {}", podsByPhase.get(false));
+            return ;
         }
         
         // TODO: If some pod are not running, check if we need to perform an update to recover from misconfiguration
@@ -254,7 +279,7 @@ class StatefulSetsReplacer {
         appsApi.replaceNamespacedStatefulSet(statefulSetToScale.getMetadata().getName(), statefulSetToScale.getMetadata().getNamespace(), statefulSetToScale, null, null);
     }
     
-    private void scaleDown() throws ApiException {
+    private void scaleDown() throws ApiException, MalformedURLException, UnknownHostException {
         // scale-down occurs one rack at a time, scale the highest rack number with the highest number of replicas
         final int maxReplicas = existingStsMap.values().stream().mapToInt(sts -> sts.getSpec().getReplicas()).max()
                 .orElseThrow(() -> new RuntimeException("Inconsistent state, no racks found"));
@@ -264,11 +289,27 @@ class StatefulSetsReplacer {
                 .map(existingStsMap::get)
                 .get(); // should always contain an item
         
-        logger.info("Scaling down sts {}", statefulSetToScale.getMetadata().getName());
-        
-        // when scaling down, we can't modify the entire spec of the existing sts because it could accidentally trigger a rolling restart
-        statefulSetToScale.getSpec().setReplicas(statefulSetToScale.getSpec().getReplicas() - 1);
-        appsApi.replaceNamespacedStatefulSet(statefulSetToScale.getMetadata().getName(), statefulSetToScale.getMetadata().getNamespace(), statefulSetToScale, null, null);
+
+        // the name of the node to remove
+        final String nodeName = statefulSetToScale.getMetadata().getName() + "-" + (statefulSetToScale.getSpec().getReplicas() - 1);
+    
+    
+        final Optional<V1Pod> pod = pods.stream().filter(p -> Objects.equals(nodeName, p.getMetadata().getName())).findFirst();
+
+        if (!pod.isPresent()) {
+            logger.warn("cant' find pod {} while scaling down {}", nodeName, statefulSetToScale.getMetadata().getName());
+        }
+        else if (podsByStatus.get(NodeStatus.NORMAL).contains(pod.get())) {
+            logger.info("Scaling down sts {}, decommissioning {}", statefulSetToScale.getMetadata().getName(), nodeName);
+            sidecarClientFactory.clientForPod(pod.get()).decommission();
+        }
+        else if (podsByStatus.get(NodeStatus.DECOMMISSIONED).contains(pod.get())) {
+            logger.info("Scaling down sts {}, removing {}", statefulSetToScale.getMetadata().getName(), nodeName);
+    
+            // when scaling down, we can't modify the entire spec of the existing sts because it could accidentally trigger a rolling restart
+            statefulSetToScale.getSpec().setReplicas(statefulSetToScale.getSpec().getReplicas() - 1);
+            appsApi.replaceNamespacedStatefulSet(statefulSetToScale.getMetadata().getName(), statefulSetToScale.getMetadata().getNamespace(), statefulSetToScale, null, null);
+        }
     }
     
     private void updateNextRack() throws ApiException {
