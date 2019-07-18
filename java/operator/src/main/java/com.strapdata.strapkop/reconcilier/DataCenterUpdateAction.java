@@ -59,8 +59,7 @@ public class DataCenterUpdateAction {
                                   SidecarClientFactory sidecarClientFactory,
                                   K8sResourceUtils k8sResourceUtils,
                                   AuthorityManager authorityManager,
-                                  @Parameter("dataCenter") DataCenter dataCenter
-    ) {
+                                  @Parameter("dataCenter") DataCenter dataCenter) {
         this.coreApi = coreApi;
         this.appsApi = appsApi;
         this.customObjectsApi = customObjectsApi;
@@ -101,6 +100,10 @@ public class DataCenterUpdateAction {
         
         if (dataCenterSpec.getSsl()) {
             createKeystoreIfNotExists();
+        }
+        
+        if (dataCenterSpec.getEnterprise() != null && dataCenterSpec.getEnterprise().getAaa() != null && dataCenterSpec.getEnterprise().getAaa().getEnabled()) {
+            createSharedSecretIfNotExists();
         }
         
         // create configmaps and their volume mounts (operator-defined config, and user overrides)
@@ -389,7 +392,16 @@ public class DataCenterUpdateAction {
                             .addItemsItem(new V1KeyToPath().key(AuthorityManager.SECRET_TRUSTSTORE_P12).path(AuthorityManager.SECRET_TRUSTSTORE_P12))));
         }
         
-        
+        // AAA shared secret
+        if (dataCenterSpec.getEnterprise() != null && dataCenterSpec.getEnterprise().getAaa() != null && dataCenterSpec.getEnterprise().getAaa().getEnabled()) {
+            cassandraContainer.addVolumeMountsItem(new V1VolumeMount().name("operator-shared-secret").mountPath("/tmp/operator-shared-secret"));
+            podSpec.addVolumesItem(new V1Volume().name("operator-shared-secret")
+                    .secret(new V1SecretVolumeSource().secretName(dataCenterChildObjectName("%s-shared-secret"))
+                            .addItemsItem(new V1KeyToPath().key("shared-secret.yaml").path("elasticsearch.yml.d/003-shared-secret.yaml"))));
+            cassandraContainer.addArgsItem("/tmp/operator-shared-secret");
+        }
+    
+    
         if (dataCenterSpec.getRestoreFromBackup() != null) {
             logger.debug("Restore requested.");
             
@@ -784,7 +796,6 @@ public class DataCenterUpdateAction {
             } else {
                 esConfig.put("aaa", ImmutableMap.of(
                         "enabled", enterprise.getAaa().getEnabled(),
-                        "shared_secret", Optional.ofNullable(enterprise.getAaa().getSharedSecret()).orElse("dummy-generated-shared-secret"),
                         "audit", ImmutableMap.of("enabled", enterprise.getAaa().getAudit())
                 ));
             }
@@ -975,5 +986,25 @@ public class DataCenterUpdateAction {
                         ));
         
         coreApi.createNamespacedSecret(dataCenterMetadata.getNamespace(), certificatesSecret, null, null, null);
+    }
+    
+    private void createSharedSecretIfNotExists() throws Exception {
+        final V1ObjectMeta secretMetadata = dataCenterChildObjectMetadata("%s-shared-secret");
+        
+        // check if secret exists
+        try {
+            coreApi.readNamespacedSecret(secretMetadata.getName(), secretMetadata.getNamespace(), null, null, null);
+            return; // do not create the secret if already exists
+        } catch (ApiException e) {
+            if (e.getCode() != 404) {
+                throw e;
+            }
+        }
+        
+        final V1Secret secret = new V1Secret()
+                .metadata(secretMetadata)
+                .putStringDataItem("shared-secret.yaml", "aaa.shared_secret: " + UUID.randomUUID().toString());
+        
+        coreApi.createNamespacedSecret(dataCenterMetadata.getNamespace(), secret, null, null, null);
     }
 }

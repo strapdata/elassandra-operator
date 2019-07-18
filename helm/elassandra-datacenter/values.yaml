@@ -59,7 +59,6 @@ enterprise:
   ssl: true
   aaa:
     enabled: true
-    shared_secret:
     audit: true
   cbs: true
 

@@ -25,11 +25,4 @@ public class Aaa {
     @SerializedName("audit")
     @Expose
     private Boolean audit = true;
-
-    /**
-     * Elasticsearch internode shared secret
-     */
-    @SerializedName("sharedSecret")
-    @Expose
-    private String sharedSecret = UUID.randomUUID().toString();
 }
