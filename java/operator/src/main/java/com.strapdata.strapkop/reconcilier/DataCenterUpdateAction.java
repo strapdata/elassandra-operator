@@ -261,7 +261,10 @@ public class DataCenterUpdateAction {
             // if enterprise JMX is enabled, stop search with a pre-stop hook
             if (dataCenterSpec.getEnterprise().getJmx()) {
                 cassandraContainer.lifecycle(new V1Lifecycle().preStop(new V1Handler().exec(new V1ExecAction()
-                        .addCommandItem("curl -X POST http://localhost:8080/enterprise/search/disable"))));
+                        .addCommandItem("curl")
+                        .addCommandItem("-X")
+                        .addCommandItem("POST")
+                        .addCommandItem("http://localhost:8080/enterprise/search/disable"))));
             }
         } else {
             cassandraContainer.addEnvItem(new V1EnvVar().name("CASSANDRA_DAEMON").value("org.apache.cassandra.service.CassandraDaemon"));
