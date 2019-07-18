@@ -20,7 +20,7 @@ export AKS_NODE_COUNT=${AKS_NODE_COUNT:-3}
 # the az service principal that will be used by the aks cluster, not the one used to create it.
 export AKS_SP_ID=${AKS_SP_ID:-}
 export AKS_SP_PASSWORD=${AKS_SP_PASSWORD:-}
-export AKS_K8S_VERSION=${AKS_K8S_VERSION:-1.12.7}
+export AKS_K8S_VERSION=${AKS_K8S_VERSION:-1.13.7}
 
 export PULL_SECRET=${PULL_SECRET:-""}
 export IMAGE_PREFIX=${IMAGE_PREFIX:-"strapdata/strapkop-"}
