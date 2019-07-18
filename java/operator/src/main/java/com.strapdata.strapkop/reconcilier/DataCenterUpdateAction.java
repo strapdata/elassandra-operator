@@ -75,7 +75,7 @@ public class DataCenterUpdateAction {
         // fingerprint used to identify which statefulset need to be updated.
         // this is important (I guess) because with multi-rack, we don't want to just update all the statefulset at once
         // so we need a mechanism to track which sts needs to be updated.
-        this.datacenterFingerprint = DigestUtils.sha1Hex(appsApi.getApiClient().getJSON().getGson().toJson(dataCenter));
+        this.datacenterFingerprint = DigestUtils.sha1Hex(appsApi.getApiClient().getJSON().getGson().toJson(dataCenter.getSpec()));
     
         // normalize Enterprise object
         if (this.dataCenterSpec.getEnterprise() == null) {
