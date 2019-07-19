@@ -85,7 +85,7 @@ public class BackupTaskReconcilier extends TaskReconcilier<BackupTask> {
                     backupTask.getMetadata().getName(),
                     StorageProvider.valueOf(backupTask.getSpec().getBackupType()),
                     backupTask.getSpec().getTarget(),
-                    pod.getMetadata().getLabels().get(OperatorMetadata.DATACENTER));
+                    pod.getMetadata().getLabels().get(OperatorMetadata.PARENT));
             
             backupArguments.backupId = pod.getSpec().getHostname();
             backupArguments.speed = CommonBackupArguments.Speed.LUDICROUS;
