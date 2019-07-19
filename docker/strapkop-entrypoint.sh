@@ -1,5 +1,7 @@
 #!/bin/bash -xue
 
+source ./systune.sh
+
 # overlay configuration from configmap mounted volumes into /etc/cassandra
 (
 for config_directory in "$@"

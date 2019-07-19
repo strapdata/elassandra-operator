@@ -296,7 +296,6 @@ public class DataCenterUpdateAction {
         
         final V1PodSpec podSpec = new V1PodSpec()
                 .securityContext(new V1PodSecurityContext().fsGroup(999L))
-                .addInitContainersItem(fileLimitInit())
                 .addInitContainersItem(vmMaxMapCountInit())
                 .addInitContainersItem(nodeInfoInit())
                 .addContainersItem(cassandraContainer)
@@ -466,15 +465,6 @@ public class DataCenterUpdateAction {
                                 .spec(dataCenterSpec.getDataVolumeClaim())
                         )
                 );
-    }
-    
-    private V1Container fileLimitInit() {
-        return new V1Container()
-                .securityContext(new V1SecurityContext().privileged(dataCenterSpec.getPrivilegedSupported()))
-                .name("increase-ulimit")
-                .image("busybox")
-                .imagePullPolicy("IfNotPresent")
-                .command(ImmutableList.of("sh", "-c", "ulimit -l unlimited"));
     }
     
     private V1Container vmMaxMapCountInit() {

@@ -19,6 +19,11 @@ COPY cassandra.in.sh /usr/share/cassandra/
 # replace ready-probe.sh
 COPY ready-probe.sh /
 
+# authorize cassandra (and all non-root user) to change system limits (ulimit) using bash
+RUN dagi libcap2-bin && setcap cap_ipc_lock=+ep /bin/bash && setcap cap_sys_resource=+ep /bin/bash
+# this file is sourced from the entrypoint.sh
+COPY systune.sh /
+
 COPY ${cassandra_k8s_addons_jar} /usr/share/cassandra/lib
 
 ADD default-config /etc/cassandra
