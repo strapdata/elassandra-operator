@@ -24,6 +24,6 @@ to=${3:-2}
 
 ./test/lib/undeploy-elassandra ${name}
 ./test/lib/wait-dc-undeploy ${name} ${to}
-./test/lib/delete-dc-pvc ${name} ${to}
+./test/lib/delete-dc-pvc ${name} ${from}
 
 ./test/lib/undeploy-operator
