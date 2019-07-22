@@ -524,10 +524,15 @@ public class DataCenterUpdateAction {
         {
             final Map<String, Object> config = new HashMap<>(); // can't use ImmutableMap as some values are null
         
+            List<String> seedList = new ArrayList<>();
+            seedList.add(seedNodesService.getMetadata().getName());
+            if (dataCenterSpec.getRemoteSeeds() != null) {
+                seedList.addAll(dataCenterSpec.getRemoteSeeds());
+            }
+            
             config.put("seed_provider", ImmutableList.of(ImmutableMap.of(
                     "class_name", "com.strapdata.cassandra.k8s.SeedProvider",
-                    //TODO: put a list of dns record (one per datacenter seed service), need an update of the seed provider
-                    "parameters", ImmutableList.of(ImmutableMap.of("service", seedNodesService.getMetadata().getName()))
+                    "parameters", ImmutableList.of(ImmutableMap.of("services", String.join(",", seedList)))
             )));
         
             configMapVolumeAddFile(configMap, volumeSource, "cassandra.yaml.d/001-operator-var-overrides.yaml", toYamlString(config));
