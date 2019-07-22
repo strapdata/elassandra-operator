@@ -174,4 +174,8 @@ public class DataCenterSpec {
     @SerializedName("enterprise")
     @Expose
     private Enterprise enterprise;
+    
+    @SerializedName("remoteSeeds")
+    @Expose
+    private List<String> remoteSeeds;
 }

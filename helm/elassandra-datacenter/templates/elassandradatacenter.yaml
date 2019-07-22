@@ -63,3 +63,7 @@ spec:
   enterprise:
 {{ toYaml .Values.enterprise | indent 4 }}
 {{- end }}
+{{- if .Values.remoteSeeds }}
+  remoteSeeds:
+{{ toYaml .Values.remoteSeeds | indent 4 }}
+{{- end }}
