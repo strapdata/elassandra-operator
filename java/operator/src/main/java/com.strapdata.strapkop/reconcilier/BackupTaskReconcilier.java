@@ -24,7 +24,8 @@ import javax.inject.Singleton;
 import java.net.MalformedURLException;
 import java.net.UnknownHostException;
 import java.nio.file.Paths;
-import java.util.stream.Collectors;
+import java.util.HashMap;
+import java.util.Map;
 
 @Singleton
 @Infrastructure
@@ -66,10 +67,13 @@ public class BackupTaskReconcilier extends TaskReconcilier<BackupTask> {
     
     private Single<Boolean> callBackupApiAllPods(final BackupTask backupTask) throws ApiException {
         final BackupTaskSpec backupSpec = backupTask.getSpec();
+    
+        final Map<String, String> labels = new HashMap<>(backupSpec.getSelector().getMatchLabels());
         
-        final String dataCenterPodsLabelSelector = backupSpec.getSelector().getMatchLabels().entrySet().stream()
-                .map(x -> x.getKey() + "=" + x.getValue())
-                .collect(Collectors.joining(","));
+        // ensure we are not targeting another cluster
+        labels.putAll(OperatorLabels.cluster(backupSpec.getCluster()));
+        
+        final String dataCenterPodsLabelSelector = OperatorLabels.toSelector(labels);
         
         final Iterable<V1Pod> pods = k8sResourceUtils.listNamespacedPods(backupTask.getMetadata().getNamespace(), null, dataCenterPodsLabelSelector);
         return Observable.fromIterable(pods)

@@ -1,8 +1,11 @@
 package com.strapdata.strapkop.handler;
 
+import com.strapdata.model.ClusterKey;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.event.K8sWatchEvent;
-import com.strapdata.strapkop.reconcilier.DataCenterReconcilier;
+import com.strapdata.strapkop.reconcilier.DataCenterDeleteReconcilier;
+import com.strapdata.strapkop.reconcilier.DataCenterUpdateReconcilier;
+import com.strapdata.strapkop.workqueue.WorkQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,22 +21,32 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
     private static final EnumSet<K8sWatchEvent.Type> creationEventTypes = EnumSet.of(ADDED, MODIFIED, INITIAL);
     private static final EnumSet<K8sWatchEvent.Type> deletionEventTypes = EnumSet.of(DELETED);
     
-    private final DataCenterReconcilier dataCenterReconcilier;
+    private final WorkQueue workQueue;
+    private final DataCenterUpdateReconcilier dataCenterUpdateReconcilier;
+    private final DataCenterDeleteReconcilier dataCenterDeleteReconcilier;
     
-    public DataCenterHandler(DataCenterReconcilier dataCenterReconcilier) {
-        this.dataCenterReconcilier = dataCenterReconcilier;
+    public DataCenterHandler(WorkQueue workQueue, DataCenterUpdateReconcilier dataCenterUpdateReconcilier, DataCenterDeleteReconcilier dataCenterDeleteReconcilier) {
+        this.workQueue = workQueue;
+        this.dataCenterUpdateReconcilier = dataCenterUpdateReconcilier;
+        this.dataCenterDeleteReconcilier = dataCenterDeleteReconcilier;
     }
     
     @Override
     public void accept(K8sWatchEvent<DataCenter> data) throws Exception {
         logger.info("processing a DataCenter event");
         
+        Runnable runnable = null;
         if (creationEventTypes.contains(data.getType())) {
-            dataCenterReconcilier.enqueueUpdate(data.getResource());
+            runnable = dataCenterUpdateReconcilier.prepareRunnable(data.getResource());
         }
    
         else if (deletionEventTypes.contains(data.getType())) {
-            dataCenterReconcilier.enqueueDelete(data.getResource());
+            runnable = dataCenterDeleteReconcilier.prepareRunnable(data.getResource());
         }
+        else {
+            return ; // unreachable
+        }
+        
+        workQueue.submit(new ClusterKey(data.getResource()), runnable);
     }
 }

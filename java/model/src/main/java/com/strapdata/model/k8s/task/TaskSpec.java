@@ -12,4 +12,9 @@ public class TaskSpec {
     @SerializedName("type")
     @Expose
     private String type;
+    
+    // tasks are elassandra-cluster-scoped
+    @SerializedName("cluster")
+    @Expose
+    private String cluster;
 }

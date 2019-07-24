@@ -1,11 +1,13 @@
 package com.strapdata.strapkop.handler;
 
+import com.strapdata.model.ClusterKey;
 import com.strapdata.model.Key;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.k8s.OperatorLabels;
-import com.strapdata.strapkop.reconcilier.DataCenterReconcilier;
+import com.strapdata.strapkop.reconcilier.DataCenterUpdateReconcilier;
+import com.strapdata.strapkop.workqueue.WorkQueue;
 import io.kubernetes.client.models.V1StatefulSet;
 import org.apache.commons.lang3.ObjectUtils;
 import org.slf4j.Logger;
@@ -23,10 +25,12 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
     
     private static final EnumSet<K8sWatchEvent.Type> acceptedEventTypes = EnumSet.of(MODIFIED, INITIAL, DELETED);
     
+    private final WorkQueue workQueue;
     private final DataCenterCache dataCenterCache;
-    private final DataCenterReconcilier dataCenterReconcilier;
+    private final DataCenterUpdateReconcilier dataCenterReconcilier;
     
-    public StatefulsetHandler(DataCenterCache dataCenterCache, DataCenterReconcilier dataCenterReconcilier) {
+    public StatefulsetHandler(WorkQueue workQueue, DataCenterCache dataCenterCache, DataCenterUpdateReconcilier dataCenterReconcilier) {
+        this.workQueue = workQueue;
         this.dataCenterCache = dataCenterCache;
         this.dataCenterReconcilier = dataCenterReconcilier;
     }
@@ -58,6 +62,6 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
             return ;
         }
         
-        dataCenterReconcilier.enqueueUpdate(dc);
+        workQueue.submit(new ClusterKey(dc), dataCenterReconcilier.prepareRunnable(dc));
     }
 }

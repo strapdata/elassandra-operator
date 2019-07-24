@@ -1,11 +1,13 @@
 package com.strapdata.strapkop.handler;
 
 import com.google.common.collect.Sets;
+import com.strapdata.model.ClusterKey;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.sidecar.NodeStatus;
 import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.event.NodeStatusEvent;
-import com.strapdata.strapkop.reconcilier.DataCenterReconcilier;
+import com.strapdata.strapkop.reconcilier.DataCenterUpdateReconcilier;
+import com.strapdata.strapkop.workqueue.WorkQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,10 +28,12 @@ public class NodeStatusHandler extends TerminalHandler<NodeStatusEvent> {
             NodeStatus.DECOMMISSIONED
     );
     
-    private final DataCenterReconcilier dataCenterReconcilier;
+    private final WorkQueue workQueue;
+    private final DataCenterUpdateReconcilier dataCenterReconcilier;
     private final DataCenterCache dataCenterCache;
     
-    public NodeStatusHandler(DataCenterReconcilier dataCenterReconcilier, DataCenterCache dataCenterCache) {
+    public NodeStatusHandler(WorkQueue workQueue, DataCenterUpdateReconcilier dataCenterReconcilier, DataCenterCache dataCenterCache) {
+        this.workQueue = workQueue;
         this.dataCenterReconcilier = dataCenterReconcilier;
         this.dataCenterCache = dataCenterCache;
     }
@@ -44,7 +48,7 @@ public class NodeStatusHandler extends TerminalHandler<NodeStatusEvent> {
             final DataCenter dc = dataCenterCache.get(event.getDataCenterKey());
             if (dc != null) {
                 logger.debug("triggering dc reconciliation because of a NodeStatus change");
-                dataCenterReconcilier.enqueueUpdate(dc);
+                workQueue.submit(new ClusterKey(dc), dataCenterReconcilier.prepareRunnable(dc));
             }
         }
     }
