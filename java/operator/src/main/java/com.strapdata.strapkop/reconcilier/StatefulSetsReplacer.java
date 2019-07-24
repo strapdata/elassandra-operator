@@ -15,6 +15,7 @@ import io.kubernetes.client.models.V1ContainerStatus;
 import io.kubernetes.client.models.V1DeleteOptions;
 import io.kubernetes.client.models.V1Pod;
 import io.kubernetes.client.models.V1StatefulSet;
+import io.reactivex.Flowable;
 import io.reactivex.Observable;
 import io.reactivex.schedulers.Schedulers;
 import io.vavr.Tuple;
@@ -25,6 +26,7 @@ import org.slf4j.LoggerFactory;
 import java.net.MalformedURLException;
 import java.net.UnknownHostException;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static com.strapdata.strapkop.reconcilier.DataCenterUpdateAction.RACK_NAME_COMPARATOR;
@@ -146,8 +148,8 @@ class StatefulSetsReplacer {
         
         for (V1Pod pod : pods) {
             final Boolean readiness =
-                    pod.getStatus().getInitContainerStatuses().stream().allMatch(V1ContainerStatus::isReady) &&
-                    pod.getStatus().getContainerStatuses().stream().allMatch(V1ContainerStatus::isReady);
+                    pod.getStatus().getInitContainerStatuses() != null && pod.getStatus().getInitContainerStatuses().stream().allMatch(V1ContainerStatus::isReady) &&
+                    pod.getStatus().getContainerStatuses() != null && pod.getStatus().getContainerStatuses().stream().allMatch(V1ContainerStatus::isReady);
             readinesses.get(readiness).add(pod);
         }
     
@@ -313,7 +315,13 @@ class StatefulSetsReplacer {
         }
         else if (podsByStatus.get(NodeStatus.NORMAL).contains(pod.get())) {
             logger.info("Scaling down sts {}, decommissioning {}", statefulSetToScale.getMetadata().getName(), nodeName);
-            sidecarClientFactory.clientForPod(pod.get()).decommission();
+            
+            // blocking call to decommission, max 5 times, with 2 second delays between each try
+            sidecarClientFactory.clientForPod(pod.get()).decommission().retryWhen(errors -> errors
+                    .zipWith(Flowable.range(1, 5), (n, i) -> i)
+                    .flatMap(retryCount -> Flowable.timer(2, TimeUnit.SECONDS))
+            ).blockingGet();
+    
         }
         else if (podsByStatus.get(NodeStatus.DECOMMISSIONED).contains(pod.get())) {
             logger.info("Scaling down sts {}, removing {}", statefulSetToScale.getMetadata().getName(), nodeName);
