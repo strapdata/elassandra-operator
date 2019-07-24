@@ -1,6 +1,7 @@
 package com.strapdata.strapkop.ssl;
 
 
+import com.strapdata.strapkop.exception.StrapkopException;
 import com.strapdata.strapkop.k8s.OperatorMetadata;
 import com.strapdata.strapkop.ssl.utils.CertManager;
 import com.strapdata.strapkop.ssl.utils.X509CertificateAndPrivateKey;
@@ -117,22 +118,28 @@ public class AuthorityManager {
      * @return the CA key and certs
      * @throws ApiException 404 if it does not exists
      */
-    public X509CertificateAndPrivateKey loadFromSecret() throws Exception {
-        V1Secret publicSecret = coreApi.readNamespacedSecret(getPublicCaSecretName(), DEFAULT_CA_SECRET_NAMESPACE, null, null, null);
-        final byte[] certsBytes = publicSecret.getData().get(SECRET_CACERT_PEM);
-        if (certsBytes == null) {
-            throw new Exception(MessageFormat.format("missing file {} from secret {} in namespace {}", SECRET_CACERT_PEM, getPublicCaSecretName(), DEFAULT_CA_SECRET_NAMESPACE));
-        }
-        final String certs = new String(certsBytes);
-
-        V1Secret privateSecret = coreApi.readNamespacedSecret(getPrivateCaSecretName(), DEFAULT_CA_SECRET_NAMESPACE, null, null, null);
-        final byte[] keyBytes = privateSecret.getData().get(SECRET_CA_KEY);
-        if (keyBytes == null) {
-            throw new Exception(MessageFormat.format("missing file {} from secret {} in namespace {}", SECRET_CA_KEY, getPrivateCaSecretName(), DEFAULT_CA_SECRET_NAMESPACE));
-        }
-        final String key = new String(keyBytes);
-        
+    public X509CertificateAndPrivateKey loadFromSecret() throws StrapkopException, ApiException {
+        final String certs = loadPublicCaFromSecret();
+        final String key = loadPrivateCaFromSecret();
+    
         return new X509CertificateAndPrivateKey(certs, key);
+    }
+    
+    public String loadPrivateCaFromSecret() throws StrapkopException, ApiException {
+        return loadItemFromSecret(getPrivateCaSecretName(), SECRET_CA_KEY);
+    }
+    
+    public String loadPublicCaFromSecret() throws StrapkopException, ApiException {
+        return loadItemFromSecret(getPublicCaSecretName(), SECRET_CACERT_PEM);
+    }
+    
+    private String loadItemFromSecret(String publicCaSecretName, String secretCacertPem) throws StrapkopException, ApiException {
+        V1Secret publicSecret = coreApi.readNamespacedSecret(publicCaSecretName, DEFAULT_CA_SECRET_NAMESPACE, null, null, null);
+        final byte[] certsBytes = publicSecret.getData().get(secretCacertPem);
+        if (certsBytes == null) {
+            throw new StrapkopException(MessageFormat.format("missing file {} from secret {} in namespace {}", secretCacertPem, publicCaSecretName, DEFAULT_CA_SECRET_NAMESPACE));
+        }
+        return new String(certsBytes);
     }
     
     /**

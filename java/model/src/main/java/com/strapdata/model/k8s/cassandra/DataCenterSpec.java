@@ -60,7 +60,7 @@ public class DataCenterSpec {
      */
     @SerializedName("env")
     @Expose
-    private List<V1EnvVar> env = new ArrayList<V1EnvVar>();
+    private List<V1EnvVar> env = new ArrayList<>();
 
     /**
      * Resource requirements for the Cassandra container.

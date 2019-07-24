@@ -9,4 +9,4 @@ index=${2:-0}
 rack_name="rack$((index % ${NUM_RACKS} + 1))"
 pod_index_in_rack="$(($index / ${NUM_RACKS}))"
 
-echo "elassandra-${name}-${rack_name}-${pod_index_in_rack}"
+echo "$(./test/lib/get-name-prefix ${name})-${rack_name}-${pod_index_in_rack}"

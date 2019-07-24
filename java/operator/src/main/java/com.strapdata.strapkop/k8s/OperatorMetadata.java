@@ -27,6 +27,13 @@ public final class OperatorMetadata {
 
     private OperatorMetadata() {}
     
+    public static Map<String, String> cluster(String clusterName) {
+        return ImmutableMap.<String, String>builder()
+                .put(CLUSTER, clusterName)
+                .putAll(MANAGED)
+                .build();
+    }
+    
     public static Map<String, String> datacenter(String parent, String clusterName, String dcName) {
         return ImmutableMap.<String, String>builder()
                 .put(PARENT, parent)

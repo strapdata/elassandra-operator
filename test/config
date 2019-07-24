@@ -42,8 +42,6 @@ export SSL=${SSL:-true}
 export AUTHENTICATION=${AUTHENTICATION:-CASSANDRA}
 export ENTERPRISE=${ENTERPRISE:-true}
 
-[ "$AUTHENTICATION" != "NONE" ] && export CQL_CRED="-u cassandra -p cassandra"
-[ "$AUTHENTICATION" != "NONE" ] && [ "$ENTERPRISE" = "true" ] && export CURL_CRED="-u cassandra:cassandra" || export CURL_CRED=""
 [ "$SSL" = "true" ] && [ "$ENTERPRISE" = "true" ] && export PROTOCOL="https" || export PROTOCOL="http"
 
 # Azure storage

@@ -3,6 +3,7 @@ package com.strapdata.strapkop.reconcilier;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.model.k8s.cassandra.DataCenterPhase;
 import com.strapdata.model.sidecar.NodeStatus;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorMetadata;
@@ -77,6 +78,11 @@ class StatefulSetsReplacer {
         this.podsByPhase = fetchPhases();
         this.podsByReadiness = fetchReadinesses();
         this.podsByStatus = fetchStatuses();
+        
+        dataCenter.getStatus()
+                .setReplicas(this.pods.size())
+                .setReadyReplicas(this.podsByReadiness.get(true).size())
+                .setJoinedReplicas(this.podsByStatus.get(NodeStatus.NORMAL).size());
     }
     
     private Map<ReplaceMode, TreeSet<String>> fetchReplaceModes() {
@@ -106,7 +112,6 @@ class StatefulSetsReplacer {
             else {
                 modes.get(ReplaceMode.NOTHING).add(rack);
             }
-    
         });
         
         return modes;
@@ -175,12 +180,12 @@ class StatefulSetsReplacer {
     private static Set<NodeStatus> MOVING_NODE_STATUSES = ImmutableSet.of(
             NodeStatus.JOINING, NodeStatus.DRAINING, NodeStatus.LEAVING, NodeStatus.MOVING, NodeStatus.STARTING, NodeStatus.UNKNOWN);
     
-
     
     void replace() throws ApiException, MalformedURLException, UnknownHostException {
         
         if (racksByReplaceMode.get(ReplaceMode.UP).size() > 0 && racksByReplaceMode.get(ReplaceMode.DOWN).size() > 0) {
             // here we have some racks to scale-up and some racks to scale-down... it should not happens
+            dataCenter.getStatus().setPhase(DataCenterPhase.ERROR);
             logger.error("inconsistent state, racks [{}] must scale up while racks [{}] must scale down",
                     racksByReplaceMode.get(ReplaceMode.UP), racksByReplaceMode.get(ReplaceMode.DOWN));
             return;
@@ -216,6 +221,7 @@ class StatefulSetsReplacer {
             updateNextRack();
         } else {
             // this should not happens except if there is no rack...
+            dataCenter.getStatus().setPhase(DataCenterPhase.RUNNING);
             logger.debug("Everything is fine, nothing to do");
         }
     }
@@ -263,6 +269,9 @@ class StatefulSetsReplacer {
     }
     
     private void scaleUp() throws ApiException {
+        
+        dataCenter.getStatus().setPhase(DataCenterPhase.SCALING_UP);
+        
         // scale-up occurs one rack at a time, scale the lowest rack number with the lowest number of replicas
         final int minReplicas = existingStsMap.values().stream().mapToInt(sts -> sts.getSpec().getReplicas()).min()
                 .orElseThrow(() -> new RuntimeException("Inconsistent state, no racks found"));
@@ -280,6 +289,9 @@ class StatefulSetsReplacer {
     }
     
     private void scaleDown() throws ApiException, MalformedURLException, UnknownHostException {
+    
+        dataCenter.getStatus().setPhase(DataCenterPhase.SCALING_DOWN);
+        
         // scale-down occurs one rack at a time, scale the highest rack number with the highest number of replicas
         final int maxReplicas = existingStsMap.values().stream().mapToInt(sts -> sts.getSpec().getReplicas()).max()
                 .orElseThrow(() -> new RuntimeException("Inconsistent state, no racks found"));
@@ -319,6 +331,9 @@ class StatefulSetsReplacer {
     }
     
     private void updateRack(String rack) throws ApiException {
+    
+        dataCenter.getStatus().setPhase(DataCenterPhase.UPDATING);
+        
         final V1StatefulSet newStatefulSet = newtStsMap.get(rack);
         logger.info("Update spec of sts {} (rolling restart)", newStatefulSet.getMetadata().getName());
         appsApi.replaceNamespacedStatefulSet(newStatefulSet.getMetadata().getName(), newStatefulSet.getMetadata().getNamespace(), newStatefulSet, null, null);

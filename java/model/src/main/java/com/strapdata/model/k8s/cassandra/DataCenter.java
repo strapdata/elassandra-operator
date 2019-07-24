@@ -23,4 +23,8 @@ public class DataCenter {
     @SerializedName("spec")
     @Expose
     private DataCenterSpec spec;
+    
+    @SerializedName("status")
+    @Expose
+    private DataCenterStatus status;
 }

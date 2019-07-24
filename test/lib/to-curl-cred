@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+cd `dirname "$BASH_SOURCE"`/../..
+source test/config
+
+cred=$1
+
+if ! [[ -z "${cred}" ]] && [[ "$ENTERPRISE" = "true" ]]; then
+  echo -n "-u ${cred}"
+fi

@@ -6,10 +6,9 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.net.InetAddresses;
 import com.google.gson.reflect.TypeToken;
 import com.squareup.okhttp.Call;
-import com.strapdata.model.k8s.cassandra.DataCenter;
-import com.strapdata.model.k8s.cassandra.DataCenterSpec;
-import com.strapdata.model.k8s.cassandra.Enterprise;
+import com.strapdata.model.k8s.cassandra.*;
 import com.strapdata.model.k8s.task.BackupTask;
+import com.strapdata.strapkop.exception.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorMetadata;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
@@ -29,6 +28,7 @@ import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
+import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -47,10 +47,12 @@ public class DataCenterUpdateAction {
     private final SidecarClientFactory sidecarClientFactory;
     private final K8sResourceUtils k8sResourceUtils;
     private final AuthorityManager authorityManager;
+    private final CredentialsReconcilier credentialsReconcilier;
     
     private final DataCenter dataCenter;
     private final V1ObjectMeta dataCenterMetadata;
     private final DataCenterSpec dataCenterSpec;
+    private final DataCenterStatus dataCenterStatus;
     private final Map<String, String> dataCenterLabels;
     private final String datacenterFingerprint;
     
@@ -59,17 +61,22 @@ public class DataCenterUpdateAction {
                                   SidecarClientFactory sidecarClientFactory,
                                   K8sResourceUtils k8sResourceUtils,
                                   AuthorityManager authorityManager,
-                                  @Parameter("dataCenter") DataCenter dataCenter) {
+                                  CredentialsReconcilier credentialsReconcilier, @Parameter("dataCenter") DataCenter dataCenter) {
         this.coreApi = coreApi;
         this.appsApi = appsApi;
         this.customObjectsApi = customObjectsApi;
         this.sidecarClientFactory = sidecarClientFactory;
         this.k8sResourceUtils = k8sResourceUtils;
         this.authorityManager = authorityManager;
-        
+        this.credentialsReconcilier = credentialsReconcilier;
+    
         this.dataCenter = dataCenter;
         this.dataCenterMetadata = dataCenter.getMetadata();
         this.dataCenterSpec = dataCenter.getSpec();
+        if (dataCenter.getStatus() == null) {
+            dataCenter.setStatus(new DataCenterStatus());
+        }
+        this.dataCenterStatus = this.dataCenter.getStatus();
         
         // fingerprint used to identify which statefulset need to be updated.
         // this is important (I guess) because with multi-rack, we don't want to just update all the statefulset at once
@@ -87,6 +94,9 @@ public class DataCenterUpdateAction {
     }
     
     void reconcileDataCenter() throws Exception {
+        // TODO: move this somewhere more appropriate
+        reconcileCredentialsMaybe(dataCenter);
+        
         logger.info("Reconciling DataCenter {}.", dataCenterMetadata.getName());
         
         // create the public service (what clients use to discover the data center)
@@ -105,6 +115,8 @@ public class DataCenterUpdateAction {
         if (dataCenterSpec.getEnterprise() != null && dataCenterSpec.getEnterprise().getAaa() != null && dataCenterSpec.getEnterprise().getAaa().getEnabled()) {
             createSharedSecretIfNotExists();
         }
+    
+        createAllCredentialsSecretsIfNotExists();
         
         // create configmaps and their volume mounts (operator-defined config, and user overrides)
         // vavr.List is used here because it allows multiple head singly linked list (heads contain the rack-specific config map)
@@ -138,15 +150,62 @@ public class DataCenterUpdateAction {
             createOrReplacePrometheusServiceMonitor();
         }
         
+        updateStatus();
+        
         logger.info("Reconciled DataCenter.");
     }
-
+    
+    // TODO: move this somewhere more appropriate
+    private void reconcileCredentialsMaybe(final DataCenter dc) throws StrapkopException, ApiException, SSLException {
+        if (dc.getStatus() != null &&
+                Objects.equals(dc.getStatus().getPhase(), DataCenterPhase.RUNNING) &&
+                Objects.equals(dc.getSpec().getAuthentication(), Authentication.CASSANDRA) &&
+                Objects.equals(dc.getStatus().getCredentialsStatus(), CredentialsStatus.DEFAULT)) {
+            
+            credentialsReconcilier.reconcile(dc);
+        }
+    }
+    
+    private void updateStatus() throws ApiException {
+        
+        switch (dataCenterSpec.getAuthentication()) {
+            case CASSANDRA:
+                if ( /* new cluster */ dataCenterStatus.getCredentialsStatus() == null ||
+                        /* added auth to existing cluster */ dataCenterStatus.getCredentialsStatus().equals(CredentialsStatus.NONE)) {
+                    // TODO: multi-dc... the credentials might already exist
+                    dataCenterStatus.setCredentialsStatus(CredentialsStatus.DEFAULT);
+                }
+                break;
+            case LDAP:
+                dataCenterStatus.setCredentialsStatus(CredentialsStatus.UNKNOWN);
+                // TODO: support LDAP
+                break;
+            case NONE:
+                dataCenterStatus.setCredentialsStatus(CredentialsStatus.NONE);
+                break;
+        }
+        
+        customObjectsApi.patchNamespacedCustomObject("stable.strapdata.com", "v1",
+                dataCenter.getMetadata().getNamespace(), "elassandra-datacenters", dataCenter.getMetadata().getName(), dataCenter);
+    }
+    
+    private String clusterChildObjectName(final String nameFormat) {
+        return String.format(nameFormat, "elassandra-" + dataCenterSpec.getClusterName() + "-" + dataCenterSpec.getDatacenterName());
+    }
+    
     private String dataCenterChildObjectName(final String nameFormat) {
         return String.format(nameFormat, dataCenterMetadata.getName());
     }
     
     private String rackChildObjectName(final String rack, final String nameFormat) {
         return String.format(nameFormat, dataCenterMetadata.getName() + "-" + rack);
+    }
+    
+    private V1ObjectMeta clusterChildObjectMetadata(final String nameFormat) {
+        return new V1ObjectMeta()
+                .name(clusterChildObjectName(nameFormat))
+                .namespace(dataCenterMetadata.getNamespace())
+                .labels(OperatorMetadata.cluster(dataCenterSpec.getClusterName()));
     }
     
     private V1ObjectMeta dataCenterChildObjectMetadata(final String nameFormat) {
@@ -279,7 +338,21 @@ public class DataCenterUpdateAction {
         
         final V1Container sidecarContainer = new V1Container()
                 .name("sidecar")
-                .env(dataCenterSpec.getEnv())
+                .env(new ArrayList<>(dataCenterSpec.getEnv()))
+                .addEnvItem(new V1EnvVar()
+                        .name("ELASSANDRA_USERNAME")
+                        .valueFrom(new V1EnvVarSource()
+                                .secretKeyRef(new V1SecretKeySelector()
+                                        .name(clusterChildObjectName("%s-credentials-strapkop"))
+                                        .key("username")))
+                )
+                .addEnvItem(new V1EnvVar()
+                        .name("ELASSANDRA_PASSWORD")
+                        .valueFrom(new V1EnvVarSource()
+                                .secretKeyRef(new V1SecretKeySelector()
+                                        .name(clusterChildObjectName("%s-credentials-strapkop"))
+                                        .key("password")))
+                )
                 .image(dataCenterSpec.getSidecarImage())
                 .imagePullPolicy(dataCenterSpec.getImagePullPolicy())
                 .securityContext(new V1SecurityContext().runAsUser(999L).runAsGroup(999L))
@@ -292,7 +365,6 @@ public class DataCenterUpdateAction {
                         .name("sidecar-config-volume")
                         .mountPath("/tmp/sidecar-config-volume")
                 );
-        
         
         final V1PodSpec podSpec = new V1PodSpec()
                 .securityContext(new V1PodSecurityContext().fsGroup(999L))
@@ -904,6 +976,7 @@ public class DataCenterUpdateAction {
         
         // if some of the sts didn't exist we abort the reconciliation for now. The sts creation will trigger a new reconciliation anyway
         if (existingStatefulSetMap.size() < statefulSetMap.size()) {
+            dataCenter.getStatus().setPhase(DataCenterPhase.CREATING);
             return;
         }
         
@@ -983,7 +1056,7 @@ public class DataCenterUpdateAction {
         coreApi.createNamespacedSecret(dataCenterMetadata.getNamespace(), certificatesSecret, null, null, null);
     }
     
-    private void createSharedSecretIfNotExists() throws Exception {
+    private void createSharedSecretIfNotExists() throws ApiException {
         final V1ObjectMeta secretMetadata = dataCenterChildObjectMetadata("%s-shared-secret");
         
         // check if secret exists
@@ -999,6 +1072,32 @@ public class DataCenterUpdateAction {
         final V1Secret secret = new V1Secret()
                 .metadata(secretMetadata)
                 .putStringDataItem("shared-secret.yaml", "aaa.shared_secret: " + UUID.randomUUID().toString());
+        
+        coreApi.createNamespacedSecret(dataCenterMetadata.getNamespace(), secret, null, null, null);
+    }
+    
+    private void createAllCredentialsSecretsIfNotExists() throws ApiException {
+        createCredentialsSecretIfNotExists(clusterChildObjectMetadata("%s-credentials-strapkop"), "strapkop");
+        createCredentialsSecretIfNotExists(clusterChildObjectMetadata("%s-credentials-admin"), "admin");
+    }
+
+    
+    private void createCredentialsSecretIfNotExists(final V1ObjectMeta secretMetadata, final String username) throws ApiException {
+    
+        // check if secret exists
+        try {
+            coreApi.readNamespacedSecret(secretMetadata.getName(), secretMetadata.getNamespace(), null, null, null);
+            return; // do not create the secret if already exists
+        } catch (ApiException e) {
+            if (e.getCode() != 404) {
+                throw e;
+            }
+        }
+    
+        final V1Secret secret = new V1Secret()
+                .metadata(secretMetadata)
+                .putStringDataItem("username", username)
+                .putStringDataItem("password", UUID.randomUUID().toString());
         
         coreApi.createNamespacedSecret(dataCenterMetadata.getNamespace(), secret, null, null, null);
     }
