@@ -8,7 +8,7 @@ replicas=${2:-1}
 rf=${3:-1}
 size=${4:-10}
 
-cred=$(./test/lib/insert-credentials-from-secret ${name})
+cred=$(./test/lib/get-credentials-from-secret ${name})
 cql_cred="$(./test/lib/to-cql-cred ${cred})"
 
 node_0=$(./test/lib/get-pod-name ${name} 0)
