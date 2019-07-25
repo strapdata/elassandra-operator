@@ -78,7 +78,7 @@ public class CqlConnectionManager implements AutoCloseable {
         final Cluster.Builder builder = Cluster.builder()
                 .withClusterName(dc.getSpec().getClusterName())
                 .withPort(dc.getSpec().getNativePort())
-                .addContactPoint(String.format("elassandra-%s-%s-seeds",
+                .addContactPoint(String.format("elassandra-%s-%s",
                         dc.getSpec().getClusterName(),
                         dc.getSpec().getDatacenterName()))
                 .withLoadBalancingPolicy(new TokenAwarePolicy(
