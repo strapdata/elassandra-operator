@@ -4,7 +4,7 @@ import com.strapdata.model.Key;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.event.K8sWatchEvent;
-import com.strapdata.strapkop.k8s.OperatorMetadata;
+import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.reconcilier.DataCenterReconcilier;
 import io.kubernetes.client.models.V1StatefulSet;
 import org.apache.commons.lang3.ObjectUtils;
@@ -51,7 +51,7 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
     
         logger.info("sts is ready, triggering a dc reconciliation");
         
-        final String dcName = sts.getMetadata().getLabels().get(OperatorMetadata.PARENT);
+        final String dcName = sts.getMetadata().getLabels().get(OperatorLabels.PARENT);
         final DataCenter dc = dataCenterCache.get(new Key(dcName, sts.getMetadata().getNamespace()));
         if (dc == null) {
             logger.warn("triggering the dc reconciliation failed because the dc missed from the cache");

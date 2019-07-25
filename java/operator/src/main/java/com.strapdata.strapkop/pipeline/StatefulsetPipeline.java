@@ -4,7 +4,7 @@ import com.squareup.okhttp.Call;
 import com.strapdata.model.Key;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.StatefulsetCache;
-import com.strapdata.strapkop.k8s.OperatorMetadata;
+import com.strapdata.strapkop.k8s.OperatorLabels;
 import io.kubernetes.client.ApiClient;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
@@ -54,7 +54,7 @@ public class StatefulsetPipeline extends K8sWatchPipeline<V1StatefulSet, V1State
         public Call createApiCall(boolean watch, String resourceVersion) throws ApiException {
             return appsV1Api.listNamespacedStatefulSetCall(config.getNamespace(),
                     null, null, null,
-                    null, OperatorMetadata.toSelector(OperatorMetadata.MANAGED),
+                    null, OperatorLabels.toSelector(OperatorLabels.MANAGED),
                     null, resourceVersion, null, watch, null, null);
         }
         

@@ -3,11 +3,11 @@ package com.strapdata.strapkop.k8s;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.strapdata.model.k8s.cassandra.DataCenter;
-import io.kubernetes.client.models.V1ObjectMeta;
 
 import java.util.Map;
 
-public final class OperatorMetadata {
+// should be called OperatorLabelsAndAnnotations...
+public final class OperatorLabels {
     public static final String PARENT = "elassandra-operator.strapdata.com/parent"; // parent datacenter resource name
     public static final String CLUSTER = "elassandra-operator.strapdata.com/cluster";
     public static final String DATACENTER = "elassandra-operator.strapdata.com/datacenter";
@@ -25,7 +25,7 @@ public final class OperatorMetadata {
             "app.kubernetes.io/managed-by", "elassandra-operator"
     );
 
-    private OperatorMetadata() {}
+    private OperatorLabels() {}
     
     public static Map<String, String> cluster(String clusterName) {
         return ImmutableMap.<String, String>builder()

@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+cd `dirname "$BASH_SOURCE"`/../..
+source test/config
+
+name=${1:-${DEFAULT_NAME}}
+cql=$2
+
+cred=$(./test/lib/get-credentials-from-secret ${name})
+cql_cred="$(./test/lib/to-cql-cred ${cred})"
+
+pod=$(./test/lib/get-pod-name ${name} 0)
+
+kubectl exec ${pod} -c ${ELASSANDRA} -- cqlsh ${pod} ${cql_cred} --no-color -e "$cql"

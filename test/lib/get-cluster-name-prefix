@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+cd `dirname "$BASH_SOURCE"`/../..
+source test/config
+
+name=${1:-${DEFAULT_NAME}}
+
+echo -n "elassandra-$(./test/lib/get-cluster-name ${name})"

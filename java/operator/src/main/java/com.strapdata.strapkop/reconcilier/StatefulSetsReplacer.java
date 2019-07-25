@@ -6,7 +6,7 @@ import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.k8s.cassandra.DataCenterPhase;
 import com.strapdata.model.sidecar.NodeStatus;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import com.strapdata.strapkop.k8s.OperatorMetadata;
+import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
@@ -106,8 +106,8 @@ class StatefulSetsReplacer {
                 modes.get(ReplaceMode.UPDATE).add(rack);
             }
             // compare the datacenter fingerprint to see if we need an update
-            else if (!sts.getMetadata().getAnnotations().get(OperatorMetadata.DATACENTER_FINGERPRINT)
-                    .equals(existingStsMap.get(rack).getMetadata().getAnnotations().get(OperatorMetadata.DATACENTER_FINGERPRINT))) {
+            else if (!sts.getMetadata().getAnnotations().get(OperatorLabels.DATACENTER_FINGERPRINT)
+                    .equals(existingStsMap.get(rack).getMetadata().getAnnotations().get(OperatorLabels.DATACENTER_FINGERPRINT))) {
                 modes.get(ReplaceMode.UPDATE).add(rack);
                 logger.debug("sts {} has to be updated\nold:{}\nnew:{}", sts.getMetadata().getName(), existingStsMap.get(rack), sts);
             }
@@ -121,7 +121,7 @@ class StatefulSetsReplacer {
     
     private List<V1Pod> fetchPods() throws Exception {
         // next step is to check the current k8s phase of every pods
-        final String allPodsSelector = OperatorMetadata.toSelector(OperatorMetadata.datacenter(dataCenter));
+        final String allPodsSelector = OperatorLabels.toSelector(OperatorLabels.datacenter(dataCenter));
         return ImmutableList.sortedCopyOf(STATEFUL_SET_POD_NEWEST_FIRST_COMPARATOR,
                 k8sResourceUtils.listNamespacedPods(dataCenter.getMetadata().getNamespace(), null, allPodsSelector)
         );
@@ -265,7 +265,7 @@ class StatefulSetsReplacer {
                                         && Objects.equals(v1PodCondition.getReason(), "Unschedulable"))
                                 .orElse(Boolean.FALSE))
                 .collect(Collectors.groupingBy(
-                        pod -> pod.getMetadata().getLabels().get(OperatorMetadata.RACK),
+                        pod -> pod.getMetadata().getLabels().get(OperatorLabels.RACK),
                         () -> new TreeMap<>(RACK_NAME_COMPARATOR),
                         Collectors.toList()));
     }

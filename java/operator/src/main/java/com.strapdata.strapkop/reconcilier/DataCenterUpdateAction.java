@@ -10,7 +10,8 @@ import com.strapdata.model.k8s.cassandra.*;
 import com.strapdata.model.k8s.task.BackupTask;
 import com.strapdata.strapkop.exception.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import com.strapdata.strapkop.k8s.OperatorMetadata;
+import com.strapdata.strapkop.k8s.OperatorLabels;
+import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import io.kubernetes.client.ApiException;
@@ -90,7 +91,7 @@ public class DataCenterUpdateAction {
             this.dataCenterSpec.setEnterprise(new Enterprise());
         }
         
-        this.dataCenterLabels = OperatorMetadata.datacenter(dataCenter);
+        this.dataCenterLabels = OperatorLabels.datacenter(dataCenter);
     }
     
     void reconcileDataCenter() throws Exception {
@@ -199,39 +200,27 @@ public class DataCenterUpdateAction {
                 dataCenter.getMetadata().getNamespace(), "elassandra-datacenters", dataCenter.getMetadata().getName(), dataCenter);
     }
     
-    private String clusterChildObjectName(final String nameFormat) {
-        return String.format(nameFormat, "elassandra-" + dataCenterSpec.getClusterName() + "-" + dataCenterSpec.getDatacenterName());
-    }
-    
-    private String dataCenterChildObjectName(final String nameFormat) {
-        return String.format(nameFormat, dataCenterMetadata.getName());
-    }
-    
-    private String rackChildObjectName(final String rack, final String nameFormat) {
-        return String.format(nameFormat, dataCenterMetadata.getName() + "-" + rack);
-    }
-    
-    private V1ObjectMeta clusterChildObjectMetadata(final String nameFormat) {
+    private V1ObjectMeta clusterChildObjectMetadata(final String name) {
         return new V1ObjectMeta()
-                .name(clusterChildObjectName(nameFormat))
+                .name(name)
                 .namespace(dataCenterMetadata.getNamespace())
-                .labels(OperatorMetadata.cluster(dataCenterSpec.getClusterName()));
+                .labels(OperatorLabels.cluster(dataCenterSpec.getClusterName()));
     }
     
-    private V1ObjectMeta dataCenterChildObjectMetadata(final String nameFormat) {
+    private V1ObjectMeta dataCenterChildObjectMetadata(final String name) {
         return new V1ObjectMeta()
-                .name(dataCenterChildObjectName(nameFormat))
+                .name(name)
                 .namespace(dataCenterMetadata.getNamespace())
                 .labels(dataCenterLabels)
-                .putAnnotationsItem(OperatorMetadata.DATACENTER_FINGERPRINT, datacenterFingerprint);
+                .putAnnotationsItem(OperatorLabels.DATACENTER_FINGERPRINT, datacenterFingerprint);
     }
     
-    private V1ObjectMeta rackChildObjectMetadata(final String rack, final String nameFormat) {
+    private V1ObjectMeta rackChildObjectMetadata(final String rack, final String name) {
         return new V1ObjectMeta()
-                .name(rackChildObjectName(rack, nameFormat))
+                .name(name)
                 .namespace(dataCenterMetadata.getNamespace())
-                .labels(OperatorMetadata.rack(dataCenter, rack))
-                .putAnnotationsItem(OperatorMetadata.DATACENTER_FINGERPRINT, datacenterFingerprint);
+                .labels(OperatorLabels.rack(dataCenter, rack))
+                .putAnnotationsItem(OperatorLabels.DATACENTER_FINGERPRINT, datacenterFingerprint);
     }
     
     private String rackName(final int rackIdx) {
@@ -267,7 +256,7 @@ public class DataCenterUpdateAction {
     
     private V1StatefulSet constructRackStatefulSet(final int rackIdx, final int numPods, final Iterable<ConfigMapVolumeMount> configMapVolumeMounts, String configmapFingerprint) throws ApiException {
         final String rack = rackName(rackIdx);
-        final V1ObjectMeta statefulSetMetadata = rackChildObjectMetadata(rack, "%s");
+        final V1ObjectMeta statefulSetMetadata = rackChildObjectMetadata(rack, OperatorNames.stsName(dataCenter, rack));
         
         final V1Container cassandraContainer = new V1Container()
                 .name("elassandra")
@@ -353,14 +342,14 @@ public class DataCenterUpdateAction {
                         .name("ELASSANDRA_USERNAME")
                         .valueFrom(new V1EnvVarSource()
                                 .secretKeyRef(new V1SecretKeySelector()
-                                        .name(clusterChildObjectName("%s-credentials-strapkop"))
+                                        .name(OperatorNames.strapkopCredentials(dataCenter))
                                         .key("username")))
                 )
                 .addEnvItem(new V1EnvVar()
                         .name("ELASSANDRA_PASSWORD")
                         .valueFrom(new V1EnvVarSource()
                                 .secretKeyRef(new V1SecretKeySelector()
-                                        .name(clusterChildObjectName("%s-credentials-strapkop"))
+                                        .name(OperatorNames.strapkopCredentials(dataCenter))
                                         .key("password")))
                 )
                 .image(dataCenterSpec.getSidecarImage())
@@ -462,13 +451,13 @@ public class DataCenterUpdateAction {
         if (dataCenterSpec.getSsl()) {
             cassandraContainer.addVolumeMountsItem(new V1VolumeMount().name("operator-keystore").mountPath("/tmp/operator-keystore"));
             podSpec.addVolumesItem(new V1Volume().name("operator-keystore")
-                    .secret(new V1SecretVolumeSource().secretName(dataCenterChildObjectName("%s-keystore"))
+                    .secret(new V1SecretVolumeSource().secretName(OperatorNames.keystore(dataCenter))
                             .addItemsItem(new V1KeyToPath().key("keystore.p12").path("keystore.p12"))));
             
             cassandraContainer.addVolumeMountsItem(new V1VolumeMount().name("operator-truststore").mountPath("/tmp/operator-truststore"));
             podSpec.addVolumesItem(new V1Volume().name("operator-truststore")
                     .secret(new V1SecretVolumeSource()
-                            .secretName(dataCenterChildObjectName(this.authorityManager.getPublicCaSecretName()))
+                            .secretName(this.authorityManager.getPublicCaSecretName())
                             .addItemsItem(new V1KeyToPath().key(AuthorityManager.SECRET_CACERT_PEM).path(AuthorityManager.SECRET_CACERT_PEM))
                             .addItemsItem(new V1KeyToPath().key(AuthorityManager.SECRET_TRUSTSTORE_P12).path(AuthorityManager.SECRET_TRUSTSTORE_P12))));
         }
@@ -477,7 +466,7 @@ public class DataCenterUpdateAction {
         if (dataCenterSpec.getEnterprise() != null && dataCenterSpec.getEnterprise().getAaa() != null && dataCenterSpec.getEnterprise().getAaa().getEnabled()) {
             cassandraContainer.addVolumeMountsItem(new V1VolumeMount().name("operator-shared-secret").mountPath("/tmp/operator-shared-secret"));
             podSpec.addVolumesItem(new V1Volume().name("operator-shared-secret")
-                    .secret(new V1SecretVolumeSource().secretName(dataCenterChildObjectName("%s-shared-secret"))
+                    .secret(new V1SecretVolumeSource().secretName(OperatorNames.sharedSecret(dataCenter))
                             .addItemsItem(new V1KeyToPath().key("shared-secret.yaml").path("elasticsearch.yml.d/003-shared-secret.yaml"))));
             cassandraContainer.addArgsItem("/tmp/operator-shared-secret");
         }
@@ -506,7 +495,7 @@ public class DataCenterUpdateAction {
                             "com.strapdata.strapkop.sidecar.SidecarRestore",
                             "-bb", backup.getSpec().getTarget(), // bucket name
                             "-c", dataCenterMetadata.getName(), // clusterID == DcName. Backup dc and restore dc must have the same name
-                            "-bi", rackChildObjectName(rack, "%s"), // pod name prefix
+                            "-bi", OperatorNames.stsName(dataCenter, rack), // pod name prefix
                             "-s", backup.getMetadata().getName(), // backup tag used to find the manifest file
                             "--bs", backup.getSpec().getBackupType(),
                             "-rs",
@@ -526,20 +515,20 @@ public class DataCenterUpdateAction {
             );
         }
         
-        final Map<String, String> rackLabels = OperatorMetadata.rack(dataCenter, rack);
+        final Map<String, String> rackLabels = OperatorLabels.rack(dataCenter, rack);
     
         return new V1StatefulSet()
                 .metadata(statefulSetMetadata)
                 .spec(new V1StatefulSetSpec()
                         // if the serviceName references a headless service, kubeDNS to create an A record for
                         // each pod : $(podName).$(serviceName).$(namespace).svc.cluster.local
-                        .serviceName(dataCenterChildObjectName("%s"))
+                        .serviceName(OperatorNames.nodesService(dataCenter))
                         .replicas(numPods)
                         .selector(new V1LabelSelector().matchLabels(rackLabels))
                         .template(new V1PodTemplateSpec()
                                 .metadata(new V1ObjectMeta()
                                         .labels(rackLabels)
-                                        .putAnnotationsItem(OperatorMetadata.CONFIGMAP_FINGERPRINT, configmapFingerprint))
+                                        .putAnnotationsItem(OperatorLabels.CONFIGMAP_FINGERPRINT, configmapFingerprint))
                                 .spec(podSpec)
                         )
                         .addVolumeClaimTemplatesItem(new V1PersistentVolumeClaim()
@@ -596,9 +585,9 @@ public class DataCenterUpdateAction {
     private static final long GB = MB * 1024;
     
     // configuration that is supposed to be variable over the cluster life and does not require a rolling restart when changed
-    private ConfigMapVolumeMount createOrReplaceVarConfigMap(final V1Service seedNodesService) throws IOException, ApiException {
+    private ConfigMapVolumeMount createOrReplaceVarConfigMap(final V1Service seedNodesService) throws ApiException {
         final V1ConfigMap configMap = new V1ConfigMap()
-                .metadata(dataCenterChildObjectMetadata("%s-operator-var-config"));
+                .metadata(dataCenterChildObjectMetadata(OperatorNames.varConfig(dataCenter)));
     
         final V1ConfigMapVolumeSource volumeSource = new V1ConfigMapVolumeSource().name(configMap.getMetadata().getName());
     
@@ -630,7 +619,7 @@ public class DataCenterUpdateAction {
     // configuration that is specific to rack. For the moment, an update of it does not trigger a restart
     private ConfigMapVolumeMount createOrReplaceRackConfigMap(final String rack) throws IOException, ApiException {
         final V1ConfigMap configMap = new V1ConfigMap()
-                .metadata(rackChildObjectMetadata(rack, "%s-operator-config"));
+                .metadata(rackChildObjectMetadata(rack, OperatorNames.rackConfig(dataCenter, rack)));
     
         final V1ConfigMapVolumeSource volumeSource = new V1ConfigMapVolumeSource().name(configMap.getMetadata().getName());
     
@@ -656,7 +645,7 @@ public class DataCenterUpdateAction {
     // configuration that should trigger a rolling restart when modified
     private Tuple2<ConfigMapVolumeMount, String> createOrReplaceSpecConfigMap() throws ApiException {
         final V1ConfigMap configMap = new V1ConfigMap()
-                .metadata(dataCenterChildObjectMetadata("%s-operator-spec-config"));
+                .metadata(dataCenterChildObjectMetadata(OperatorNames.specConfig(dataCenter)));
         
         final V1ConfigMapVolumeSource volumeSource = new V1ConfigMapVolumeSource().name(configMap.getMetadata().getName());
         
@@ -890,7 +879,7 @@ public class DataCenterUpdateAction {
     }
     
     private V1Service createOrReplaceSeedNodesService() throws ApiException {
-        final V1ObjectMeta serviceMetadata = dataCenterChildObjectMetadata("%s-seeds")
+        final V1ObjectMeta serviceMetadata = dataCenterChildObjectMetadata(OperatorNames.seedsService(dataCenter))
                 // tolerate-unready-endpoints - allow the seed provider can discover the other seeds (and itself) before the readiness-probe gives the green light
                 .putAnnotationsItem("service.alpha.kubernetes.io/tolerate-unready-endpoints", "true");
         
@@ -904,7 +893,7 @@ public class DataCenterUpdateAction {
                                 new V1ServicePort().name("internode").port(
                                         dataCenterSpec.getSsl() ? dataCenterSpec.getSslStoragePort() : dataCenterSpec.getStoragePort())))
                         // only select the pod number 0 as seed
-                        .selector(OperatorMetadata.pod(dataCenter, rackName(0), rackChildObjectName(rackName(0), "%s-0")))
+                        .selector(OperatorLabels.pod(dataCenter, rackName(0), OperatorNames.podName(dataCenter, rackName(0), 0)))
                 );
         k8sResourceUtils.createOrReplaceNamespacedService(service);
         
@@ -912,7 +901,7 @@ public class DataCenterUpdateAction {
     }
     
     private void createOrReplaceNodesService() throws ApiException {
-        final V1ObjectMeta serviceMetadata = dataCenterChildObjectMetadata("%s");
+        final V1ObjectMeta serviceMetadata = dataCenterChildObjectMetadata(OperatorNames.nodesService(dataCenter));
         
         final V1Service service = new V1Service()
                 .metadata(serviceMetadata)
@@ -936,7 +925,7 @@ public class DataCenterUpdateAction {
     
     private void createOrReplaceElasticsearchService() throws ApiException {
         final V1Service service = new V1Service()
-                .metadata(dataCenterChildObjectMetadata("%s-elasticsearch"))
+                .metadata(dataCenterChildObjectMetadata(OperatorNames.elasticsearchService(dataCenter)))
                 .spec(new V1ServiceSpec()
                         .type("ClusterIP")
                         .addPortsItem(new V1ServicePort().name("elasticsearch").port(9200))
@@ -995,7 +984,7 @@ public class DataCenterUpdateAction {
     }
     
     private void createOrReplacePrometheusServiceMonitor() throws ApiException {
-        final String name = dataCenterChildObjectName("%s");
+        final String name = OperatorNames.prometheusServiceMonitor(dataCenter);
         
         final ImmutableMap<String, Object> prometheusServiceMonitor = ImmutableMap.<String, Object>builder()
                 .put("apiVersion", "monitoring.coreos.com/v1")
@@ -1035,7 +1024,7 @@ public class DataCenterUpdateAction {
     }
     
     private void createKeystoreIfNotExists() throws Exception {
-        final V1ObjectMeta certificatesMetadata = dataCenterChildObjectMetadata("%s-keystore");
+        final V1ObjectMeta certificatesMetadata = dataCenterChildObjectMetadata(OperatorNames.keystore(dataCenter));
         
         // check if secret exists
         try {
@@ -1048,9 +1037,9 @@ public class DataCenterUpdateAction {
         }
         
         // generate statefulset wilcard certificate in a PKCS12 keystore
-        final String wildcardStatefulsetName = "*." + dataCenterChildObjectName("%s") + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local";
-        final String headlessServiceName = dataCenterChildObjectName("%s") + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local";
-        final String elasticsearchServiceName = dataCenterChildObjectName("%s") + "-elasticsearch." + dataCenterMetadata.getNamespace() + ".svc.cluster.local";
+        final String wildcardStatefulsetName = "*." + OperatorNames.nodesService(dataCenter) + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local";
+        final String headlessServiceName = OperatorNames.nodesService(dataCenter)  + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local";
+        final String elasticsearchServiceName = OperatorNames.elasticsearchService(dataCenter) + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local";
         @SuppressWarnings("UnstableApiUsage")
         final V1Secret certificatesSecret = new V1Secret()
                 .metadata(certificatesMetadata)
@@ -1067,7 +1056,7 @@ public class DataCenterUpdateAction {
     }
     
     private void createSharedSecretIfNotExists() throws ApiException {
-        final V1ObjectMeta secretMetadata = dataCenterChildObjectMetadata("%s-shared-secret");
+        final V1ObjectMeta secretMetadata = dataCenterChildObjectMetadata(OperatorNames.sharedSecret(dataCenter));
         
         // check if secret exists
         try {
@@ -1087,8 +1076,12 @@ public class DataCenterUpdateAction {
     }
     
     private void createAllCredentialsSecretsIfNotExists() throws ApiException {
-        createCredentialsSecretIfNotExists(clusterChildObjectMetadata("%s-credentials-strapkop"), "strapkop");
-        createCredentialsSecretIfNotExists(clusterChildObjectMetadata("%s-credentials-admin"), "admin");
+        createCredentialsSecretIfNotExists(
+                clusterChildObjectMetadata(OperatorNames.strapkopCredentials(dataCenter)), "strapkop");
+        createCredentialsSecretIfNotExists(
+                clusterChildObjectMetadata(OperatorNames.adminCredentials(dataCenter)), "admin");
+        
+
     }
 
     

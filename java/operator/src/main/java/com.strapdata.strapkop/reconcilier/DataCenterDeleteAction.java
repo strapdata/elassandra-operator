@@ -3,7 +3,7 @@ package com.strapdata.strapkop.reconcilier;
 import com.google.gson.JsonSyntaxException;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import com.strapdata.strapkop.k8s.OperatorMetadata;
+import com.strapdata.strapkop.k8s.OperatorLabels;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.micronaut.context.annotation.Parameter;
@@ -28,7 +28,7 @@ public class DataCenterDeleteAction {
     public void deleteDataCenter() throws Exception {
         logger.info("Deleting DataCenter {}.", dataCenter.getMetadata().getName());
         
-        final String labelSelector = OperatorMetadata.toSelector(OperatorMetadata.datacenter(dataCenter));
+        final String labelSelector = OperatorLabels.toSelector(OperatorLabels.datacenter(dataCenter));
         
         // delete persistent volumes & persistent volume claims
         // TODO: this is disabled for now for safety. Perhaps add a flag or something to control this.

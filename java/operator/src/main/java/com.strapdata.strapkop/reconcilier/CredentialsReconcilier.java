@@ -9,6 +9,7 @@ import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.cql.CqlConnectionManager;
 import com.strapdata.strapkop.cql.CqlCredentials;
 import com.strapdata.strapkop.exception.StrapkopException;
+import com.strapdata.strapkop.k8s.OperatorNames;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.apis.CustomObjectsApi;
@@ -47,14 +48,12 @@ public class CredentialsReconcilier {
             logger.info("reconcile credentials for {}", dataCenter.getMetadata().getName());
     
             final CqlCredentials strapkopCredentials = loadCredentialsFromSecret(dataCenter,
-                    String.format("elassandra-%s-%s-credentials-strapkop",
-                            dataCenter.getSpec().getClusterName(), dataCenter.getSpec().getDatacenterName()));
+                    OperatorNames.strapkopCredentials(dataCenter));
     
             final CqlCredentials adminCredentials = loadCredentialsFromSecret(dataCenter,
-                    String.format("elassandra-%s-%s-credentials-admin",
-                            dataCenter.getSpec().getClusterName(), dataCenter.getSpec().getDatacenterName()));
+                    OperatorNames.adminCredentials(dataCenter));
     
-            Session session = null;
+            Session session;
             try {
                 logger.info("try connecting to {} with default credentials", dataCenter.getMetadata().getName());
                 session = cqlConnectionManager.add(dataCenter, defaultCredentials);
@@ -71,6 +70,8 @@ public class CredentialsReconcilier {
     
                 logger.info("Dropping default role cassandra for {}", dataCenter.getMetadata().getName());
                 session.execute("DROP ROLE cassandra");
+                session.execute("ALTER KEYSPACE system_auth WITH replication = {'class': 'NetworkTopologyStrategy', ?: ?};",
+                        dataCenter.getSpec().getDatacenterName(), 1); // TODO: find a smart way to set the RF map
             }
             catch (AuthenticationException e) {
                 logger.info("failed to connect to {} with default credentials, trying to connect with managed credentials", dataCenter.getMetadata().getName(), e);
@@ -80,7 +81,7 @@ public class CredentialsReconcilier {
             
             dataCenter.getStatus().setCredentialsStatus(CredentialsStatus.MANAGED);
             dataCenter.getStatus().setCqlStatus(CqlStatus.ESTABLISHED);
-            dataCenter.getStatus().setCqlErrorMessage(null);
+            dataCenter.getStatus().setCqlErrorMessage("");
             updateDataCenter(dataCenter);
             
 //            patchDataCenterStatus(dataCenter, ImmutableMap.of(

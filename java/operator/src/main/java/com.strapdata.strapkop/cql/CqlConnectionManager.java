@@ -12,6 +12,7 @@ import com.strapdata.model.k8s.cassandra.Authentication;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.cache.CqlConnectionCache;
 import com.strapdata.strapkop.exception.StrapkopException;
+import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import io.kubernetes.client.ApiException;
 import io.netty.handler.ssl.SslContext;
@@ -78,9 +79,7 @@ public class CqlConnectionManager implements AutoCloseable {
         final Cluster.Builder builder = Cluster.builder()
                 .withClusterName(dc.getSpec().getClusterName())
                 .withPort(dc.getSpec().getNativePort())
-                .addContactPoint(String.format("elassandra-%s-%s",
-                        dc.getSpec().getClusterName(),
-                        dc.getSpec().getDatacenterName()))
+                .addContactPoint(OperatorNames.nodesService(dc))
                 .withLoadBalancingPolicy(new TokenAwarePolicy(
                         DCAwareRoundRobinPolicy.builder()
                                 .withLocalDc(dc.getSpec().getDatacenterName())

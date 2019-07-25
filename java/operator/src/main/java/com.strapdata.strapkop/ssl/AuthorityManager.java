@@ -2,7 +2,7 @@ package com.strapdata.strapkop.ssl;
 
 
 import com.strapdata.strapkop.exception.StrapkopException;
-import com.strapdata.strapkop.k8s.OperatorMetadata;
+import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.ssl.utils.CertManager;
 import com.strapdata.strapkop.ssl.utils.X509CertificateAndPrivateKey;
 import io.kubernetes.client.ApiException;
@@ -98,7 +98,7 @@ public class AuthorityManager {
                 .metadata(new V1ObjectMeta()
                         .name(getPublicCaSecretName())
                         .namespace(DEFAULT_CA_SECRET_NAMESPACE)
-                        .labels(OperatorMetadata.MANAGED))
+                        .labels(OperatorLabels.MANAGED))
                 .putStringDataItem(SECRET_CACERT_PEM, ca.getCertificateChainAsString())
                 .putDataItem(SECRET_TRUSTSTORE_P12, certManager.generateTruststoreBytes(ca, CA_TRUSTPASS));
         logger.info("Storing public CA in secret {} in namespace {} secret={}", getPublicCaSecretName(), DEFAULT_CA_SECRET_NAMESPACE, publicSecret);
@@ -107,7 +107,7 @@ public class AuthorityManager {
         final V1Secret privateSecret = new V1Secret()
             .metadata(new V1ObjectMeta()
                 .name(getPrivateCaSecretName())
-                .labels(OperatorMetadata.MANAGED))
+                .labels(OperatorLabels.MANAGED))
             .putStringDataItem(SECRET_CA_KEY, ca.getPrivateKeyAsString());
         logger.info("Storing private CA in secret {} in namespace {}", getPrivateCaSecretName(), DEFAULT_CA_SECRET_NAMESPACE);
         coreApi.createNamespacedSecret(DEFAULT_CA_SECRET_NAMESPACE, privateSecret, null, null, null);
