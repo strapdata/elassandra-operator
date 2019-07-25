@@ -12,14 +12,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Prototype
-public class DataCenterDeteteAction {
-    private static final Logger logger = LoggerFactory.getLogger(DataCenterDeteteAction.class);
+public class DataCenterDeleteAction {
+    private static final Logger logger = LoggerFactory.getLogger(DataCenterDeleteAction.class);
     
     private final K8sResourceUtils k8sResourceUtils;
     private final CoreV1Api coreV1Api;
     private final DataCenter dataCenter;
     
-    public DataCenterDeteteAction(K8sResourceUtils k8sResourceUtils, CoreV1Api coreV1Api, @Parameter("dataCenter") DataCenter dataCenter) {
+    public DataCenterDeleteAction(K8sResourceUtils k8sResourceUtils, CoreV1Api coreV1Api, @Parameter("dataCenter") DataCenter dataCenter) {
         this.k8sResourceUtils = k8sResourceUtils;
         this.coreV1Api = coreV1Api;
         this.dataCenter = dataCenter;
@@ -76,11 +76,12 @@ public class DataCenterDeteteAction {
             // delete secrets
             coreV1Api.deleteCollectionNamespacedSecret(dataCenter.getMetadata().getNamespace(), false,
                     null, null, null, labelSelector, null, null, null, null);
+            logger.debug("Deleted Secrets.");
         } catch (final JsonSyntaxException e) {
-            logger.debug("Caught JSON exception while deleting ConfigMap. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
+            logger.debug("Caught JSON exception while deleting Secrets. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
             
         } catch (final ApiException e) {
-            logger.error("Failed to delete ConfigMap.", e);
+            logger.error("Failed to delete Secrets.", e);
         }
         
         // delete Services
