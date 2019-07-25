@@ -1,6 +1,5 @@
 package com.strapdata.strapkop.reconcilier;
 
-import com.strapdata.model.Key;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import io.micronaut.context.ApplicationContext;
 import io.reactivex.schedulers.Schedulers;
@@ -54,7 +53,7 @@ public class DataCenterReconcilier {
                 context.createBean(DataCenterUpdateAction.class, dc).reconcileDataCenter();
             } else if (task._1.equals(Action.DELETE)) {
                 logger.debug("processing a dc deletion for {} in thread {}", dc.getMetadata().getName(), Thread.currentThread().getName());
-                context.createBean(DataCenterDeteteAction.class, dc).deleteDataCenter();
+                context.createBean(DataCenterDeleteAction.class, dc).deleteDataCenter();
             }
         }
         catch (Exception e) {
