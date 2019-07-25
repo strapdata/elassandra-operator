@@ -1,6 +1,7 @@
 package com.strapdata.strapkop.reconcilier;
 
 import com.datastax.driver.core.Session;
+import com.datastax.driver.core.exceptions.AuthenticationException;
 import com.datastax.driver.core.exceptions.DriverException;
 import com.strapdata.model.k8s.cassandra.CqlStatus;
 import com.strapdata.model.k8s.cassandra.CredentialsStatus;
@@ -53,21 +54,30 @@ public class CredentialsReconcilier {
                     String.format("elassandra-%s-%s-credentials-admin",
                             dataCenter.getSpec().getClusterName(), dataCenter.getSpec().getDatacenterName()));
     
-            Session session = cqlConnectionManager.add(dataCenter, defaultCredentials);
+            Session session = null;
+            try {
+                logger.info("try connecting to {} with default credentials", dataCenter.getMetadata().getName());
+                session = cqlConnectionManager.add(dataCenter, defaultCredentials);
+                logger.info("successfully connected to {} with default credentials", dataCenter.getMetadata().getName());
+                
+                logger.info("creating role strapkop for {}", dataCenter.getMetadata().getName());
+                createRole(strapkopCredentials, session);
     
-            logger.info("creating role strapkop for {}", dataCenter.getMetadata().getName());
+                logger.info("creating role admin for {}", dataCenter.getMetadata().getName());
+                createRole(adminCredentials, session);
     
-            createRole(strapkopCredentials, session);
+                logger.info("Connecting to {} with new credentials and closing default connection", dataCenter.getMetadata().getName());
+                session = cqlConnectionManager.add(dataCenter, strapkopCredentials);
     
-            logger.info("creating role admin for {}", dataCenter.getMetadata().getName());
-    
-            createRole(adminCredentials, session);
-    
-            session = cqlConnectionManager.add(dataCenter, strapkopCredentials);
-    
-            logger.info("Drop default role cassandra for {}", dataCenter.getMetadata().getName());
-            session.execute("DROP ROLE cassandra");
-    
+                logger.info("Dropping default role cassandra for {}", dataCenter.getMetadata().getName());
+                session.execute("DROP ROLE cassandra");
+            }
+            catch (AuthenticationException e) {
+                logger.info("failed to connect to {} with default credentials, trying to connect with managed credentials", dataCenter.getMetadata().getName(), e);
+                cqlConnectionManager.add(dataCenter, strapkopCredentials);
+                logger.info("successfully connected to {} with managed credentials", dataCenter.getMetadata().getName());
+            }
+            
             dataCenter.getStatus().setCredentialsStatus(CredentialsStatus.MANAGED);
             dataCenter.getStatus().setCqlStatus(CqlStatus.ESTABLISHED);
             dataCenter.getStatus().setCqlErrorMessage(null);

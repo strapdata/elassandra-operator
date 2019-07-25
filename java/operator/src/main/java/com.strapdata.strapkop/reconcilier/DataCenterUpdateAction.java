@@ -159,8 +159,9 @@ public class DataCenterUpdateAction {
     private void reconcileCredentialsMaybe(final DataCenter dc) throws StrapkopException, ApiException, SSLException {
         if (dc.getStatus() != null &&
                 Objects.equals(dc.getStatus().getPhase(), DataCenterPhase.RUNNING) &&
-                Objects.equals(dc.getSpec().getAuthentication(), Authentication.CASSANDRA) &&
-                Objects.equals(dc.getStatus().getCredentialsStatus(), CredentialsStatus.DEFAULT)) {
+                Objects.equals(dc.getSpec().getAuthentication(), Authentication.CASSANDRA) && (
+                        Objects.equals(dc.getStatus().getCredentialsStatus(), CredentialsStatus.DEFAULT) ||
+                        Objects.equals(dc.getStatus().getCredentialsStatus(), CredentialsStatus.UNKNOWN))) {
             
             credentialsReconcilier.reconcile(dc);
         }
@@ -172,8 +173,16 @@ public class DataCenterUpdateAction {
             case CASSANDRA:
                 if ( /* new cluster */ dataCenterStatus.getCredentialsStatus() == null ||
                         /* added auth to existing cluster */ dataCenterStatus.getCredentialsStatus().equals(CredentialsStatus.NONE)) {
-                    // TODO: multi-dc... the credentials might already exist
-                    dataCenterStatus.setCredentialsStatus(CredentialsStatus.DEFAULT);
+                    // TODO: in multi-dc, the credentials might have already been
+                    
+                    // if we restore the dc from a backup, we don't really know which credentials has been restored
+                    if (dataCenterSpec.getRestoreFromBackup() != null) {
+                        dataCenterStatus.setCredentialsStatus(CredentialsStatus.UNKNOWN);
+                    }
+                    else {
+                        // else we assume the default cassandra:cassandra
+                        dataCenterStatus.setCredentialsStatus(CredentialsStatus.DEFAULT);
+                    }
                 }
                 break;
             case LDAP:
@@ -185,6 +194,7 @@ public class DataCenterUpdateAction {
                 break;
         }
         
+        // this might not work if the dc has been updated meanwhile... should be a proper patch operation (which seems not working for customobject with k8s sdk v4)
         customObjectsApi.patchNamespacedCustomObject("stable.strapdata.com", "v1",
                 dataCenter.getMetadata().getNamespace(), "elassandra-datacenters", dataCenter.getMetadata().getName(), dataCenter);
     }
