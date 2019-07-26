@@ -195,8 +195,7 @@ public class DataCenterUpdateAction {
                 break;
         }
         
-        // this might not work if the dc has been updated meanwhile... should be a proper patch operation (which seems not working for customobject with k8s sdk v4)
-        customObjectsApi.patchNamespacedCustomObject("stable.strapdata.com", "v1",
+        customObjectsApi.replaceNamespacedCustomObjectStatus("stable.strapdata.com", "v1",
                 dataCenter.getMetadata().getNamespace(), "elassandra-datacenters", dataCenter.getMetadata().getName(), dataCenter);
     }
     
