@@ -43,7 +43,7 @@ public class NodeStatusSource implements EventSource<NodeStatusEvent> {
                 .flatMap(i -> Observable.fromIterable(listPods()))
                 .map(pod -> new NodeStatusEvent()
                         .setPod(pod)
-                        .setDataCenterKey(new Key(pod.getMetadata().getLabels().get(OperatorLabels.DATACENTER), config.getNamespace()))
+                        .setDataCenterKey(new Key(pod.getMetadata().getLabels().get(OperatorLabels.PARENT), config.getNamespace()))
                 )
                 .flatMapSingle(event -> sidecarClientFactory.clientForPod(event.getPod()).status()
                         .doOnSubscribe(d -> logger.debug("requesting pod {} sidecar for health check on thread {}", event.getPod().getMetadata().getName(), Thread.currentThread().getName()))
