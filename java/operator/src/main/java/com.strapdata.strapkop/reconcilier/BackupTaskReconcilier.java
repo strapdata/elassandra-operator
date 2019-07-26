@@ -54,7 +54,7 @@ public class BackupTaskReconcilier extends TaskReconcilier<BackupTask> {
                 task.setStatus(new TaskStatus().setPhase(success ? "Succeeded" : "Failed" ));
                 logger.info("Backup name={} namespace={} success={}",
                         task.getMetadata().getName(), task.getMetadata().getNamespace(), success);
-                customObjectsApi.patchNamespacedCustomObject("stable.strapdata.com", "v1",
+                customObjectsApi.replaceNamespacedCustomObjectStatus("stable.strapdata.com", "v1",
                         task.getMetadata().getNamespace(), "elassandra-backups", task.getMetadata().getName(), task);
             });
         }

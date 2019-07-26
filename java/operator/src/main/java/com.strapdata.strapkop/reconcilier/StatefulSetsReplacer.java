@@ -86,6 +86,17 @@ class StatefulSetsReplacer {
                 .setReadyReplicas(this.podsByReadiness.get(true).size())
                 .setJoinedReplicas(this.podsByStatus.get(NodeStatus.NORMAL).size());
     }
+
+    private boolean stsNeedsUpdate(final V1StatefulSet existingSts, final DataCenter dc) {
+        final Long stsGen = Long.valueOf(existingSts.getMetadata().getAnnotations().get(OperatorLabels.DATACENTER_GENERATION));
+        final Long dcGen = dc.getMetadata().getGeneration();
+        
+        if (stsGen == null || dcGen == null) {
+            return false;
+        }
+        
+        return stsGen < dcGen;
+    }
     
     private Map<ReplaceMode, TreeSet<String>> fetchReplaceModes() {
         
@@ -105,9 +116,8 @@ class StatefulSetsReplacer {
                 modes.get(ReplaceMode.DOWN).add(rack);
                 modes.get(ReplaceMode.UPDATE).add(rack);
             }
-            // compare the datacenter fingerprint to see if we need an update
-            else if (!sts.getMetadata().getAnnotations().get(OperatorLabels.DATACENTER_FINGERPRINT)
-                    .equals(existingStsMap.get(rack).getMetadata().getAnnotations().get(OperatorLabels.DATACENTER_FINGERPRINT))) {
+            // compare the datacenter generation and the sts annotation to see if we need an update
+            else if (stsNeedsUpdate(existingStsMap.get(rack), dataCenter)) {
                 modes.get(ReplaceMode.UPDATE).add(rack);
                 logger.debug("sts {} has to be updated\nold:{}\nnew:{}", sts.getMetadata().getName(), existingStsMap.get(rack), sts);
             }

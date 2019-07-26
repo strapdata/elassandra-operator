@@ -19,7 +19,7 @@ public class DataCenterUpdateReconcilier extends Reconcilier<DataCenter> {
     }
     
     @Override
-    void process(final DataCenter dc) {
+    void reconcile(final DataCenter dc) {
         
         try {
             logger.debug("processing a dc reconciliation request for {} in thread {}", dc.getMetadata().getName(), Thread.currentThread().getName());

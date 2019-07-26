@@ -1,5 +1,6 @@
 package com.strapdata.strapkop.preflight;
 
+import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.handler.*;
 import com.strapdata.strapkop.pipeline.*;
 import io.reactivex.Observer;
@@ -24,6 +25,7 @@ public class RegisterHandlers implements Preflight<Void> {
     @Override
     public Void call() throws Exception {
         bind(DataCenterPipeline.class, DataCenterHandler.class);
+        bind(DataCenterPipeline.class, CredentialsHandler.class);
         bind(StatefulsetPipeline.class, StatefulsetHandler.class);
         bind(NodeStatusPipeline.class, NodeStatusHandler.class);
         bind(TaskPipeline.class, TaskHandler.class);

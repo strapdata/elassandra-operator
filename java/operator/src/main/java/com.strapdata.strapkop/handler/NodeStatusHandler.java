@@ -48,7 +48,7 @@ public class NodeStatusHandler extends TerminalHandler<NodeStatusEvent> {
             final DataCenter dc = dataCenterCache.get(event.getDataCenterKey());
             if (dc != null) {
                 logger.debug("triggering dc reconciliation because of a NodeStatus change");
-                workQueue.submit(new ClusterKey(dc), dataCenterReconcilier.prepareRunnable(dc));
+                workQueue.submit(new ClusterKey(dc), dataCenterReconcilier.asCompletable(dc));
             }
         }
     }

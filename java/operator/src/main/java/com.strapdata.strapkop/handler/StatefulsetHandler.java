@@ -62,6 +62,6 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
             return ;
         }
         
-        workQueue.submit(new ClusterKey(dc), dataCenterReconcilier.prepareRunnable(dc));
+        workQueue.submit(new ClusterKey(dc), dataCenterReconcilier.asCompletable(dc));
     }
 }

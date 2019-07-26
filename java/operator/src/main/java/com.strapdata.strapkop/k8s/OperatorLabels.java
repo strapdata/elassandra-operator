@@ -14,8 +14,7 @@ public final class OperatorLabels {
     public static final String RACK = "elassandra-operator.strapdata.com/rack";
     public static final String POD = "statefulset.kubernetes.io/pod-name";
     
-    // this is an annotation attached to datacenter child object that store a fingerprint of the datacenter spec
-    public static final String DATACENTER_FINGERPRINT = "elassandra-operator.strapdata.com/datacenter-fingerprint";
+    public static final String DATACENTER_GENERATION = "elassandra-operator.strapdata.com/datacenter-generation";
     
     // this annotation is used to store a hash of the config map in the pod so that statefulset trigger a rolling restart
     // when the config map change

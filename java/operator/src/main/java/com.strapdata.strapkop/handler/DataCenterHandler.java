@@ -6,6 +6,7 @@ import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.reconcilier.DataCenterDeleteReconcilier;
 import com.strapdata.strapkop.reconcilier.DataCenterUpdateReconcilier;
 import com.strapdata.strapkop.workqueue.WorkQueue;
+import io.reactivex.Completable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,18 +36,18 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
     public void accept(K8sWatchEvent<DataCenter> data) throws Exception {
         logger.info("processing a DataCenter event");
         
-        Runnable runnable = null;
+        Completable completable = null;
         if (creationEventTypes.contains(data.getType())) {
-            runnable = dataCenterUpdateReconcilier.prepareRunnable(data.getResource());
+            completable = dataCenterUpdateReconcilier.asCompletable(data.getResource());
         }
    
         else if (deletionEventTypes.contains(data.getType())) {
-            runnable = dataCenterDeleteReconcilier.prepareRunnable(data.getResource());
+            completable = dataCenterDeleteReconcilier.asCompletable(data.getResource());
         }
         else {
             return ; // unreachable
         }
         
-        workQueue.submit(new ClusterKey(data.getResource()), runnable);
+        workQueue.submit(new ClusterKey(data.getResource()), completable);
     }
 }

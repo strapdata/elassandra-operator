@@ -21,7 +21,7 @@ import javax.inject.Singleton;
 import javax.net.ssl.SSLException;
 
 @Singleton
-public class CredentialsReconcilier {
+public class CredentialsReconcilier extends Reconcilier<DataCenter> {
     
     private static final Logger logger = LoggerFactory.getLogger(CredentialsReconcilier.class);
     
@@ -39,6 +39,7 @@ public class CredentialsReconcilier {
         this.customObjectsApi = customObjectsApi;
     }
     
+    @Override
     public void reconcile(final DataCenter dataCenter) throws ApiException, StrapkopException, SSLException {
         
         // TODO: be idempotent
@@ -82,32 +83,23 @@ public class CredentialsReconcilier {
             dataCenter.getStatus().setCredentialsStatus(CredentialsStatus.MANAGED);
             dataCenter.getStatus().setCqlStatus(CqlStatus.ESTABLISHED);
             dataCenter.getStatus().setCqlErrorMessage("");
-            updateDataCenter(dataCenter);
+            updateDataCenterStatus(dataCenter);
             
-//            patchDataCenterStatus(dataCenter, ImmutableMap.of(
-//                    "/status/credentialsStatus", new JsonPrimitive(CredentialsStatus.MANAGED.toString()),
-//                    "/status/cqlStatus", new JsonPrimitive(CqlStatus.ESTABLISHED.toString())
-//                    "/status/cqlErrorMessage", null));
-    
             logger.info("reconciled credentials for {}", dataCenter.getMetadata().getName());
         }
         catch (DriverException e) {
+            logger.error("Driver exception while reconciling credentials for {}", dataCenter.getMetadata().getName(), e);
             dataCenter.getStatus().setCredentialsStatus(CredentialsStatus.UNKNOWN);
             dataCenter.getStatus().setCqlStatus(CqlStatus.ERRORED);
             dataCenter.getStatus().setCqlErrorMessage(e.getMessage());
-            updateDataCenter(dataCenter);
-//            patchDataCenterStatus(dataCenter, ImmutableMap.of(
-//                    "/status/credentialsStatus", new JsonPrimitive(CredentialsStatus.UNKNOWN.toString()),
-//                    "/status/cqlStatus", new JsonPrimitive(CqlStatus.ERRORED.toString()),
-//                    "/status/cqlErrorMessage", new JsonPrimitive(e.getMessage())));
+            updateDataCenterStatus(dataCenter);
         }
     }
     
-    private void updateDataCenter(DataCenter dataCenter) throws ApiException {
-        // HUm... currently this reconilier is called from DataCenterReconcilier so we can't update the status now because it will be updated later anyway
-//        customObjectsApi.patchNamespacedCustomObject("stable.strapdata.com", "v1",
-//                dataCenter.getMetadata().getNamespace(), "elassandra-datacenters", dataCenter.getMetadata().getName(),
-//                dataCenter);
+    private void updateDataCenterStatus(DataCenter dataCenter) throws ApiException {
+        customObjectsApi.patchNamespacedCustomObjectStatus("stable.strapdata.com", "v1",
+                dataCenter.getMetadata().getNamespace(), "elassandra-datacenters", dataCenter.getMetadata().getName(),
+                dataCenter);
     }
     
     private void createRole(CqlCredentials credentials, Session session) throws StrapkopException {
@@ -117,27 +109,9 @@ public class CredentialsReconcilier {
         if (credentials.getPassword().matches(".*[\"\'].*")) {
             throw new StrapkopException(String.format("invalid character in cassandra password for username %s", credentials.getUsername()));
         }
-        session.execute(String.format("CREATE ROLE %s with SUPERUSER = true AND LOGIN = true and PASSWORD = '%s'", credentials.getUsername(), credentials.getPassword()));
+        session.execute(String.format("CREATE ROLE IF NOT EXISTS %s with SUPERUSER = true AND LOGIN = true and PASSWORD = '%s'", credentials.getUsername(), credentials.getPassword()));
     }
     
-    // Patch is not working for obscure reason
-//    private void patchDataCenterStatus(final DataCenter dataCenter, Map<String, JsonElement> patch) throws ApiException {
-//        final ArrayList<JsonObject> patchBody = new ArrayList<>();
-//
-//        patch.forEach((path, value) -> {
-//            final JsonObject jsonPatch = new JsonObject();
-//            jsonPatch.addProperty("op", "replace");
-//            jsonPatch.addProperty("path", path);
-//            jsonPatch.add("value", value);
-//            patchBody.add(jsonPatch);
-//        });
-//
-//        customObjectsApi.patchNamespacedCustomObject("stable.strapdata.com", "v1",
-//                dataCenter.getMetadata().getNamespace(), "elassandra-datacenters", dataCenter.getMetadata().getName(),
-//                patchBody
-//        );
-//    }
-//
     private CqlCredentials loadCredentialsFromSecret(final DataCenter dataCenter, final String secretName) throws ApiException, StrapkopException {
         final V1Secret secret = coreApi.readNamespacedSecret(secretName,
                 dataCenter.getMetadata().getNamespace(),

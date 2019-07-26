@@ -18,7 +18,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
- * A generic reactive Pipeline to process events from various sources and trigger actions such as reconciliations.
+ * A generic reactive Pipeline to reconcile events from various sources and trigger actions such as reconciliations.
  * @param <DataT> the event payload data
  */
 public class EventPipeline<DataT> {

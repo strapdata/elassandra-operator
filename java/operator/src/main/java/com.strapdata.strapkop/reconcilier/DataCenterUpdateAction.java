@@ -95,9 +95,6 @@ public class DataCenterUpdateAction {
     }
     
     void reconcileDataCenter() throws Exception {
-        // TODO: move this somewhere more appropriate
-        reconcileCredentialsMaybe(dataCenter);
-        
         logger.info("Reconciling DataCenter {}.", dataCenterMetadata.getName());
         
         // create the public service (what clients use to discover the data center)
@@ -156,18 +153,6 @@ public class DataCenterUpdateAction {
         logger.info("Reconciled DataCenter.");
     }
     
-    // TODO: move this somewhere more appropriate
-    private void reconcileCredentialsMaybe(final DataCenter dc) throws StrapkopException, ApiException, SSLException {
-        if (dc.getStatus() != null &&
-                Objects.equals(dc.getStatus().getPhase(), DataCenterPhase.RUNNING) &&
-                Objects.equals(dc.getSpec().getAuthentication(), Authentication.CASSANDRA) && (
-                        Objects.equals(dc.getStatus().getCredentialsStatus(), CredentialsStatus.DEFAULT) ||
-                        Objects.equals(dc.getStatus().getCredentialsStatus(), CredentialsStatus.UNKNOWN))) {
-            
-            credentialsReconcilier.reconcile(dc);
-        }
-    }
-    
     private void updateStatus() throws ApiException {
         
         switch (dataCenterSpec.getAuthentication()) {
@@ -211,7 +196,7 @@ public class DataCenterUpdateAction {
                 .name(name)
                 .namespace(dataCenterMetadata.getNamespace())
                 .labels(dataCenterLabels)
-                .putAnnotationsItem(OperatorLabels.DATACENTER_FINGERPRINT, datacenterFingerprint);
+                .putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, dataCenter.getMetadata().getGeneration().toString());
     }
     
     private V1ObjectMeta rackChildObjectMetadata(final String rack, final String name) {
@@ -219,7 +204,7 @@ public class DataCenterUpdateAction {
                 .name(name)
                 .namespace(dataCenterMetadata.getNamespace())
                 .labels(OperatorLabels.rack(dataCenter, rack))
-                .putAnnotationsItem(OperatorLabels.DATACENTER_FINGERPRINT, datacenterFingerprint);
+                .putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, dataCenter.getMetadata().getGeneration().toString());
     }
     
     private String rackName(final int rackIdx) {

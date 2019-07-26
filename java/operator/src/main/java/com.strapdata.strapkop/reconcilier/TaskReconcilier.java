@@ -2,6 +2,7 @@ package com.strapdata.strapkop.reconcilier;
 
 import com.strapdata.model.k8s.task.Task;
 import io.kubernetes.client.ApiException;
+import io.reactivex.Completable;
 import io.vavr.Tuple2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,7 +19,7 @@ public abstract class TaskReconcilier<TaskT extends Task<?, ?>> extends Reconcil
     protected abstract void processCancel(TaskT task);
 
     @Override
-    void process(final Tuple2<Action, TaskT> item) {
+    void reconcile(final Tuple2<Action, TaskT> item) {
         
         final TaskT task = item._2;
         
@@ -37,11 +38,11 @@ public abstract class TaskReconcilier<TaskT extends Task<?, ?>> extends Reconcil
         }
     }
     
-    public Runnable prepareSubmitRunnable(TaskT task) {
-        return this.prepareRunnable(new Tuple2<>(Action.SUBMIT, task));
+    public Completable prepareSubmitRunnable(TaskT task) {
+        return this.asCompletable(new Tuple2<>(Action.SUBMIT, task));
     }
     
-    public Runnable prepareCancelRunnable(TaskT task) {
-        return this.prepareRunnable(new Tuple2<>(Action.CANCEL, task));
+    public Completable prepareCancelRunnable(TaskT task) {
+        return this.asCompletable(new Tuple2<>(Action.CANCEL, task));
     }
 }
