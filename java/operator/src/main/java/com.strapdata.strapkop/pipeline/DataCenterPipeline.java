@@ -29,7 +29,7 @@ public class DataCenterPipeline extends K8sWatchPipeline<DataCenter, DataCenterL
         super(apiClient, new DataCenterAdapter(customObjectsApi, config), cache);
     }
     
-    private static class DataCenterAdapter extends K8sWatchResourceAdapter<DataCenter, DataCenterList> {
+    public static class DataCenterAdapter extends K8sWatchResourceAdapter<DataCenter, DataCenterList> {
         
         private final CustomObjectsApi customObjectsApi;
         private final OperatorConfig config;
@@ -50,12 +50,12 @@ public class DataCenterPipeline extends K8sWatchPipeline<DataCenter, DataCenterL
         }
     
         @Override
-        public Call createApiCall(boolean watch, String resourceVersion) throws ApiException {
+        public Call createListApiCall(boolean watch, String resourceVersion) throws ApiException {
             return customObjectsApi.listNamespacedCustomObjectCall("stable.strapdata.com", "v1",
                     config.getNamespace(), "elassandra-datacenters", null, null,
                     resourceVersion, watch, null, null);
         }
-    
+  
         @Override
         public Key getKey(DataCenter resource) {
             return new Key(getMetadata(resource));

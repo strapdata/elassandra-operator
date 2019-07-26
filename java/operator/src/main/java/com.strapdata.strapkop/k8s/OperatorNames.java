@@ -22,21 +22,12 @@ public class OperatorNames {
                         + "-" + rack);
     }
     
-    public static String strapkopCredentials(final DataCenter dataCenter) {
-        return OperatorNames.clusterChildObjectName("%s-credentials-strapkop", dataCenter);
-    }
-    
-    public static String adminCredentials(final DataCenter dataCenter) {
-        return OperatorNames.clusterChildObjectName("%s-credentials-admin", dataCenter);
+    public static String clusterSecret(final DataCenter dataCenter) {
+        return OperatorNames.clusterChildObjectName("%s", dataCenter);
     }
     
     public static String keystore(final DataCenter dataCenter) {
         return OperatorNames.dataCenterChildObjectName("%s-keystore", dataCenter);
-    }
-    
-    public static String sharedSecret(final DataCenter dataCenter) {
-        // TODO: check if this need to be set cluster wide
-        return OperatorNames.dataCenterChildObjectName("%s-shared-secret", dataCenter);
     }
     
     public static String nodesService(final DataCenter dataCenter) {

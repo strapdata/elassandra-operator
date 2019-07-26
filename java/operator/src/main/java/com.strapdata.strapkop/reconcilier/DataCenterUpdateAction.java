@@ -8,7 +8,6 @@ import com.google.gson.reflect.TypeToken;
 import com.squareup.okhttp.Call;
 import com.strapdata.model.k8s.cassandra.*;
 import com.strapdata.model.k8s.task.BackupTask;
-import com.strapdata.strapkop.exception.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.k8s.OperatorNames;
@@ -29,7 +28,6 @@ import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
-import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -110,11 +108,7 @@ public class DataCenterUpdateAction {
             createKeystoreIfNotExists();
         }
         
-        if (dataCenterSpec.getEnterprise() != null && dataCenterSpec.getEnterprise().getAaa() != null && dataCenterSpec.getEnterprise().getAaa().getEnabled()) {
-            createSharedSecretIfNotExists();
-        }
-    
-        createAllCredentialsSecretsIfNotExists();
+        createClusterSecretIfNotExists();
         
         // create configmaps and their volume mounts (operator-defined config, and user overrides)
         // vavr.List is used here because it allows multiple head singly linked list (heads contain the rack-specific config map)
@@ -180,8 +174,7 @@ public class DataCenterUpdateAction {
                 break;
         }
         
-        customObjectsApi.replaceNamespacedCustomObjectStatus("stable.strapdata.com", "v1",
-                dataCenter.getMetadata().getNamespace(), "elassandra-datacenters", dataCenter.getMetadata().getName(), dataCenter);
+        k8sResourceUtils.updateCustomResourceDataCenterStatusConlifctFree(dataCenter);
     }
     
     private V1ObjectMeta clusterChildObjectMetadata(final String name) {
@@ -324,17 +317,14 @@ public class DataCenterUpdateAction {
                 .env(new ArrayList<>(dataCenterSpec.getEnv()))
                 .addEnvItem(new V1EnvVar()
                         .name("ELASSANDRA_USERNAME")
-                        .valueFrom(new V1EnvVarSource()
-                                .secretKeyRef(new V1SecretKeySelector()
-                                        .name(OperatorNames.strapkopCredentials(dataCenter))
-                                        .key("username")))
+                        .value("strapkop")
                 )
                 .addEnvItem(new V1EnvVar()
                         .name("ELASSANDRA_PASSWORD")
                         .valueFrom(new V1EnvVarSource()
                                 .secretKeyRef(new V1SecretKeySelector()
-                                        .name(OperatorNames.strapkopCredentials(dataCenter))
-                                        .key("password")))
+                                        .name(OperatorNames.clusterSecret(dataCenter))
+                                        .key("strapkop_password")))
                 )
                 .image(dataCenterSpec.getSidecarImage())
                 .imagePullPolicy(dataCenterSpec.getImagePullPolicy())
@@ -446,13 +436,13 @@ public class DataCenterUpdateAction {
                             .addItemsItem(new V1KeyToPath().key(AuthorityManager.SECRET_TRUSTSTORE_P12).path(AuthorityManager.SECRET_TRUSTSTORE_P12))));
         }
         
-        // AAA shared secret
+        // Cluster secret mounted as config file (e.g AAA shared secret)
         if (dataCenterSpec.getEnterprise() != null && dataCenterSpec.getEnterprise().getAaa() != null && dataCenterSpec.getEnterprise().getAaa().getEnabled()) {
-            cassandraContainer.addVolumeMountsItem(new V1VolumeMount().name("operator-shared-secret").mountPath("/tmp/operator-shared-secret"));
-            podSpec.addVolumesItem(new V1Volume().name("operator-shared-secret")
-                    .secret(new V1SecretVolumeSource().secretName(OperatorNames.sharedSecret(dataCenter))
+            cassandraContainer.addVolumeMountsItem(new V1VolumeMount().name("operator-cluster-secret").mountPath("/tmp/operator-cluster-secret"));
+            podSpec.addVolumesItem(new V1Volume().name("operator-cluster-secret")
+                    .secret(new V1SecretVolumeSource().secretName(OperatorNames.clusterSecret(dataCenter))
                             .addItemsItem(new V1KeyToPath().key("shared-secret.yaml").path("elasticsearch.yml.d/003-shared-secret.yaml"))));
-            cassandraContainer.addArgsItem("/tmp/operator-shared-secret");
+            cassandraContainer.addArgsItem("/tmp/operator-cluster-secret");
         }
     
     
@@ -1039,9 +1029,8 @@ public class DataCenterUpdateAction {
         coreApi.createNamespacedSecret(dataCenterMetadata.getNamespace(), certificatesSecret, null, null, null);
     }
     
-    private void createSharedSecretIfNotExists() throws ApiException {
-        final V1ObjectMeta secretMetadata = dataCenterChildObjectMetadata(OperatorNames.sharedSecret(dataCenter));
-        
+    private void createClusterSecretIfNotExists() throws ApiException {
+        final V1ObjectMeta secretMetadata = clusterChildObjectMetadata(OperatorNames.clusterSecret(dataCenter));
         // check if secret exists
         try {
             coreApi.readNamespacedSecret(secretMetadata.getName(), secretMetadata.getNamespace(), null, null, null);
@@ -1051,40 +1040,16 @@ public class DataCenterUpdateAction {
                 throw e;
             }
         }
-        
+    
+        // because this is created once, we should put things even if we don't need it yet (e.g shared secret if AAA is disabled)
         final V1Secret secret = new V1Secret()
                 .metadata(secretMetadata)
+                // strapkop role is used by the operator and sidecar
+                .putStringDataItem("strapkop_password", UUID.randomUUID().toString())
+                // admin is intended to be distributed to human administrator, so the credentials lifecycle is decoupled
+                .putStringDataItem("admin_password", UUID.randomUUID().toString())
+                // elassandra-enterprise shared secret is intended to be mounted as a config fragment
                 .putStringDataItem("shared-secret.yaml", "aaa.shared_secret: " + UUID.randomUUID().toString());
-        
-        coreApi.createNamespacedSecret(dataCenterMetadata.getNamespace(), secret, null, null, null);
-    }
-    
-    private void createAllCredentialsSecretsIfNotExists() throws ApiException {
-        createCredentialsSecretIfNotExists(
-                clusterChildObjectMetadata(OperatorNames.strapkopCredentials(dataCenter)), "strapkop");
-        createCredentialsSecretIfNotExists(
-                clusterChildObjectMetadata(OperatorNames.adminCredentials(dataCenter)), "admin");
-        
-
-    }
-
-    
-    private void createCredentialsSecretIfNotExists(final V1ObjectMeta secretMetadata, final String username) throws ApiException {
-    
-        // check if secret exists
-        try {
-            coreApi.readNamespacedSecret(secretMetadata.getName(), secretMetadata.getNamespace(), null, null, null);
-            return; // do not create the secret if already exists
-        } catch (ApiException e) {
-            if (e.getCode() != 404) {
-                throw e;
-            }
-        }
-    
-        final V1Secret secret = new V1Secret()
-                .metadata(secretMetadata)
-                .putStringDataItem("username", username)
-                .putStringDataItem("password", UUID.randomUUID().toString());
         
         coreApi.createNamespacedSecret(dataCenterMetadata.getNamespace(), secret, null, null, null);
     }

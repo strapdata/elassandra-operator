@@ -3,9 +3,13 @@ package com.strapdata.strapkop.k8s;
 import com.google.common.base.Strings;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.Iterators;
+import com.squareup.okhttp.Call;
+import com.strapdata.model.k8s.cassandra.DataCenter;
 import io.kubernetes.client.ApiException;
+import io.kubernetes.client.ApiResponse;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
+import io.kubernetes.client.apis.CustomObjectsApi;
 import io.kubernetes.client.models.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,6 +29,9 @@ public class K8sResourceUtils {
     
     @Inject
     private AppsV1Api appsApi;
+    
+    @Inject
+    private CustomObjectsApi customObjectsApi;
     
     @FunctionalInterface
     public interface ApiCallable {
@@ -284,5 +291,15 @@ public class K8sResourceUtils {
         final V1ServicePage firstPage = new V1ServicePage(null);
 
         return new ResourceListIterable<>(firstPage);
+    }
+    
+    public void updateCustomResourceDataCenterStatusConlifctFree(final DataCenter dc) throws ApiException {
+        final Call call = customObjectsApi.getNamespacedCustomObjectCall("stable.strapdata.com", "v1",
+                dc.getMetadata().getNamespace(), "elassandra-datacenters", dc.getMetadata().getName(), null, null);
+        final ApiResponse<DataCenter> apiResponse = customObjectsApi.getApiClient().execute(call, DataCenter.class);
+        final DataCenter freshDc = apiResponse.getData();
+        freshDc.setStatus(dc.getStatus());
+        customObjectsApi.replaceNamespacedCustomObjectStatus("stable.strapdata.com", "v1",
+                dc.getMetadata().getNamespace(), "elassandra-datacenters", dc.getMetadata().getName(), freshDc);
     }
 }

@@ -1,6 +1,5 @@
 package com.strapdata.strapkop.preflight;
 
-import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.handler.*;
 import com.strapdata.strapkop.pipeline.*;
 import io.reactivex.Observer;

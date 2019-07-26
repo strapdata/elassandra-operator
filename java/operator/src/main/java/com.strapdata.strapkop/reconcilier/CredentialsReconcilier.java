@@ -9,16 +9,19 @@ import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.cql.CqlConnectionManager;
 import com.strapdata.strapkop.cql.CqlCredentials;
 import com.strapdata.strapkop.exception.StrapkopException;
+import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CoreV1Api;
-import io.kubernetes.client.apis.CustomObjectsApi;
 import io.kubernetes.client.models.V1Secret;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 import javax.net.ssl.SSLException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 
 @Singleton
 public class CredentialsReconcilier extends Reconcilier<DataCenter> {
@@ -27,52 +30,48 @@ public class CredentialsReconcilier extends Reconcilier<DataCenter> {
     
     private final CqlConnectionManager cqlConnectionManager;
     private final CoreV1Api coreApi;
-    private final CustomObjectsApi customObjectsApi;
+    private K8sResourceUtils k8sResourceUtils;
+    
     
     private final static CqlCredentials defaultCredentials = new CqlCredentials()
             .setUsername("cassandra")
             .setPassword("cassandra");
     
-    public CredentialsReconcilier(CqlConnectionManager cqlConnectionManager, CoreV1Api coreApi, CustomObjectsApi customObjectsApi) {
+    public CredentialsReconcilier(CqlConnectionManager cqlConnectionManager, CoreV1Api coreApi, K8sResourceUtils k8sResourceUtils) {
         this.cqlConnectionManager = cqlConnectionManager;
         this.coreApi = coreApi;
-        this.customObjectsApi = customObjectsApi;
+        this.k8sResourceUtils = k8sResourceUtils;
     }
     
     @Override
     public void reconcile(final DataCenter dataCenter) throws ApiException, StrapkopException, SSLException {
         
-        // TODO: be idempotent
-        
         try {
     
             logger.info("reconcile credentials for {}", dataCenter.getMetadata().getName());
     
-            final CqlCredentials strapkopCredentials = loadCredentialsFromSecret(dataCenter,
-                    OperatorNames.strapkopCredentials(dataCenter));
-    
-            final CqlCredentials adminCredentials = loadCredentialsFromSecret(dataCenter,
-                    OperatorNames.adminCredentials(dataCenter));
+            final List<CqlCredentials> credentials = loadCredentialsFromSecret(dataCenter, OperatorNames.clusterSecret(dataCenter));
+            final CqlCredentials strapkopCredentials = credentials.stream().filter(c -> Objects.equals("strapkop", c.getUsername())).findFirst().get();
     
             Session session;
             try {
                 logger.info("try connecting to {} with default credentials", dataCenter.getMetadata().getName());
                 session = cqlConnectionManager.add(dataCenter, defaultCredentials);
                 logger.info("successfully connected to {} with default credentials", dataCenter.getMetadata().getName());
+    
+                for (CqlCredentials cred : credentials) {
+                    logger.info("creating role {} for {}", cred.getUsername(), dataCenter.getMetadata().getName());
+                    createRole(cred, session);
+                }
                 
-                logger.info("creating role strapkop for {}", dataCenter.getMetadata().getName());
-                createRole(strapkopCredentials, session);
-    
-                logger.info("creating role admin for {}", dataCenter.getMetadata().getName());
-                createRole(adminCredentials, session);
-    
                 logger.info("Connecting to {} with new credentials and closing default connection", dataCenter.getMetadata().getName());
                 session = cqlConnectionManager.add(dataCenter, strapkopCredentials);
     
                 logger.info("Dropping default role cassandra for {}", dataCenter.getMetadata().getName());
                 session.execute("DROP ROLE cassandra");
-                session.execute("ALTER KEYSPACE system_auth WITH replication = {'class': 'NetworkTopologyStrategy', ?: ?};",
-                        dataCenter.getSpec().getDatacenterName(), 1); // TODO: find a smart way to set the RF map
+                session.execute(String.format(
+                        "ALTER KEYSPACE system_auth WITH replication = {'class': 'NetworkTopologyStrategy', '%s': %d};",
+                        dataCenter.getSpec().getDatacenterName(), 1)); // TODO: find a smart way to set the RF map
             }
             catch (AuthenticationException e) {
                 logger.info("failed to connect to {} with default credentials, trying to connect with managed credentials", dataCenter.getMetadata().getName(), e);
@@ -83,8 +82,9 @@ public class CredentialsReconcilier extends Reconcilier<DataCenter> {
             dataCenter.getStatus().setCredentialsStatus(CredentialsStatus.MANAGED);
             dataCenter.getStatus().setCqlStatus(CqlStatus.ESTABLISHED);
             dataCenter.getStatus().setCqlErrorMessage("");
-            updateDataCenterStatus(dataCenter);
-            
+            k8sResourceUtils.updateCustomResourceDataCenterStatusConlifctFree(dataCenter);
+    
+    
             logger.info("reconciled credentials for {}", dataCenter.getMetadata().getName());
         }
         catch (DriverException e) {
@@ -92,14 +92,8 @@ public class CredentialsReconcilier extends Reconcilier<DataCenter> {
             dataCenter.getStatus().setCredentialsStatus(CredentialsStatus.UNKNOWN);
             dataCenter.getStatus().setCqlStatus(CqlStatus.ERRORED);
             dataCenter.getStatus().setCqlErrorMessage(e.getMessage());
-            updateDataCenterStatus(dataCenter);
+            k8sResourceUtils.updateCustomResourceDataCenterStatusConlifctFree(dataCenter);
         }
-    }
-    
-    private void updateDataCenterStatus(DataCenter dataCenter) throws ApiException {
-        customObjectsApi.patchNamespacedCustomObjectStatus("stable.strapdata.com", "v1",
-                dataCenter.getMetadata().getNamespace(), "elassandra-datacenters", dataCenter.getMetadata().getName(),
-                dataCenter);
     }
     
     private void createRole(CqlCredentials credentials, Session session) throws StrapkopException {
@@ -112,22 +106,25 @@ public class CredentialsReconcilier extends Reconcilier<DataCenter> {
         session.execute(String.format("CREATE ROLE IF NOT EXISTS %s with SUPERUSER = true AND LOGIN = true and PASSWORD = '%s'", credentials.getUsername(), credentials.getPassword()));
     }
     
-    private CqlCredentials loadCredentialsFromSecret(final DataCenter dataCenter, final String secretName) throws ApiException, StrapkopException {
+    private List<CqlCredentials> loadCredentialsFromSecret(final DataCenter dataCenter, final String secretName) throws ApiException, StrapkopException {
         final V1Secret secret = coreApi.readNamespacedSecret(secretName,
                 dataCenter.getMetadata().getNamespace(),
                 null,
                 null,
                 null);
-        
-        final byte[] usernameBytes = secret.getData().get("username");
-        final byte[] passwordBytes = secret.getData().get("password");
-        
-        if (usernameBytes == null || passwordBytes == null) {
-            throw new StrapkopException(String.format("secret %s does not contain the correct username and password fields", secretName));
+
+    
+        final byte[] adminPassword = secret.getData().get("admin_password");
+        final byte[] strapkopPassword = secret.getData().get("strapkop_password");
+
+        if (adminPassword == null || strapkopPassword == null) {
+            throw new StrapkopException(String.format("secret %s does not contain the correct passwords fields", secretName));
         }
-        
-        return new CqlCredentials()
-                .setUsername(new String(usernameBytes))
-                .setPassword(new String(passwordBytes));
+    
+        final List<CqlCredentials> credentials = new ArrayList<>();
+        credentials.add(new CqlCredentials().setUsername("strapkop").setPassword(new String(strapkopPassword)));
+        credentials.add(new CqlCredentials().setUsername("admin").setPassword(new String(adminPassword)));
+    
+        return credentials;
     }
 }

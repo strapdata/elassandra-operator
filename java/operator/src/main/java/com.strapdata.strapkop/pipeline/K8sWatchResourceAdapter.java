@@ -15,7 +15,7 @@ public abstract class K8sWatchResourceAdapter<ResourceT, ResourceListT> {
     }
     public abstract Type getResourceType();
     public abstract Type getResourceListType();
-    public abstract Call createApiCall(final boolean watch, final String resourceVersion) throws ApiException;
+    public abstract Call createListApiCall(final boolean watch, final String resourceVersion) throws ApiException;
     public abstract Key getKey(final ResourceT resource);
     public abstract V1ObjectMeta getMetadata(final ResourceT resource);
     public abstract Collection<? extends ResourceT> getListItems(final ResourceListT list);

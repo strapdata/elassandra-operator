@@ -3,9 +3,9 @@ kind: CustomResourceDefinition
 metadata:
   # name must match the spec fields below, and be in the form: <plural>.<group>
   name: elassandra-datacenters.stable.strapdata.com
-  annotations:
-    "helm.sh/hook": crd-install
-    "helm.sh/hook-delete-policy": before-hook-creation
+  #annotations:
+  #  "helm.sh/hook": crd-install
+  #  "helm.sh/hook-delete-policy": before-hook-creation
 spec:
   # group name to use for REST API: /apis/<group>/<version>
   group: stable.strapdata.com
@@ -23,6 +23,6 @@ spec:
     # shortNames allow shorter string to match your resource on the CLI
     shortNames:
     - edc
-subresources:
-  # status enables the status subresource.
-  status: {}
+  subresources:
+    # status enables the status subresource.
+    status: {}
