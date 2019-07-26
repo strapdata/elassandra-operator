@@ -12,16 +12,16 @@ replicas2=${5:-1}
 name1=${cluster}-${dc1}
 name2=${cluster}-${dc2}
 
-#./test/lib/deploy-operator
-#
-## deploy first dc
-#./test/lib/deploy-elassandra ${name1} ${replicas1}
-#./test/lib/wait-dc-ready ${name1} ${replicas1}
-#./test/lib/check-dc-ok ${name1} ${replicas1}
-#
-## insert data
-#./test/lib/insert-basic-dataset ${name1} ${replicas1}
-#./test/lib/assert-basic-dataset ${name1} ${replicas1}
+./test/lib/deploy-operator
+
+# deploy first dc
+./test/lib/deploy-elassandra ${name1} ${replicas1}
+./test/lib/wait-dc-ready ${name1} ${replicas1}
+./test/lib/check-dc-ok ${name1} ${replicas1}
+
+# insert data
+./test/lib/insert-basic-dataset ${name1} ${replicas1}
+./test/lib/assert-basic-dataset ${name1} ${replicas1}
 
 # increase rf of system_auth (this is a temporary trick, I guess)
 ./test/lib/exec-cql ${name1} \
