@@ -54,7 +54,7 @@ podTemplate(
             usernamePassword(credentialsId: "nexus-jenkins-deployer", usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD'),
             usernamePassword(credentialsId: 'nexus-jenkins-deployer', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASSWORD')
     ]) {
-      withEnv(["AKS_NAME=${aksName}", "IMAGE_SUFFIX=-staging", "PULL_SECRET=nexus-registry", "DOCKER_HOST=tcp://localhost:1234"]) {
+      withEnv(["AKS_NAME=${aksName}", "IMAGE_SUFFIX=-staging", "PULL_SECRET=nexus-registry", "DOCKER_HOST=tcp://localhost:1234", "MEMORY_REQUEST=2048Mi", "MEMORY_LIMIT=2048Mi"]) {
 
         try {
           stage('init') {

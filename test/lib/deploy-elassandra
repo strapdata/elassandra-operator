@@ -31,6 +31,8 @@ helm ${helm_cmd} \
     --set enterprise.cbs=$([[ "${AUTHENTICATION}" != "NONE" ]] && echo "true" || echo "false") \
     --set hostPortEnabled=false \
     --set racks=${NUM_RACKS} \
+    --set resources.limits.memory=${MEMORY_LIMIT} \
+    --set resources.requests.memory=${MEMORY_REQUEST} \
     helm/elassandra-datacenter
 
 #    --set userSecretVolumeSource.secretName=${name} \
