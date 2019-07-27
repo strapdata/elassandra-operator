@@ -24,18 +24,18 @@ rules:
 - apiGroups:
   - stable.strapdata.com
   resources:
-  - elassandra-datacenter
-  - elassandra-datacenters
-  - elassandra-datacenter/status
-  - elassandra-datacenters/status
-  - elassandra-backup
-  - elassandra-backups
-  - elassandra-backup/status
-  - elassandra-backups/status
-  - elassandra-task
-  - elassandra-tasks
-  - elassandra-task/status
-  - elassandra-tasks/status
+  - elassandradatacenter
+  - elassandradatacenters
+  - elassandradatacenter/status
+  - elassandradatacenters/status
+  - elassandrabackup
+  - elassandrabackups
+  - elassandrabackup/status
+  - elassandrabackups/status
+  - elassandratask
+  - elassandratasks
+  - elassandratask/status
+  - elassandratasks/status
   verbs:
   - '*'
 - apiGroups:

@@ -146,7 +146,7 @@ public class TaskEventSource implements EventSource<K8sWatchEvent<Task<?,?>>> {
     
     private Call createApiCall(boolean watch, String resourceVersion) throws ApiException {
         return customObjectsApi.listNamespacedCustomObjectCall("stable.strapdata.com", "v1",
-                config.getNamespace(), "elassandra-tasks", null, null,
+                config.getNamespace(), "elassandratasks", null, null,
                 resourceVersion, watch, null, null);
     }
     

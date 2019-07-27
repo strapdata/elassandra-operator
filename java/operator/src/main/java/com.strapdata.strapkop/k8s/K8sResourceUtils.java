@@ -292,14 +292,17 @@ public class K8sResourceUtils {
 
         return new ResourceListIterable<>(firstPage);
     }
-    
-    public void updateCustomResourceDataCenterStatusConlifctFree(final DataCenter dc) throws ApiException {
+
+    // temporary shitty solution TODO: remove this
+    public DataCenter freshenDataCenter(final DataCenter dc) throws ApiException {
         final Call call = customObjectsApi.getNamespacedCustomObjectCall("stable.strapdata.com", "v1",
-                dc.getMetadata().getNamespace(), "elassandra-datacenters", dc.getMetadata().getName(), null, null);
+                dc.getMetadata().getNamespace(), "elassandradatacenters", dc.getMetadata().getName(), null, null);
         final ApiResponse<DataCenter> apiResponse = customObjectsApi.getApiClient().execute(call, DataCenter.class);
-        final DataCenter freshDc = apiResponse.getData();
-        freshDc.setStatus(dc.getStatus());
+        return apiResponse.getData();
+    }
+
+    public void updateDataCenterStatus(final DataCenter dc) throws ApiException {
         customObjectsApi.replaceNamespacedCustomObjectStatus("stable.strapdata.com", "v1",
-                dc.getMetadata().getNamespace(), "elassandra-datacenters", dc.getMetadata().getName(), freshDc);
+                dc.getMetadata().getNamespace(), "elassandradatacenters", dc.getMetadata().getName(), dc);
     }
 }

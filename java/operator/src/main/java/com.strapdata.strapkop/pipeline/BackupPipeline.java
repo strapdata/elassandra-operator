@@ -48,7 +48,7 @@ public class BackupPipeline extends K8sWatchPipeline<BackupTask, BackupTaskList>
         @Override
         public Call createListApiCall(boolean watch, String resourceVersion) throws ApiException {
             return customObjectsApi.listNamespacedCustomObjectCall("stable.strapdata.com", "v1",
-                    config.getNamespace(), "elassandra-backups", null, null,
+                    config.getNamespace(), "elassandrabackups", null, null,
                     resourceVersion, watch, null, null);
         }
     

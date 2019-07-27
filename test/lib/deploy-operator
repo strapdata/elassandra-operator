@@ -15,7 +15,7 @@ helm install -n elassandra-operator --wait \
 
 for ((i=10; i>=1; i--)); do
 
-  if kubectl get crd elassandra-datacenters.stable.strapdata.com; then
+  if kubectl get crd elassandradatacenters.stable.strapdata.com; then
     test/lib/wait-pod-ready $(test/lib/get-operator-pod-name)
     sleep 5 # some magic
     exit 0

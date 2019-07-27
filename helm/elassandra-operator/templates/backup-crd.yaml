@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   # name must match the spec fields below, and be in the form: <plural>.<group>
-  name: elassandra-backups.stable.strapdata.com
+  name: elassandrabackups.stable.strapdata.com
   annotations:
     "helm.sh/hook": crd-install
     "helm.sh/hook-delete-policy": before-hook-creation
@@ -15,9 +15,9 @@ spec:
   scope: Namespaced
   names:
     # plural name to be used in the URL: /apis/<group>/<version>/<plural>
-    plural: elassandra-backups
+    plural: elassandrabackups
     # singular name to be used as an alias on the CLI and for display
-    singular: elassandra-backup
+    singular: elassandrabackup
     # kind is normally the CamelCased singular type. Your resource manifests use this.
     kind: ElassandraBackup
     # shortNames allow shorter string to match your resource on the CLI

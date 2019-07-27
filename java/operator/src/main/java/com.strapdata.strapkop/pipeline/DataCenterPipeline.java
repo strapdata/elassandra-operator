@@ -52,7 +52,7 @@ public class DataCenterPipeline extends K8sWatchPipeline<DataCenter, DataCenterL
         @Override
         public Call createListApiCall(boolean watch, String resourceVersion) throws ApiException {
             return customObjectsApi.listNamespacedCustomObjectCall("stable.strapdata.com", "v1",
-                    config.getNamespace(), "elassandra-datacenters", null, null,
+                    config.getNamespace(), "elassandradatacenters", null, null,
                     resourceVersion, watch, null, null);
         }
   

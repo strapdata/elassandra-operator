@@ -44,7 +44,10 @@ public class CredentialsReconcilier extends Reconcilier<DataCenter> {
     }
     
     @Override
-    public void reconcile(final DataCenter dataCenter) throws ApiException, StrapkopException, SSLException {
+    public void reconcile(DataCenter dataCenter) throws ApiException, StrapkopException, SSLException {
+        
+        // temporary fix
+        dataCenter = k8sResourceUtils.freshenDataCenter(dataCenter);
         
         try {
     
@@ -82,7 +85,7 @@ public class CredentialsReconcilier extends Reconcilier<DataCenter> {
             dataCenter.getStatus().setCredentialsStatus(CredentialsStatus.MANAGED);
             dataCenter.getStatus().setCqlStatus(CqlStatus.ESTABLISHED);
             dataCenter.getStatus().setCqlErrorMessage("");
-            k8sResourceUtils.updateCustomResourceDataCenterStatusConlifctFree(dataCenter);
+            k8sResourceUtils.updateDataCenterStatus(dataCenter);
     
     
             logger.info("reconciled credentials for {}", dataCenter.getMetadata().getName());
@@ -92,7 +95,7 @@ public class CredentialsReconcilier extends Reconcilier<DataCenter> {
             dataCenter.getStatus().setCredentialsStatus(CredentialsStatus.UNKNOWN);
             dataCenter.getStatus().setCqlStatus(CqlStatus.ERRORED);
             dataCenter.getStatus().setCqlErrorMessage(e.getMessage());
-            k8sResourceUtils.updateCustomResourceDataCenterStatusConlifctFree(dataCenter);
+            k8sResourceUtils.updateDataCenterStatus(dataCenter);
         }
     }
     

@@ -13,9 +13,9 @@ kind: ElassandraBackup
 metadata:
   name: ${backup_name}
 spec:
+  cluster: $(./test/lib/get-cluster-name ${name})
   selector:
     matchLabels:
-      elassandra-operator.strapdata.com/cluster: $(./test/lib/get-cluster-name ${name})
       elassandra-operator.strapdata.com/datacenter: $(./test/lib/get-dc-name ${name})
   backupType: "AZURE_BLOB"
   target: ${AZURE_STORAGE_CONTAINER}

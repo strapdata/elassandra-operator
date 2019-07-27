@@ -174,7 +174,7 @@ public class DataCenterUpdateAction {
                 break;
         }
         
-        k8sResourceUtils.updateCustomResourceDataCenterStatusConlifctFree(dataCenter);
+        k8sResourceUtils.updateDataCenterStatus(dataCenter);
     }
     
     private V1ObjectMeta clusterChildObjectMetadata(final String name) {
@@ -452,7 +452,7 @@ public class DataCenterUpdateAction {
             // custom objects api doesn't give us a nice way to pass in the type we want so we do it manually
             final BackupTask backup;
             {
-                final Call call = customObjectsApi.getNamespacedCustomObjectCall("stable.strapdata.com", "v1", "default", "elassandra-backups", dataCenterSpec.getRestoreFromBackup(), null, null);
+                final Call call = customObjectsApi.getNamespacedCustomObjectCall("stable.strapdata.com", "v1", "default", "elassandrabackups", dataCenterSpec.getRestoreFromBackup(), null, null);
                 backup = customObjectsApi.getApiClient().<BackupTask>execute(call, new TypeToken<BackupTask>() {
                 }.getType()).getData();
             }
