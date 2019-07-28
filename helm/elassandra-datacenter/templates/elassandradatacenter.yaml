@@ -2,6 +2,7 @@ apiVersion: stable.strapdata.com/v1
 kind: ElassandraDataCenter
 metadata:
   name: {{ template "elassandra.resourceName" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     app: {{ template "elassandra.name" . }}
     chart: {{ template "elassandra.chart" . }}
@@ -37,8 +38,14 @@ spec:
 {{- if .Values.restoreFromBackup }}
   restoreFromBackup: {{ .Values.restoreFromBackup }}
 {{- end }}
-{{- if .Values.userConfigMapVolumeSource }}
   userConfigMapVolumeSource:
+    name: {{ template "elassandra.resourceName" . }}
+    items:
+{{- range $key, $val := .Values.configs }}
+      - key: {{ $key }}
+        path: /etc/cassandra/{{ $key }}
+{{- end }}
+{{- if .Values.userConfigMapVolumeSource }}
 {{ toYaml .Values.userConfigMapVolumeSource | indent 4 }}
 {{- end }}
 {{- if .Values.userSecretVolumeSource }}

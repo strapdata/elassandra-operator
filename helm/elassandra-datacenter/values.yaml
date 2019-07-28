@@ -86,8 +86,14 @@ enterprise:
 #  - name: BUCKET_NAME
 #    value: "my-bucket"
 #
-#userConfigMapVolumeSource:
-#  - name: configMapReference
+
+# Custom configmap that defines the ConfigMap key (relative to /etc/cassandra) -> path mappings.
+# Example:
+# userConfigMapVolumeSource:
+#   name: concurrent-data
+#   items:
+#   - key: 100-concurrent-yaml
+#     path: cassandra.yaml.d/100-concurrent.yaml
 
 ## Example GCP ConfigMap
 #apiVersion: extensions/v1beta1
