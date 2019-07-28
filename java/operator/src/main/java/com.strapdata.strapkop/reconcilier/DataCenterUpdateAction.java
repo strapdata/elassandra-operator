@@ -112,6 +112,7 @@ public class DataCenterUpdateAction {
         final String configFingerprint = tuple._2;
         configMapVolumeMounts = configMapVolumeMounts.prepend(createOrReplaceVarConfigMap(seedNodesService));
         if (dataCenterSpec.getUserConfigMapVolumeSource() != null) {
+            logger.debug("Adding UserConfigMapVolumeSource={}", dataCenterSpec.getUserConfigMapVolumeSource().getName());
             configMapVolumeMounts = configMapVolumeMounts.prepend
                     (new ConfigMapVolumeMount("user-config-volume", "/tmp/user-config", dataCenterSpec.getUserConfigMapVolumeSource()));
         }
@@ -385,6 +386,7 @@ public class DataCenterUpdateAction {
         
         // add configmap volumes
         for (final ConfigMapVolumeMount configMapVolumeMount : configMapVolumeMounts) {
+            logger.debug("Adding configMapVolumeMount name={} path={}",configMapVolumeMount.name, configMapVolumeMount.mountPath);
             cassandraContainer.addVolumeMountsItem(new V1VolumeMount()
                     .name(configMapVolumeMount.name)
                     .mountPath(configMapVolumeMount.mountPath)
