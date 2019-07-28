@@ -158,6 +158,20 @@ public class DataCenterSpec {
     private Integer sslStoragePort = 37001;
 
     /**
+     * Java JMX port
+     */
+    @SerializedName("jmxPort")
+    @Expose
+    private Integer jmxPort = 7199;
+
+    /**
+     * Java debugger port (also hostPort)
+     */
+    @SerializedName("jdbPort")
+    @Expose
+    private Integer jdbPort = -1;
+
+    /**
      * Enable SSL support
      */
     @SerializedName("ssl")

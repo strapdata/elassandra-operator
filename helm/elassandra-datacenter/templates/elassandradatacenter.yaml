@@ -58,6 +58,9 @@ spec:
   nativePort : {{ default "39042" .Values.nativePort }}
   storagePort : {{ default "37000" .Values.storagePort }}
   sslStoragePort : {{ default "37001" .Values.sslStoragePort }}
+{{- if .Values.jdbPort }}
+  jdbPort: {{ .Values.jdbPort }}
+{{- end }}
 {{- if .Values.ssl }}
   ssl:
 {{ toYaml .Values.ssl | indent 4 }}

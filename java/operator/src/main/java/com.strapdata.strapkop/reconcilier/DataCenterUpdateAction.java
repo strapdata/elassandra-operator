@@ -209,20 +209,17 @@ public class DataCenterUpdateAction {
             this.volumeSource = volumeSource;
         }
     }
-    
-    private V1ContainerPort interNodePort() {
-        V1ContainerPort port = new V1ContainerPort().name("internode").containerPort(dataCenterSpec.getStoragePort());
-        return (dataCenterSpec.getHostPortEnabled()) ? port.hostPort(dataCenterSpec.getStoragePort()) : port;
+
+    private V1Container addPortsItem(V1Container container, int port, String name) {
+        return addPortsItem(container, port, name, false);
     }
-    
-    private V1ContainerPort interNodeSslPort() {
-        V1ContainerPort port = new V1ContainerPort().name("internode-ssl").containerPort(dataCenterSpec.getSslStoragePort());
-        return (dataCenterSpec.getHostPortEnabled()) ? port.hostPort(dataCenterSpec.getSslStoragePort()) : port;
-    }
-    
-    private V1ContainerPort nativePort() {
-        V1ContainerPort port = new V1ContainerPort().name("cql").containerPort(dataCenterSpec.getNativePort());
-        return (dataCenterSpec.getHostPortEnabled()) ? port.hostPort(dataCenterSpec.getNativePort()) : port;
+
+    private V1Container addPortsItem(V1Container container, int port, String name, boolean withHostPort) {
+        if (port > 0) {
+            V1ContainerPort v1Port = new V1ContainerPort().name(name).containerPort(port);
+            container.addPortsItem((dataCenterSpec.getHostPortEnabled() && withHostPort) ? v1Port.hostPort(port) : v1Port);
+        }
+        return container;
     }
     
     private V1StatefulSet constructRackStatefulSet(final int rackIdx, final int numPods, final Iterable<ConfigMapVolumeMount> configMapVolumeMounts, String configmapFingerprint) throws ApiException, StrapkopException {
@@ -234,10 +231,6 @@ public class DataCenterUpdateAction {
                 .image(dataCenterSpec.getElassandraImage())
                 .imagePullPolicy(dataCenterSpec.getImagePullPolicy())
                 .terminationMessagePolicy("FallbackToLogsOnError")
-                .addPortsItem(interNodePort())
-                .addPortsItem(interNodeSslPort())
-                .addPortsItem(nativePort())
-                .addPortsItem(new V1ContainerPort().name("jmx").containerPort(7199))
                 .resources(dataCenterSpec.getResources())
                 .securityContext(new V1SecurityContext()
                         .runAsUser(999L)
@@ -274,8 +267,14 @@ public class DataCenterUpdateAction {
                 .addEnvItem(new V1EnvVar().name("POD_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.name"))))
                 .addEnvItem(new V1EnvVar().name("POD_IP").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("status.podIP"))))
                 .addEnvItem(new V1EnvVar().name("NODE_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("spec.nodeName"))));
-        
-        for (V1EnvVar envVar : this.dataCenterSpec.getEnv()) {
+
+        addPortsItem(cassandraContainer, dataCenterSpec.getStoragePort(), "internode", true);
+        addPortsItem(cassandraContainer, dataCenterSpec.getSslStoragePort(), "internode-ssl", true);
+        addPortsItem(cassandraContainer, dataCenterSpec.getNativePort(), "cql", true);
+        addPortsItem(cassandraContainer, dataCenterSpec.getJmxPort(), "jmx", false);
+        addPortsItem(cassandraContainer, dataCenterSpec.getJdbPort(), "jdb", false);
+
+        for(V1EnvVar envVar : this.dataCenterSpec.getEnv()) {
             if (envVar.getName().equals("NODEINFO_SECRET")) {
                 cassandraContainer.addEnvItem(new V1EnvVar()
                         .name("NODEINFO_TOKEN")
@@ -644,7 +643,19 @@ public class DataCenterUpdateAction {
             configMapVolumeAddFile(configMap, volumeSource, "cassandra-env.sh.d/001-cassandra-exporter.sh",
                     "JVM_OPTS=\"${JVM_OPTS} -javaagent:${CASSANDRA_HOME}/agents/cassandra-exporter-agent.jar=@${CASSANDRA_CONF}/cassandra-exporter.conf\"");
         }
-        
+
+        // Add jdb transport socket
+        if (dataCenterSpec.getJdbPort() > 0) {
+            configMapVolumeAddFile(configMap, volumeSource, "cassandra-env.sh.d/001-cassandra-jdb.sh",
+                "JVM_OPTS=\"${JVM_OPTS} -Xdebug -Xnoagent -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address="+dataCenterSpec.getJdbPort()+"\"");
+        }
+
+        // this does not work with elassandra because it needs to run as root. It has been moved to the init container
+        // tune ulimits
+        // configMapVolumeAddFile(configMap, volumeSource, "cassandra-env.sh.d/002-cassandra-limits.sh",
+        //        "ulimit -l unlimited\n" // unlimited locked memory
+        //);
+
         // heap size and GC settings
         // TODO: tune
         {
@@ -880,7 +891,7 @@ public class DataCenterUpdateAction {
                 .spec(new V1ServiceSpec()
                         .clusterIP("None")
                         .addPortsItem(new V1ServicePort().name("cql").port(dataCenterSpec.getNativePort()))
-                        .addPortsItem(new V1ServicePort().name("jmx").port(7199))
+                        .addPortsItem(new V1ServicePort().name("jmx").port(dataCenterSpec.getJmxPort()))
                         .selector(dataCenterLabels)
                 );
         
