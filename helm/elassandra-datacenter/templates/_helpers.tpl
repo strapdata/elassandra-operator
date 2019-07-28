@@ -36,10 +36,9 @@ Create chart name and version as used by the chart label.
 {{- end -}}
 
 {{- define "elassandra.clusterName" -}}
-{{- (split "-" .Release.Name)._0 -}}
+{{- (split "-" .Release.Name)._0 | required "Release name has to be clustername-dcname (in lowercase)" -}}
 {{- end -}}
 
 {{- define "elassandra.resourceName" -}}
-{{ printf "elassandra-%s-%s" (include "elassandra.clusterName" .) (include "elassandra.datacenterName" .) | trunc 63 | trimSuffix "-" }}
+{{ .Release.Name | lower }}
 {{- end -}}
-
