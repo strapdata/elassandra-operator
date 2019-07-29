@@ -107,14 +107,6 @@ public class DataCenterSpec {
     private Boolean prometheusSupport;
 
     /**
-     * Labels to attach to the Prometheus ServiceMonitor for this data center.
-     * 
-     */
-    @SerializedName("prometheusServiceMonitorLabels")
-    @Expose
-    private Map<String, String> prometheusServiceMonitorLabels;
-
-    /**
      * Attempt to run privileged configuration options for better performance
      * 
      */

@@ -53,7 +53,7 @@ public class DataCenterUpdateAction {
     private final DataCenterSpec dataCenterSpec;
     private final DataCenterStatus dataCenterStatus;
     private final Map<String, String> dataCenterLabels;
-    
+
     public DataCenterUpdateAction(CoreV1Api coreApi, AppsV1Api appsApi,
                                   CustomObjectsApi customObjectsApi,
                                   SidecarClientFactory sidecarClientFactory,
@@ -131,11 +131,6 @@ public class DataCenterUpdateAction {
         }
         
         createOrScaleAllStatefulsets(statefulSetMap);
-        
-        if (dataCenterSpec.getPrometheusSupport()) {
-            createOrReplacePrometheusServiceMonitor();
-        }
-        
         updateStatus();
         
         logger.info("Reconciled DataCenter.");
@@ -225,7 +220,7 @@ public class DataCenterUpdateAction {
     private V1StatefulSet constructRackStatefulSet(final int rackIdx, final int numPods, final Iterable<ConfigMapVolumeMount> configMapVolumeMounts, String configmapFingerprint) throws ApiException, StrapkopException {
         final String rack = rackName(rackIdx);
         final V1ObjectMeta statefulSetMetadata = rackChildObjectMetadata(rack, OperatorNames.stsName(dataCenter, rack));
-        
+
         final V1Container cassandraContainer = new V1Container()
                 .name("elassandra")
                 .image(dataCenterSpec.getElassandraImage())
@@ -487,7 +482,18 @@ public class DataCenterUpdateAction {
         }
         
         final Map<String, String> rackLabels = OperatorLabels.rack(dataCenter, rack);
-    
+
+        final V1ObjectMeta templateMetadata = new V1ObjectMeta()
+            .labels(rackLabels)
+            .putAnnotationsItem(OperatorLabels.CONFIGMAP_FINGERPRINT, configmapFingerprint);
+
+        // add prometheus annotations to scrap nodes
+        if (dataCenterSpec.getPrometheusSupport()) {
+            String[] annotations = new String[] { "prometheus.io/scrape", "true", "prometheus.io/port", "9500" };
+            for (int i = 0; i < annotations.length; i += 2)
+                templateMetadata.putAnnotationsItem(annotations[i], annotations[i + 1]);
+        }
+
         return new V1StatefulSet()
                 .metadata(statefulSetMetadata)
                 .spec(new V1StatefulSetSpec()
@@ -497,9 +503,7 @@ public class DataCenterUpdateAction {
                         .replicas(numPods)
                         .selector(new V1LabelSelector().matchLabels(rackLabels))
                         .template(new V1PodTemplateSpec()
-                                .metadata(new V1ObjectMeta()
-                                        .labels(rackLabels)
-                                        .putAnnotationsItem(OperatorLabels.CONFIGMAP_FINGERPRINT, configmapFingerprint))
+                                .metadata(templateMetadata)
                                 .spec(podSpec)
                         )
                         .addVolumeClaimTemplatesItem(new V1PersistentVolumeClaim()
@@ -638,10 +642,17 @@ public class DataCenterUpdateAction {
             configMapVolumeAddFile(configMap, volumeSource, "cassandra.yaml.d/001-operator-spec-overrides.yaml", toYamlString(config));
         }
         
-        // prometheus support
+        // prometheus support (see prometheus annotations)
         if (dataCenterSpec.getPrometheusSupport()) {
+            // instaclustr jmx agent
+            /*
             configMapVolumeAddFile(configMap, volumeSource, "cassandra-env.sh.d/001-cassandra-exporter.sh",
-                    "JVM_OPTS=\"${JVM_OPTS} -javaagent:${CASSANDRA_HOME}/agents/cassandra-exporter-agent.jar=@${CASSANDRA_CONF}/cassandra-exporter.conf\"");
+                "JVM_OPTS=\"${JVM_OPTS} -javaagent:${CASSANDRA_HOME}/agents/cassandra-exporter-agent.jar=@${CASSANDRA_CONF}/cassandra-exporter.conf\"");
+            */
+
+            // jmx-promtheus exporter
+            configMapVolumeAddFile(configMap, volumeSource, "cassandra-env.sh.d/001-cassandra-exporter.sh",
+                "JVM_OPTS=\"${JVM_OPTS} -javaagent:${CASSANDRA_HOME}/agents/jmx_prometheus_javaagent.jar=9500:${CASSANDRA_CONF}/jmx_prometheus_exporter.yml\"");
         }
 
         // Add jdb transport socket
@@ -965,47 +976,7 @@ public class DataCenterUpdateAction {
         final StatefulSetsReplacer statefulSetsReplacer = new StatefulSetsReplacer(coreApi, appsApi, k8sResourceUtils, sidecarClientFactory, dataCenter, statefulSetMap, existingStatefulSetMap);
         statefulSetsReplacer.replace();
     }
-    
-    private void createOrReplacePrometheusServiceMonitor() throws ApiException {
-        final String name = OperatorNames.prometheusServiceMonitor(dataCenter);
-        
-        final ImmutableMap<String, Object> prometheusServiceMonitor = ImmutableMap.<String, Object>builder()
-                .put("apiVersion", "monitoring.coreos.com/v1")
-                .put("kind", "ServiceMonitor")
-                .put("metadata", ImmutableMap.<String, Object>builder()
-                        .put("name", name)
-                        .put("labels", ImmutableMap.<String, Object>builder()
-                                .putAll(dataCenterLabels)
-                                .putAll(Optional.ofNullable(dataCenterSpec.getPrometheusServiceMonitorLabels()).orElse(ImmutableMap.of()))
-                                .build()
-                        )
-                        .build()
-                )
-                .put("spec", ImmutableMap.<String, Object>builder()
-                        .put("selector", ImmutableMap.<String, Object>builder()
-                                .put("matchLabels", ImmutableMap.<String, Object>builder()
-                                        .putAll(dataCenterLabels)
-                                        .build()
-                                )
-                                .build()
-                        )
-                        .put("endpoints", ImmutableList.<Map<String, Object>>builder()
-                                .add(ImmutableMap.<String, Object>builder()
-                                        .put("port", "prometheus")
-                                        .build()
-                                )
-                                .build()
-                        )
-                        .build()
-                )
-                .build();
-        
-        K8sResourceUtils.createOrReplaceResource(
-                () -> customObjectsApi.createNamespacedCustomObject("monitoring.coreos.com", "v1", dataCenterMetadata.getNamespace(), "servicemonitors", prometheusServiceMonitor, null),
-                () -> customObjectsApi.replaceNamespacedCustomObject("monitoring.coreos.com", "v1", dataCenterMetadata.getNamespace(), "servicemonitors", name, prometheusServiceMonitor)
-        );
-    }
-    
+
     private void createKeystoreIfNotExists() throws Exception {
         final V1ObjectMeta certificatesMetadata = dataCenterChildObjectMetadata(OperatorNames.keystore(dataCenter));
         

@@ -27,10 +27,15 @@ mkdir /etc/cassandra/elasticsearch.yml.d
 # remove curl and cqlsh config
 rm -vf /root/.curlrc /root/.cassandra/cqlshrc
 
-# install cassandra-exporter (Prometheus monitoring support)
+# install the instaclustr cassandra-exporter (Prometheus monitoring support)
 (cd "/usr/share/cassandra/agents" &&
     curl -SLO "https://github.com/instaclustr/cassandra-exporter/releases/download/v0.9.6/cassandra-exporter-agent-0.9.6.jar" &&
     ln -s cassandra-exporter-agent-0.9.6.jar cassandra-exporter-agent.jar)
+
+# install the jmx-prometheus-exporter (Prometheus monitoring support)
+(cd "/usr/share/cassandra/agents" &&
+    curl -SLO "https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/0.12.0/jmx_prometheus_javaagent-0.12.0.jar" &&
+    ln -s jmx_prometheus_javaagent-0.12.0.jar jmx_prometheus_javaagent.jar)
 
 apt-get -y autoremove
 
