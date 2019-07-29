@@ -89,6 +89,8 @@ dependencies {
     compile "io.kubernetes:client-java:4.0.0"
     compile "javax.inject:javax.inject:1"
     runtime "ch.qos.logback:logback-classic:1.2.3"
+    
+    compile "com.datastax.cassandra:cassandra-driver-core:3.7.1"
 
     compile project(':java:model')
     compile project(':java:backup')

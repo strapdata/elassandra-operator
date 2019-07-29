@@ -9,7 +9,6 @@ import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.cql.CqlConnectionManager;
 import com.strapdata.strapkop.cql.CqlCredentials;
 import com.strapdata.strapkop.exception.StrapkopException;
-import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CoreV1Api;
@@ -24,30 +23,24 @@ import java.util.List;
 import java.util.Objects;
 
 @Singleton
-public class CredentialsReconcilier extends Reconcilier<DataCenter> {
+public class CredentialsInitializer {
     
-    private static final Logger logger = LoggerFactory.getLogger(CredentialsReconcilier.class);
+    private static final Logger logger = LoggerFactory.getLogger(CredentialsInitializer.class);
     
     private final CqlConnectionManager cqlConnectionManager;
     private final CoreV1Api coreApi;
-    private K8sResourceUtils k8sResourceUtils;
     
     
     private final static CqlCredentials defaultCredentials = new CqlCredentials()
             .setUsername("cassandra")
             .setPassword("cassandra");
     
-    public CredentialsReconcilier(CqlConnectionManager cqlConnectionManager, CoreV1Api coreApi, K8sResourceUtils k8sResourceUtils) {
+    public CredentialsInitializer(CqlConnectionManager cqlConnectionManager, CoreV1Api coreApi) {
         this.cqlConnectionManager = cqlConnectionManager;
         this.coreApi = coreApi;
-        this.k8sResourceUtils = k8sResourceUtils;
     }
     
-    @Override
-    public void reconcile(DataCenter dataCenter) throws ApiException, StrapkopException, SSLException {
-        
-        // temporary fix
-        dataCenter = k8sResourceUtils.freshenDataCenter(dataCenter);
+    void initializeCredentials(DataCenter dataCenter) throws ApiException, StrapkopException, SSLException {
         
         try {
     
@@ -85,9 +78,7 @@ public class CredentialsReconcilier extends Reconcilier<DataCenter> {
             dataCenter.getStatus().setCredentialsStatus(CredentialsStatus.MANAGED);
             dataCenter.getStatus().setCqlStatus(CqlStatus.ESTABLISHED);
             dataCenter.getStatus().setCqlErrorMessage("");
-            k8sResourceUtils.updateDataCenterStatus(dataCenter);
-    
-    
+            
             logger.info("reconciled credentials for {}", dataCenter.getMetadata().getName());
         }
         catch (DriverException e) {
@@ -95,7 +86,6 @@ public class CredentialsReconcilier extends Reconcilier<DataCenter> {
             dataCenter.getStatus().setCredentialsStatus(CredentialsStatus.UNKNOWN);
             dataCenter.getStatus().setCqlStatus(CqlStatus.ERRORED);
             dataCenter.getStatus().setCqlErrorMessage(e.getMessage());
-            k8sResourceUtils.updateDataCenterStatus(dataCenter);
         }
     }
     

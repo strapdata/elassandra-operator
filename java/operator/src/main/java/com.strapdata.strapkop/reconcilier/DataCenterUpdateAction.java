@@ -46,7 +46,6 @@ public class DataCenterUpdateAction {
     private final SidecarClientFactory sidecarClientFactory;
     private final K8sResourceUtils k8sResourceUtils;
     private final AuthorityManager authorityManager;
-    private final CredentialsReconcilier credentialsReconcilier;
     
     private final DataCenter dataCenter;
     private final V1ObjectMeta dataCenterMetadata;
@@ -60,14 +59,13 @@ public class DataCenterUpdateAction {
                                   SidecarClientFactory sidecarClientFactory,
                                   K8sResourceUtils k8sResourceUtils,
                                   AuthorityManager authorityManager,
-                                  CredentialsReconcilier credentialsReconcilier, @Parameter("dataCenter") DataCenter dataCenter) {
+                                  @Parameter("dataCenter") DataCenter dataCenter) {
         this.coreApi = coreApi;
         this.appsApi = appsApi;
         this.customObjectsApi = customObjectsApi;
         this.sidecarClientFactory = sidecarClientFactory;
         this.k8sResourceUtils = k8sResourceUtils;
         this.authorityManager = authorityManager;
-        this.credentialsReconcilier = credentialsReconcilier;
     
         this.dataCenter = dataCenter;
         this.dataCenterMetadata = dataCenter.getMetadata();
@@ -147,6 +145,8 @@ public class DataCenterUpdateAction {
         logger.info("Reconciled DataCenter.");
     }
     
+    // this only modify the status object, but does not actually commit it to k8s api.
+    // the root DataCenterReconcilier is in charge of calling the update api
     private void updateStatus() throws ApiException {
         
         switch (dataCenterSpec.getAuthentication()) {
@@ -173,8 +173,6 @@ public class DataCenterUpdateAction {
                 dataCenterStatus.setCredentialsStatus(CredentialsStatus.NONE);
                 break;
         }
-        
-        k8sResourceUtils.updateDataCenterStatus(dataCenter);
     }
     
     private V1ObjectMeta clusterChildObjectMetadata(final String name) {

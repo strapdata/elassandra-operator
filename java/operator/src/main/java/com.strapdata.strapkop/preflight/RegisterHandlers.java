@@ -24,7 +24,6 @@ public class RegisterHandlers implements Preflight<Void> {
     @Override
     public Void call() throws Exception {
         bind(DataCenterPipeline.class, DataCenterHandler.class);
-        bind(DataCenterPipeline.class, CredentialsHandler.class);
         bind(StatefulsetPipeline.class, StatefulsetHandler.class);
         bind(NodeStatusPipeline.class, NodeStatusHandler.class);
         bind(TaskPipeline.class, TaskHandler.class);

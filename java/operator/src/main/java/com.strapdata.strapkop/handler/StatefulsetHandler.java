@@ -2,8 +2,6 @@ package com.strapdata.strapkop.handler;
 
 import com.strapdata.model.ClusterKey;
 import com.strapdata.model.Key;
-import com.strapdata.model.k8s.cassandra.DataCenter;
-import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.reconcilier.DataCenterUpdateReconcilier;
@@ -26,17 +24,15 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
     private static final EnumSet<K8sWatchEvent.Type> acceptedEventTypes = EnumSet.of(MODIFIED, INITIAL, DELETED);
     
     private final WorkQueue workQueue;
-    private final DataCenterCache dataCenterCache;
     private final DataCenterUpdateReconcilier dataCenterReconcilier;
     
-    public StatefulsetHandler(WorkQueue workQueue, DataCenterCache dataCenterCache, DataCenterUpdateReconcilier dataCenterReconcilier) {
+    public StatefulsetHandler(WorkQueue workQueue, DataCenterUpdateReconcilier dataCenterReconcilier) {
         this.workQueue = workQueue;
-        this.dataCenterCache = dataCenterCache;
         this.dataCenterReconcilier = dataCenterReconcilier;
     }
     
     @Override
-    public void accept(K8sWatchEvent<V1StatefulSet> data) throws Exception {
+    public void accept(K8sWatchEvent<V1StatefulSet> data) {
         if (!acceptedEventTypes.contains(data.getType())) {
             return ;
         }
@@ -55,13 +51,11 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
     
         logger.info("sts is ready, triggering a dc reconciliation");
         
-        final String dcName = sts.getMetadata().getLabels().get(OperatorLabels.PARENT);
-        final DataCenter dc = dataCenterCache.get(new Key(dcName, sts.getMetadata().getNamespace()));
-        if (dc == null) {
-            logger.warn("triggering the dc reconciliation failed because the dc missed from the cache");
-            return ;
-        }
+        final String dcResourceName = sts.getMetadata().getLabels().get(OperatorLabels.PARENT);
+        final String clusterName = sts.getMetadata().getLabels().get(OperatorLabels.CLUSTER);
         
-        workQueue.submit(new ClusterKey(dc), dataCenterReconcilier.asCompletable(dc));
+        workQueue.submit(
+                new ClusterKey(clusterName, sts.getMetadata().getNamespace()),
+                dataCenterReconcilier.asCompletable((new Key(dcResourceName, sts.getMetadata().getNamespace()))));
     }
 }

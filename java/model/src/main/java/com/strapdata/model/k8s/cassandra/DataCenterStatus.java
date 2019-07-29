@@ -14,6 +14,10 @@ public class DataCenterStatus {
     @Expose
     private DataCenterPhase phase;
     
+    @SerializedName("lastErrorMessage")
+    @Expose
+    private String lastErrorMessage = null;
+    
     @SerializedName("credentialsStatus")
     @Expose
     private CredentialsStatus credentialsStatus;

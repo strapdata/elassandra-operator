@@ -2,10 +2,10 @@ package com.strapdata.strapkop.handler;
 
 import com.google.common.collect.Sets;
 import com.strapdata.model.ClusterKey;
-import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.sidecar.NodeStatus;
 import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.event.NodeStatusEvent;
+import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.reconcilier.DataCenterUpdateReconcilier;
 import com.strapdata.strapkop.workqueue.WorkQueue;
 import org.slf4j.Logger;
@@ -39,17 +39,17 @@ public class NodeStatusHandler extends TerminalHandler<NodeStatusEvent> {
     }
     
     @Override
-    public void accept(NodeStatusEvent event) throws Exception {
+    public void accept(NodeStatusEvent event) {
         logger.info("processing a NodeStatus event {} {} -> {}",
                 event.getPod().getMetadata().getName(),
                 event.getPreviousMode(), event.getCurrentMode());
         
         if (event.getCurrentMode() != null && reconcileOperationModes.contains(event.getCurrentMode())) {
-            final DataCenter dc = dataCenterCache.get(event.getDataCenterKey());
-            if (dc != null) {
-                logger.debug("triggering dc reconciliation because of a NodeStatus change");
-                workQueue.submit(new ClusterKey(dc), dataCenterReconcilier.asCompletable(dc));
-            }
+            final String clusterName = event.getPod().getMetadata().getLabels().get(OperatorLabels.CLUSTER);
+            logger.debug("triggering dc reconciliation because of a NodeStatus change");
+            workQueue.submit(
+                    new ClusterKey(clusterName, event.getDataCenterKey().getNamespace()),
+                    dataCenterReconcilier.asCompletable(event.getDataCenterKey()));
         }
     }
 }

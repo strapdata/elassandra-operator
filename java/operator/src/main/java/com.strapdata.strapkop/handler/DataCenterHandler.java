@@ -1,6 +1,7 @@
 package com.strapdata.strapkop.handler;
 
 import com.strapdata.model.ClusterKey;
+import com.strapdata.model.Key;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.reconcilier.DataCenterDeleteReconcilier;
@@ -38,7 +39,7 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
         
         Completable completable = null;
         if (creationEventTypes.contains(data.getType())) {
-            completable = dataCenterUpdateReconcilier.asCompletable(data.getResource());
+            completable = dataCenterUpdateReconcilier.asCompletable(new Key(data.getResource().getMetadata()));
         }
    
         else if (deletionEventTypes.contains(data.getType())) {
