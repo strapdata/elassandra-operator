@@ -112,7 +112,7 @@ public class DataCenterSpec {
      */
     @SerializedName("privilegedSupported")
     @Expose
-    private Boolean privilegedSupported;
+    private Boolean privilegedSupported = false;
 
     /**
      * Enable elasticsearch service
