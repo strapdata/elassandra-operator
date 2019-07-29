@@ -14,6 +14,10 @@ def getGitCommitHash = { ->
 
 ext.gitCommitHash = getGitCommitHash()
 ext.latestElassandraVersion = (new File('./docker/supportedElassandraVersions.txt') as String[])[0]
+if (!ext.javaElassandraVersion) {
+  // the elassandra version used to build k8s-addons (seedProvider, config loader...)
+  ext.javaElassandraVersion = ext.latestElassandraVersion
+}
 
 allprojects {
   repositories {
