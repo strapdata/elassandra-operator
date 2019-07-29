@@ -52,7 +52,6 @@ public class DataCenterUpdateAction {
     private final DataCenterSpec dataCenterSpec;
     private final DataCenterStatus dataCenterStatus;
     private final Map<String, String> dataCenterLabels;
-    private final String datacenterFingerprint;
     
     public DataCenterUpdateAction(CoreV1Api coreApi, AppsV1Api appsApi,
                                   CustomObjectsApi customObjectsApi,
@@ -75,11 +74,6 @@ public class DataCenterUpdateAction {
         }
         this.dataCenterStatus = this.dataCenter.getStatus();
         
-        // fingerprint used to identify which statefulset need to be updated.
-        // this is important (I guess) because with multi-rack, we don't want to just update all the statefulset at once
-        // so we need a mechanism to track which sts needs to be updated.
-        this.datacenterFingerprint = DigestUtils.sha1Hex(appsApi.getApiClient().getJSON().getGson().toJson(dataCenter.getSpec()));
-    
         // normalize Enterprise object
         if (this.dataCenterSpec.getEnterprise() == null) {
             this.dataCenterSpec.setEnterprise(new Enterprise());
