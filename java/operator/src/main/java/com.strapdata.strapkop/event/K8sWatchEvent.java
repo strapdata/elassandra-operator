@@ -21,7 +21,15 @@ public class K8sWatchEvent<ResourceT> {
         ERROR,
         INITIAL
     }
-    
+
+    public boolean isUpdate() {
+        return creationEventTypes.contains(this);
+    }
+
+    public boolean isDeletion() {
+        return deletionEventTypes.contains(this);
+    }
+
     private Type type;
     private ResourceT resource;
 }
