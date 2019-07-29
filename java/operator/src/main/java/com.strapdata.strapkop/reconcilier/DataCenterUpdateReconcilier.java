@@ -37,7 +37,7 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
     
             // call the main reconciliation
             logger.debug("processing a dc reconciliation request for {} in thread {}", dc.getMetadata().getName(), Thread.currentThread().getName());
-            context.createBean(DataCenterUpdateAction.class, k8sResourceUtils.freshenDataCenter(dc)).reconcileDataCenter();
+            context.createBean(DataCenterUpdateAction.class, dc).reconcileDataCenter();
     
             // setup credentials if necessary
             if (dc.getStatus() != null &&
