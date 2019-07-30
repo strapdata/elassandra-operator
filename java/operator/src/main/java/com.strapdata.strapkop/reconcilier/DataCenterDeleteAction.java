@@ -26,33 +26,16 @@ public class DataCenterDeleteAction {
     }
     
     public void deleteDataCenter() throws Exception {
-        logger.info("Deleting DataCenter {}.", dataCenter.getMetadata().getName());
-        
         final String labelSelector = OperatorLabels.toSelector(OperatorLabels.datacenter(dataCenter));
         
-        // delete persistent volumes & persistent volume claims
-        // TODO: this is disabled for now for safety. Perhaps add a flag or something to control this.
-//        k8sResourceUtils.listNamespacedPods(dataCenterKey.namespace, null, labelSelector).forEach(pod -> {
-//            try (@SuppressWarnings("unused") final MDC.MDCCloseable _podMDC = putNamespacedName("Pod", pod.getMetadata())) {
-//                try {
-//                    k8sResourceUtils.deletePersistentVolumeAndPersistentVolumeClaim(pod);
-//                    logger.debug("Deleted Pod Persistent Volume & Claim.");
-//
-//                } catch (final ApiException e) {
-//                    logger.error("Failed to delete Pod Persistent Volume and/or Claim.", e);
-//                }
-//            }
-//        });
-        
+
         // delete StatefulSets
         k8sResourceUtils.listNamespacedStatefulSets(dataCenter.getMetadata().getNamespace(), null, labelSelector).forEach(statefulSet -> {
             try {
                 k8sResourceUtils.deleteStatefulSet(statefulSet);
-                logger.debug("Deleted StatefulSet.");
-                
+                logger.debug("Deleted StatefulSet namespace={} name={}", dataCenter.getMetadata().getNamespace(), statefulSet.getMetadata().getName());
             } catch (final JsonSyntaxException e) {
                 logger.debug("Caught JSON exception while deleting StatefulSet. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
-                
             } catch (final ApiException e) {
                 logger.error("Failed to delete StatefulSet.", e);
             }
@@ -62,11 +45,9 @@ public class DataCenterDeleteAction {
         k8sResourceUtils.listNamespacedConfigMaps(dataCenter.getMetadata().getNamespace(), null, labelSelector).forEach(configMap -> {
             try {
                 k8sResourceUtils.deleteConfigMap(configMap);
-                logger.debug("Deleted ConfigMap.");
-                
+                logger.debug("Deleted ConfigMap namespace={} name={}", dataCenter.getMetadata().getNamespace(),configMap.getMetadata().getName());
             } catch (final JsonSyntaxException e) {
                 logger.debug("Caught JSON exception while deleting ConfigMap. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
-                
             } catch (final ApiException e) {
                 logger.error("Failed to delete ConfigMap.", e);
             }
@@ -76,10 +57,9 @@ public class DataCenterDeleteAction {
             // delete secrets
             coreV1Api.deleteCollectionNamespacedSecret(dataCenter.getMetadata().getNamespace(), false,
                     null, null, null, labelSelector, null, null, null, null);
-            logger.debug("Deleted Secrets.");
+            logger.debug("Deleted Secrets namespace={}", dataCenter.getMetadata().getNamespace());
         } catch (final JsonSyntaxException e) {
             logger.debug("Caught JSON exception while deleting Secrets. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
-            
         } catch (final ApiException e) {
             logger.error("Failed to delete Secrets.", e);
         }
@@ -88,16 +68,31 @@ public class DataCenterDeleteAction {
         k8sResourceUtils.listNamespacedServices(dataCenter.getMetadata().getNamespace(), null, labelSelector).forEach(service -> {
             try {
                 k8sResourceUtils.deleteService(service);
-                logger.debug("Deleted Service.");
-                
+                logger.debug("Deleted Service namespace={} name={}", service.getMetadata().getNamespace(), service.getMetadata().getName());
             } catch (final JsonSyntaxException e) {
                 logger.debug("Caught JSON exception while deleting Service. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
-                
             } catch (final ApiException e) {
                 logger.error("Failed to delete Service.", e);
             }
         });
-        
-        logger.info("Deleted DataCenter.");
+
+        // delete persistent volume claims
+        switch(dataCenter.getSpec().getDecomissionPolicy()) {
+            case KEEP_PVC:
+                break;
+            case BACKUP_AND_DELETE_PVC:
+                // TODO: backup
+            case DELETE_PVC:
+                k8sResourceUtils.listNamespacedPods( dataCenter.getMetadata().getNamespace(), null, labelSelector).forEach(pod -> {
+                    try {
+                        k8sResourceUtils.deletePersistentVolumeClaim(pod);
+                    } catch (final ApiException e) {
+                        logger.error("Failed to delete PVC for pod={}"+pod.getMetadata().getName(), e);
+                    }
+                });
+                break;
+        }
+
+        logger.info("Deleted DataCenter namespace={} name={}", dataCenter.getMetadata().getNamespace(), dataCenter.getMetadata().getName());
     }
 }

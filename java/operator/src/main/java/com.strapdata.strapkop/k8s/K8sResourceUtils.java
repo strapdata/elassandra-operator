@@ -125,6 +125,20 @@ public class K8sResourceUtils {
         appsApi.deleteNamespacedStatefulSet(statefulSetMetadata.getName(), statefulSetMetadata.getNamespace(), deleteOptions, null, null, null, false, "Foreground");
     }
 
+    public void deletePersistentVolumeClaim(final V1Pod pod) throws ApiException {
+
+        final V1DeleteOptions deleteOptions = new V1DeleteOptions()
+            .propagationPolicy("Foreground");
+
+        // TODO: maybe delete all volumes?
+        final String pvcName = pod.getSpec().getVolumes().get(0).getPersistentVolumeClaim().getClaimName();
+        final V1PersistentVolumeClaim pvc = coreApi.readNamespacedPersistentVolumeClaim(pvcName, pod.getMetadata().getNamespace(), null, null, null);
+
+        logger.debug("Deleting PVC name={}", pvcName);
+        coreApi.deleteNamespacedPersistentVolumeClaim(pvcName, pod.getMetadata().getNamespace(), deleteOptions, null, null, null, null, null);
+    }
+
+    /*
     public void deletePersistentVolumeAndPersistentVolumeClaim(final V1Pod pod) throws ApiException {
         logger.debug("Deleting Pod Persistent Volumes and Claims.");
 
@@ -138,8 +152,7 @@ public class K8sResourceUtils {
         coreApi.deleteNamespacedPersistentVolumeClaim(pvcName, pod.getMetadata().getNamespace(), deleteOptions, null, null, null, null, null);
         coreApi.deletePersistentVolume(pvc.getSpec().getVolumeName(), deleteOptions, null, null, null, null, null);
     }
-
-
+    */
 
     static class ResourceListIterable<T> implements Iterable<T> {
         interface Page<T> {

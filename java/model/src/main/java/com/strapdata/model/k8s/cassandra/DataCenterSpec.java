@@ -171,6 +171,13 @@ public class DataCenterSpec {
     private Boolean ssl = false;
 
     /**
+     * Decomission policy control PVC when node removed.
+     */
+    @SerializedName("decomissionPolicy")
+    @Expose
+    private DecomissionPolicy decomissionPolicy = DecomissionPolicy.DELETE_PVC;
+
+    /**
      * Enable cassandra/ldap authentication and authorization
      */
     @SerializedName("authentication")
