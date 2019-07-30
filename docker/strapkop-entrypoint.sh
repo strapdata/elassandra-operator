@@ -21,6 +21,10 @@ else
   echo "broadcast_rpc_address: $POD_IP" > /etc/cassandra/cassandra.yaml.d/002-broadcast_rpc_address.yaml
 fi
 
+# Generate /etc/cassandra/jmxremote.password
+if [ -n "$JMX_PASSWORD" ]; then
+   echo "cassandra $JMX_PASSWORD\n" > /etc/cassandra/jmxremote.password
+fi
 
 # handle kubernetes SIGTERM and gracefully stop elassandra
 _term() {

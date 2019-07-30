@@ -274,7 +274,6 @@ public class DataCenterUpdateAction {
                 cassandraContainer.addEnvItem(new V1EnvVar()
                         .name("NODEINFO_TOKEN")
                         .valueFrom(new V1EnvVarSource().secretKeyRef(new V1SecretKeySelector().name(envVar.getValue()).key("token"))));
-                
                 break;
             }
         }
@@ -325,7 +324,11 @@ public class DataCenterUpdateAction {
                 .addVolumeMountsItem(new V1VolumeMount()
                         .name("sidecar-config-volume")
                         .mountPath("/tmp/sidecar-config-volume")
-                );
+                )
+                .addEnvItem(new V1EnvVar().name("NAMESPACE").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.namespace"))))
+                .addEnvItem(new V1EnvVar().name("POD_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.name"))))
+                .addEnvItem(new V1EnvVar().name("POD_IP").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("status.podIP"))))
+                .addEnvItem(new V1EnvVar().name("NODE_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("spec.nodeName"))));
         
         final V1PodSpec podSpec = new V1PodSpec()
                 .securityContext(new V1PodSecurityContext().fsGroup(999L))
@@ -410,7 +413,17 @@ public class DataCenterUpdateAction {
                     .secret(dataCenterSpec.getUserSecretVolumeSource())
             );
         }
-        
+
+        // mount JMX password to a env variable for elassandra and sidecar
+        final V1EnvVar jmxPasswordEnvVar = new V1EnvVar()
+            .name("JMX_PASSWORD")
+            .valueFrom(new V1EnvVarSource().secretKeyRef(new V1SecretKeySelector()
+                .name(OperatorNames.clusterSecret(dataCenter))
+                .key("jmx_password")));
+        cassandraContainer.addEnvItem(jmxPasswordEnvVar);
+        sidecarContainer.addEnvItem(jmxPasswordEnvVar);
+
+        // mount SSL keystores
         if (dataCenterSpec.getSsl()) {
             cassandraContainer.addVolumeMountsItem(new V1VolumeMount().name("operator-keystore").mountPath("/tmp/operator-keystore"));
             podSpec.addVolumesItem(new V1Volume().name("operator-keystore")
@@ -800,14 +813,14 @@ public class DataCenterUpdateAction {
                         "validate = true\n";
         
         configMapVolumeAddFile(configMap, volumeSource, "cqlshrc", cqlshrc);
-        
+
         configMapVolumeAddFile(configMap, volumeSource, "curlrc", "cacert = /tmp/operator-truststore/cacert.pem");
     
         final String envScript = ""+
                 "mkdir -p ~/.cassandra\n"+
                 "cp ${CASSANDRA_CONF}/cqlshrc ~/.cassandra/cqlshrc\n"+
                 "cp ${CASSANDRA_CONF}/curlrc ~/.curlrc\n";
-        
+
         configMapVolumeAddFile(configMap, volumeSource, "cassandra-env.sh.d/002-ssl.sh", envScript);
     }
     
@@ -1028,6 +1041,8 @@ public class DataCenterUpdateAction {
                 .putStringDataItem("strapkop_password", UUID.randomUUID().toString())
                 // admin is intended to be distributed to human administrator, so the credentials lifecycle is decoupled
                 .putStringDataItem("admin_password", UUID.randomUUID().toString())
+                // cassandra JMX password, mounted as /etc/cassandra/jmxremote.password
+                .putStringDataItem("jmx_password", UUID.randomUUID().toString())
                 // elassandra-enterprise shared secret is intended to be mounted as a config fragment
                 .putStringDataItem("shared-secret.yaml", "aaa.shared_secret: " + UUID.randomUUID().toString());
         

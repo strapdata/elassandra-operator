@@ -4,5 +4,5 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 
 @ConfigurationProperties("cassandra_jmx")
 public class CassandraConfiguration {
-    String jmxServiceURL = "service:jmx:rmi:///jndi/rmi://localhost:7199/jmxrmi";
+    String jmxServiceURL = "service:jmx:rmi:///jndi/rmi://"+System.getenv("POD_IP")+":7199/jmxrmi";
 }
