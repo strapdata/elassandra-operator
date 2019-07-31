@@ -23,11 +23,11 @@ public class K8sWatchEvent<ResourceT> {
     }
 
     public boolean isUpdate() {
-        return creationEventTypes.contains(this);
+        return creationEventTypes.contains(this.type);
     }
 
     public boolean isDeletion() {
-        return deletionEventTypes.contains(this);
+        return deletionEventTypes.contains(this.type);
     }
 
     private Type type;
