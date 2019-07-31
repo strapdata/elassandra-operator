@@ -9,12 +9,21 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class TaskSpec {
     
-    @SerializedName("type")
-    @Expose
-    private String type;
-    
-    // tasks are elassandra-cluster-scoped
+    // tasks are always elassandra-cluster-scoped
     @SerializedName("cluster")
     @Expose
     private String cluster;
+
+    // most tasks are limited to a datacenter
+    @SerializedName("datacenter")
+    @Expose
+    private String datacenter;
+    
+    @SerializedName("cleanup")
+    @Expose
+    private CleanupTaskSpec cleanup;
+    
+    @SerializedName("backup")
+    @Expose
+    private BackupTaskSpec backup;
 }

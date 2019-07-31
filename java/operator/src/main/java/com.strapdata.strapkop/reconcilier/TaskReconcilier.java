@@ -7,7 +7,7 @@ import io.vavr.Tuple2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public abstract class TaskReconcilier<TaskT extends Task<?, ?>> extends Reconcilier<Tuple2<TaskReconcilier.Action, TaskT>> {
+public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier.Action, Task>> {
 
     private static final Logger logger = LoggerFactory.getLogger(TaskReconcilier.class);
     
@@ -15,13 +15,13 @@ public abstract class TaskReconcilier<TaskT extends Task<?, ?>> extends Reconcil
         SUBMIT, CANCEL
     }
     
-    protected abstract void processSubmit(TaskT task) throws ApiException;
-    protected abstract void processCancel(TaskT task);
+    protected abstract void processSubmit(Task task) throws ApiException;
+    protected abstract void processCancel(Task task);
 
     @Override
-    void reconcile(final Tuple2<Action, TaskT> item) {
+    void reconcile(final Tuple2<Action, Task> item) {
         
-        final TaskT task = item._2;
+        final Task task = item._2;
         
         if (item._1.equals(Action.SUBMIT)) {
             logger.debug("processing a task submit request for {} in thread {}", task.getMetadata().getName(), Thread.currentThread().getName());
@@ -38,11 +38,11 @@ public abstract class TaskReconcilier<TaskT extends Task<?, ?>> extends Reconcil
         }
     }
     
-    public Completable prepareSubmitRunnable(TaskT task) {
+    public Completable prepareSubmitRunnable(Task task) {
         return this.asCompletable(new Tuple2<>(Action.SUBMIT, task));
     }
     
-    public Completable prepareCancelRunnable(TaskT task) {
+    public Completable prepareCancelRunnable(Task task) {
         return this.asCompletable(new Tuple2<>(Action.CANCEL, task));
     }
 }

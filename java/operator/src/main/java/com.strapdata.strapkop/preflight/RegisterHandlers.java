@@ -27,7 +27,6 @@ public class RegisterHandlers implements Preflight<Void> {
         bind(StatefulsetPipeline.class, StatefulsetHandler.class);
         bind(NodeStatusPipeline.class, NodeStatusHandler.class);
         bind(TaskPipeline.class, TaskHandler.class);
-        bind(BackupPipeline.class, TaskHandler.class);
         return null;
     }
     

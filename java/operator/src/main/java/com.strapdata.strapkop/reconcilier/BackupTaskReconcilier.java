@@ -1,12 +1,10 @@
 package com.strapdata.strapkop.reconcilier;
 
-import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableMap;
 import com.strapdata.model.backup.BackupArguments;
 import com.strapdata.model.backup.CommonBackupArguments;
 import com.strapdata.model.backup.StorageProvider;
-import com.strapdata.model.k8s.task.BackupTask;
-import com.strapdata.model.k8s.task.BackupTaskSpec;
-import com.strapdata.model.k8s.task.TaskStatus;
+import com.strapdata.model.k8s.task.*;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
@@ -24,12 +22,11 @@ import javax.inject.Singleton;
 import java.net.MalformedURLException;
 import java.net.UnknownHostException;
 import java.nio.file.Paths;
-import java.util.HashMap;
 import java.util.Map;
 
 @Singleton
 @Infrastructure
-public class BackupTaskReconcilier extends TaskReconcilier<BackupTask> {
+public class BackupTaskReconcilier extends TaskReconcilier  {
     private static final Logger logger = LoggerFactory.getLogger(BackupTaskReconcilier.class);
     
     private final K8sResourceUtils k8sResourceUtils;
@@ -43,15 +40,14 @@ public class BackupTaskReconcilier extends TaskReconcilier<BackupTask> {
     }
     
     @Override
-    protected void processSubmit(BackupTask task) throws ApiException {
+    protected void processSubmit(Task task) throws ApiException {
         logger.info("processing backup task submit");
     
-        if (task.getStatus() == null ||
-                Strings.isNullOrEmpty(task.getStatus().getPhase())) {
+        if (task.getStatus() == null || task.getStatus().getPhase() == null) {
         
             logger.debug("Reconciling Backup");
             callBackupApiAllPods(task).onErrorReturnItem(false).subscribe(success -> {
-                task.setStatus(new TaskStatus().setPhase(success ? "Succeeded" : "Failed" ));
+                task.setStatus(new TaskStatus().setPhase(success ? TaskPhase.SUCCEED : TaskPhase.FAILED ));
                 logger.info("Backup name={} namespace={} success={}",
                         task.getMetadata().getName(), task.getMetadata().getNamespace(), success);
                 customObjectsApi.replaceNamespacedCustomObjectStatus("stable.strapdata.com", "v1",
@@ -61,18 +57,18 @@ public class BackupTaskReconcilier extends TaskReconcilier<BackupTask> {
     }
     
     @Override
-    protected void processCancel(BackupTask task) {
+    protected void processCancel(Task task) {
         logger.info("processing backup task cancel");
     }
     
-    private Single<Boolean> callBackupApiAllPods(final BackupTask backupTask) throws ApiException {
-        final BackupTaskSpec backupSpec = backupTask.getSpec();
+    private Single<Boolean> callBackupApiAllPods(final Task backupTask) throws ApiException {
+        final BackupTaskSpec backupSpec = backupTask.getSpec().getBackup();
     
-        final Map<String, String> labels = new HashMap<>(backupSpec.getSelector().getMatchLabels());
-        
-        // ensure we are not targeting another cluster
-        labels.putAll(OperatorLabels.cluster(backupSpec.getCluster()));
-        
+        // backup target a single datacenter
+        final Map<String, String> labels = ImmutableMap.of(
+                OperatorLabels.CLUSTER, backupSpec.getCluster(),
+                OperatorLabels.DATACENTER, backupSpec.getDatacenter());
+    
         final String dataCenterPodsLabelSelector = OperatorLabels.toSelector(labels);
         
         final Iterable<V1Pod> pods = k8sResourceUtils.listNamespacedPods(backupTask.getMetadata().getNamespace(), null, dataCenterPodsLabelSelector);
@@ -82,13 +78,13 @@ public class BackupTaskReconcilier extends TaskReconcilier<BackupTask> {
                 .all(Boolean::booleanValue);
     }
     
-    private Single<Boolean> callBackupApi(final V1Pod pod, BackupTask backupTask) {
+    private Single<Boolean> callBackupApi(final V1Pod pod, Task backupTask) {
         try {
             BackupArguments backupArguments = generateBackupArguments(pod.getStatus().getPodIP(),
                     7199,
                     backupTask.getMetadata().getName(),
-                    StorageProvider.valueOf(backupTask.getSpec().getBackupType()),
-                    backupTask.getSpec().getTarget(),
+                    StorageProvider.valueOf(backupTask.getSpec().getBackup().getType()),
+                    backupTask.getSpec().getBackup().getTarget(),
                     pod.getMetadata().getLabels().get(OperatorLabels.PARENT));
             
             backupArguments.backupId = pod.getSpec().getHostname();

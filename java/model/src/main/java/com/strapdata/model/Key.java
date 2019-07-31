@@ -24,5 +24,4 @@ public class Key {
         this.name = metadata.getName();
         this.namespace = metadata.getNamespace();
     }
-
 }

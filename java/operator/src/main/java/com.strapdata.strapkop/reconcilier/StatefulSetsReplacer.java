@@ -4,9 +4,12 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.k8s.cassandra.DataCenterPhase;
+import com.strapdata.model.k8s.task.CleanupTaskSpec;
+import com.strapdata.model.k8s.task.Task;
 import com.strapdata.model.sidecar.NodeStatus;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
+import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
@@ -232,10 +235,22 @@ class StatefulSetsReplacer {
         } else if (racksByReplaceMode.get(ReplaceMode.UPDATE).size() > 0) {
             updateNextRack();
         } else {
-            // this should not happens except if there is no rack...
+            
+            if (dataCenter.getStatus().getPhase().equals(DataCenterPhase.SCALING_DOWN)
+                    || (dataCenter.getStatus().getPhase().equals(DataCenterPhase.SCALING_UP) && dataCenter.getSpec().getReplicas() > 1)) {
+                triggerCleanupTask();
+            }
+
             dataCenter.getStatus().setPhase(DataCenterPhase.RUNNING);
             logger.debug("Everything is fine, nothing to do");
         }
+    }
+    
+    private void triggerCleanupTask() throws ApiException {
+        final String name = OperatorNames.dataCenterChildObjectName("%s-" + UUID.randomUUID().toString().substring(0, 8), dataCenter);
+        final Task cleanupTask = Task.fromDataCenter(name, dataCenter);
+        cleanupTask.getSpec().setCleanup(new CleanupTaskSpec());
+        k8sResourceUtils.createTask(cleanupTask);
     }
     
     private void tryRecoverUnschedulablePods() throws ApiException {

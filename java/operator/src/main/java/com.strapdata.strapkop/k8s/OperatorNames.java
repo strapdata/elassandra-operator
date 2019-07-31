@@ -4,15 +4,17 @@ import com.strapdata.model.k8s.cassandra.DataCenter;
 
 public class OperatorNames {
     
-    
     public static String clusterChildObjectName(final String nameFormat, final DataCenter dataCenter) {
         return String.format(nameFormat, "elassandra-" + dataCenter.getSpec().getClusterName());
     }
     
+    public static String dataCenterResource(final String clusterName, final String datacenterName) {
+        return "elassandra-" + clusterName + "-" + datacenterName;
+    }
+    
     public static String dataCenterChildObjectName(final String nameFormat, final DataCenter dataCenter) {
         return String.format(nameFormat,
-                "elassandra-" + dataCenter.getSpec().getClusterName()
-                        + "-" + dataCenter.getSpec().getDatacenterName());
+                dataCenterResource(dataCenter.getSpec().getClusterName(), dataCenter.getSpec().getDatacenterName()));
     }
     
     public static String rackChildObjectName(final String nameFormat, final DataCenter dataCenter, final String rack) {
@@ -64,5 +66,11 @@ public class OperatorNames {
     
     public static String podName(final DataCenter dataCenter, final String rack, int podIndex) {
         return OperatorNames.rackChildObjectName("%s-" + podIndex, dataCenter, rack);
+    }
+    
+    public static String podName(final DataCenter dataCenter, int crossRackPodIndex) {
+        final String rack = "rack" + (crossRackPodIndex % dataCenter.getSpec().getRacks() + 1);
+        final int podIndexInRack = crossRackPodIndex / dataCenter.getSpec().getRacks();
+        return podName(dataCenter, rack, podIndexInRack);
     }
 }

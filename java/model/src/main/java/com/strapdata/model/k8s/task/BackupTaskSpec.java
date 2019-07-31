@@ -9,14 +9,9 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 public class BackupTaskSpec extends TaskSpec {
-    
-    // selector allow to select rack or pod within the cluster, null means all nodes in the cluster
-    @SerializedName("selector")
+    @SerializedName("type")
     @Expose
-    private V1LabelSelector selector = null;
-    @SerializedName("backupType")
-    @Expose
-    private String backupType;
+    private String type;
     @SerializedName("target")
     @Expose
     private String target;

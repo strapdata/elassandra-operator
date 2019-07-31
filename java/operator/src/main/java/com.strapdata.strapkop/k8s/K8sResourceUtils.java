@@ -6,6 +6,7 @@ import com.google.common.collect.Iterators;
 import com.squareup.okhttp.Call;
 import com.strapdata.model.Key;
 import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.model.k8s.task.Task;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.ApiResponse;
 import io.kubernetes.client.apis.AppsV1Api;
@@ -33,6 +34,7 @@ public class K8sResourceUtils {
     
     @Inject
     private CustomObjectsApi customObjectsApi;
+    
     
     @FunctionalInterface
     public interface ApiCallable {
@@ -312,5 +314,15 @@ public class K8sResourceUtils {
     public void updateDataCenterStatus(final DataCenter dc) throws ApiException {
         customObjectsApi.replaceNamespacedCustomObjectStatus("stable.strapdata.com", "v1",
                 dc.getMetadata().getNamespace(), "elassandradatacenters", dc.getMetadata().getName(), dc);
+    }
+    
+    public void updateTaskStatus(Task task) throws ApiException {
+        customObjectsApi.replaceNamespacedCustomObjectStatus("stable.strapdata.com", "v1",
+                task.getMetadata().getNamespace(), "elassandratasks", task.getMetadata().getName(), task);
+    }
+    
+    public void createTask(Task task) throws ApiException {
+        customObjectsApi.createNamespacedCustomObject("stable.strapdata.com", "v1",
+                task.getMetadata().getNamespace(), "elassandratasks", task, null);
     }
 }

@@ -41,4 +41,8 @@ public class DataCenterStatus {
     @SerializedName("joinedReplicas")
     @Expose
     private Integer joinedReplicas = 0;
+    
+    @SerializedName("currentTask")
+    @Expose
+    private String currentTask;
 }

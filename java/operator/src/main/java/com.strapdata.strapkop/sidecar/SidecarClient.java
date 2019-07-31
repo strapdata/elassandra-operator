@@ -32,6 +32,10 @@ public class SidecarClient {
         return httpClient.exchange(POST("/operations/decommission", "")).ignoreElements();
     }
     
+    public Completable cleanup() {
+        return httpClient.exchange(POST("/operations/cleanup", "")).ignoreElements();
+    }
+    
     public Single<BackupResponse> backup(BackupArguments backupArguments) {
         return httpClient.retrieve(POST("/backups", backupArguments), BackupResponse.class).singleOrError();
     }

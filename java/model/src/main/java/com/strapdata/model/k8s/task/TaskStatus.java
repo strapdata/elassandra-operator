@@ -5,11 +5,22 @@ import com.google.gson.annotations.SerializedName;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @Data
 @NoArgsConstructor
 public class TaskStatus {
     
     @SerializedName("phase")
     @Expose
-    private String phase;
+    private TaskPhase phase = null;
+    
+    @SerializedName("lastErrorMessage")
+    @Expose
+    private String lastErrorMessage = null;
+    
+    @SerializedName("pods")
+    @Expose
+    private Map<String, TaskPhase> pods = new HashMap<>();
 }

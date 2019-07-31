@@ -12,9 +12,13 @@ import java.net.UnknownHostException;
 public class SidecarClientFactory {
     
     public SidecarClient clientForAddress(final InetAddress address) throws MalformedURLException {
-        return new SidecarClient(new URL("http://" + address.getHostAddress() + ":8080"));
+        return clientForHost(address.getHostAddress());
     }
-
+    
+    public SidecarClient clientForHost(final String host) throws MalformedURLException {
+        return new SidecarClient(new URL("http://" + host + ":8080"));
+    }
+    
     public SidecarClient clientForPod(final V1Pod pod) throws UnknownHostException, MalformedURLException {
         return clientForAddress(InetAddress.getByName(pod.getStatus().getPodIP()));
     }

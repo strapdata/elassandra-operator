@@ -7,7 +7,8 @@ import com.google.common.net.InetAddresses;
 import com.google.gson.reflect.TypeToken;
 import com.squareup.okhttp.Call;
 import com.strapdata.model.k8s.cassandra.*;
-import com.strapdata.model.k8s.task.BackupTask;
+import com.strapdata.model.k8s.task.Task;
+import com.strapdata.strapkop.exception.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.k8s.OperatorNames;
@@ -223,7 +224,7 @@ public class DataCenterUpdateAction {
         return (dataCenterSpec.getHostPortEnabled()) ? port.hostPort(dataCenterSpec.getNativePort()) : port;
     }
     
-    private V1StatefulSet constructRackStatefulSet(final int rackIdx, final int numPods, final Iterable<ConfigMapVolumeMount> configMapVolumeMounts, String configmapFingerprint) throws ApiException {
+    private V1StatefulSet constructRackStatefulSet(final int rackIdx, final int numPods, final Iterable<ConfigMapVolumeMount> configMapVolumeMounts, String configmapFingerprint) throws ApiException, StrapkopException {
         final String rack = rackName(rackIdx);
         final V1ObjectMeta statefulSetMetadata = rackChildObjectMetadata(rack, OperatorNames.stsName(dataCenter, rack));
         
@@ -442,11 +443,14 @@ public class DataCenterUpdateAction {
             logger.debug("Restore requested.");
             
             // custom objects api doesn't give us a nice way to pass in the type we want so we do it manually
-            final BackupTask backup;
+            final Task backup;
             {
-                final Call call = customObjectsApi.getNamespacedCustomObjectCall("stable.strapdata.com", "v1", "default", "elassandrabackups", dataCenterSpec.getRestoreFromBackup(), null, null);
-                backup = customObjectsApi.getApiClient().<BackupTask>execute(call, new TypeToken<BackupTask>() {
+                final Call call = customObjectsApi.getNamespacedCustomObjectCall("stable.strapdata.com", "v1", "default", "elassandratasks", dataCenterSpec.getRestoreFromBackup(), null, null);
+                backup = customObjectsApi.getApiClient().<Task>execute(call, new TypeToken<Task>() {
                 }.getType()).getData();
+                if (backup.getSpec().getBackup() == null) {
+                    throw new StrapkopException(String.format("task %s is not a backup", backup.getMetadata().getName()));
+                }
             }
             
             podSpec.addInitContainersItem(new V1Container()
@@ -459,11 +463,11 @@ public class DataCenterUpdateAction {
                             "java", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseCGroupMemoryLimitForHeap",
                             "-cp", "/app/resources:/app/classes:/app/libs/*",
                             "com.strapdata.strapkop.sidecar.SidecarRestore",
-                            "-bb", backup.getSpec().getTarget(), // bucket name
+                            "-bb", backup.getSpec().getBackup().getTarget(), // bucket name
                             "-c", dataCenterMetadata.getName(), // clusterID == DcName. Backup dc and restore dc must have the same name
                             "-bi", OperatorNames.stsName(dataCenter, rack), // pod name prefix
                             "-s", backup.getMetadata().getName(), // backup tag used to find the manifest file
-                            "--bs", backup.getSpec().getBackupType(),
+                            "--bs", backup.getSpec().getBackup().getType(),
                             "-rs",
                             "--shared-path", "/tmp", // elassandra can't run as root,
                             "--cd", "/tmp/sidecar-config-volume" // location where the restore task can write config fragments
