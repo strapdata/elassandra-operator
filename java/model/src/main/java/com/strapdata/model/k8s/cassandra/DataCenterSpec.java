@@ -29,14 +29,10 @@ public class DataCenterSpec {
     @SerializedName("replicas")
     @Expose
     private int replicas;
-
-    @SerializedName("racks")
-    @Expose
-    private int racks;
     
-    @SerializedName("rackNodeSelectors")
+    @SerializedName("nodeAffinityPolicy")
     @Expose
-    private Map<String, V1NodeSelector> rackNodeSelectors;
+    private NodeAffinityPolicy nodeAffinityPolicy = NodeAffinityPolicy.STRICT;
     
     @SerializedName("elassandraImage")
     @Expose
