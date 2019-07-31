@@ -34,13 +34,15 @@ public abstract class K8sWatchPipeline<ResourceT, ResourceListT> extends EventPi
             case ADDED:
             case MODIFIED:
             case INITIAL:
-                cache.insert(key, event.getResource());
+                cache.put(key, event.getResource());
                 break;
             case DELETED:
-                cache.delete(key);
+                cache.remove(key);
                 break;
             case ERROR:
                 break;
         }
+
+        logger.trace("cache={}", cache);
     }
 }
