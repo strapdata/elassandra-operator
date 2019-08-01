@@ -204,11 +204,7 @@ public class DataCenterUpdateAction {
             this.volumeSource = volumeSource;
         }
     }
-
-    private V1Container addPortsItem(V1Container container, int port, String name) {
-        return addPortsItem(container, port, name, false);
-    }
-
+    
     private V1Container addPortsItem(V1Container container, int port, String name, boolean withHostPort) {
         if (port > 0) {
             V1ContainerPort v1Port = new V1ContainerPort().name(name).containerPort(port);
