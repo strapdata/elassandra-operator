@@ -433,17 +433,28 @@ public class DataCenterUpdateAction {
                             .addItemsItem(new V1KeyToPath().key(AuthorityManager.SECRET_CACERT_PEM).path(AuthorityManager.SECRET_CACERT_PEM))
                             .addItemsItem(new V1KeyToPath().key(AuthorityManager.SECRET_TRUSTSTORE_P12).path(AuthorityManager.SECRET_TRUSTSTORE_P12))));
         }
-        
-        // Cluster secret mounted as config file (e.g AAA shared secret)
+    
+        // mount cluster secret volume
+        cassandraContainer.addVolumeMountsItem(new V1VolumeMount().name("operator-cluster-secret").mountPath("/tmp/operator-cluster-secret"));
+        cassandraContainer.addArgsItem("/tmp/operator-cluster-secret");
+        final V1SecretVolumeSource clusterSecretVolumeSource = new V1SecretVolumeSource().secretName(OperatorNames.clusterSecret(dataCenter));
+        podSpec.addVolumesItem(new V1Volume().name("operator-cluster-secret").secret(clusterSecretVolumeSource));
+        // use it as a fragment config directory
+        cassandraContainer.addArgsItem("/tmp/operator-cluster-secret");
+    
+    
+        // add shared secret from cluster secret volume (e.g AAA shared secret)
         if (dataCenterSpec.getEnterprise() != null && dataCenterSpec.getEnterprise().getAaa() != null && dataCenterSpec.getEnterprise().getAaa().getEnabled()) {
-            cassandraContainer.addVolumeMountsItem(new V1VolumeMount().name("operator-cluster-secret").mountPath("/tmp/operator-cluster-secret"));
-            podSpec.addVolumesItem(new V1Volume().name("operator-cluster-secret")
-                    .secret(new V1SecretVolumeSource().secretName(OperatorNames.clusterSecret(dataCenter))
-                            .addItemsItem(new V1KeyToPath().key("shared-secret.yaml").path("elasticsearch.yml.d/003-shared-secret.yaml"))));
-            cassandraContainer.addArgsItem("/tmp/operator-cluster-secret");
+            clusterSecretVolumeSource.addItemsItem(new V1KeyToPath()
+                    .key("shared-secret.yaml")
+                    .path("elasticsearch.yml.d/003-shared-secret.yaml"));
         }
     
-    
+        // add jmx password file to secret volume
+        clusterSecretVolumeSource.addItemsItem(new V1KeyToPath()
+                .key("jmxremote.password")
+                .path("jmxremote.passsword"));
+        
         if (dataCenterSpec.getRestoreFromBackup() != null) {
             logger.debug("Restore requested.");
             
@@ -1038,7 +1049,7 @@ public class DataCenterUpdateAction {
                 // admin is intended to be distributed to human administrator, so the credentials lifecycle is decoupled
                 .putStringDataItem("admin_password", UUID.randomUUID().toString())
                 // cassandra JMX password, mounted as /etc/cassandra/jmxremote.password
-                .putStringDataItem("jmx_password", UUID.randomUUID().toString())
+                .putStringDataItem("jmxremote.password", "cassandra " + UUID.randomUUID().toString())
                 // elassandra-enterprise shared secret is intended to be mounted as a config fragment
                 .putStringDataItem("shared-secret.yaml", "aaa.shared_secret: " + UUID.randomUUID().toString());
         
