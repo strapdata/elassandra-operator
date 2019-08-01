@@ -2,12 +2,10 @@ package com.strapdata.strapkop.pipeline;
 
 import com.squareup.okhttp.Call;
 import com.strapdata.model.Key;
-import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.NodeCache;
-import com.strapdata.strapkop.k8s.OperatorLabels;
 import io.kubernetes.client.ApiClient;
 import io.kubernetes.client.ApiException;
-import io.kubernetes.client.apis.AppsV1Api;
+import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.models.V1ListMeta;
 import io.kubernetes.client.models.V1Node;
 import io.kubernetes.client.models.V1NodeList;
@@ -26,18 +24,16 @@ public class NodePipeline extends K8sWatchPipeline<V1Node, V1NodeList> {
 
     private final Logger logger = LoggerFactory.getLogger(NodePipeline.class);
 
-    public NodePipeline(ApiClient apiClient, NodeCache cache, AppsV1Api appsV1Api, OperatorConfig config) {
-        super(apiClient, new NodeAdapter(appsV1Api, config), cache);
+    public NodePipeline(ApiClient apiClient, CoreV1Api coreV1Api, NodeCache cache) {
+        super(apiClient, new NodeAdapter(coreV1Api), cache);
     }
     
     private static class NodeAdapter extends K8sWatchResourceAdapter<V1Node, V1NodeList> {
-        
-        private final AppsV1Api appsV1Api;
-        private final OperatorConfig config;
-        
-        public NodeAdapter(AppsV1Api appsV1Api, OperatorConfig config) {
-            this.appsV1Api = appsV1Api;
-            this.config = config;
+    
+        private final CoreV1Api coreV1Api;
+    
+        public NodeAdapter(CoreV1Api coreV1Api) {
+            this.coreV1Api = coreV1Api;
         }
         
         @Override
@@ -52,10 +48,9 @@ public class NodePipeline extends K8sWatchPipeline<V1Node, V1NodeList> {
         
         @Override
         public Call createListApiCall(boolean watch, String resourceVersion) throws ApiException {
-            return appsV1Api.listNamespacedStatefulSetCall(config.getNamespace(),
-                    null, null, null,
-                    null, OperatorLabels.toSelector(OperatorLabels.MANAGED),
-                    null, resourceVersion, null, watch, null, null);
+            return coreV1Api.listNodeCall(null, null, null, null,
+                    null, null, resourceVersion, null, watch
+                    , null, null);
         }
         
         @Override
