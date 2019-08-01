@@ -30,17 +30,14 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
         logger.info("processing a DataCenter event");
         
         Completable completable = null;
-        switch(data.getType()) {
-            case ADDED:
-            case INITIAL:
-            case MODIFIED:
-                completable = dataCenterUpdateReconcilier.asCompletable(new Key(data.getResource().getMetadata()));
-                break;
-            case DELETED:
-                completable = dataCenterDeleteReconcilier.asCompletable(data.getResource());
-                break;
-            default:
-                return;
+        if (data.isUpdate()) {
+            completable = dataCenterUpdateReconcilier.asCompletable(new Key(data.getResource().getMetadata()));
+        }
+        else if (data.isDeletion()) {
+            completable = dataCenterDeleteReconcilier.asCompletable(data.getResource());
+        }
+        else {
+            return;
         }
 
         workQueue.submit(new ClusterKey(data.getResource()), completable);
