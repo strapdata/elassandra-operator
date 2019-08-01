@@ -22,5 +22,5 @@ public class TaskStatus {
     
     @SerializedName("pods")
     @Expose
-    private Map<String, TaskPhase> pods = new HashMap<>();
+    private Map<String, TaskPhase> pods = null;
 }

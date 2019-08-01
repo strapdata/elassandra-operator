@@ -130,7 +130,6 @@ public abstract class BaseArguments {
 
     //TODO: Allow user to override commitlog directory (some environments may allow different disks which better suit commitlog performance
     @Option(name = "--dd", aliases = {"--data-directory"}, usage = "Base directory that contains the Cassandra data, cache and commitlog directories", metaVar = "/cassandra", handler = PathOptionHandler.class)
-    @Nullable
     public Path cassandraDirectory = Paths.get("/var/lib/cassandra/");
 
 
@@ -145,7 +144,6 @@ public abstract class BaseArguments {
 
 
     @Option(name = "-p", aliases = {"--shared-path"}, usage = "Shared Container path for pod", metaVar = "/", handler = PathOptionHandler.class)
-    @Nullable
     public Path sharedContainerPath = Paths.get("/");
 
 }

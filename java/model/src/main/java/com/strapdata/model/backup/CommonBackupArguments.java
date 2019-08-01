@@ -143,6 +143,7 @@ public abstract class CommonBackupArguments extends BaseArguments {
     @Option(name = "-j", aliases = {"--jmx"}, usage = "JMX service url for Cassandra", metaVar = "jmx-url", handler = JMXUrlOptionHandler.class, forbids = "--offline")
     @JsonSerialize(using = JMXServiceURLSerializer.class)
     @JsonDeserialize(using = JMXServiceURLDeserializer.class)
+    @Nullable
     public JMXServiceURL jmxServiceURL;
 
     @Option(name = "--ju", usage = "JMX service user for Cassandra", metaVar = "jmx-user", forbids = "--offline")

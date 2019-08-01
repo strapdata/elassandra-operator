@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
-public class BackupTaskSpec extends TaskSpec {
+public class BackupTaskSpec {
     @SerializedName("type")
     @Expose
     private String type;

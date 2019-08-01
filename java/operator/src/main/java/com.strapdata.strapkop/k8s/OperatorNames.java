@@ -73,4 +73,9 @@ public class OperatorNames {
         final int podIndexInRack = crossRackPodIndex / dataCenter.getSpec().getRacks();
         return podName(dataCenter, rack, podIndexInRack);
     }
+    
+    public static String podFqdn(final DataCenter dc, final String podName) {
+        return String.format("%s.%s.%s.svc.cluster.local", podName,
+                OperatorNames.nodesService(dc), dc.getMetadata().getNamespace());
+    }
 }
