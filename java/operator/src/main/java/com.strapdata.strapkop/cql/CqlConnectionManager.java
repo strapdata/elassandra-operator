@@ -57,7 +57,7 @@ public class CqlConnectionManager implements AutoCloseable {
             existing._1.close();
         }
         
-        cache.insert(key, Tuple.of(cluster, session));
+        cache.put(key, Tuple.of(cluster, session));
         return session;
     }
     
@@ -115,7 +115,7 @@ public class CqlConnectionManager implements AutoCloseable {
     @Override
     public void close() {
         logger.info("closing all opened cql connections");
-        for (Map.Entry<Key, Tuple2<Cluster, Session>> entry : cache.list()) {
+        for (Map.Entry<Key, Tuple2<Cluster, Session>> entry : cache.entrySet()) {
             Cluster cluster = entry.getValue()._1;
             if (!cluster.isClosed()) {
                 try {

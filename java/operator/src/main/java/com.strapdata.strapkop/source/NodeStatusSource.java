@@ -52,7 +52,7 @@ public class NodeStatusSource implements EventSource<NodeStatusEvent> {
                         .onErrorReturn(throwable -> event.setCurrentMode(null))
                         .subscribeOn(Schedulers.io()))
                 .map(event -> event.setPreviousMode(nodeStatusCache.get(new Key(event.getPod().getMetadata()))))
-                .doOnNext(event -> nodeStatusCache.insert(new Key(event.getPod().getMetadata()), event.getCurrentMode()))
+                .doOnNext(event -> nodeStatusCache.put(new Key(event.getPod().getMetadata()), event.getCurrentMode()))
                 .filter(event -> !Objects.equals(event.getCurrentMode(), event.getPreviousMode()));
     }
     
