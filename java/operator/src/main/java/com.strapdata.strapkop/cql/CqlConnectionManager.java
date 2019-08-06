@@ -45,17 +45,18 @@ public class CqlConnectionManager implements AutoCloseable {
     }
     
     public Session add(final DataCenter dc, final CqlCredentials credentials) throws DriverException, StrapkopException, ApiException, SSLException {
-        final Cluster cluster = createClusterObject(dc, credentials);
+        
         final Key key = new Key(dc.getMetadata());
-    
-        logger.info("creating a new CQL connection for {}", dc.getMetadata().getName());
-        final Session session = cluster.connect();
         
         final Tuple2<Cluster, Session> existing = cache.get(key);
         if (existing != null && !existing._1.isClosed()) {
             logger.info("closing existing CQL connection for {}", dc.getMetadata().getName());
             existing._1.close();
         }
+    
+        logger.info("creating a new CQL connection for {}", dc.getMetadata().getName());
+        final Cluster cluster = createClusterObject(dc, credentials);
+        final Session session = cluster.connect();
         
         cache.put(key, Tuple.of(cluster, session));
         return session;
