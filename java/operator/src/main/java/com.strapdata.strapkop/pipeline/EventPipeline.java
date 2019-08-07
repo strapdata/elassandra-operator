@@ -51,6 +51,7 @@ public class EventPipeline<DataT> {
         
         // the defer operator combined with retry and repeat is used to recreate the observable after each complete or error.
         final Observable<DataT> coldObservable = Observable.defer(() -> source.createObservable())
+                .subscribeOn(Schedulers.io()) // seems that subscribeOn at this point is important, otherwise watches get executed on the compute scheduler
                 .observeOn(Schedulers.io())
                 .doOnError(throwable -> {
                     if (!(throwable instanceof RuntimeException) || !skippedExceptions.contains(throwable.getCause().getClass())) {

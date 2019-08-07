@@ -10,6 +10,7 @@ import io.kubernetes.client.ApiException;
 import io.kubernetes.client.ApiResponse;
 import io.kubernetes.client.util.Watch;
 import io.reactivex.Observable;
+import io.reactivex.schedulers.Schedulers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,7 +48,9 @@ public class K8sWatchEventSource<ResourceT, ResourceListT>
      * @throws ApiException
      */
     @Override
-    public Observable<K8sWatchEvent<ResourceT>> createObservable() throws ApiException { logger.info("(re)creating k8s event observable for {}", this.getClass().getSimpleName());
+    public Observable<K8sWatchEvent<ResourceT>> createObservable() throws ApiException {
+        
+        logger.info("(re)creating k8s event observable for {}", this.getClass().getSimpleName());
         
         // if last resource version is not null, restart watching where we stopped
         if (lastResourceVersion != null) {
@@ -87,7 +90,9 @@ public class K8sWatchEventSource<ResourceT, ResourceListT>
         final Watch<JsonObject> watch = Watch.createWatch(apiClient, adapter.createListApiCall(true, lastResourceVersion),
                 new TypeToken<Watch.Response<JsonObject>>() {
                 }.getType());
-        return Observable.fromIterable(watch).map(this::objectJsonToEvent).doFinally(watch::close);
+        return Observable.fromIterable(watch)
+                .observeOn(Schedulers.io()).observeOn(Schedulers.io()) // blocking io seemed to happen on computational thread...
+                .map(this::objectJsonToEvent).doFinally(watch::close);
     }
     
     /**

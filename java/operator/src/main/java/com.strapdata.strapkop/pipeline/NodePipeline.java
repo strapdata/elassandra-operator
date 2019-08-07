@@ -18,8 +18,8 @@ import org.slf4j.LoggerFactory;
 import java.lang.reflect.Type;
 import java.util.Collection;
 
-@Context
-@Infrastructure
+//@Context
+//@Infrastructure
 public class NodePipeline extends K8sWatchPipeline<V1Node, V1NodeList> {
 
     private final Logger logger = LoggerFactory.getLogger(NodePipeline.class);
