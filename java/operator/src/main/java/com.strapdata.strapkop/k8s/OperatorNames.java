@@ -44,10 +44,6 @@ public class OperatorNames {
         return OperatorNames.dataCenterChildObjectName("%s-seeds", dataCenter);
     }
     
-    public static String prometheusServiceMonitor(final DataCenter dataCenter) {
-        return OperatorNames.dataCenterChildObjectName("%s", dataCenter);
-    }
-    
     public static String varConfig(final DataCenter dataCenter) {
         return OperatorNames.dataCenterChildObjectName("%s-operator-var-config", dataCenter);
     }
@@ -66,12 +62,6 @@ public class OperatorNames {
     
     public static String podName(final DataCenter dataCenter, final String rack, int podIndex) {
         return OperatorNames.rackChildObjectName("%s-" + podIndex, dataCenter, rack);
-    }
-    
-    public static String podName(final DataCenter dataCenter, int crossRackPodIndex) {
-        final String rack = "rack" + (crossRackPodIndex % dataCenter.getSpec().getRacks() + 1);
-        final int podIndexInRack = crossRackPodIndex / dataCenter.getSpec().getRacks();
-        return podName(dataCenter, rack, podIndexInRack);
     }
     
     public static String podFqdn(final DataCenter dc, final String podName) {

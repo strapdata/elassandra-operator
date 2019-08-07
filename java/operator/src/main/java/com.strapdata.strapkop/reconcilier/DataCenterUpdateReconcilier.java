@@ -38,7 +38,7 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
             
             // abort if there is a task currently executing
             if (dc.getStatus() != null && Objects.equals(dc.getStatus().getPhase(), DataCenterPhase.EXECUTING_TASK)) {
-                logger.debug("do not reconcile datacenter as some task is executing");
+                logger.debug("do not reconcile datacenter as a task is already being executed ({})", dc.getStatus().getCurrentTask());
                 return ;
             }
             
@@ -57,7 +57,7 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
                 credentialsInitializer.initializeCredentials(dc);
             }
             
-            // update status
+            // update status can only happen at the end
             k8sResourceUtils.updateDataCenterStatus(dc);
         } catch (Exception e) {
             logger.error("an error occurred while processing DataCenter update reconciliation for {}", key.getName(), e);

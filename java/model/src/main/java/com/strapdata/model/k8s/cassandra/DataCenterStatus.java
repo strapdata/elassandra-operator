@@ -5,6 +5,8 @@ import com.google.gson.annotations.SerializedName;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @NoArgsConstructor
 public class DataCenterStatus {
@@ -45,4 +47,12 @@ public class DataCenterStatus {
     @SerializedName("currentTask")
     @Expose
     private String currentTask;
+    
+    @SerializedName("rackStatuses")
+    @Expose
+    private List<RackStatus> rackStatuses;
+    
+    @SerializedName("podStatuses")
+    @Expose
+    private List<ElassandraPodStatus> podStatuses;
 }

@@ -4,6 +4,7 @@ import com.google.common.base.Strings;
 import com.strapdata.model.Key;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.k8s.cassandra.DataCenterPhase;
+import com.strapdata.model.k8s.cassandra.ElassandraPodStatus;
 import com.strapdata.model.k8s.task.Task;
 import com.strapdata.model.k8s.task.TaskPhase;
 import com.strapdata.model.k8s.task.TaskStatus;
@@ -160,9 +161,8 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
             task.getStatus().setPods(new HashMap<>());
         }
         
-        for (int i = 0; i < dc.getSpec().getReplicas(); i++) {
-            final String podName = OperatorNames.podName(dc, i);
-            task.getStatus().getPods().put(podName, TaskPhase.WAITING);
+        for (ElassandraPodStatus podStatuses : dc.getStatus().getPodStatuses()) {
+            task.getStatus().getPods().put(podStatuses.getPodName(), TaskPhase.WAITING);
         }
     }
     

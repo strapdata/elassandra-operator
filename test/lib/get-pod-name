@@ -6,7 +6,9 @@ source test/config
 name=${1:-${DEFAULT_NAME}}
 index=${2:-0}
 
-rack_name="rack$((index % ${NUM_RACKS} + 1))"
-pod_index_in_rack="$(($index / ${NUM_RACKS}))"
+pod_name="$(kubectl get edc elassandra-cluster-dc1  -o json | jq '.status.podStatuses['${index}'].podName' -rc)"
+if [[ "$pod_name" = "null" ]]; then
+  exit 1
+fi
 
-echo "$(./test/lib/get-name-prefix ${name})-${rack_name}-${pod_index_in_rack}"
+echo "$pod_name"

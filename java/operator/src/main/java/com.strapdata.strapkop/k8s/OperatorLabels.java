@@ -8,11 +8,13 @@ import java.util.Map;
 
 // should be called OperatorLabelsAndAnnotations...
 public final class OperatorLabels {
+    public static final String POD = "statefulset.kubernetes.io/pod-name";
+    public static final String ZONE = "failure-domain.beta.kubernetes.io/zone";
+    
     public static final String PARENT = "elassandra-operator.strapdata.com/parent"; // parent datacenter resource name
     public static final String CLUSTER = "elassandra-operator.strapdata.com/cluster";
     public static final String DATACENTER = "elassandra-operator.strapdata.com/datacenter";
     public static final String RACK = "elassandra-operator.strapdata.com/rack";
-    public static final String POD = "statefulset.kubernetes.io/pod-name";
     
     public static final String DATACENTER_GENERATION = "elassandra-operator.strapdata.com/datacenter-generation";
     
