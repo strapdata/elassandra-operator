@@ -492,6 +492,7 @@ public class DataCenterUpdateAction {
         
         final V1Container sidecarContainer = new V1Container()
                 .name("sidecar")
+                .terminationMessagePolicy("FallbackToLogsOnError")
                 .env(new ArrayList<>(dataCenterSpec.getEnv()))
                 .addEnvItem(new V1EnvVar()
                         .name("ELASSANDRA_USERNAME")
@@ -667,6 +668,7 @@ public class DataCenterUpdateAction {
             
             podSpec.addInitContainersItem(new V1Container()
                     .name("sidecar-restore")
+                    .terminationMessagePolicy("FallbackToLogsOnError")
                     .env(dataCenterSpec.getEnv())
                     .image(dataCenterSpec.getSidecarImage())
                     .imagePullPolicy(dataCenterSpec.getImagePullPolicy())
