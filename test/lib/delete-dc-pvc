@@ -4,12 +4,9 @@ cd `dirname "$BASH_SOURCE"`/../..
 source test/config
 
 name=${1:-${DEFAULT_NAME}}
-replicas=${2:-1}
+pod_list=$2
 
 # delete zombies pvc
-for ((i=0; i<${replicas}; i++)); do
-  kubectl delete pvc data-volume-$(./test/lib/get-pod-name ${name} ${i}) || true
+for pod in ${pod_list}; do
+  kubectl delete pvc data-volume-${pod} || true
 done
-
-# hopefully this will only delete pv that are Released...
-# kubectl delete pv --all || true

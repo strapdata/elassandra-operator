@@ -22,8 +22,9 @@ to=${3:-2}
 ./test/lib/check-dc-ok ${name} ${to}
 ./test/lib/assert-basic-dataset ${name} ${to}
 
+pod_list="$(./test/lib/list-pod-names ${name})"
 ./test/lib/undeploy-elassandra ${name}
-./test/lib/wait-dc-undeploy ${name} ${to}
-./test/lib/delete-dc-pvc ${name} "$(( ${from} > ${to} ? ${from} : ${to} ))"
+./test/lib/wait-dc-undeploy ${name} "$pod_list"
+./test/lib/delete-dc-pvc ${name} "$pod_list"
 
 ./test/lib/undeploy-operator

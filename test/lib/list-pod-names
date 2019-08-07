@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+cd `dirname "$BASH_SOURCE"`/../..
+source test/config
+
+name=${1:-${DEFAULT_NAME}}
+
+kubectl get edc elassandra-cluster-dc1  -o json | jq '.status.podStatuses[].podName' -rc

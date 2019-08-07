@@ -36,16 +36,19 @@ name2=${cluster}-${dc2}
 ./test/lib/assert-basic-dataset ${name2} ${replicas2}
 
 # remove first dc
+pod_list="$(./test/lib/list-pod-names ${name1})"
 ./test/lib/undeploy-elassandra ${name1}
-./test/lib/wait-dc-undeploy ${name1} ${replicas1}
-./test/lib/delete-dc-pvc ${name1} ${replicas1}
+./test/lib/wait-dc-undeploy ${name1} "$pod_list"
+./test/lib/delete-dc-pvc ${name1} "$pod_list"
+
 
 # TODO: assert again data in 2nd dc
 # ./test/lib/assert-basic-dataset ${name2} ${replicas2}
 
 # remove second dc
+pod_list="$(./test/lib/list-pod-names ${name2})"
 ./test/lib/undeploy-elassandra ${name2}
-./test/lib/wait-dc-undeploy ${name2} ${replicas2}
-./test/lib/delete-dc-pvc ${name2} ${replicas2}
+./test/lib/wait-dc-undeploy ${name2} "$pod_list"
+./test/lib/delete-dc-pvc ${name2} "$pod_list"
 
 ./test/lib/undeploy-operator
