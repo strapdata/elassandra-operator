@@ -3,7 +3,7 @@ package com.strapdata.model.k8s.cassandra;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 import io.kubernetes.client.models.*;
@@ -169,9 +169,9 @@ public class DataCenterSpec {
     /**
      * Decomission policy control PVC when node removed.
      */
-    @SerializedName("decomissionPolicy")
+    @SerializedName("decommissionPolicy")
     @Expose
-    private DecomissionPolicy decomissionPolicy = DecomissionPolicy.DELETE_PVC;
+    private DecommissionPolicy decommissionPolicy = DecommissionPolicy.DELETE_PVC;
 
     /**
      * Enable cassandra/ldap authentication and authorization

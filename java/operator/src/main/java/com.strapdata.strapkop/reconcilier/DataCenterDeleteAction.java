@@ -77,7 +77,7 @@ public class DataCenterDeleteAction {
         });
 
         // delete persistent volume claims
-        switch(dataCenter.getSpec().getDecomissionPolicy()) {
+        switch(dataCenter.getSpec().getDecommissionPolicy()) {
             case KEEP_PVC:
                 break;
             case BACKUP_AND_DELETE_PVC:
