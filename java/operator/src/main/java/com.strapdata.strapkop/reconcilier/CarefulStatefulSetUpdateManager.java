@@ -8,6 +8,7 @@ import com.strapdata.model.k8s.task.CleanupTaskSpec;
 import com.strapdata.model.k8s.task.Task;
 import com.strapdata.model.sidecar.NodeStatus;
 import com.strapdata.strapkop.cache.NodeStatusCache;
+import com.strapdata.strapkop.exception.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.k8s.OperatorNames;
@@ -23,7 +24,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.MalformedURLException;
-import java.net.UnknownHostException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -56,7 +56,7 @@ class CarefulStatefulSetUpdateManager {
     private Map<RackMode, TreeSet<String>> racksByRackMode;
     
     
-    CarefulStatefulSetUpdateManager(AppsV1Api appsApi, K8sResourceUtils k8sResourceUtils, SidecarClientFactory sidecarClientFactory, NodeStatusCache nodeStatusCache) throws Exception {
+    CarefulStatefulSetUpdateManager(AppsV1Api appsApi, K8sResourceUtils k8sResourceUtils, SidecarClientFactory sidecarClientFactory, NodeStatusCache nodeStatusCache) {
         this.appsApi = appsApi;
         this.k8sResourceUtils = k8sResourceUtils;
         this.sidecarClientFactory = sidecarClientFactory;
@@ -83,7 +83,7 @@ class CarefulStatefulSetUpdateManager {
      *
      * Only one expected rack should have a different replicas value than the existing one.
      */
-    void updateNextStatefulSet(DataCenter dataCenter, TreeMap<String, V1StatefulSet> newtStsMap, TreeMap<String, V1StatefulSet> existingStsMap) throws ApiException, MalformedURLException, UnknownHostException {
+    void updateNextStatefulSet(DataCenter dataCenter, TreeMap<String, V1StatefulSet> newtStsMap, TreeMap<String, V1StatefulSet> existingStsMap) throws ApiException, MalformedURLException, StrapkopException {
     
         // make a lot of observations and build some data structures in order to take the best decision
         observe(dataCenter, newtStsMap, existingStsMap);
@@ -165,7 +165,7 @@ class CarefulStatefulSetUpdateManager {
         
         // TODO: take care of user defined config map changes
         
-        if (stsGen == null || dcGen == null) {
+        if (dcGen == null) {
             return false;
         }
         
@@ -343,17 +343,20 @@ class CarefulStatefulSetUpdateManager {
     /**
      * Scale up a specific rack (+1)
      */
-    private void scaleDown(String rack) throws ApiException, MalformedURLException {
+    private void scaleDown(String rack) throws ApiException, MalformedURLException, StrapkopException {
     
+        
         dataCenter.getStatus().setPhase(DataCenterPhase.SCALING_DOWN);
         
         final V1StatefulSet statefulSetToScale = newtStsMap.get(rack);
         final int replicas = existingStsMap.get(rack).getSpec().getReplicas() - 1;
         // ensure we scale only -1
         statefulSetToScale.getSpec().setReplicas(replicas);
+    
+        logger.debug("Scaling down sts {} to {}", statefulSetToScale.getMetadata().getName(), replicas);
         
         // the name of the pod remove
-        final String podName = statefulSetToScale.getMetadata().getName() + "-" + (statefulSetToScale.getSpec().getReplicas() - 1);
+        final String podName = statefulSetToScale.getMetadata().getName() + "-" + replicas;
         
         if (podsByStatus.get(NodeStatus.NORMAL).contains(podName)) {
             logger.info("Scaling down sts {} to {}, decommissioning {}", statefulSetToScale.getMetadata().getName(), replicas, podName);
@@ -374,6 +377,9 @@ class CarefulStatefulSetUpdateManager {
             
             
             appsApi.replaceNamespacedStatefulSet(statefulSetToScale.getMetadata().getName(), statefulSetToScale.getMetadata().getNamespace(), statefulSetToScale, null, null);
+        }
+        else {
+            throw new StrapkopException("unreachable");
         }
     }
     
