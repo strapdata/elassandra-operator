@@ -431,7 +431,12 @@ class CarefulStatefulSetUpdateManager {
             );
             
             // set pod statuses
-            for (int i = 0; i < sts.getSpec().getReplicas(); i++) {
+            final int replicas = Integer.max(
+                    existingStsMap.get(rack).getSpec().getReplicas(),
+                    sts.getSpec().getReplicas()
+            );
+            
+            for (int i = 0; i < replicas; i++) {
                 String podName = OperatorNames.podName(dataCenter, rack, i);
                 podStatuses.add(new ElassandraPodStatus()
                         // TODO: add more information in ElassandraPodStatus
