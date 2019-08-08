@@ -62,6 +62,7 @@ public final class OperatorLabels {
         return ImmutableMap.<String, String>builder()
                 .putAll(datacenter(dataCenter))
                 .put(RACK,rackName)
+                .put(RELEASE, extractTagFromImage(dataCenter.getSpec().getElassandraImage()))
                 .build();
     }
     
@@ -69,8 +70,15 @@ public final class OperatorLabels {
         return ImmutableMap.<String, String>builder()
                 .putAll(rack(dataCenter, rackName))
                 .put(POD, podName)
-                .put(RELEASE, dataCenter.getSpec().getElassandraImage())
                 .build();
+    }
+    
+    private static String extractTagFromImage(String imageName) {
+        int pos = imageName.indexOf(":");
+        if (pos == -1) {
+            return "latest";
+        }
+        return imageName.substring(pos + 1);
     }
     
     public static String toSelector(Map<String, String> labels) {
