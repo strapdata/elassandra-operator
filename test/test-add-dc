@@ -16,6 +16,7 @@ name2=${cluster}-${dc2}
 
 # deploy first dc
 ./test/lib/deploy-elassandra ${name1} ${replicas1}
+
 ./test/lib/wait-dc-ready ${name1} ${replicas1}
 ./test/lib/check-dc-ok ${name1} ${replicas1}
 

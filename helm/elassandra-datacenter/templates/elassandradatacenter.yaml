@@ -49,14 +49,17 @@ spec:
   userSecretVolumeSource:
 {{ toYaml .Values.userSecretVolumeSource | indent 4 }}
 {{- end }}
-  prometheusSupport: {{ .Values.prometheusEnabled | default "false" }}
-  privilegedSupported: {{ .Values.privilegedSupported | default "false" }}
-  hostPortEnabled: {{ .Values.hostPortEnabled | default "true" }}
-  nativePort : {{ .Values.nativePort | default "39042" }}
-  storagePort : {{ .Values.storagePort | default "37000" }}
-  sslStoragePort : {{ .Values.sslStoragePort | default "37001" }}
+  prometheusSupport: {{ .Values.prometheusEnabled }}
+  privilegedSupported: {{ .Values.privilegedSupported }}
+  hostPortEnabled: {{ .Values.hostPortEnabled }}
+  nativePort : {{ .Values.nativePort }}
+  storagePort : {{ .Values.storagePort }}
+  sslStoragePort : {{ .Values.sslStoragePort }}
 {{- if .Values.jdbPort }}
   jdbPort: {{ .Values.jdbPort }}
+{{- end }}
+{{- if .Values.jmxPort }}
+  jmxPort: {{ .Values.jmxPort }}
 {{- end }}
 {{- if .Values.ssl }}
   ssl:

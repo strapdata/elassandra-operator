@@ -89,11 +89,11 @@ elasticsearchEnabled: true
 ssl: true
 authentication: CASSANDRA
 
-# hostPortEnabled: true
-# storagePort: 37000
-# sslStoragPort: 37001
-# nativePort: 39042
-# jmxPort: 7199
+hostPortEnabled: false
+storagePort: 37000
+sslStoragePort: 37001
+nativePort: 39042
+jmxPort: 7199
 # jdbPort: 4242
 
 remoteSeeds: []

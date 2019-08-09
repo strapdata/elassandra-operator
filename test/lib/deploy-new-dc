@@ -12,4 +12,5 @@ helm_cmd="install --wait -n ${name}"
 
 cat <<EOF | ./test/lib/deploy-elassandra  "$name" "$replicas" -
 remoteSeeds: [${remoteSeeds}]
+
 EOF
