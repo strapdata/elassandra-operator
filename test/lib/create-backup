@@ -5,7 +5,7 @@ source test/config
 
 name=${1:-${DEFAULT_NAME}}
 replicas=${2:-1}
-backup_name=${3:-testbackup-${dc}}
+backup_name=${3:-testbackup-${name}}
 
 cat <<EOF | kubectl create -f -
 apiVersion: stable.strapdata.com/v1
