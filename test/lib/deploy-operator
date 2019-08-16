@@ -3,7 +3,10 @@
 cd `dirname "$BASH_SOURCE"`/../..
 source test/config
 
-helm install -n elassandra-operator --wait \
+helm_cmd="install --wait -n"
+[ "${UPGRADE}" = "true" ] && helm_cmd="upgrade"
+
+helm ${helm_cmd} elassandra-operator \
     --set image.repository=${OPERATOR_IMAGE} \
     --set-string image.tag=${TAG} \
     --set imagePullPolicy=${PULL_POLICY_OPERATOR} \

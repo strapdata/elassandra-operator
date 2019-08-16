@@ -17,6 +17,7 @@ import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.apis.CustomObjectsApi;
+import io.kubernetes.client.custom.IntOrString;
 import io.kubernetes.client.models.*;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
@@ -206,7 +207,7 @@ public class DataCenterUpdateAction {
                 // filter-out full nodes
                 .filter(z -> z.getRemainingSlots() > 0)
                 
-                // select the preferred zone based on some priorities (see below)
+                // select the preferred zone based on some priorities
                 .min(Zone.scaleComparator)
                 
                 // throw an exception in case node zone is available
@@ -221,7 +222,7 @@ public class DataCenterUpdateAction {
                 // filter-out empty nodes
                 .filter(z -> z.replicas > 0)
                 
-                // select the preferred zone based on some priorities (see below)
+                // select the preferred zone based on some priorities
                 .max(Zone.scaleComparator)
                 
                 // throw an exception in case node zone is available
@@ -303,6 +304,9 @@ public class DataCenterUpdateAction {
         }
         
         createOrScaleAllStatefulsets(newStatefulSetMap, existingStsMap);
+        
+        createOrReplaceReaperObjects();
+        
         updateStatus();
         
         logger.info("Reconciled DataCenter.");
@@ -1229,5 +1233,166 @@ public class DataCenterUpdateAction {
                 .putStringDataItem("shared-secret.yaml", "aaa.shared_secret: " + UUID.randomUUID().toString());
         
         coreApi.createNamespacedSecret(dataCenterMetadata.getNamespace(), secret, null, null, null);
+    }
+    
+    private void createOrReplaceReaperObjects() throws ApiException {
+        
+        final Map<String, String> labels = OperatorLabels.reaper(dataCenter);
+        
+        final V1ObjectMeta meta = new V1ObjectMeta()
+                .name(OperatorNames.reaperDeployment(dataCenter))
+                .namespace(dataCenterMetadata.getNamespace())
+                .labels(labels);
+    
+        final V1Container container = new V1Container();
+    
+        final V1PodSpec podSpec = new V1PodSpec()
+                .addContainersItem(container);
+        
+        final V1Deployment deployment = new V1Deployment()
+                .metadata(meta)
+                .spec(new V1DeploymentSpec()
+                        // delay the creation of the reaper pod, after we have created the reaper_db keyspace
+                        .replicas(dataCenterStatus.getReaperKeyspaceInitialized() ? 1 : 0)
+                        .selector(new V1LabelSelector()
+                                .matchLabels(labels)
+                        )
+                        .template(new V1PodTemplateSpec()
+                                .metadata(new V1ObjectMeta().labels(labels))
+                                .spec(podSpec)
+                        )
+                );
+        
+        // common configuration
+        container
+                .name("reaper")
+                .image("thelastpickle/cassandra-reaper")
+                .addPortsItem(new V1ContainerPort()
+                        .name("app")
+                        .containerPort(8080)
+                        .protocol("TCP")
+                )
+                .addPortsItem(new V1ContainerPort()
+                        .name("admin")
+                        .containerPort(8081)
+                        .protocol("TCP")
+                )
+                .livenessProbe(new V1Probe()
+                        .httpGet(new V1HTTPGetAction()
+                                .path("/")
+                                .port(new IntOrString("admin"))
+                        )
+                        .initialDelaySeconds(60)
+                        .periodSeconds(20)
+                        .timeoutSeconds(5)
+                )
+                .readinessProbe(new V1Probe()
+                        .httpGet(new V1HTTPGetAction()
+                                .path("/")
+                                .port(new IntOrString("admin"))
+                        )
+                        .initialDelaySeconds(10)
+                        .periodSeconds(10)
+                        .timeoutSeconds(5)
+                )
+                .addEnvItem(new V1EnvVar()
+                        .name("REAPER_DATACENTER_AVAILABILITY")
+                        .value("EACH")
+                )
+                .addEnvItem(new V1EnvVar()
+                        .name("REAPER_JMX_AUTH_PASSWORD")
+                        .valueFrom(new V1EnvVarSource()
+                                .secretKeyRef(new V1SecretKeySelector()
+                                        .name(OperatorNames.clusterSecret(dataCenter))
+                                        .key("jmx_password")
+                                )
+                        )
+                )
+                .addEnvItem(new V1EnvVar()
+                        .name("REAPER_JMX_AUTH_USERNAME")
+                        .value("cassandra")
+                )
+                .addEnvItem(new V1EnvVar()
+                        .name("REAPER_STORAGE_TYPE")
+                        .value("cassandra")
+                )
+                .addEnvItem(new V1EnvVar()
+                        .name("REAPER_CASS_CLUSTER_NAME")
+                        .value(dataCenterSpec.getClusterName())
+                )
+                .addEnvItem(new V1EnvVar()
+                        .name("REAPER_CASS_CONTACT_POINTS")
+                        .value("[" + OperatorNames.seedsService(dataCenter) + "]")
+                )
+                .addEnvItem(new V1EnvVar()
+                        .name("REAPER_CASS_PORT")
+                        .value(dataCenterSpec.getNativePort().toString())
+                )
+                .addEnvItem(new V1EnvVar()
+                        .name("REAPER_CASS_KEYSPACE")
+                        .value("reaper_db")
+                )
+                .addEnvItem(new V1EnvVar()
+                        .name("REAPER_CASS_LOCAL_DC")
+                        .value(dataCenterSpec.getDatacenterName())
+                );
+        
+        
+        // reaper with cassandra authentication
+        if (!Objects.equals(dataCenterSpec.getAuthentication(), Authentication.NONE)) {
+            container
+                    .addEnvItem(new V1EnvVar()
+                            .name("REAPER_CASS_AUTH_ENABLED")
+                            .value("true")
+                    )
+                    .addEnvItem(new V1EnvVar()
+                            .name("REAPER_CASS_AUTH_USERNAME")
+                            .value("strapkop") // TODO: create an account for reaper
+                    )
+                    .addEnvItem(new V1EnvVar()
+                            .name("REAPER_CASS_AUTH_PASSWORD")
+                            .valueFrom(new V1EnvVarSource()
+                                    .secretKeyRef(new V1SecretKeySelector()
+                                            .name(OperatorNames.clusterSecret(dataCenter))
+                                            .key("strapkop_password")
+                                    )
+                            )
+                    );
+        } else {
+            container.addEnvItem(new V1EnvVar()
+                    .name("REAPER_CASS_AUTH_ENABLED")
+                    .value("false")
+            );
+        }
+        
+        // reaper with cassandra ssl on native port
+        if (Boolean.TRUE.equals(dataCenterSpec.getSsl())) {
+            podSpec.addVolumesItem(new V1Volume()
+                    .name("truststore")
+                    .secret(new V1SecretVolumeSource()
+                            .secretName(authorityManager.getPublicCaSecretName())
+                    )
+            );
+            container
+                    .addEnvItem(new V1EnvVar()
+                            .name("REAPER_CASS_NATIVE_PROTOCOL_SSL_ENCRYPTION_ENABLED")
+                            .value("true")
+                    )
+                    .addEnvItem(new V1EnvVar()
+                            .name("JAVA_OPTS")
+                            .value("-Djavax.net.ssl.trustStore=/truststore/truststore.p12 -Djavax.net.ssl.trustStorePassword=changeit")
+                    )
+                    .addVolumeMountsItem(new V1VolumeMount()
+                            .mountPath("/truststore")
+                            .name("truststore")
+                    );
+        } else {
+            container.addEnvItem(new V1EnvVar()
+                    .name("REAPER_CASS_NATIVE_PROTOCOL_SSL_ENCRYPTION_ENABLED")
+                    .value("false")
+            );
+        }
+        
+        k8sResourceUtils.createOrReplaceNamespacedDeployment(deployment);
     }
 }

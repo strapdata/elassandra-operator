@@ -68,4 +68,8 @@ public class OperatorNames {
         return String.format("%s.%s.%s.svc.cluster.local", podName,
                 OperatorNames.nodesService(dc), dc.getMetadata().getNamespace());
     }
+    
+    public static String reaperDeployment(DataCenter dataCenter) {
+        return OperatorNames.dataCenterChildObjectName("%s-reaper", dataCenter);
+    }
 }

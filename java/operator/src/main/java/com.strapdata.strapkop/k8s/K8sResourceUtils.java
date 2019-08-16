@@ -87,6 +87,21 @@ public class K8sResourceUtils {
                 }
         );
     }
+    
+    public void createOrReplaceNamespacedDeployment(final V1Deployment deployment) throws ApiException {
+        final String namespace = deployment.getMetadata().getNamespace();
+        logger.debug("Creating/replacing namespaced Deployment.");
+        createOrReplaceResource(
+                () -> {
+                    appsApi.createNamespacedDeployment(namespace, deployment, null, null, null);
+                    logger.debug("Created namespaced Deployment.");
+                },
+                () -> {
+                    appsApi.replaceNamespacedDeployment(deployment.getMetadata().getName(), namespace, deployment, null, null);
+                    logger.debug("Replaced namespaced Deployment.");
+                }
+        );
+    }
 
     public void deleteService(final V1Service service) throws ApiException {
         final V1ObjectMeta metadata = service.getMetadata();

@@ -2,6 +2,7 @@ package com.strapdata.strapkop.reconcilier;
 
 import com.strapdata.model.Key;
 import com.strapdata.model.k8s.cassandra.*;
+import com.strapdata.strapkop.cql.CqlConnectionManager;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import io.kubernetes.client.ApiException;
 import io.micronaut.context.ApplicationContext;
@@ -19,11 +20,15 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
     private final ApplicationContext context;
     private final K8sResourceUtils k8sResourceUtils;
     private final CredentialsInitializer credentialsInitializer;
+    private final KeyspacesManager keyspacesManager;
+    private final CqlConnectionManager cqlConnectionManager;
     
-    public DataCenterUpdateReconcilier(final ApplicationContext context, K8sResourceUtils k8sResourceUtils, CredentialsInitializer credentialsInitializer) {
+    public DataCenterUpdateReconcilier(final ApplicationContext context, K8sResourceUtils k8sResourceUtils, CredentialsInitializer credentialsInitializer, KeyspacesManager keyspacesManager, CqlConnectionManager cqlConnectionManager) {
         this.context = context;
         this.k8sResourceUtils = k8sResourceUtils;
         this.credentialsInitializer = credentialsInitializer;
+        this.keyspacesManager = keyspacesManager;
+        this.cqlConnectionManager = cqlConnectionManager;
     }
     
     @Override
@@ -46,15 +51,29 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
             logger.debug("processing a dc reconciliation request for {} in thread {}", dc.getMetadata().getName(), Thread.currentThread().getName());
             context.createBean(DataCenterUpdateAction.class, dc).reconcileDataCenter();
             
-            // setup credentials if necessary
+            // reconcile credentials are open the cql connection
+            // TODO: split this two parts in separated controllers so we can handle cassandra without auth enabled
+            //         ... and manage the cql status after the first cql initialization
             if (dc.getStatus() != null &&
                     Objects.equals(dc.getStatus().getPhase(), DataCenterPhase.RUNNING) &&
                     Objects.equals(dc.getSpec().getAuthentication(), Authentication.CASSANDRA) && (
                     Objects.equals(dc.getStatus().getCredentialsStatus(), CredentialsStatus.DEFAULT) ||
-                            Objects.equals(dc.getStatus().getCredentialsStatus(), CredentialsStatus.UNKNOWN))) {
-                
+                            Objects.equals(dc.getStatus().getCredentialsStatus(), CredentialsStatus.UNKNOWN) ||
+                            cqlConnectionManager.get(dc) == null // in case the operator restarted
+                            
+            )) {
                 logger.debug("triggering a credentials reconciliation");
                 credentialsInitializer.initializeCredentials(dc);
+            }
+        
+            
+            if (dc.getStatus() != null &&
+                    Objects.equals(dc.getStatus().getPhase(), DataCenterPhase.RUNNING) &&
+                    Objects.equals(dc.getStatus().getCqlStatus(), CqlStatus.ESTABLISHED) &&
+                    !dc.getStatus().getReaperKeyspaceInitialized()) {
+                
+                logger.debug("initialize reaper keyspace");
+                keyspacesManager.initializeReaperKeyspace(dc);
             }
             
             // update status can only happen at the end

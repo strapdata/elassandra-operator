@@ -32,8 +32,7 @@ public final class OperatorLabels {
     public static final String CONFIGMAP_FINGERPRINT = labelPrefix + "configmap-fingerprint";
     
     public static final Map<String, String> MANAGED = ImmutableMap.of(
-            "app.kubernetes.io/managed-by", "elassandra-operator",
-            "app", "elassandra" // compatibility with dashboard
+            "app.kubernetes.io/managed-by", "elassandra-operator"
     );
 
     private OperatorLabels() {}
@@ -42,6 +41,7 @@ public final class OperatorLabels {
         return ImmutableMap.<String, String>builder()
                 .put(CLUSTER, clusterName)
                 .putAll(MANAGED)
+                .put("app", "elassandra")
                 .build();
     }
     
@@ -72,6 +72,14 @@ public final class OperatorLabels {
                 .put(POD, podName)
                 .build();
     }
+    
+    public static Map<String, String> reaper(DataCenter dataCenter) {
+        return ImmutableMap.<String, String>builder()
+                .putAll(datacenter(dataCenter))
+                .put("app", "reaper") // overwrite label app
+                .build();
+    }
+    
     
     private static String extractTagFromImage(String imageName) {
         int pos = imageName.indexOf(":");
