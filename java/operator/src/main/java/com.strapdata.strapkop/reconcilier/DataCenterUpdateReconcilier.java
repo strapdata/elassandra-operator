@@ -19,14 +19,14 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
     
     private final ApplicationContext context;
     private final K8sResourceUtils k8sResourceUtils;
-    private final CredentialsInitializer credentialsInitializer;
+    private final CqlCredentialsManager cqlCredentialsManager;
     private final KeyspacesManager keyspacesManager;
     private final CqlConnectionManager cqlConnectionManager;
     
-    public DataCenterUpdateReconcilier(final ApplicationContext context, K8sResourceUtils k8sResourceUtils, CredentialsInitializer credentialsInitializer, KeyspacesManager keyspacesManager, CqlConnectionManager cqlConnectionManager) {
+    public DataCenterUpdateReconcilier(final ApplicationContext context, K8sResourceUtils k8sResourceUtils, CqlCredentialsManager cqlCredentialsManager, KeyspacesManager keyspacesManager, CqlConnectionManager cqlConnectionManager) {
         this.context = context;
         this.k8sResourceUtils = k8sResourceUtils;
-        this.credentialsInitializer = credentialsInitializer;
+        this.cqlCredentialsManager = cqlCredentialsManager;
         this.keyspacesManager = keyspacesManager;
         this.cqlConnectionManager = cqlConnectionManager;
     }
@@ -51,22 +51,13 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
             logger.debug("processing a dc reconciliation request for {} in thread {}", dc.getMetadata().getName(), Thread.currentThread().getName());
             context.createBean(DataCenterUpdateAction.class, dc).reconcileDataCenter();
             
-            // reconcile credentials are open the cql connection
-            // TODO: split this two parts in separated controllers so we can handle cassandra without auth enabled
-            //         ... and manage the cql status after the first cql initialization
-            if (dc.getStatus() != null &&
-                    Objects.equals(dc.getStatus().getPhase(), DataCenterPhase.RUNNING) &&
-                    Objects.equals(dc.getSpec().getAuthentication(), Authentication.CASSANDRA) && (
-                    Objects.equals(dc.getStatus().getCredentialsStatus(), CredentialsStatus.DEFAULT) ||
-                            Objects.equals(dc.getStatus().getCredentialsStatus(), CredentialsStatus.UNKNOWN) ||
-                            cqlConnectionManager.get(dc) == null // in case the operator restarted
-                            
-            )) {
-                logger.debug("triggering a credentials reconciliation");
-                credentialsInitializer.initializeCredentials(dc);
-            }
-        
+            // reconcile cql connection
+            cqlConnectionManager.reconcileConnection(dc, cqlCredentialsManager);
             
+            // reconcile credentials
+            cqlCredentialsManager.reconcileCredentials(dc);
+            
+            // reconcile keyspaces
             if (dc.getStatus() != null &&
                     Objects.equals(dc.getStatus().getPhase(), DataCenterPhase.RUNNING) &&
                     Objects.equals(dc.getStatus().getCqlStatus(), CqlStatus.ESTABLISHED) &&
@@ -74,6 +65,11 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
                 
                 logger.debug("initialize reaper keyspace");
                 keyspacesManager.initializeReaperKeyspace(dc);
+                
+                // TODO:
+///                session.execute(String.format(
+//                        "ALTER KEYSPACE system_auth WITH replication = {'class': 'NetworkTopologyStrategy', '%s': %d};",
+//                        dataCenter.getSpec().getDatacenterName(), 1)); // TODO: find a smart way to set the RF map
             }
             
             // update status can only happen at the end

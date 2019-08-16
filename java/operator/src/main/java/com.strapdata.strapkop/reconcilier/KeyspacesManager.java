@@ -33,7 +33,7 @@ public class KeyspacesManager {
     }
     
     private Session getSession(DataCenter dc) throws StrapkopException {
-        final Session session = cqlConnectionManager.get(dc);
+        final Session session = cqlConnectionManager.getConnection(dc);
     
         if (session == null) {
             throw new StrapkopException("no cql connection available to initialize reaper keyspace");

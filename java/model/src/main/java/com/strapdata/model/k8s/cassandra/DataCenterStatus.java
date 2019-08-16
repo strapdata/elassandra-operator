@@ -22,7 +22,7 @@ public class DataCenterStatus {
     
     @SerializedName("credentialsStatus")
     @Expose
-    private CredentialsStatus credentialsStatus;
+    private CredentialsStatus credentialsStatus = null;
     
     @SerializedName("cqlStatus")
     @Expose

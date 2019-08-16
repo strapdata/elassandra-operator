@@ -9,10 +9,13 @@ import com.datastax.driver.core.policies.DCAwareRoundRobinPolicy;
 import com.datastax.driver.core.policies.TokenAwarePolicy;
 import com.strapdata.model.Key;
 import com.strapdata.model.k8s.cassandra.Authentication;
+import com.strapdata.model.k8s.cassandra.CqlStatus;
 import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.model.k8s.cassandra.DataCenterPhase;
 import com.strapdata.strapkop.cache.CqlConnectionCache;
 import com.strapdata.strapkop.exception.StrapkopException;
 import com.strapdata.strapkop.k8s.OperatorNames;
+import com.strapdata.strapkop.reconcilier.CqlCredentialsManager;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import io.kubernetes.client.ApiException;
 import io.netty.handler.ssl.SslContext;
@@ -31,6 +34,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * Create and store cql connections
+ */
 @Singleton
 public class CqlConnectionManager implements AutoCloseable {
     
@@ -44,25 +50,67 @@ public class CqlConnectionManager implements AutoCloseable {
         this.cache = cache;
     }
     
-    public Session add(final DataCenter dc, final CqlCredentials credentials) throws DriverException, StrapkopException, ApiException, SSLException {
-        
-        final Key key = new Key(dc.getMetadata());
-        
-        final Tuple2<Cluster, Session> existing = cache.get(key);
-        if (existing != null && !existing._1.isClosed()) {
-            logger.info("closing existing CQL connection for {}", dc.getMetadata().getName());
-            existing._1.close();
-        }
     
-        logger.info("creating a new CQL connection for {}", dc.getMetadata().getName());
-        final Cluster cluster = createClusterObject(dc, credentials);
-        final Session session = cluster.connect();
+    /**
+     * CQL connection reconciliation : ensure there is always a cql session activated
+     */
+    public void reconcileConnection(final DataCenter dc, final CqlCredentialsManager cqlCredentialsManager) throws StrapkopException, ApiException, SSLException {
         
-        cache.put(key, Tuple.of(cluster, session));
-        return session;
+        // abort if dc is not running
+        if (!Objects.equals(dc.getStatus().getPhase(), DataCenterPhase.RUNNING)) {
+            return ;
+        }
+        
+        final Session session = getConnection(dc);
+        
+        if (session == null || session.isClosed()) {
+    
+            if (dc.getSpec().getAuthentication().equals(Authentication.NONE)) {
+                updateConnection(dc, null);
+            }
+            // do nothing if the credentials status is unknown
+            else if (Objects.equals(dc.getStatus().getCredentialsStatus().getUnknown(), false)) {
+                final CqlCredentials cqlCredentials = cqlCredentialsManager.getCurrentCredentials(dc);
+                updateConnection(dc, cqlCredentials);
+            }
+        }
     }
     
-    public Session get(final Key dcKey) {
+    /**
+     * Close existing connection to the dc and create a new one that will be stored for later retrieval
+     * @param dc the datacenter to connect  to
+     * @param credentials (optional) credentials if auth is required
+     * @return a cql session
+     * @throws DriverException
+     * @throws StrapkopException
+     * @throws ApiException
+     * @throws SSLException
+     */
+    public Session updateConnection(final DataCenter dc, final CqlCredentials credentials) throws DriverException, StrapkopException, ApiException, SSLException {
+        
+        try {
+            final Key key = new Key(dc.getMetadata());
+    
+            removeConnection(dc);
+    
+            logger.info("creating a new CQL connection for {}", dc.getMetadata().getName());
+            final Cluster cluster = createClusterObject(dc, credentials);
+            final Session session = cluster.connect();
+            
+            dc.getStatus().setCqlStatus(CqlStatus.ESTABLISHED);
+            dc.getStatus().setCqlErrorMessage("");
+            cache.put(key, Tuple.of(cluster, session));
+            return session;
+    
+        }
+        catch (DriverException exception) {
+            dc.getStatus().setCqlStatus(CqlStatus.ERRORED);
+            dc.getStatus().setCqlErrorMessage(exception.getMessage());
+            throw exception;
+        }
+    }
+    
+    public Session getConnection(final Key dcKey) {
         final Tuple2<Cluster, Session> t = cache.get(dcKey);
         if (t == null) {
             return null;
@@ -70,13 +118,26 @@ public class CqlConnectionManager implements AutoCloseable {
         return t._2;
     }
     
-    public Session get(final DataCenter dc) {
-        return get(new Key(dc.getMetadata()));
+    public Session getConnection(final DataCenter dc) {
+        return getConnection(new Key(dc.getMetadata()));
+    }
+    
+    public void removeConnection(final DataCenter dc) {
+        final Key key = new Key(dc.getMetadata());
+    
+        final Tuple2<Cluster, Session> existing = cache.remove(key);
+    
+        if (existing != null && !existing._1.isClosed()) {
+            logger.info("closing existing CQL connection for {}", dc.getMetadata().getName());
+            existing._1.close();
+        }
+    
+        dc.getStatus().setCqlStatus(CqlStatus.NOT_STARTED);
     }
     
     private Cluster createClusterObject(final DataCenter dc, final CqlCredentials credentials) throws StrapkopException, ApiException, SSLException {
         
-        // TODO: add remote seeds as contact point
+        // TODO: updateConnection remote seeds as contact point
         final Cluster.Builder builder = Cluster.builder()
                 .withClusterName(dc.getSpec().getClusterName())
                 .withPort(dc.getSpec().getNativePort())
@@ -90,7 +151,9 @@ public class CqlConnectionManager implements AutoCloseable {
             builder.withSSL(getSSLOptions());
         }
         
-        if (Objects.equals(dc.getSpec().getAuthentication(), Authentication.CASSANDRA)) {
+        if (!Objects.equals(dc.getSpec().getAuthentication(), Authentication.NONE)) {
+            
+            Objects.requireNonNull(credentials);
             
             builder.withCredentials(
                     credentials.getUsername(),

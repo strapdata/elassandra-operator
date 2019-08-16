@@ -341,29 +341,23 @@ public class DataCenterUpdateAction {
     // the root DataCenterReconcilier is in charge of calling the update api
     private void updateStatus() {
         
-        switch (dataCenterSpec.getAuthentication()) {
-            case CASSANDRA:
-                if ( /* new cluster */ dataCenterStatus.getCredentialsStatus() == null ||
-                        /* added auth to existing cluster */ dataCenterStatus.getCredentialsStatus().equals(CredentialsStatus.NONE)) {
-                    // TODO: in multi-dc, the credentials might have already been
-                    
-                    // if we restore the dc from a backup, we don't really know which credentials has been restored
-                    if (dataCenterSpec.getRestoreFromBackup() != null) {
-                        dataCenterStatus.setCredentialsStatus(CredentialsStatus.UNKNOWN);
-                    } else {
-                        // else we assume the default cassandra:cassandra
-                        dataCenterStatus.setCredentialsStatus(CredentialsStatus.DEFAULT);
-                    }
+        if (dataCenterSpec.getAuthentication() == Authentication.CASSANDRA) {
+            if ( /* new cluster */ dataCenterStatus.getCredentialsStatus() == null) {
+                // TODO: in multi-dc, the credentials might have already been
+                
+                // if we restore the dc from a backup, we don't really know which credentials has been restored
+                if (dataCenterSpec.getRestoreFromBackup() != null) {
+                    dataCenterStatus.setCredentialsStatus(new CredentialsStatus()
+                            .setUnknown(true));
                 }
-                break;
-            case LDAP:
-                dataCenterStatus.setCredentialsStatus(CredentialsStatus.UNKNOWN);
-                // TODO: support LDAP
-                break;
-            case NONE:
-                dataCenterStatus.setCredentialsStatus(CredentialsStatus.NONE);
-                break;
+            }
         }
+        
+        if (dataCenterStatus.getCredentialsStatus() == null) {
+            dataCenterStatus.setCredentialsStatus(new CredentialsStatus());
+        }
+        
+        // TODO: LDAP support ?
     }
     
     private V1ObjectMeta clusterChildObjectMetadata(final String name) {

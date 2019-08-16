@@ -308,7 +308,7 @@ class CarefulStatefulSetUpdateManager {
 //    }
 //
 //    private TreeMap<String, List<V1Pod>> fetchUnschedulablePods() {
-//        return podsByPhase.get(PodPhase.PENDING).stream()
+//        return podsByPhase.getConnection(PodPhase.PENDING).stream()
 //                .filter(pod ->
 //                        pod.getStatus().getConditions().stream()
 //                                .filter(v1PodCondition -> Objects.equals(v1PodCondition.getType(), "PodScheduled"))
@@ -355,7 +355,7 @@ class CarefulStatefulSetUpdateManager {
     
         logger.debug("Scaling down sts {} to {}", statefulSetToScale.getMetadata().getName(), replicas);
         
-        // the name of the pod remove
+        // the name of the pod to remove
         final String podName = statefulSetToScale.getMetadata().getName() + "-" + replicas;
         
         if (podsByStatus.get(NodeStatus.NORMAL).contains(podName)) {
