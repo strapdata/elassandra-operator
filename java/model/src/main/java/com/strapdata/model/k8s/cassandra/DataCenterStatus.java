@@ -56,7 +56,7 @@ public class DataCenterStatus {
     @Expose
     private List<ElassandraPodStatus> podStatuses;
     
-    @SerializedName("reaperKeyspaceInitialized")
+    @SerializedName("keyspaceStatuses")
     @Expose
-    private Boolean reaperKeyspaceInitialized = false;
+    private KeyspaceStatuses keyspaceStatuses = new KeyspaceStatuses();
 }

@@ -58,19 +58,7 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
             cqlCredentialsManager.reconcileCredentials(dc);
             
             // reconcile keyspaces
-            if (dc.getStatus() != null &&
-                    Objects.equals(dc.getStatus().getPhase(), DataCenterPhase.RUNNING) &&
-                    Objects.equals(dc.getStatus().getCqlStatus(), CqlStatus.ESTABLISHED) &&
-                    !dc.getStatus().getReaperKeyspaceInitialized()) {
-                
-                logger.debug("initialize reaper keyspace");
-                keyspacesManager.initializeReaperKeyspace(dc);
-                
-                // TODO:
-///                session.execute(String.format(
-//                        "ALTER KEYSPACE system_auth WITH replication = {'class': 'NetworkTopologyStrategy', '%s': %d};",
-//                        dataCenter.getSpec().getDatacenterName(), 1)); // TODO: find a smart way to set the RF map
-            }
+            keyspacesManager.reconcileKeyspaces(dc);
             
             // update status can only happen at the end
             k8sResourceUtils.updateDataCenterStatus(dc);

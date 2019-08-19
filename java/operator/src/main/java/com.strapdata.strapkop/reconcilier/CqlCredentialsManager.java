@@ -108,7 +108,7 @@ public class CqlCredentialsManager {
                     removeDefaultRole(dataCenter);
                 }
             } else {
-                // otherwise we create the managed roles and close the cql session
+                // otherwise we create the managed roles and close the default cql session
                 createManagedRoles(dataCenter);
                 cqlConnectionManager.removeConnection(dataCenter);
             }
@@ -202,7 +202,7 @@ public class CqlCredentialsManager {
         
         // create role if not exists, then alter... so this is completely idempotent and can even update password
         session.execute(String.format("CREATE ROLE IF NOT EXISTS %s with SUPERUSER = true AND LOGIN = true and PASSWORD = '%s'", credentials.getUsername(), credentials.getPassword()));
-        session.execute(String.format("ALTER ROLE %s WITH SUPERUSER = true AND LOGIN = true PASSWORD = %s", credentials.getUsername(), credentials.getPassword()));
+        session.execute(String.format("ALTER ROLE %s WITH SUPERUSER = true AND LOGIN = true AND PASSWORD = '%s'", credentials.getUsername(), credentials.getPassword()));
     }
     
     
