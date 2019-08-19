@@ -139,6 +139,13 @@ public class K8sResourceUtils {
 
         appsApi.deleteNamespacedStatefulSet(statefulSetMetadata.getName(), statefulSetMetadata.getNamespace(), deleteOptions, null, null, null, false, "Foreground");
     }
+    
+    public void deleteDeployment(final String name, final String namespace) throws ApiException {
+        V1DeleteOptions deleteOptions = new V1DeleteOptions()
+                .propagationPolicy("Foreground");
+        
+        appsApi.deleteNamespacedStatefulSet(name, namespace, deleteOptions, null, null, null, false, "Foreground");
+    }
 
     public void deletePersistentVolumeClaim(final V1Pod pod) throws ApiException {
 

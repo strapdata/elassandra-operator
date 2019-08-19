@@ -4,13 +4,18 @@ import com.google.gson.JsonSyntaxException;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
+import com.strapdata.strapkop.k8s.OperatorNames;
 import io.kubernetes.client.ApiException;
+import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * TODO: we should probably use kubernetes GC to manage deletion : https://kubernetes.io/docs/concepts/workloads/controllers/garbage-collection/
+ */
 @Prototype
 public class DataCenterDeleteAction {
     private static final Logger logger = LoggerFactory.getLogger(DataCenterDeleteAction.class);
@@ -19,7 +24,7 @@ public class DataCenterDeleteAction {
     private final CoreV1Api coreV1Api;
     private final DataCenter dataCenter;
     
-    public DataCenterDeleteAction(K8sResourceUtils k8sResourceUtils, CoreV1Api coreV1Api, @Parameter("dataCenter") DataCenter dataCenter) {
+    public DataCenterDeleteAction(K8sResourceUtils k8sResourceUtils, CoreV1Api coreV1Api, AppsV1Api appsV1Api, @Parameter("dataCenter") DataCenter dataCenter) {
         this.k8sResourceUtils = k8sResourceUtils;
         this.coreV1Api = coreV1Api;
         this.dataCenter = dataCenter;
@@ -93,6 +98,9 @@ public class DataCenterDeleteAction {
                 break;
         }
 
+        // delete reaper deployment
+        k8sResourceUtils.deleteDeployment(OperatorNames.reaperDeployment(dataCenter), dataCenter.getMetadata().getNamespace());
+        
         logger.info("Deleted DataCenter namespace={} name={}", dataCenter.getMetadata().getNamespace(), dataCenter.getMetadata().getName());
     }
 }
