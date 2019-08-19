@@ -69,7 +69,7 @@ public class OperatorNames {
                 OperatorNames.nodesService(dc), dc.getMetadata().getNamespace());
     }
     
-    public static String reaperDeployment(DataCenter dataCenter) {
+    public static String reaper(DataCenter dataCenter) {
         return OperatorNames.dataCenterChildObjectName("%s-reaper", dataCenter);
     }
 }

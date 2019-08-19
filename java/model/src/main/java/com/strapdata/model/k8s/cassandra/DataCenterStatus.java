@@ -59,4 +59,8 @@ public class DataCenterStatus {
     @SerializedName("keyspaceStatuses")
     @Expose
     private KeyspaceStatuses keyspaceStatuses = new KeyspaceStatuses();
+    
+    @SerializedName("reaperRegistered")
+    @Expose
+    private Boolean reaperRegistered = false;
 }

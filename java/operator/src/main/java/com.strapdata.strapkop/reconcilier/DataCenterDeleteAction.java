@@ -8,6 +8,7 @@ import com.strapdata.strapkop.k8s.OperatorNames;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
+import io.kubernetes.client.models.V1DeleteOptions;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
 import org.slf4j.Logger;
@@ -80,7 +81,7 @@ public class DataCenterDeleteAction {
                 logger.error("Failed to delete Service.", e);
             }
         });
-
+        
         // delete persistent volume claims
         switch(dataCenter.getSpec().getDecommissionPolicy()) {
             case KEEP_PVC:
@@ -98,8 +99,15 @@ public class DataCenterDeleteAction {
                 break;
         }
 
-        // delete reaper deployment
-        k8sResourceUtils.deleteDeployment(OperatorNames.reaperDeployment(dataCenter), dataCenter.getMetadata().getNamespace());
+        try {
+            // delete reaper deployment
+            k8sResourceUtils.deleteDeployment(OperatorNames.reaper(dataCenter), dataCenter.getMetadata().getNamespace());
+            // delete reaper services
+            k8sResourceUtils.deleteService(OperatorNames.reaper(dataCenter), dataCenter.getMetadata().getNamespace());
+        }
+        catch (ApiException e) {
+            logger.error("problem while deleting cassandra reaper on dc={}", dataCenter.getMetadata().getName(), e);
+        }
         
         logger.info("Deleted DataCenter namespace={} name={}", dataCenter.getMetadata().getNamespace(), dataCenter.getMetadata().getName());
     }

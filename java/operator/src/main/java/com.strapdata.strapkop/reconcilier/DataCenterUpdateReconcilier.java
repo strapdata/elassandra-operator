@@ -2,10 +2,12 @@ package com.strapdata.strapkop.reconcilier;
 
 import com.strapdata.model.Key;
 import com.strapdata.model.k8s.cassandra.*;
+import com.strapdata.strapkop.ReaperClient;
 import com.strapdata.strapkop.cql.CqlConnectionManager;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import io.kubernetes.client.ApiException;
 import io.micronaut.context.ApplicationContext;
+import io.reactivex.schedulers.Schedulers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +61,20 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
             
             // reconcile keyspaces
             keyspacesManager.reconcileKeyspaces(dc);
+    
+            if (dc.getStatus().getKeyspaceStatuses().getReaperInitialized()
+                    && !dc.getStatus().getReaperRegistered()) {
+                try (ReaperClient reaperClient = new ReaperClient(dc)) {
+                    
+                    reaperClient.registerCluster().subscribeOn(Schedulers.io()).blockingGet();
+                    dc.getStatus().setReaperRegistered(true);
+                    logger.info("registered dc={} in cassandra-reaper", dc.getMetadata().getName());
+                }
+                catch (Exception e) {
+                    logger.error("error while registering dc={} in cassandra-reaper", dc.getMetadata().getName(), e);
+                }
+    
+            }
             
             // update status can only happen at the end
             k8sResourceUtils.updateDataCenterStatus(dc);

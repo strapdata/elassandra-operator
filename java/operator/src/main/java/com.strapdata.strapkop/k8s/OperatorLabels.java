@@ -4,6 +4,7 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 
+import java.util.HashMap;
 import java.util.Map;
 
 // should be called OperatorLabelsAndAnnotations...
@@ -41,16 +42,15 @@ public final class OperatorLabels {
         return ImmutableMap.<String, String>builder()
                 .put(CLUSTER, clusterName)
                 .putAll(MANAGED)
-                .put("app", "elassandra")
+                .put("app", "elassandra") // for grafana
                 .build();
     }
     
     public static Map<String, String> datacenter(String parent, String clusterName, String dcName) {
         return ImmutableMap.<String, String>builder()
+                .putAll(OperatorLabels.cluster(clusterName))
                 .put(PARENT, parent)
-                .put(CLUSTER, clusterName)
                 .put(DATACENTER, dcName)
-                .putAll(MANAGED)
                 .build();
     }
     
@@ -74,10 +74,9 @@ public final class OperatorLabels {
     }
     
     public static Map<String, String> reaper(DataCenter dataCenter) {
-        return ImmutableMap.<String, String>builder()
-                .putAll(datacenter(dataCenter))
-                .put("app", "reaper") // overwrite label app
-                .build();
+        final Map<String, String> labels = new HashMap<>(datacenter(dataCenter));
+        labels.put("app", "reaper"); // overwrite label app
+        return labels;
     }
     
     
