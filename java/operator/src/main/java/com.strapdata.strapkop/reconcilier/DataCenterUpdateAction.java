@@ -1229,15 +1229,16 @@ public class DataCenterUpdateAction {
         coreApi.createNamespacedSecret(dataCenterMetadata.getNamespace(), secret, null, null, null);
     }
     
-    private void createOrReplaceReaperObjects() throws ApiException {
+    private void createOrReplaceReaperObjects() throws ApiException, StrapkopException {
         
         final Map<String, String> labels = OperatorLabels.reaper(dataCenter);
         
         final V1ObjectMeta meta = new V1ObjectMeta()
                 .name(OperatorNames.reaper(dataCenter))
                 .namespace(dataCenterMetadata.getNamespace())
-                .labels(labels);
-    
+                .labels(labels)
+                .putAnnotationsItem("datacenter-generation", dataCenter.getMetadata().getGeneration().toString());
+        
         final V1Container container = new V1Container();
     
         final V1PodSpec podSpec = new V1PodSpec()
@@ -1390,9 +1391,7 @@ public class DataCenterUpdateAction {
                     .value("false")
             );
         }
-        
-        k8sResourceUtils.createOrReplaceNamespacedDeployment(deployment);
-        
+    
         // create reaper service
         final V1Service service = new V1Service()
                 .metadata(meta)
@@ -1402,7 +1401,29 @@ public class DataCenterUpdateAction {
                         .addPortsItem(new V1ServicePort().name("admin").port(8081))
                         .selector(labels)
                 );
-        
+    
         k8sResourceUtils.createOrReplaceNamespacedService(service);
+        
+        // abort deployment replacement if it is already up to date (according to the annotation datacenter-generation)
+        // this is important because otherwise it generate a "larsen" : deployment replace -> k8s event -> reconciliation -> deployment replace...
+        try {
+            final V1Deployment existingDeployment = appsApi.readNamespacedDeployment(meta.getName(), meta.getNamespace(), null, null, null);
+            final String datacenterGeneration = existingDeployment.getMetadata().getAnnotations().get("datacenter-generation");
+            
+            if (datacenterGeneration == null) {
+                throw new StrapkopException(String.format("reaper deployment %s miss the annotation datacenter-generation", meta.getName()));
+            }
+            
+            if (Objects.equals(Long.parseLong(datacenterGeneration), dataCenterMetadata.getGeneration())) {
+                return ;
+            }
+        }
+        catch (ApiException e) {
+            if (e.getCode() != 404) {
+                throw e;
+            }
+        }
+    
+        k8sResourceUtils.createOrReplaceNamespacedDeployment(deployment);
     }
 }

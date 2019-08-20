@@ -17,8 +17,6 @@ import org.slf4j.LoggerFactory;
 import java.lang.reflect.Type;
 import java.util.Collection;
 
-
-// TODO: this pipeline is not used yet
 @Context
 @Infrastructure
 public class DeploymentPipeline extends K8sWatchPipeline<V1Deployment, V1DeploymentList> {
