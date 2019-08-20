@@ -34,7 +34,7 @@ public class DataCenterDeleteAction {
     public void deleteDataCenter() throws Exception {
         final String labelSelector = OperatorLabels.toSelector(OperatorLabels.datacenter(dataCenter));
         
-
+        
         // delete StatefulSets
         k8sResourceUtils.listNamespacedStatefulSets(dataCenter.getMetadata().getNamespace(), null, labelSelector).forEach(statefulSet -> {
             try {
@@ -51,7 +51,7 @@ public class DataCenterDeleteAction {
         k8sResourceUtils.listNamespacedConfigMaps(dataCenter.getMetadata().getNamespace(), null, labelSelector).forEach(configMap -> {
             try {
                 k8sResourceUtils.deleteConfigMap(configMap);
-                logger.debug("Deleted ConfigMap namespace={} name={}", dataCenter.getMetadata().getNamespace(),configMap.getMetadata().getName());
+                logger.debug("Deleted ConfigMap namespace={} name={}", dataCenter.getMetadata().getNamespace(), configMap.getMetadata().getName());
             } catch (final JsonSyntaxException e) {
                 logger.debug("Caught JSON exception while deleting ConfigMap. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
             } catch (final ApiException e) {
@@ -83,30 +83,40 @@ public class DataCenterDeleteAction {
         });
         
         // delete persistent volume claims
-        switch(dataCenter.getSpec().getDecommissionPolicy()) {
+        switch (dataCenter.getSpec().getDecommissionPolicy()) {
             case KEEP_PVC:
                 break;
             case BACKUP_AND_DELETE_PVC:
                 // TODO: backup
             case DELETE_PVC:
-                k8sResourceUtils.listNamespacedPods( dataCenter.getMetadata().getNamespace(), null, labelSelector).forEach(pod -> {
+                k8sResourceUtils.listNamespacedPods(dataCenter.getMetadata().getNamespace(), null, labelSelector).forEach(pod -> {
                     try {
                         k8sResourceUtils.deletePersistentVolumeClaim(pod);
+                    } catch (final JsonSyntaxException e) {
+                        logger.debug("Caught JSON exception while deleting PVC. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
                     } catch (final ApiException e) {
-                        logger.error("Failed to delete PVC for pod={}"+pod.getMetadata().getName(), e);
+                        logger.error("Failed to delete PVC for pod={}" + pod.getMetadata().getName(), e);
                     }
                 });
                 break;
         }
-
+        
         try {
             // delete reaper deployment
             k8sResourceUtils.deleteDeployment(OperatorNames.reaper(dataCenter), dataCenter.getMetadata().getNamespace());
+        } catch (final JsonSyntaxException e) {
+            logger.debug("Caught JSON exception while deleting deployment. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
+        } catch (ApiException e) {
+            logger.error("problem while deleting cassandra reaper deployment on dc={}", dataCenter.getMetadata().getName(), e);
+        }
+        
+        try {
             // delete reaper services
             k8sResourceUtils.deleteService(OperatorNames.reaper(dataCenter), dataCenter.getMetadata().getNamespace());
-        }
-        catch (ApiException e) {
-            logger.error("problem while deleting cassandra reaper on dc={}", dataCenter.getMetadata().getName(), e);
+        } catch (final JsonSyntaxException e) {
+            logger.debug("Caught JSON exception while deleting deployment. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
+        } catch (ApiException e) {
+            logger.error("problem while deleting cassandra reaper service on dc={}", dataCenter.getMetadata().getName(), e);
         }
         
         logger.info("Deleted DataCenter namespace={} name={}", dataCenter.getMetadata().getNamespace(), dataCenter.getMetadata().getName());

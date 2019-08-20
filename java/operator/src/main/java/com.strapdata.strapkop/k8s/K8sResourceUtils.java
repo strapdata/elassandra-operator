@@ -146,7 +146,7 @@ public class K8sResourceUtils {
         V1DeleteOptions deleteOptions = new V1DeleteOptions()
                 .propagationPolicy("Foreground");
         
-        appsApi.deleteNamespacedStatefulSet(name, namespace, deleteOptions, null, null, null, false, "Foreground");
+        appsApi.deleteNamespacedDeployment(name, namespace, deleteOptions, null, null, null, false, "Foreground");
     }
     
     public void deleteService(final String name, final String namespace) throws ApiException {
