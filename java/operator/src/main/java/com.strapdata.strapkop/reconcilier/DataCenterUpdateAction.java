@@ -1234,7 +1234,7 @@ public class DataCenterUpdateAction {
         final Map<String, String> labels = OperatorLabels.reaper(dataCenter);
         
         final V1ObjectMeta meta = new V1ObjectMeta()
-                .name(OperatorNames.reaperDeployment(dataCenter))
+                .name(OperatorNames.reaper(dataCenter))
                 .namespace(dataCenterMetadata.getNamespace())
                 .labels(labels);
     
@@ -1392,5 +1392,17 @@ public class DataCenterUpdateAction {
         }
         
         k8sResourceUtils.createOrReplaceNamespacedDeployment(deployment);
+        
+        // create reaper service
+        final V1Service service = new V1Service()
+                .metadata(meta)
+                .spec(new V1ServiceSpec()
+                        .type("ClusterIP")
+                        .addPortsItem(new V1ServicePort().name("app").port(8080))
+                        .addPortsItem(new V1ServicePort().name("admin").port(8081))
+                        .selector(labels)
+                );
+        
+        k8sResourceUtils.createOrReplaceNamespacedService(service);
     }
 }
