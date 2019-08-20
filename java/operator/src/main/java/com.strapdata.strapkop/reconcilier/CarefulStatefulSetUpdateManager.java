@@ -273,10 +273,7 @@ class CarefulStatefulSetUpdateManager {
      * Create an ElassandraTask of type cleanup
      */
     private void triggerCleanupTask() throws ApiException {
-        final String name = OperatorNames.dataCenterChildObjectName("%s-cleanup-" + UUID.randomUUID().toString().substring(0, 8), dataCenter);
-        final Task cleanupTask = Task.fromDataCenter(name, dataCenter);
-        cleanupTask.getSpec().setCleanup(new CleanupTaskSpec());
-        k8sResourceUtils.createTask(cleanupTask);
+        k8sResourceUtils.createTask(dataCenter, "cleanup", spec -> spec.setCleanup(new CleanupTaskSpec()));
     }
     
     // TODO: reuse part of this commented code to delete failed stuck pod with old config

@@ -7,6 +7,7 @@ import com.squareup.okhttp.Call;
 import com.strapdata.model.Key;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.k8s.task.Task;
+import com.strapdata.model.k8s.task.TaskSpec;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.ApiResponse;
 import io.kubernetes.client.apis.AppsV1Api;
@@ -21,6 +22,7 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.function.Consumer;
 
 @Singleton
 public class K8sResourceUtils {
@@ -366,5 +368,12 @@ public class K8sResourceUtils {
     public void createTask(Task task) throws ApiException {
         customObjectsApi.createNamespacedCustomObject("stable.strapdata.com", "v1",
                 task.getMetadata().getNamespace(), "elassandratasks", task, null);
+    }
+    
+    public void createTask(DataCenter dc, String taskType, Consumer<TaskSpec> modifier) throws ApiException {
+            final String name = OperatorNames.generateTaskName(dc, taskType);
+            final Task task = Task.fromDataCenter(name, dc);
+            modifier.accept(task.getSpec());
+            this.createTask(task);
     }
 }

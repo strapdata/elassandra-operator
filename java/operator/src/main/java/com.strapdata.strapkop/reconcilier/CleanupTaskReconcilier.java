@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
 @Singleton
 @Infrastructure
 public final class CleanupTaskReconcilier extends TaskReconcilier {
-    private static final Logger logger = LoggerFactory.getLogger(TaskReconcilier.class);
+    private static final Logger logger = LoggerFactory.getLogger(CleanupTaskReconcilier.class);
     
     private final SidecarClientFactory sidecarClientFactory;
     

@@ -2,6 +2,8 @@ package com.strapdata.strapkop.k8s;
 
 import com.strapdata.model.k8s.cassandra.DataCenter;
 
+import java.util.UUID;
+
 public class OperatorNames {
     
     public static String clusterChildObjectName(final String nameFormat, final DataCenter dataCenter) {
@@ -71,5 +73,9 @@ public class OperatorNames {
     
     public static String reaper(DataCenter dataCenter) {
         return OperatorNames.dataCenterChildObjectName("%s-reaper", dataCenter);
+    }
+    
+    public static String generateTaskName(DataCenter dc, String taskType) {
+        return OperatorNames.dataCenterChildObjectName("%s-" + taskType + "-" + UUID.randomUUID().toString().substring(0, 8), dc);
     }
 }
