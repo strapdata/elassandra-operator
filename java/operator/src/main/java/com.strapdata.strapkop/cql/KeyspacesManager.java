@@ -1,4 +1,4 @@
-package com.strapdata.strapkop.reconcilier;
+package com.strapdata.strapkop.cql;
 
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.Session;

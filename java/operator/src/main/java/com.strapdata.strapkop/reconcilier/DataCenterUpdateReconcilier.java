@@ -4,6 +4,8 @@ import com.strapdata.model.Key;
 import com.strapdata.model.k8s.cassandra.*;
 import com.strapdata.strapkop.ReaperClient;
 import com.strapdata.strapkop.cql.CqlConnectionManager;
+import com.strapdata.strapkop.cql.CqlCredentialsManager;
+import com.strapdata.strapkop.cql.KeyspacesManager;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import io.kubernetes.client.ApiException;
 import io.micronaut.context.ApplicationContext;

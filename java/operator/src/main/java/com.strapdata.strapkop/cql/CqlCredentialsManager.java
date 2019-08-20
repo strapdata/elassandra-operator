@@ -1,11 +1,9 @@
-package com.strapdata.strapkop.reconcilier;
+package com.strapdata.strapkop.cql;
 
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.exceptions.AuthenticationException;
 import com.datastax.driver.core.exceptions.DriverException;
 import com.strapdata.model.k8s.cassandra.*;
-import com.strapdata.strapkop.cql.CqlConnectionManager;
-import com.strapdata.strapkop.cql.CqlCredentials;
 import com.strapdata.strapkop.exception.StrapkopException;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import io.kubernetes.client.ApiException;

@@ -15,7 +15,6 @@ import com.strapdata.model.k8s.cassandra.DataCenterPhase;
 import com.strapdata.strapkop.cache.CqlConnectionCache;
 import com.strapdata.strapkop.exception.StrapkopException;
 import com.strapdata.strapkop.k8s.OperatorNames;
-import com.strapdata.strapkop.reconcilier.CqlCredentialsManager;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import io.kubernetes.client.ApiException;
 import io.netty.handler.ssl.SslContext;
