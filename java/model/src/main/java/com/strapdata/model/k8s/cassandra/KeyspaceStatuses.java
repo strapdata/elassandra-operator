@@ -12,8 +12,4 @@ public class KeyspaceStatuses {
     @SerializedName("observedReplicas")
     @Expose
     private Integer observedReplicas;
-    
-    @SerializedName("reaperInitialized")
-    @Expose
-    private Boolean reaperInitialized = false;
 }

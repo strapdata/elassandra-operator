@@ -7,6 +7,7 @@ import com.google.common.collect.ImmutableMap;
 import com.strapdata.model.k8s.cassandra.CqlStatus;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.k8s.cassandra.DataCenterPhase;
+import com.strapdata.model.k8s.cassandra.ReaperStatus;
 import com.strapdata.strapkop.cql.CqlConnectionManager;
 import com.strapdata.strapkop.exception.StrapkopException;
 
@@ -60,9 +61,9 @@ public class KeyspacesManager {
     }
     
     private void updateReaperKeyspace(DataCenter dc, Map<String, Integer> rfMap) throws StrapkopException {
-        if (!Objects.equals(dc.getStatus().getKeyspaceStatuses().getReaperInitialized(), true)) {
+        if (!Objects.equals(dc.getStatus().getReaperStatus().isInitialized(), true)) {
             createOrPartialAlterKeyspace(dc, "reaper_db", rfMap);
-            dc.getStatus().getKeyspaceStatuses().setReaperInitialized(true);
+            dc.getStatus().setReaperStatus(ReaperStatus.KEYSPACE_INITIALIZED);
         }
         else {
             partialAlterKeyspace(dc, "reaper_db", rfMap);

@@ -1247,7 +1247,7 @@ public class DataCenterUpdateAction {
                 .metadata(meta)
                 .spec(new V1DeploymentSpec()
                         // delay the creation of the reaper pod, after we have created the reaper_db keyspace
-                        .replicas(dataCenterStatus.getKeyspaceStatuses().getReaperInitialized() ? 1 : 0)
+                        .replicas(dataCenterStatus.getReaperStatus().isInitialized() ? 1 : 0)
                         .selector(new V1LabelSelector()
                                 .matchLabels(labels)
                         )

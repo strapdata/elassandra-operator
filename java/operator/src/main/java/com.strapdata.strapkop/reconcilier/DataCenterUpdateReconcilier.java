@@ -61,20 +61,9 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
             
             // reconcile keyspaces
             keyspacesManager.reconcileKeyspaces(dc);
-    
-            if (dc.getStatus().getKeyspaceStatuses().getReaperInitialized()
-                    && !dc.getStatus().getReaperRegistered()) {
-                try (ReaperClient reaperClient = new ReaperClient(dc)) {
-                    
-                    reaperClient.registerCluster().subscribeOn(Schedulers.io()).blockingGet();
-                    dc.getStatus().setReaperRegistered(true);
-                    logger.info("registered dc={} in cassandra-reaper", dc.getMetadata().getName());
-                }
-                catch (Exception e) {
-                    logger.error("error while registering dc={} in cassandra-reaper", dc.getMetadata().getName(), e);
-                }
-    
-            }
+            
+            // reconcile reaper
+            reconcileReaper(dc);
             
             // update status can only happen at the end
             k8sResourceUtils.updateDataCenterStatus(dc);
@@ -87,6 +76,30 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
                 dc.getStatus().setPhase(DataCenterPhase.ERROR);
                 dc.getStatus().setLastErrorMessage(e.getMessage());
                 k8sResourceUtils.updateDataCenterStatus(dc);
+            }
+        }
+    }
+    
+    private void reconcileReaper(DataCenter dc) {
+    
+        if (dc.getStatus().getReaperStatus().equals(ReaperStatus.KEYSPACE_INITIALIZED)) {
+            try (ReaperClient reaperClient = new ReaperClient(dc)) {
+        
+                if (!reaperClient.ping().blockingGet()) {
+                    logger.info("reaper is not ready before registration, waiting");
+                }
+                else {
+                    reaperClient.registerCluster()
+                            .observeOn(Schedulers.io())
+                            .subscribeOn(Schedulers.io())
+                            .blockingGet();
+                    dc.getStatus().setReaperStatus(ReaperStatus.REGISTERED);
+                    logger.info("registered dc={} in cassandra-reaper", dc.getMetadata().getName());
+                }
+            }
+            catch (Exception e) {
+                dc.getStatus().setLastErrorMessage(e.getMessage());
+                logger.error("error while registering dc={} in cassandra-reaper", dc.getMetadata().getName(), e);
             }
         }
     }

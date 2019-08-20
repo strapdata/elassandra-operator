@@ -8,6 +8,9 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.client.RxHttpClient;
 import io.reactivex.Single;
+import io.reactivex.schedulers.Schedulers;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -25,13 +28,23 @@ import static io.micronaut.http.HttpRequest.POST;
 @SuppressWarnings("rawtypes")
 public class ReaperClient implements Closeable {
     
+    
+    private final Logger logger = LoggerFactory.getLogger(ReaperClient.class);
+    
     private final RxHttpClient httpClient;
     private final DataCenter dataCenter;
     
     public ReaperClient(DataCenter dc) throws MalformedURLException {
         httpClient = RxHttpClient.create(new URL("http", OperatorNames.reaper(dc), 8080, "/"));
         this.dataCenter = dc;
-        httpClient.close();
+    }
+    
+    public Single<Boolean> ping() {
+        return httpClient.exchange(GET("/ping"))
+                .observeOn(Schedulers.io())
+                .map(res -> res.code() == 204)
+                .onErrorReturnItem(false)
+                .single(false);
     }
     
     /**
@@ -45,7 +58,9 @@ public class ReaperClient implements Closeable {
         return authenticate().flatMap(jwt -> httpClient.exchange(
                     POST(String.format("/cluster?seedHost=%s&jmxPort=%d", seedHost, jmxPort), "")
                     .header("Authorization", String.format("Bearer %s", jwt))
-            ).singleOrError()
+            )
+                .observeOn(Schedulers.io())
+                .singleOrError()
         ).map(res -> true);
     }
     
@@ -62,6 +77,9 @@ public class ReaperClient implements Closeable {
         
         return login("admin", "admin")
                 .flatMap(this::getJwt)
+                .doOnError(throwable -> {
+                    logger.error("reaper authentication error", throwable);
+                })
                 .doOnSuccess(jwt -> this.jwt = jwt);
     }
     
@@ -74,6 +92,10 @@ public class ReaperClient implements Closeable {
                 "password", password
         );
         return httpClient.exchange(POST("/login", data).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE))
+                .observeOn(Schedulers.io())
+                .doOnNext(httpResponse -> {
+                    logger.debug("reaper login response status={}", httpResponse.getStatus().getCode());
+                })
                 .map(this::parseCookie)
                 .singleOrError();
     }
@@ -83,6 +105,10 @@ public class ReaperClient implements Closeable {
      */
     private Single<String> getJwt(String cookie) {
         return httpClient.exchange(GET("/jwt").header("Cookie", cookie))
+                .observeOn(Schedulers.io())
+                .doOnNext(httpResponse -> {
+                    logger.debug("reaper jwt response status={}", httpResponse.getStatus().getCode());
+                })
                 .map(httpResponse -> Objects.requireNonNull(httpResponse.body()).toString(StandardCharsets.UTF_8))
                 .singleOrError();
     }
@@ -101,7 +127,7 @@ public class ReaperClient implements Closeable {
             return null;
         }
     
-        return m.group(0);
+        return m.group(1);
     }
     
     @Override
