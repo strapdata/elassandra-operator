@@ -3,7 +3,7 @@ package com.strapdata.strapkop.handler;
 import com.google.common.collect.Sets;
 import com.strapdata.model.ClusterKey;
 import com.strapdata.model.Key;
-import com.strapdata.model.sidecar.NodeStatus;
+import com.strapdata.model.sidecar.ElassandraPodStatus;
 import com.strapdata.strapkop.event.NodeStatusEvent;
 import com.strapdata.strapkop.reconcilier.DataCenterUpdateReconcilier;
 import com.strapdata.strapkop.workqueue.WorkQueue;
@@ -17,14 +17,14 @@ public class NodeStatusHandler extends TerminalHandler<NodeStatusEvent> {
     
     private final Logger logger = LoggerFactory.getLogger(NodeStatusHandler.class);
     
-    private static final Set<NodeStatus> reconcileOperationModes = Sets.immutableEnumSet(
+    private static final Set<ElassandraPodStatus> reconcileOperationModes = Sets.immutableEnumSet(
             // Reconcile when nodes switch to NORMAL. There may be pending scale operations that were
             // waiting for a healthy cluster.
-            NodeStatus.NORMAL,
+            ElassandraPodStatus.NORMAL,
             
             // Reconcile when nodes have finished decommissioning. This will resume the StatefulSet
             // reconciliation.
-            NodeStatus.DECOMMISSIONED
+            ElassandraPodStatus.DECOMMISSIONED
     );
     
     private final WorkQueue workQueue;
@@ -37,13 +37,13 @@ public class NodeStatusHandler extends TerminalHandler<NodeStatusEvent> {
     
     @Override
     public void accept(NodeStatusEvent event) {
-        logger.info("processing a NodeStatus event {} {} -> {}",
+        logger.info("processing a ElassandraPodCrdStatus event {} {} -> {}",
                 event.getPod().getName(),
                 event.getPreviousMode(), event.getCurrentMode());
         
         if (event.getCurrentMode() != null && reconcileOperationModes.contains(event.getCurrentMode())) {
             final String clusterName = event.getPod().getCluster();
-            logger.debug("triggering dc reconciliation because of a NodeStatus change");
+            logger.debug("triggering dc reconciliation because of a ElassandraPodCrdStatus change");
             workQueue.submit(
                     new ClusterKey(clusterName, event.getPod().getNamespace()),
                     dataCenterReconcilier.asCompletable(new Key(event.getPod().getParent(), event.getPod().getNamespace())));
