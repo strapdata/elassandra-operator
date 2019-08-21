@@ -25,6 +25,10 @@ import java.util.regex.Pattern;
 import static io.micronaut.http.HttpRequest.GET;
 import static io.micronaut.http.HttpRequest.POST;
 
+/**
+ * This is the http client for the reaper api.
+ * It use reaper authentication mechanism as described in http://cassandra-reaper.io/docs/api/
+ */
 @SuppressWarnings("rawtypes")
 public class ReaperClient implements Closeable {
     
@@ -39,6 +43,9 @@ public class ReaperClient implements Closeable {
         this.dataCenter = dc;
     }
     
+    /**
+     * Check for the availability of reaper
+     */
     public Single<Boolean> ping() {
         return httpClient.exchange(GET("/ping"))
                 .observeOn(Schedulers.io())
@@ -48,7 +55,7 @@ public class ReaperClient implements Closeable {
     }
     
     /**
-     * Register the cluster
+     * Register the cluster (the datacenter in fact, because reaper is configured with availability == EACH and local_dc)
      */
     public Single<Boolean> registerCluster() {
         
@@ -67,7 +74,7 @@ public class ReaperClient implements Closeable {
     private String jwt = null;
     
     /**
-     * Authenticate the first time then store the jwt for later reuse
+     * Encapsulate the authentication logic, fetch the jwt token the first time then store it for later reuse
      */
     private Single<String> authenticate() {
         

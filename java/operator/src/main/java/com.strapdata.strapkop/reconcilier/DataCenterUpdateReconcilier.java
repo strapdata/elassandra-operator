@@ -64,8 +64,8 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
             // reconcile keyspaces
             keyspacesManager.reconcileKeyspaces(dc);
             
-            // reconcile reaper
-            reconcileReaper(dc);
+            // reconcile reaper cluster registration
+            reconcileReaperRegistration(dc);
             
             // update status can only happen at the end
             k8sResourceUtils.updateDataCenterStatus(dc);
@@ -82,7 +82,12 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
         }
     }
     
-    private void reconcileReaper(DataCenter dc) {
+    
+    /**
+     * As soon as reaper_db keyspace is created, this function try to ping the reaper api and, if success, register the datacenter.
+     * THe registration is done only once. If the datacenter is unregistered by the user, it will not register it again automatically.
+     */
+    private void reconcileReaperRegistration(DataCenter dc) {
     
         if (dc.getStatus().getReaperStatus().equals(ReaperStatus.KEYSPACE_INITIALIZED)) {
             try (ReaperClient reaperClient = new ReaperClient(dc)) {
