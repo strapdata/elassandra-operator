@@ -15,7 +15,6 @@ ENTRYPOINT ["strapkop-entrypoint.sh"]
 
 COPY cassandra /usr/sbin/cassandra
 COPY nodetool /usr/bin/nodetool
-COPY cassandra.in.sh /usr/share/cassandra/
 # replace ready-probe.sh
 COPY ready-probe.sh /
 
