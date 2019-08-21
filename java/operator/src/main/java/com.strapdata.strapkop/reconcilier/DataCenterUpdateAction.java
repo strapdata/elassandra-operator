@@ -1404,7 +1404,7 @@ public class DataCenterUpdateAction {
     
         k8sResourceUtils.createOrReplaceNamespacedService(service);
         
-        // abort deployment replacement if it is already up to date (according to the annotation datacenter-generation)
+        // abort deployment replacement if it is already up to date (according to the annotation datacenter-generation and to spec.replicas)
         // this is important because otherwise it generate a "larsen" : deployment replace -> k8s event -> reconciliation -> deployment replace...
         try {
             final V1Deployment existingDeployment = appsApi.readNamespacedDeployment(meta.getName(), meta.getNamespace(), null, null, null);
@@ -1414,7 +1414,8 @@ public class DataCenterUpdateAction {
                 throw new StrapkopException(String.format("reaper deployment %s miss the annotation datacenter-generation", meta.getName()));
             }
             
-            if (Objects.equals(Long.parseLong(datacenterGeneration), dataCenterMetadata.getGeneration())) {
+            if (Objects.equals(Long.parseLong(datacenterGeneration), dataCenterMetadata.getGeneration()) &&
+                    Objects.equals(existingDeployment.getSpec().getReplicas(), deployment.getSpec().getReplicas())) {
                 return ;
             }
         }
