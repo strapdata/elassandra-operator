@@ -32,7 +32,7 @@ public class WorkQueue {
      * @param key
      * @param completable
      */
-    public void submit(final ClusterKey key, final Completable completable) {
+    public synchronized void submit(final ClusterKey key, final Completable completable) {
         
         Subject<Completable> queue = queues.get(key);
         
