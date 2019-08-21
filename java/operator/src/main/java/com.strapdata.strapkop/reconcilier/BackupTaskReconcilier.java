@@ -6,6 +6,7 @@ import com.strapdata.model.backup.StorageProvider;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.k8s.task.Task;
 import com.strapdata.model.k8s.task.TaskPhase;
+import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
@@ -66,10 +67,8 @@ public class BackupTaskReconcilier extends TaskReconcilier {
                         task.getSpec().getBackup().getTarget(),
                         OperatorNames.dataCenterResource(task.getSpec().getCluster(), task.getSpec().getDatacenter()),
                         pod);
-        
-                final String podFqdn = OperatorNames.podFqdn(dc, pod);
-        
-                final boolean success = sidecarClientFactory.clientForHost(podFqdn)
+    
+                final boolean success = sidecarClientFactory.clientForPod(new ElassandraPod(dc, pod))
                         .backup(backupArguments)
                         .doOnSuccess(backupResponse -> logger.debug("received backup response with status = {}", backupResponse.getStatus()))
                         .map(backupResponse -> backupResponse.getStatus().equalsIgnoreCase("success"))
@@ -138,7 +137,7 @@ public class BackupTaskReconcilier extends TaskReconcilier {
 //                    pod);
 //
 //
-//            return sidecarClientFactory.clientForHost(pod)
+//            return sidecarClientFactory.clientForPod(pod)
 //                    .backup(backupArguments)
 //                    .doOnSuccess(backupResponse -> logger.debug("received backup response with status = {}", backupResponse.getStatus()))
 //                    .map(backupResponse -> backupResponse.getStatus().equalsIgnoreCase("success"))

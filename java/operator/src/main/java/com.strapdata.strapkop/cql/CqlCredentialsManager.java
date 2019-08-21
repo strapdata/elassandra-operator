@@ -198,7 +198,7 @@ public class CqlCredentialsManager {
             throw new StrapkopException(String.format("invalid character in cassandra password for username %s", credentials.getUsername()));
         }
         
-        // create role if not exists, then alter... so this is completely idempotent and can even update password
+        // create role if not exists, then alter... so this is completely idempotent and can even update password, although it might not be optimized
         session.execute(String.format("CREATE ROLE IF NOT EXISTS %s with SUPERUSER = true AND LOGIN = true and PASSWORD = '%s'", credentials.getUsername(), credentials.getPassword()));
         session.execute(String.format("ALTER ROLE %s WITH SUPERUSER = true AND LOGIN = true AND PASSWORD = '%s'", credentials.getUsername(), credentials.getPassword()));
     }

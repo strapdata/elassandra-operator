@@ -54,7 +54,7 @@ public class DataCenterStatus {
     
     @SerializedName("podStatuses")
     @Expose
-    private List<ElassandraPodStatus> podStatuses;
+    private List<ElassandraPodCrdStatus> podStatuses;
     
     @SerializedName("keyspaceStatuses")
     @Expose

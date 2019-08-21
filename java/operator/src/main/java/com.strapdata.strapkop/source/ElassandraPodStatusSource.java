@@ -1,9 +1,8 @@
 package com.strapdata.strapkop.source;
 
-import com.strapdata.model.Key;
-import com.strapdata.model.sidecar.NodeStatus;
+import com.strapdata.model.sidecar.ElassandraPodStatus;
 import com.strapdata.strapkop.cache.DataCenterCache;
-import com.strapdata.strapkop.cache.NodeStatusCache;
+import com.strapdata.strapkop.cache.ElassandraPodStatusCache;
 import com.strapdata.strapkop.event.NodeStatusEvent;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import io.reactivex.Observable;
@@ -17,17 +16,17 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 @Singleton
-public class NodeStatusSource implements EventSource<NodeStatusEvent> {
+public class ElassandraPodStatusSource implements EventSource<NodeStatusEvent> {
     
-    private final Logger logger = LoggerFactory.getLogger(NodeStatusSource.class);
+    private final Logger logger = LoggerFactory.getLogger(ElassandraPodStatusSource.class);
     
     
-    private final NodeStatusCache nodeStatusCache;
+    private final ElassandraPodStatusCache elassandraPodStatusCache;
     private final DataCenterCache dataCenterCache;
     private final SidecarClientFactory sidecarClientFactory;
     
-    public NodeStatusSource(NodeStatusCache nodeStatusCache, DataCenterCache dataCenterCache, SidecarClientFactory sidecarClientFactory) {
-        this.nodeStatusCache = nodeStatusCache;
+    public ElassandraPodStatusSource(ElassandraPodStatusCache elassandraPodStatusCache, DataCenterCache dataCenterCache, SidecarClientFactory sidecarClientFactory) {
+        this.elassandraPodStatusCache = elassandraPodStatusCache;
         this.dataCenterCache = dataCenterCache;
         this.sidecarClientFactory = sidecarClientFactory;
     }
@@ -43,20 +42,25 @@ public class NodeStatusSource implements EventSource<NodeStatusEvent> {
                 )
                 .flatMapSingle(event -> {
                             try {
-                                return sidecarClientFactory.clientForHost(event.getPod().getFqdn()).status()
+                                return sidecarClientFactory.clientForPod(event.getPod()).status()
                                         .observeOn(Schedulers.io())
                                         .doOnSubscribe(d -> logger.debug("requesting pod {} sidecar for health check on thread {}", event.getPod().getName(), Thread.currentThread().getName()))
                                         .map(event::setCurrentMode)
-                                        .doOnError(throwable -> logger.warn("failed to get the status from sidecar pod {}", event.getPod().getName(), throwable))
-                                        .onErrorReturn(throwable -> event.setCurrentMode(NodeStatus.UNKNOWN));
+                                        .doOnError(throwable -> {
+                                            logger.warn("failed to get the status from sidecar pod {}", event.getPod().getName(), throwable);
+                                            sidecarClientFactory.invalidateClient(event.getPod());
+                                        })
+                                        .onErrorReturn(throwable -> event.setCurrentMode(ElassandraPodStatus.UNKNOWN));
                             } catch (Exception e) {
                                 logger.warn("failed to get the status of pod={}", event.getPod().getName(), e);
-                                return Single.just(event.setCurrentMode(NodeStatus.UNKNOWN));
+                                sidecarClientFactory.invalidateClient(event.getPod());
+                                return Single.just(event.setCurrentMode(ElassandraPodStatus.UNKNOWN));
                             }
                         }
                 )
-                .map(event -> event.setPreviousMode(nodeStatusCache.get(new Key(event.getPod().getName(), event.getPod().getNamespace()))))
-                .doOnNext(event -> nodeStatusCache.put(new Key(event.getPod().getName(), event.getPod().getNamespace()), event.getCurrentMode()))
+                .map(event -> event.setPreviousMode(elassandraPodStatusCache.get(event.getPod())))
+                .doOnNext(event -> elassandraPodStatusCache.put(event.getPod(), event.getCurrentMode()))
                 .filter(event -> !Objects.equals(event.getCurrentMode(), event.getPreviousMode()));
     }
+    
 }

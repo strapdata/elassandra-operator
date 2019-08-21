@@ -2,13 +2,13 @@ package com.strapdata.model.k8s.cassandra;
 
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
-import com.strapdata.model.sidecar.NodeStatus;
+import com.strapdata.model.sidecar.ElassandraPodStatus;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
-public class ElassandraPodStatus {
+public class ElassandraPodCrdStatus {
     
     @SerializedName("podName")
     @Expose
@@ -16,5 +16,5 @@ public class ElassandraPodStatus {
     
     @SerializedName("mode")
     @Expose
-    private NodeStatus mode;
+    private ElassandraPodStatus mode;
 }

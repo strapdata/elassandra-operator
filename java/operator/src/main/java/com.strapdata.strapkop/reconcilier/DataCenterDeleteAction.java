@@ -2,6 +2,8 @@ package com.strapdata.strapkop.reconcilier;
 
 import com.google.gson.JsonSyntaxException;
 import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.cache.ElassandraPodStatusCache;
+import com.strapdata.strapkop.cache.SidecarConnectionCache;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.k8s.OperatorNames;
@@ -24,16 +26,23 @@ public class DataCenterDeleteAction {
     private final K8sResourceUtils k8sResourceUtils;
     private final CoreV1Api coreV1Api;
     private final DataCenter dataCenter;
+    private final ElassandraPodStatusCache elassandraPodStatusCache;
+    private final SidecarConnectionCache sidecarConnectionCache;
     
-    public DataCenterDeleteAction(K8sResourceUtils k8sResourceUtils, CoreV1Api coreV1Api, AppsV1Api appsV1Api, @Parameter("dataCenter") DataCenter dataCenter) {
+    public DataCenterDeleteAction(K8sResourceUtils k8sResourceUtils, CoreV1Api coreV1Api, AppsV1Api appsV1Api, @Parameter("dataCenter") DataCenter dataCenter, ElassandraPodStatusCache elassandraPodStatusCache, SidecarConnectionCache sidecarConnectionCache) {
         this.k8sResourceUtils = k8sResourceUtils;
         this.coreV1Api = coreV1Api;
         this.dataCenter = dataCenter;
+        this.elassandraPodStatusCache = elassandraPodStatusCache;
+        this.sidecarConnectionCache = sidecarConnectionCache;
     }
     
     public void deleteDataCenter() throws Exception {
         final String labelSelector = OperatorLabels.toSelector(OperatorLabels.datacenter(dataCenter));
         
+        // cleanup local caches
+        elassandraPodStatusCache.purgeDataCenter(dataCenter);
+        sidecarConnectionCache.purgeDataCenter(dataCenter);
         
         // delete StatefulSets
         k8sResourceUtils.listNamespacedStatefulSets(dataCenter.getMetadata().getNamespace(), null, labelSelector).forEach(statefulSet -> {

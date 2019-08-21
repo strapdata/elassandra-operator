@@ -3,8 +3,8 @@ package com.strapdata.strapkop.reconcilier;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.k8s.task.Task;
 import com.strapdata.model.k8s.task.TaskPhase;
+import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import io.kubernetes.client.ApiException;
 import io.micronaut.context.annotation.Infrastructure;
@@ -62,10 +62,7 @@ public final class CleanupTaskReconcilier extends TaskReconcilier {
                 (pod, timer) -> pod)
                 .doOnNext(pod -> {
                     try {
-                        final String podFqdn = String.format("%s.%s.%s.svc.cluster.local", pod,
-                                OperatorNames.nodesService(dc), dc.getMetadata().getNamespace());
-                        
-                        final Throwable t = sidecarClientFactory.clientForHost(podFqdn).cleanup().blockingGet();
+                        final Throwable t = sidecarClientFactory.clientForPod(new ElassandraPod(dc, pod)).cleanup().blockingGet();
                         if (t != null) throw t;
                         task.getStatus().getPods().put(pod, TaskPhase.SUCCEED);
                     } catch (Throwable throwable) {
