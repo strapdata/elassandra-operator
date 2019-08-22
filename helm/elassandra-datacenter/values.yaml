@@ -16,6 +16,7 @@ image:
 imagePullPolicy: Always
 imagePullSecret: ""
 
+# TODO: we do not support unprivileged setup yet
 privilegedSupported: true
 
 resources:

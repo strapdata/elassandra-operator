@@ -18,7 +18,11 @@ COPY nodetool /usr/bin/nodetool
 # replace ready-probe.sh
 COPY ready-probe.sh /
 
-# authorize cassandra (and all non-root user) to change system limits (ulimit) using bash
+# authorize cassandra (and all non-root user) to change system limits (ulimit) using
+# ulimit can not be set at the host level because, when user is changed from root to cassandra, it lost existing limits.
+# ulimit has to be set after the user has changes, but this require some capabilities to be set on the entrypoint executable,
+# which is bash actually...
+# unfortunalty, this does not work with unpriviledged mode... TODO: we'll have to find a workaround if we want to support unpriviledged setup
 RUN dagi libcap2-bin && setcap cap_ipc_lock=+ep /bin/bash && setcap cap_sys_resource=+ep /bin/bash
 # this file is sourced from the entrypoint.sh
 COPY systune.sh /
