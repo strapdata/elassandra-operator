@@ -3,6 +3,7 @@ package com.strapdata.strapkop.cql;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.exceptions.AuthenticationException;
 import com.datastax.driver.core.exceptions.DriverException;
+import com.google.common.collect.ImmutableMap;
 import com.strapdata.model.k8s.cassandra.*;
 import com.strapdata.strapkop.exception.StrapkopException;
 import com.strapdata.strapkop.k8s.OperatorNames;
@@ -36,6 +37,13 @@ public class CqlCredentialsManager {
     public final static CqlCredentials defaultCredentials = new CqlCredentials()
             .setUsername("cassandra")
             .setPassword("cassandra");
+    
+    // Map of managed cql users -> superuser boolean
+    public final static Map<String, Boolean> superuserMap = ImmutableMap.of(
+            "strapkop", true,
+            "admin", true,
+            "reaper", false
+    );
     
     public CqlCredentialsManager(CqlConnectionManager cqlConnectionManager, CoreV1Api coreApi) {
         this.cqlConnectionManager = cqlConnectionManager;
@@ -166,7 +174,7 @@ public class CqlCredentialsManager {
         final Map<String, CqlCredentials> credentials = loadAllCredentials(dataCenter);
         for (CqlCredentials cred : credentials.values()) {
             logger.info("creating role {} for {}", cred.getUsername(), dataCenter.getMetadata().getName());
-            createOrUpdateRole(cred, session);
+            createOrUpdateRole(cred, session, superuserMap.get(cred.getUsername()));
         }
         dataCenter.getStatus().getCredentialsStatus().setManaged(true);
     }
@@ -190,7 +198,7 @@ public class CqlCredentialsManager {
      * @param session
      * @throws StrapkopException
      */
-    private void createOrUpdateRole(CqlCredentials credentials, Session session) throws StrapkopException {
+    private void createOrUpdateRole(CqlCredentials credentials, Session session, boolean superuser) throws StrapkopException {
         if (credentials.getUsername().matches(".*[\"\';].*")) {
             throw new StrapkopException(String.format("invalid character in cassandra username %s", credentials.getUsername()));
         }
@@ -199,8 +207,8 @@ public class CqlCredentialsManager {
         }
         
         // create role if not exists, then alter... so this is completely idempotent and can even update password, although it might not be optimized
-        session.execute(String.format("CREATE ROLE IF NOT EXISTS %s with SUPERUSER = true AND LOGIN = true and PASSWORD = '%s'", credentials.getUsername(), credentials.getPassword()));
-        session.execute(String.format("ALTER ROLE %s WITH SUPERUSER = true AND LOGIN = true AND PASSWORD = '%s'", credentials.getUsername(), credentials.getPassword()));
+        session.execute(String.format("CREATE ROLE IF NOT EXISTS %s with SUPERUSER = %b AND LOGIN = true and PASSWORD = '%s'", credentials.getUsername(), superuser, credentials.getPassword()));
+        session.execute(String.format("ALTER ROLE %s WITH SUPERUSER = %b AND LOGIN = true AND PASSWORD = '%s'", credentials.getUsername(), superuser, credentials.getPassword()));
     }
     
     
@@ -214,7 +222,7 @@ public class CqlCredentialsManager {
      * @throws ApiException
      */
     public CqlCredentials loadCredentials(final DataCenter dataCenter, final String username) throws StrapkopException, ApiException {
-        return loadCredentialsList(dataCenter, new String[]{username}).get(username);
+        return loadCredentialsList(dataCenter, Collections.singleton(username)).get(username);
     }
     
     /**
@@ -226,13 +234,10 @@ public class CqlCredentialsManager {
      * @throws StrapkopException
      */
     public Map<String, CqlCredentials> loadAllCredentials(final DataCenter dataCenter) throws ApiException, StrapkopException {
-        
-        String[] userList = {"strapkop", "admin"};
-        
-        return loadCredentialsList(dataCenter, userList);
+        return loadCredentialsList(dataCenter, superuserMap.keySet());
     }
     
-    private Map<String, CqlCredentials> loadCredentialsList(final DataCenter dataCenter, String[] userList) throws ApiException, StrapkopException {
+    private Map<String, CqlCredentials> loadCredentialsList(final DataCenter dataCenter, Collection<String> userList) throws ApiException, StrapkopException {
         
         final String secretName = OperatorNames.clusterSecret(dataCenter);
         
@@ -244,7 +249,7 @@ public class CqlCredentialsManager {
         
         final Map<String, CqlCredentials> credentials = new HashMap<>();
         for (String user : userList) {
-            byte[] password = secret.getData().get(String.format("%s_password", user));
+            byte[] password = secret.getData().get(String.format("cassandra.%s_password", user));
             if (password == null) {
                 throw new StrapkopException(String.format("secret %s does not contain password for user %s", secretName, user));
             }

@@ -37,10 +37,14 @@ public class ReaperClient implements Closeable {
     
     private final RxHttpClient httpClient;
     private final DataCenter dataCenter;
+    private final String username;
+    private final String password;
     
-    public ReaperClient(DataCenter dc) throws MalformedURLException {
+    public ReaperClient(DataCenter dc, String username, String password) throws MalformedURLException {
         httpClient = RxHttpClient.create(new URL("http", OperatorNames.reaper(dc), 8080, "/"));
         this.dataCenter = dc;
+        this.username = username;
+        this.password = password;
     }
     
     /**
@@ -82,7 +86,7 @@ public class ReaperClient implements Closeable {
             return Single.just(this.jwt);
         }
         
-        return login("admin", "admin")
+        return login(username, password)
                 .flatMap(this::getJwt)
                 .doOnError(throwable -> {
                     logger.error("reaper authentication error", throwable);

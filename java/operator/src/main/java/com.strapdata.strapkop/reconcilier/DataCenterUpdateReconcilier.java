@@ -6,8 +6,12 @@ import com.strapdata.strapkop.ReaperClient;
 import com.strapdata.strapkop.cql.CqlConnectionManager;
 import com.strapdata.strapkop.cql.CqlCredentialsManager;
 import com.strapdata.strapkop.cql.KeyspacesManager;
+import com.strapdata.strapkop.exception.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
+import com.strapdata.strapkop.k8s.OperatorNames;
 import io.kubernetes.client.ApiException;
+import io.kubernetes.client.apis.CoreV1Api;
+import io.kubernetes.client.models.V1Secret;
 import io.micronaut.context.ApplicationContext;
 import io.reactivex.schedulers.Schedulers;
 import org.slf4j.Logger;
@@ -26,13 +30,15 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
     private final CqlCredentialsManager cqlCredentialsManager;
     private final KeyspacesManager keyspacesManager;
     private final CqlConnectionManager cqlConnectionManager;
+    private final CoreV1Api coreApi;
     
-    public DataCenterUpdateReconcilier(final ApplicationContext context, K8sResourceUtils k8sResourceUtils, CqlCredentialsManager cqlCredentialsManager, KeyspacesManager keyspacesManager, CqlConnectionManager cqlConnectionManager) {
+    public DataCenterUpdateReconcilier(final ApplicationContext context, K8sResourceUtils k8sResourceUtils, CqlCredentialsManager cqlCredentialsManager, KeyspacesManager keyspacesManager, CqlConnectionManager cqlConnectionManager, CoreV1Api coreApi) {
         this.context = context;
         this.k8sResourceUtils = k8sResourceUtils;
         this.cqlCredentialsManager = cqlCredentialsManager;
         this.keyspacesManager = keyspacesManager;
         this.cqlConnectionManager = cqlConnectionManager;
+        this.coreApi = coreApi;
     }
     
     @Override
@@ -87,10 +93,13 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
      * As soon as reaper_db keyspace is created, this function try to ping the reaper api and, if success, register the datacenter.
      * THe registration is done only once. If the datacenter is unregistered by the user, it will not register it again automatically.
      */
-    private void reconcileReaperRegistration(DataCenter dc) {
+    private void reconcileReaperRegistration(DataCenter dc) throws StrapkopException, ApiException {
     
         if (dc.getStatus().getReaperStatus().equals(ReaperStatus.KEYSPACE_INITIALIZED)) {
-            try (ReaperClient reaperClient = new ReaperClient(dc)) {
+            
+            final String reaperAdminPassword = loadReaperAdminPassword(dc);
+            
+            try (ReaperClient reaperClient = new ReaperClient(dc, "admin", reaperAdminPassword)) {
         
                 if (!reaperClient.ping().blockingGet()) {
                     logger.info("reaper is not ready before registration, waiting");
@@ -109,5 +118,21 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
                 logger.error("error while registering dc={} in cassandra-reaper", dc.getMetadata().getName(), e);
             }
         }
+    }
+    
+    // TODO: cache cluster secret to avoid loading secret again and again
+    private String loadReaperAdminPassword(DataCenter dc) throws ApiException, StrapkopException {
+        final String secretName = OperatorNames.clusterSecret(dc);
+        final V1Secret secret = coreApi.readNamespacedSecret(secretName,
+                dc.getMetadata().getNamespace(),
+                null,
+                null,
+                null);
+        final byte[] password = secret.getData().get("reaper.admin_password");
+        if (password == null) {
+            throw new StrapkopException(String.format("secret %s does not contain reaper.admin_password", secretName));
+        }
+        return new String(password);
+    
     }
 }

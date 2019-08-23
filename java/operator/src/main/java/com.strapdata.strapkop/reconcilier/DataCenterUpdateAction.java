@@ -1218,9 +1218,15 @@ public class DataCenterUpdateAction {
         final V1Secret secret = new V1Secret()
                 .metadata(secretMetadata)
                 // strapkop role is used by the operator and sidecar
-                .putStringDataItem("strapkop_password", UUID.randomUUID().toString())
+                .putStringDataItem("cassandra.strapkop_password", UUID.randomUUID().toString())
                 // admin is intended to be distributed to human administrator, so the credentials lifecycle is decoupled
-                .putStringDataItem("admin_password", UUID.randomUUID().toString())
+                .putStringDataItem("cassandra.admin_password", UUID.randomUUID().toString())
+                // password used by reaper to access its cassandra backend
+                .putStringDataItem("cassandra.reaper_password", UUID.randomUUID().toString())
+                
+                // password used to access reaper webui and api
+                .putStringDataItem("reaper.admin_password", UUID.randomUUID().toString())
+                
                 // cassandra JMX password, mounted as /etc/cassandra/jmxremote.password
                 .putStringDataItem("jmx_password", UUID.randomUUID().toString())
                 // elassandra-enterprise shared secret is intended to be mounted as a config fragment
@@ -1240,7 +1246,7 @@ public class DataCenterUpdateAction {
                 .putAnnotationsItem("datacenter-generation", dataCenter.getMetadata().getGeneration().toString());
         
         final V1Container container = new V1Container();
-    
+        
         final V1PodSpec podSpec = new V1PodSpec()
                 .addContainersItem(container);
         
@@ -1312,6 +1318,19 @@ public class DataCenterUpdateAction {
                         .value("cassandra")
                 )
                 .addEnvItem(new V1EnvVar()
+                        .name("REAPER_AUTH_USER")
+                        .value("admin")
+                )
+                .addEnvItem(new V1EnvVar()
+                        .name("REAPER_AUTH_PASSWORD")
+                        .valueFrom(new V1EnvVarSource()
+                                .secretKeyRef(new V1SecretKeySelector()
+                                        .name(OperatorNames.clusterSecret(dataCenter))
+                                        .key("reaper.admin_password")
+                                )
+                        )
+                )
+                .addEnvItem(new V1EnvVar()
                         .name("REAPER_STORAGE_TYPE")
                         .value("cassandra")
                 )
@@ -1346,14 +1365,14 @@ public class DataCenterUpdateAction {
                     )
                     .addEnvItem(new V1EnvVar()
                             .name("REAPER_CASS_AUTH_USERNAME")
-                            .value("strapkop") // TODO: create an account for reaper
+                            .value("reaper") // TODO: create an account for reaper
                     )
                     .addEnvItem(new V1EnvVar()
                             .name("REAPER_CASS_AUTH_PASSWORD")
                             .valueFrom(new V1EnvVarSource()
                                     .secretKeyRef(new V1SecretKeySelector()
                                             .name(OperatorNames.clusterSecret(dataCenter))
-                                            .key("strapkop_password")
+                                            .key("cassandra.reaper_password")
                                     )
                             )
                     );
@@ -1391,7 +1410,7 @@ public class DataCenterUpdateAction {
                     .value("false")
             );
         }
-    
+        
         // create reaper service
         final V1Service service = new V1Service()
                 .metadata(meta)
@@ -1401,7 +1420,7 @@ public class DataCenterUpdateAction {
                         .addPortsItem(new V1ServicePort().name("admin").port(8081))
                         .selector(labels)
                 );
-    
+        
         k8sResourceUtils.createOrReplaceNamespacedService(service);
         
         // abort deployment replacement if it is already up to date (according to the annotation datacenter-generation and to spec.replicas)
@@ -1416,15 +1435,14 @@ public class DataCenterUpdateAction {
             
             if (Objects.equals(Long.parseLong(datacenterGeneration), dataCenterMetadata.getGeneration()) &&
                     Objects.equals(existingDeployment.getSpec().getReplicas(), deployment.getSpec().getReplicas())) {
-                return ;
+                return;
             }
-        }
-        catch (ApiException e) {
+        } catch (ApiException e) {
             if (e.getCode() != 404) {
                 throw e;
             }
         }
-    
+        
         k8sResourceUtils.createOrReplaceNamespacedDeployment(deployment);
     }
 }

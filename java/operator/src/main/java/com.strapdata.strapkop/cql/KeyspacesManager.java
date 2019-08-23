@@ -8,7 +8,6 @@ import com.strapdata.model.k8s.cassandra.CqlStatus;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.k8s.cassandra.DataCenterPhase;
 import com.strapdata.model.k8s.cassandra.ReaperStatus;
-import com.strapdata.strapkop.cql.CqlConnectionManager;
 import com.strapdata.strapkop.exception.StrapkopException;
 
 import javax.inject.Singleton;
@@ -17,6 +16,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+/**
+ * Manage the creation of keyspaces, grant permissions, alter replication map...
+ */
 @Singleton
 public class KeyspacesManager {
     
@@ -63,6 +65,7 @@ public class KeyspacesManager {
     private void updateReaperKeyspace(DataCenter dc, Map<String, Integer> rfMap) throws StrapkopException {
         if (!Objects.equals(dc.getStatus().getReaperStatus().isInitialized(), true)) {
             createOrPartialAlterKeyspace(dc, "reaper_db", rfMap);
+            grant(dc, "ALL PERMISSIONS", "KEYSPACE reaper_db", "reaper");
             dc.getStatus().setReaperStatus(ReaperStatus.KEYSPACE_INITIALIZED);
         }
         else {
@@ -71,14 +74,14 @@ public class KeyspacesManager {
     }
     
     private void createKeyspace(final DataCenter dc, final String name, Map<String, Integer> rfMap, boolean ifNotExists) throws StrapkopException {
-        final Session session = getSession(dc);
+        final Session session = getSessionRequireNonNull(dc);
         session.execute(String.format(
                 "CREATE KEYSPACE %s %s WITH replication = {'class': 'NetworkTopologyStrategy', %s};",
                 ifNotExists ? "IF NOT EXISTS" : "", name, stringifyRfMap(rfMap)));
     }
     
     private void alterKeyspace(final DataCenter dc, final String name, Map<String, Integer> rfMap) throws StrapkopException {
-        final Session session = getSession(dc);
+        final Session session = getSessionRequireNonNull(dc);
         session.execute(String.format(
                 "ALTER KEYSPACE %s WITH replication = {'class': 'NetworkTopologyStrategy', %s};",
                 name, stringifyRfMap(rfMap)));
@@ -102,7 +105,7 @@ public class KeyspacesManager {
      * @throws StrapkopException
      */
     private void partialAlterKeyspace(final DataCenter dc, final String name, Map<String, Integer> rfMap) throws StrapkopException {
-        final Session session = getSession(dc);
+        final Session session = getSessionRequireNonNull(dc);
         final Row row = session.execute("SELECT keyspace_name, replication FROM system_schema.keyspaces WHERE keyspace_name = ?", name).one();
         if (row == null) {
             throw new StrapkopException(String.format("keyspace=%s does not exist in dc=%s", name, dc.getMetadata().getName()));
@@ -118,8 +121,12 @@ public class KeyspacesManager {
         alterKeyspace(dc, name, mergeRfMap);
     }
     
+    private void grant(DataCenter dc, String permission, String resource, String user) throws StrapkopException {
+        final Session session = getSessionRequireNonNull(dc);
+        session.execute(String.format("GRANT %s ON %s TO %s;", permission, resource, user));
+    }
     
-    private Session getSession(DataCenter dc) throws StrapkopException {
+    private Session getSessionRequireNonNull(DataCenter dc) throws StrapkopException {
         final Session session = cqlConnectionManager.getConnection(dc);
         
         if (session == null) {
