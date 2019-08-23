@@ -5,6 +5,7 @@ source test/config
 
 ./test/lib/undeploy-operator || true
 kubectl delete sts --all --force --grace-period=0
+kubectl delete deployments --all --force --grace-period=0
 kubectl delete pod --all --force --grace-period=0
 kubectl delete svc --all --force --grace-period=0
 kubectl delete edc --all || true

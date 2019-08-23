@@ -28,7 +28,7 @@ is_dc_ready() {
     return 1;
   fi
   if [[ "$AUTHENTICATION" == 'CASSANDRA' ]]; then
-    [[ "$(kubectl get edc "$1" -o 'jsonpath={.status.credentialsStatus}')" == 'MANAGED' ]]
+    [[ "$(kubectl get edc "$1" -o 'jsonpath={.status.credentialsStatus.managed}')" == 'true' ]]
   fi
 }
 
