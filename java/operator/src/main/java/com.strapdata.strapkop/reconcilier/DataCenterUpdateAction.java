@@ -383,10 +383,6 @@ public class DataCenterUpdateAction {
                 .putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, dataCenter.getMetadata().getGeneration().toString());
     }
     
-    private String rackName(final int rackIdx) {
-        return "rack" + (rackIdx + 1);
-    }
-    
     private static class ConfigMapVolumeMount {
         final String name, mountPath;
         
@@ -399,12 +395,11 @@ public class DataCenterUpdateAction {
         }
     }
     
-    private V1Container addPortsItem(V1Container container, int port, String name, boolean withHostPort) {
+    private void addPortsItem(V1Container container, int port, String name, boolean withHostPort) {
         if (port > 0) {
             V1ContainerPort v1Port = new V1ContainerPort().name(name).containerPort(port);
             container.addPortsItem((dataCenterSpec.getHostPortEnabled() && withHostPort) ? v1Port.hostPort(port) : v1Port);
         }
-        return container;
     }
     
     private V1StatefulSet constructZoneStatefulSet(final String rack, final int replicas, final Iterable<ConfigMapVolumeMount> configMapVolumeMounts, String configmapFingerprint) throws ApiException, StrapkopException {
@@ -450,7 +445,13 @@ public class DataCenterUpdateAction {
                 .addEnvItem(new V1EnvVar().name("NAMESPACE").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.namespace"))))
                 .addEnvItem(new V1EnvVar().name("POD_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.name"))))
                 .addEnvItem(new V1EnvVar().name("POD_IP").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("status.podIP"))))
-                .addEnvItem(new V1EnvVar().name("NODE_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("spec.nodeName"))));
+                .addEnvItem(new V1EnvVar().name("NODE_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("spec.nodeName"))))
+                .addEnvItem(new V1EnvVar().name("STRAPKOP_PASSWORD").valueFrom(new V1EnvVarSource()
+                        .secretKeyRef(new V1SecretKeySelector()
+                                .name(OperatorNames.clusterSecret(dataCenter))
+                                .key("cassandra.strapkop_password")
+                        )
+                ));
         
         addPortsItem(cassandraContainer, dataCenterSpec.getStoragePort(), "internode", true);
         addPortsItem(cassandraContainer, dataCenterSpec.getSslStoragePort(), "internode-ssl", true);
@@ -501,7 +502,7 @@ public class DataCenterUpdateAction {
                         .valueFrom(new V1EnvVarSource()
                                 .secretKeyRef(new V1SecretKeySelector()
                                         .name(OperatorNames.clusterSecret(dataCenter))
-                                        .key("strapkop_password")))
+                                        .key("cassandra.strapkop_password")))
                 )
                 .image(dataCenterSpec.getSidecarImage())
                 .imagePullPolicy(dataCenterSpec.getImagePullPolicy())
@@ -947,25 +948,76 @@ public class DataCenterUpdateAction {
         // not sure if k8s exposes the right number of CPU cores inside the container
         
         // strapdata ssl support
-        {
-            addSslConfig(configMap, volumeSource);
-        }
+        addSslConfig(configMap, volumeSource);
         
         //strapdata authentication support
-        {
-            addAuthenticationConfig(configMap, volumeSource);
-        }
+        addAuthenticationConfig(configMap, volumeSource);
         
         // strapdata enterprise support
-        {
-            addEnterpriseConfig(configMap, volumeSource);
-        }
+        addEnterpriseConfig(configMap, volumeSource);
+        
+        // add cqlshrc and curlrc
+        addCqlshAndCurlConfig(configMap, volumeSource);
+        
         
         k8sResourceUtils.createOrReplaceNamespacedConfigMap(configMap);
         
         final String configMapFingerprint = DigestUtils.sha1Hex(appsApi.getApiClient().getJSON().getGson().toJson(configMap.getData()));
         
         return Tuple.of(new ConfigMapVolumeMount("operator-spec-config-volume", "/tmp/operator-spec-config", volumeSource), configMapFingerprint);
+    }
+    
+    private void addCqlshAndCurlConfig(V1ConfigMap configMap, V1ConfigMapVolumeSource volumeSource) {
+        String cqlshrc = "";
+        String curlrc = "";
+        
+        if (dataCenterSpec.getSsl()) {
+            cqlshrc +=
+                    "[connection]\n" +
+                            "factory = cqlshlib.ssl.ssl_transport_factory\n" +
+                            "port = " + dataCenterSpec.getNativePort() + "\n" +
+                            "ssl = true\n" +
+                            "\n" +
+                            "[ssl]\n" +
+                            "certfile = /tmp/operator-truststore/cacert.pem\n" +
+                            "validate = true\n";
+            
+            if (Optional.ofNullable(dataCenterSpec.getEnterprise()).map(Enterprise::getSsl).orElse(false)) {
+                curlrc += "cacert = /tmp/operator-truststore/cacert.pem\n";
+            }
+            
+        } else {
+            cqlshrc +=
+                    "[connection]\n" +
+                            "factory = cqlshlib.ssl.ssl_transport_factory\n" +
+                            "port = " + dataCenterSpec.getNativePort() + "\n";
+        }
+        
+        
+        if (!dataCenterSpec.getAuthentication().equals(Authentication.NONE)) {
+            cqlshrc += "[authentication]\n" +
+                    "username = strapkop\n" +
+                    "password = ${PASSWORD}";
+            
+            if (Optional.ofNullable(dataCenterSpec.getEnterprise()).map(Enterprise::getAaa).map(Aaa::getEnabled).orElse(false)) {
+                cqlshrc += "user = strapkop:${PASSWORD}\n";
+            }
+            
+        }
+        
+        configMapVolumeAddFile(configMap, volumeSource, "cqlshrc", cqlshrc);
+        
+        configMapVolumeAddFile(configMap, volumeSource, "curlrc", curlrc);
+        
+        // replace template ${PASSWORD} with env var ${STRAPKOP_PASSWORD}
+        final String sedTemplating = "sed -e \"s/\\${PASSWORD}/1/\" -e \"s/${STRAPKOP_PASSWORD}/dog/\"";
+        
+        final String envScript = "" +
+                "mkdir -p ~/.cassandra\n" +
+                "cat ${CASSANDRA_CONF}/cqlshrc | " + sedTemplating + " > ~/.cassandra/cqlshrc\n" +
+                "cat ${CASSANDRA_CONF}/curlrc | " + sedTemplating + " > ~/.curlrc\n";
+        
+        configMapVolumeAddFile(configMap, volumeSource, "cassandra-env.sh.d/002-cqlshrc-curlrc.sh", envScript);
     }
     
     private void addSslConfig(V1ConfigMap configMap, V1ConfigMapVolumeSource volumeSource) {
@@ -1004,27 +1056,6 @@ public class DataCenterUpdateAction {
         );
         
         configMapVolumeAddFile(configMap, volumeSource, "cassandra.yaml.d/002-ssl.yaml", toYamlString(cassandraConfig));
-        
-        final String cqlshrc =
-                "[connection]\n" +
-                        "factory = cqlshlib.ssl.ssl_transport_factory\n" +
-                        "port = " + dataCenterSpec.getNativePort() + "\n" +
-                        "ssl = true\n" +
-                        "\n" +
-                        "[ssl]\n" +
-                        "certfile = /tmp/operator-truststore/cacert.pem\n" +
-                        "validate = true\n";
-        
-        configMapVolumeAddFile(configMap, volumeSource, "cqlshrc", cqlshrc);
-        
-        configMapVolumeAddFile(configMap, volumeSource, "curlrc", "cacert = /tmp/operator-truststore/cacert.pem");
-        
-        final String envScript = "" +
-                "mkdir -p ~/.cassandra\n" +
-                "cp ${CASSANDRA_CONF}/cqlshrc ~/.cassandra/cqlshrc\n" +
-                "cp ${CASSANDRA_CONF}/curlrc ~/.curlrc\n";
-        
-        configMapVolumeAddFile(configMap, volumeSource, "cassandra-env.sh.d/002-ssl.sh", envScript);
     }
     
     private void addAuthenticationConfig(V1ConfigMap configMap, V1ConfigMapVolumeSource volumeSource) {
