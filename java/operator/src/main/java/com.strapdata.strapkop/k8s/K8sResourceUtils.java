@@ -339,14 +339,6 @@ public class K8sResourceUtils {
 
         return new ResourceListIterable<>(firstPage);
     }
-
-    // temporary shitty solution TODO: remove this
-    public DataCenter freshenDataCenter(final DataCenter dc) throws ApiException {
-        final Call call = customObjectsApi.getNamespacedCustomObjectCall("stable.strapdata.com", "v1",
-                dc.getMetadata().getNamespace(), "elassandradatacenters", dc.getMetadata().getName(), null, null);
-        final ApiResponse<DataCenter> apiResponse = customObjectsApi.getApiClient().execute(call, DataCenter.class);
-        return apiResponse.getData();
-    }
     
     public DataCenter readDatacenter(final Key key) throws ApiException {
         final Call call = customObjectsApi.getNamespacedCustomObjectCall("stable.strapdata.com", "v1",

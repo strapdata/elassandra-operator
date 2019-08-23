@@ -45,6 +45,9 @@ public class WorkQueue {
     }
     
     private Subject<Completable> createQueue(final ClusterKey key) {
+        
+        logger.debug("creating workqueue for key {}", key);
+        
         final Subject<Completable> queue = BehaviorSubject.<Completable>create()
                 .toSerialized(); // this make the subject thread safe (e.g can call onNext concurrently)
         

@@ -24,15 +24,14 @@ import java.util.Set;
 public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier.Action, Task>> {
 
     private static final Logger logger = LoggerFactory.getLogger(TaskReconcilier.class);
-    static Set<TaskPhase> terminatedPhases = EnumSet.of(TaskPhase.SUCCEED, TaskPhase.FAILED);
+    private static Set<TaskPhase> terminatedPhases = EnumSet.of(TaskPhase.SUCCEED, TaskPhase.FAILED);
     final K8sResourceUtils k8sResourceUtils;
     private final String taskType;
     
-    public TaskReconcilier(String taskType, K8sResourceUtils k8sResourceUtils) {
+    TaskReconcilier(String taskType, K8sResourceUtils k8sResourceUtils) {
         this.k8sResourceUtils = k8sResourceUtils;
         this.taskType = taskType;
     }
-    
     
     enum Action {
         SUBMIT, CANCEL
@@ -64,6 +63,7 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
         return this.asCompletable(new Tuple2<>(Action.SUBMIT, task));
     }
     
+    // TODO: implement task cancellation
     public Completable prepareCancelCompletable(Task task) {
         return this.asCompletable(new Tuple2<>(Action.CANCEL, task));
     }
@@ -143,8 +143,7 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
                 Objects.equals(dc.getStatus().getReadyReplicas(), dc.getSpec().getReplicas());
     }
     
-    void ensureLockDc(Task task, DataCenter dc) throws ApiException {
-        // TODO: move the locking logic on parent class for other tasks
+    private void ensureLockDc(Task task, DataCenter dc) throws ApiException {
         
         if (Objects.equals(dc.getStatus().getCurrentTask(), task.getMetadata().getName())) {
             return ;
