@@ -13,6 +13,7 @@ import io.kubernetes.client.ApiResponse;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.apis.CustomObjectsApi;
+import io.kubernetes.client.apis.ExtensionsV1beta1Api;
 import io.kubernetes.client.models.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +38,9 @@ public class K8sResourceUtils {
     @Inject
     private CustomObjectsApi customObjectsApi;
     
-    
+    @Inject
+    private ExtensionsV1beta1Api extensionsV1beta1Api;
+
     @FunctionalInterface
     public interface ApiCallable {
         void call() throws ApiException;
@@ -66,6 +69,24 @@ public class K8sResourceUtils {
                 () -> {
                     coreApi.createNamespacedService(namespace, service, null, null, null);
                     logger.debug("Created namespaced Service.");
+                },
+                () -> {
+                    // temporarily disable service replace call to fix issue #41 since service can't be customized right now
+//                        coreApi.replaceNamespacedService(service.getMetadata().getName(), service.getMetadata().getNamespace(), service, null, null);
+//                        logger.debug("Replaced namespaced Service.");
+                }
+        );
+    }
+
+    public void createOrReplaceNamespacedIngress(final V1beta1Ingress ingress) throws ApiException {
+        final String namespace = ingress.getMetadata().getNamespace();
+
+        logger.debug("Creating/replacing namespaced Ingress.");
+
+        createOrReplaceResource(
+                () -> {
+                    extensionsV1beta1Api.createNamespacedIngress(namespace, ingress, null, null, null);
+                    logger.debug("Created namespaced Ingress.");
                 },
                 () -> {
                     // temporarily disable service replace call to fix issue #41 since service can't be customized right now
@@ -109,6 +130,12 @@ public class K8sResourceUtils {
         final V1ObjectMeta metadata = service.getMetadata();
 
         coreApi.deleteNamespacedService(metadata.getName(), metadata.getNamespace(), new V1DeleteOptions(), null, null, null, null, null);
+    }
+
+    public void deleteIngress(final V1beta1Ingress ingress) throws ApiException {
+        final V1ObjectMeta metadata = ingress.getMetadata();
+
+        extensionsV1beta1Api.deleteNamespacedIngress(metadata.getName(), metadata.getNamespace(), new V1DeleteOptions(), null, null, null, null, null);
     }
 
     public void deleteConfigMap(final V1ConfigMap configMap) throws ApiException {
@@ -336,6 +363,35 @@ public class K8sResourceUtils {
         }
 
         final V1ServicePage firstPage = new V1ServicePage(null);
+
+        return new ResourceListIterable<>(firstPage);
+    }
+
+    public Iterable<V1beta1Ingress> listNamespacedIngress(final String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) throws ApiException {
+        class V1IngressPage implements ResourceListIterable.Page<V1beta1Ingress> {
+            private final V1beta1IngressList ingressList;
+
+            private V1IngressPage(final String continueToken) throws ApiException {
+                ingressList = extensionsV1beta1Api.listNamespacedIngress(namespace, null, null, continueToken, fieldSelector, labelSelector, null, null, null, null);
+            }
+
+            @Override
+            public Collection<V1beta1Ingress> items() {
+                return ingressList.getItems();
+            }
+
+            @Override
+            public ResourceListIterable.Page<V1beta1Ingress> nextPage() throws ApiException {
+                final String continueToken = ingressList.getMetadata().getContinue();
+
+                if (Strings.isNullOrEmpty(continueToken))
+                    return null;
+
+                return new V1IngressPage(continueToken);
+            }
+        }
+
+        final V1IngressPage firstPage = new V1IngressPage(null);
 
         return new ResourceListIterable<>(firstPage);
     }

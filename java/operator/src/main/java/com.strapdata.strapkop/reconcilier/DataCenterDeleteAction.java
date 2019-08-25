@@ -90,7 +90,19 @@ public class DataCenterDeleteAction {
                 logger.error("Failed to delete Service.", e);
             }
         });
-        
+
+        // delete Ingress
+        k8sResourceUtils.listNamespacedIngress(dataCenter.getMetadata().getNamespace(), null, labelSelector).forEach(ingress -> {
+            try {
+                k8sResourceUtils.deleteIngress(ingress);
+                logger.debug("Deleted Ingress namespace={} name={}", ingress.getMetadata().getNamespace(), ingress.getMetadata().getName());
+            } catch (final JsonSyntaxException e) {
+                logger.debug("Caught JSON exception while deleting Ingress. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
+            } catch (final ApiException e) {
+                logger.error("Failed to delete Ingress.", e);
+            }
+        });
+
         // delete persistent volume claims
         switch (dataCenter.getSpec().getDecommissionPolicy()) {
             case KEEP_PVC:

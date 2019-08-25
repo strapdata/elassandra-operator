@@ -1443,6 +1443,10 @@ public class DataCenterUpdateAction {
         }
         
         // create reaper service
+        final String APP_SERVICE_NAME = "app";
+        final String ADMIN_SERVICE_NAME = "admin";
+        final int APP_SERVICE_PORT = 8080;
+        final int ADMIN_SERVICE_PORT = 8081;
         final V1Service service = new V1Service()
                 .metadata(meta)
                 .spec(new V1ServiceSpec()
@@ -1451,8 +1455,32 @@ public class DataCenterUpdateAction {
                         .addPortsItem(new V1ServicePort().name("admin").port(8081))
                         .selector(labels)
                 );
-        
         k8sResourceUtils.createOrReplaceNamespacedService(service);
+
+        // create reaper ingress
+        String ingressDomain = System.getenv("INGRESS_DOMAIN");
+        if (ingressDomain != null) {
+            String reaperHost = "reaper." + this.dataCenterMetadata.getName() + "." + ingressDomain;
+            logger.info("Creating reaper ingress host={}", reaperHost);
+            final V1beta1Ingress ingress = new V1beta1Ingress()
+                    .metadata(meta)
+                    .spec(new V1beta1IngressSpec()
+                            .addRulesItem(new V1beta1IngressRule()
+                                    .host(reaperHost)
+                                    .http(new V1beta1HTTPIngressRuleValue()
+                                            .addPathsItem(new V1beta1HTTPIngressPath()
+                                                    .path("/")
+                                                    .backend(new V1beta1IngressBackend().serviceName(APP_SERVICE_NAME).servicePort(new IntOrString(APP_SERVICE_PORT)))
+                                            )
+                                            .addPathsItem(new V1beta1HTTPIngressPath()
+                                                    .path("/")
+                                                    .backend(new V1beta1IngressBackend().serviceName(ADMIN_SERVICE_NAME).servicePort(new IntOrString(ADMIN_SERVICE_PORT)))
+                                            )
+                                    )
+                            )
+                    );
+            k8sResourceUtils.createOrReplaceNamespacedIngress(ingress);
+        }
         
         // abort deployment replacement if it is already up to date (according to the annotation datacenter-generation and to spec.replicas)
         // this is important because otherwise it generate a "larsen" : deployment replace -> k8s event -> reconciliation -> deployment replace...
