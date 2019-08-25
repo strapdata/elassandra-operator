@@ -1117,6 +1117,13 @@ public class DataCenterUpdateAction {
                     "JVM_OPTS=\"$JVM_OPTS -Dcassandra.custom_query_handler_class=org.elassandra.index.EnterpriseElasticQueryHandler\"");
             // TODO: override com exporter in cassandra-env.sh.d/001-cassandra-exporter.sh
         }
+
+        // add elassandra datacenter.group config
+        if (dataCenterSpec.getDatacenterGroup() != null) {
+            final Map<String, Object> esConfig = new HashMap<>();
+            esConfig.put("datacenter", ImmutableMap.of("group", dataCenterSpec.getDatacenterGroup()));
+            configMapVolumeAddFile(configMap, volumeSource, "elasticsearch.yml.d/003-datacentergroup.yaml", toYamlString(esConfig));
+        }
     }
     
     private V1Service createOrReplaceSeedNodesService(String seedRack) throws ApiException {

@@ -187,4 +187,11 @@ public class DataCenterSpec {
     @SerializedName("remoteSeeds")
     @Expose
     private List<String> remoteSeeds;
+
+    /**
+     * Elassandra datacenter group
+     */
+    @SerializedName("datacenterGroup")
+    @Expose
+    private String datacenterGroup = null;
 }

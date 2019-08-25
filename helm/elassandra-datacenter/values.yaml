@@ -41,6 +41,9 @@ enterprise:
     audit: true
   cbs: true
 
+# Elassandra datacenter.group
+#datacenterGroup:
+
 #Example authentication for AWS S3 based backups
 #env:
 #  - name: AWS_ACCESS_KEY_ID
