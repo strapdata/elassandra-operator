@@ -32,7 +32,7 @@ public class DataCenterSpec {
     
     @SerializedName("nodeAffinityPolicy")
     @Expose
-    private NodeAffinityPolicy nodeAffinityPolicy = NodeAffinityPolicy.STRICT;
+    private ElassandraPodsAffinityPolicy elassandraPodsAffinityPolicy = ElassandraPodsAffinityPolicy.STRICT;
     
     @SerializedName("elassandraImage")
     @Expose
