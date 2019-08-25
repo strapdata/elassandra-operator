@@ -8,6 +8,7 @@ import com.google.gson.reflect.TypeToken;
 import com.squareup.okhttp.Call;
 import com.strapdata.model.k8s.cassandra.*;
 import com.strapdata.model.k8s.task.Task;
+import com.strapdata.strapkop.cql.CqlConnectionManager;
 import com.strapdata.strapkop.exception.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
@@ -56,13 +57,15 @@ public class DataCenterUpdateAction {
     private final DataCenterStatus dataCenterStatus;
     private final Map<String, String> dataCenterLabels;
     
-    private final CarefulStatefulSetUpdateManager carefulStatefulSetUpdateManager;
-    
+    private final com.strapdata.strapkop.reconcilier.CarefulStatefulSetUpdateManager carefulStatefulSetUpdateManager;
+    private final CqlConnectionManager cqlConnectionManager;
+
     public DataCenterUpdateAction(CoreV1Api coreApi, AppsV1Api appsApi,
                                   CustomObjectsApi customObjectsApi,
                                   K8sResourceUtils k8sResourceUtils,
                                   AuthorityManager authorityManager,
-                                  CarefulStatefulSetUpdateManager carefulStatefulSetUpdateManager,
+                                  com.strapdata.strapkop.reconcilier.CarefulStatefulSetUpdateManager carefulStatefulSetUpdateManager,
+                                  CqlConnectionManager cqlConnectionManager,
                                   @Parameter("dataCenter") DataCenter dataCenter) {
         this.coreApi = coreApi;
         this.appsApi = appsApi;
@@ -74,6 +77,7 @@ public class DataCenterUpdateAction {
         this.dataCenterMetadata = dataCenter.getMetadata();
         this.dataCenterSpec = dataCenter.getSpec();
         this.carefulStatefulSetUpdateManager = carefulStatefulSetUpdateManager;
+        this.cqlConnectionManager = cqlConnectionManager;
         if (dataCenter.getStatus() == null) {
             dataCenter.setStatus(new DataCenterStatus());
         }
@@ -304,9 +308,16 @@ public class DataCenterUpdateAction {
         }
         
         createOrScaleAllStatefulsets(newStatefulSetMap, existingStsMap);
-        
-        createOrReplaceReaperObjects();
-        
+
+        if (dataCenterSpec.getReaperSupport()) {
+            createOrReplaceReaperObjects();
+        } else {
+            final String reaperLabelSelector = OperatorLabels.toSelector(OperatorLabels.reaper(dataCenter));
+            k8sResourceUtils.deleteIngress(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector);
+            k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector);
+            k8sResourceUtils.deleteDeployment(OperatorNames.reaper(dataCenter), dataCenter.getMetadata().getNamespace());
+        }
+
         updateStatus();
         
         logger.info("Reconciled DataCenter.");
@@ -340,24 +351,7 @@ public class DataCenterUpdateAction {
     // this only modify the status object, but does not actually commit it to k8s api.
     // the root DataCenterReconcilier is in charge of calling the update api
     private void updateStatus() {
-        
-        if (dataCenterSpec.getAuthentication() == Authentication.CASSANDRA) {
-            if ( /* new cluster */ dataCenterStatus.getCredentialsStatus() == null) {
-                // TODO: in multi-dc, the credentials might have already been
-                
-                // if we restore the dc from a backup, we don't really know which credentials has been restored
-                if (dataCenterSpec.getRestoreFromBackup() != null) {
-                    dataCenterStatus.setCredentialsStatus(new CredentialsStatus()
-                            .setUnknown(true));
-                }
-            }
-        }
-        
-        if (dataCenterStatus.getCredentialsStatus() == null) {
-            dataCenterStatus.setCredentialsStatus(new CredentialsStatus());
-        }
-        
-        // TODO: LDAP support ?
+
     }
     
     private V1ObjectMeta clusterChildObjectMetadata(final String name) {
@@ -569,7 +563,7 @@ public class DataCenterUpdateAction {
         final V1NodeSelectorTerm nodeSelectorTerm = new V1NodeSelectorTerm()
                 .addMatchExpressionsItem(new V1NodeSelectorRequirement()
                         .key(OperatorLabels.ZONE).operator("In").addValuesItem(rack));
-        switch (dataCenterSpec.getNodeAffinityPolicy()) {
+        switch (dataCenterSpec.getElassandraPodsAffinityPolicy()) {
             case STRICT:
                 podSpec.affinity(new V1Affinity()
                         .nodeAffinity(new V1NodeAffinity()
@@ -892,7 +886,7 @@ public class DataCenterUpdateAction {
             
             // same as stock cassandra-env.sh
             final long jvmHeapSize = Math.max(
-                    Math.min(memoryLimit / 2, 1 * GB),
+                    Math.min(memoryLimit / 2, GB),
                     Math.min(memoryLimit / 4, 8 * GB)
             );
             
@@ -953,8 +947,8 @@ public class DataCenterUpdateAction {
         //strapdata authentication support
         addAuthenticationConfig(configMap, volumeSource);
         
-        // strapdata enterprise support
-        addEnterpriseConfig(configMap, volumeSource);
+        // elasticsearch config support
+        addElasticsearchConfig(configMap, volumeSource);
         
         // add cqlshrc and curlrc
         addCqlshAndCurlConfig(configMap, volumeSource);
@@ -1081,11 +1075,11 @@ public class DataCenterUpdateAction {
         }
     }
     
-    private void addEnterpriseConfig(V1ConfigMap configMap, V1ConfigMapVolumeSource volumeSource) {
+    private void addElasticsearchConfig(V1ConfigMap configMap, V1ConfigMapVolumeSource volumeSource) {
         final Enterprise enterprise = dataCenterSpec.getEnterprise();
         if (enterprise.getEnabled()) {
             final Map<String, Object> esConfig = new HashMap<>();
-            
+
             esConfig.put("jmx", ImmutableMap.of(
                     "enabled", enterprise.getJmx()
             ));
@@ -1272,22 +1266,22 @@ public class DataCenterUpdateAction {
         
         coreApi.createNamespacedSecret(dataCenterMetadata.getNamespace(), secret, null, null, null);
     }
-    
+
     private void createOrReplaceReaperObjects() throws ApiException, StrapkopException {
-        
+
         final Map<String, String> labels = OperatorLabels.reaper(dataCenter);
-        
+
         final V1ObjectMeta meta = new V1ObjectMeta()
                 .name(OperatorNames.reaper(dataCenter))
                 .namespace(dataCenterMetadata.getNamespace())
                 .labels(labels)
                 .putAnnotationsItem("datacenter-generation", dataCenter.getMetadata().getGeneration().toString());
-        
+
         final V1Container container = new V1Container();
-        
+
         final V1PodSpec podSpec = new V1PodSpec()
                 .addContainersItem(container);
-        
+
         final V1Deployment deployment = new V1Deployment()
                 .metadata(meta)
                 .spec(new V1DeploymentSpec()
@@ -1301,7 +1295,7 @@ public class DataCenterUpdateAction {
                                 .spec(podSpec)
                         )
                 );
-        
+
         // common configuration
         container
                 .name("reaper")
@@ -1392,8 +1386,8 @@ public class DataCenterUpdateAction {
                         .name("REAPER_CASS_LOCAL_DC")
                         .value(dataCenterSpec.getDatacenterName())
                 );
-        
-        
+
+
         // reaper with cassandra authentication
         if (!Objects.equals(dataCenterSpec.getAuthentication(), Authentication.NONE)) {
             container
@@ -1420,7 +1414,7 @@ public class DataCenterUpdateAction {
                     .value("false")
             );
         }
-        
+
         // reaper with cassandra ssl on native port
         if (Boolean.TRUE.equals(dataCenterSpec.getSsl())) {
             podSpec.addVolumesItem(new V1Volume()
@@ -1448,7 +1442,7 @@ public class DataCenterUpdateAction {
                     .value("false")
             );
         }
-        
+
         // create reaper service
         final String APP_SERVICE_NAME = "app";
         final String ADMIN_SERVICE_NAME = "admin";
@@ -1458,8 +1452,8 @@ public class DataCenterUpdateAction {
                 .metadata(meta)
                 .spec(new V1ServiceSpec()
                         .type("ClusterIP")
-                        .addPortsItem(new V1ServicePort().name("app").port(8080))
-                        .addPortsItem(new V1ServicePort().name("admin").port(8081))
+                        .addPortsItem(new V1ServicePort().name(APP_SERVICE_NAME).port(APP_SERVICE_PORT))
+                        .addPortsItem(new V1ServicePort().name(ADMIN_SERVICE_NAME).port(ADMIN_SERVICE_PORT))
                         .selector(labels)
                 );
         k8sResourceUtils.createOrReplaceNamespacedService(service);
@@ -1467,7 +1461,7 @@ public class DataCenterUpdateAction {
         // create reaper ingress
         String ingressDomain = System.getenv("INGRESS_DOMAIN");
         if (ingressDomain != null) {
-            String reaperHost = "reaper." + this.dataCenterMetadata.getName() + "." + ingressDomain;
+            String reaperHost = "reaper." + dataCenter.getMetadata().getName() + "." + ingressDomain;
             logger.info("Creating reaper ingress host={}", reaperHost);
             final V1beta1Ingress ingress = new V1beta1Ingress()
                     .metadata(meta)
@@ -1488,17 +1482,17 @@ public class DataCenterUpdateAction {
                     );
             k8sResourceUtils.createOrReplaceNamespacedIngress(ingress);
         }
-        
+
         // abort deployment replacement if it is already up to date (according to the annotation datacenter-generation and to spec.replicas)
         // this is important because otherwise it generate a "larsen" : deployment replace -> k8s event -> reconciliation -> deployment replace...
         try {
             final V1Deployment existingDeployment = appsApi.readNamespacedDeployment(meta.getName(), meta.getNamespace(), null, null, null);
             final String datacenterGeneration = existingDeployment.getMetadata().getAnnotations().get("datacenter-generation");
-            
+
             if (datacenterGeneration == null) {
                 throw new StrapkopException(String.format("reaper deployment %s miss the annotation datacenter-generation", meta.getName()));
             }
-            
+
             if (Objects.equals(Long.parseLong(datacenterGeneration), dataCenterMetadata.getGeneration()) &&
                     Objects.equals(existingDeployment.getSpec().getReplicas(), deployment.getSpec().getReplicas())) {
                 return;
@@ -1508,7 +1502,7 @@ public class DataCenterUpdateAction {
                 throw e;
             }
         }
-        
+
         k8sResourceUtils.createOrReplaceNamespacedDeployment(deployment);
     }
 }

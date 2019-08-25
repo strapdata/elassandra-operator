@@ -4,13 +4,13 @@ import com.google.gson.JsonSyntaxException;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.cache.SidecarConnectionCache;
+import com.strapdata.strapkop.cql.KeyspaceReplicationManager;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
-import io.kubernetes.client.models.V1DeleteOptions;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
 import org.slf4j.Logger;
@@ -28,16 +28,33 @@ public class DataCenterDeleteAction {
     private final DataCenter dataCenter;
     private final ElassandraNodeStatusCache elassandraNodeStatusCache;
     private final SidecarConnectionCache sidecarConnectionCache;
+    private final KeyspaceReplicationManager keyspaceReplicationManager;
     
-    public DataCenterDeleteAction(K8sResourceUtils k8sResourceUtils, CoreV1Api coreV1Api, AppsV1Api appsV1Api, @Parameter("dataCenter") DataCenter dataCenter, ElassandraNodeStatusCache elassandraNodeStatusCache, SidecarConnectionCache sidecarConnectionCache) {
+    public DataCenterDeleteAction(K8sResourceUtils k8sResourceUtils,
+                                  CoreV1Api coreV1Api,
+                                  AppsV1Api appsV1Api,
+                                  @Parameter("dataCenter") DataCenter dataCenter,
+                                  ElassandraNodeStatusCache elassandraNodeStatusCache,
+                                  SidecarConnectionCache sidecarConnectionCache,
+                                  KeyspaceReplicationManager keyspaceReplicationManager) {
         this.k8sResourceUtils = k8sResourceUtils;
         this.coreV1Api = coreV1Api;
         this.dataCenter = dataCenter;
         this.elassandraNodeStatusCache = elassandraNodeStatusCache;
         this.sidecarConnectionCache = sidecarConnectionCache;
+        this.keyspaceReplicationManager = keyspaceReplicationManager;
     }
     
-    public void deleteDataCenter() throws Exception {
+    void deleteDataCenter() throws Exception {
+        // remove the datacenter from replication maps of managed keyspaces
+        keyspaceReplicationManager.removeDatacenter(this.dataCenter);
+
+        // delete reaper objects
+        final String reaperLabelSelector = OperatorLabels.toSelector(OperatorLabels.reaper(dataCenter));
+        k8sResourceUtils.deleteIngress(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector);
+        k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector);
+        k8sResourceUtils.deleteDeployment(OperatorNames.reaper(dataCenter), dataCenter.getMetadata().getNamespace());
+
         final String labelSelector = OperatorLabels.toSelector(OperatorLabels.datacenter(dataCenter));
         
         // cleanup local caches
@@ -80,28 +97,7 @@ public class DataCenterDeleteAction {
         }
         
         // delete Services
-        k8sResourceUtils.listNamespacedServices(dataCenter.getMetadata().getNamespace(), null, labelSelector).forEach(service -> {
-            try {
-                k8sResourceUtils.deleteService(service);
-                logger.debug("Deleted Service namespace={} name={}", service.getMetadata().getNamespace(), service.getMetadata().getName());
-            } catch (final JsonSyntaxException e) {
-                logger.debug("Caught JSON exception while deleting Service. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
-            } catch (final ApiException e) {
-                logger.error("Failed to delete Service.", e);
-            }
-        });
-
-        // delete Ingress
-        k8sResourceUtils.listNamespacedIngress(dataCenter.getMetadata().getNamespace(), null, labelSelector).forEach(ingress -> {
-            try {
-                k8sResourceUtils.deleteIngress(ingress);
-                logger.debug("Deleted Ingress namespace={} name={}", ingress.getMetadata().getNamespace(), ingress.getMetadata().getName());
-            } catch (final JsonSyntaxException e) {
-                logger.debug("Caught JSON exception while deleting Ingress. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
-            } catch (final ApiException e) {
-                logger.error("Failed to delete Ingress.", e);
-            }
-        });
+        k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, labelSelector);
 
         // delete persistent volume claims
         switch (dataCenter.getSpec().getDecommissionPolicy()) {
@@ -120,24 +116,6 @@ public class DataCenterDeleteAction {
                     }
                 });
                 break;
-        }
-        
-        try {
-            // delete reaper deployment
-            k8sResourceUtils.deleteDeployment(OperatorNames.reaper(dataCenter), dataCenter.getMetadata().getNamespace());
-        } catch (final JsonSyntaxException e) {
-            logger.debug("Caught JSON exception while deleting deployment. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
-        } catch (ApiException e) {
-            logger.error("problem while deleting cassandra reaper deployment on dc={}", dataCenter.getMetadata().getName(), e);
-        }
-        
-        try {
-            // delete reaper services
-            k8sResourceUtils.deleteService(OperatorNames.reaper(dataCenter), dataCenter.getMetadata().getNamespace());
-        } catch (final JsonSyntaxException e) {
-            logger.debug("Caught JSON exception while deleting deployment. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
-        } catch (ApiException e) {
-            logger.error("problem while deleting cassandra reaper service on dc={}", dataCenter.getMetadata().getName(), e);
         }
         
         logger.info("Deleted DataCenter namespace={} name={}", dataCenter.getMetadata().getNamespace(), dataCenter.getMetadata().getName());

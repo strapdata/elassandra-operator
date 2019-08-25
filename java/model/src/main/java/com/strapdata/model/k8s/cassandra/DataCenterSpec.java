@@ -1,14 +1,14 @@
 
 package com.strapdata.model.k8s.cassandra;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 import io.kubernetes.client.models.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -96,11 +96,19 @@ public class DataCenterSpec {
 
     /**
      * Enable Prometheus support.
-     * 
+`     * `
      */
     @SerializedName("prometheusSupport")
     @Expose
     private Boolean prometheusSupport;
+
+    /**
+     * Enable Cassandra Reaper support.
+     *
+     */
+    @SerializedName("reaperSupport")
+    @Expose
+    private Boolean reaperSupport;
 
     /**
      * Attempt to run privileged configuration options for better performance

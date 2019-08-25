@@ -3,6 +3,7 @@ package com.strapdata.strapkop.k8s;
 import com.google.common.base.Strings;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.Iterators;
+import com.google.gson.JsonSyntaxException;
 import com.squareup.okhttp.Call;
 import com.strapdata.model.Key;
 import com.strapdata.model.k8s.cassandra.DataCenter;
@@ -126,10 +127,36 @@ public class K8sResourceUtils {
         );
     }
 
+    public void deleteService(String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) throws ApiException {
+        listNamespacedServices(namespace, null, labelSelector).forEach(service -> {
+            try {
+                deleteService(service);
+                logger.debug("Deleted Service namespace={} name={}", service.getMetadata().getNamespace(), service.getMetadata().getName());
+            } catch (final JsonSyntaxException e) {
+                logger.debug("Caught JSON exception while deleting Service. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
+            } catch (final ApiException e) {
+                logger.error("Failed to delete Service.", e);
+            }
+        });
+    }
+
     public void deleteService(final V1Service service) throws ApiException {
         final V1ObjectMeta metadata = service.getMetadata();
 
         coreApi.deleteNamespacedService(metadata.getName(), metadata.getNamespace(), new V1DeleteOptions(), null, null, null, null, null);
+    }
+
+    public void deleteIngress(String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) throws ApiException {
+        listNamespacedIngress(namespace, null, labelSelector).forEach(ingress -> {
+            try {
+                deleteIngress(ingress);
+                logger.debug("Deleted Ingress namespace={} name={}", ingress.getMetadata().getNamespace(), ingress.getMetadata().getName());
+            } catch (final JsonSyntaxException e) {
+                logger.debug("Caught JSON exception while deleting Ingress. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
+            } catch (final ApiException e) {
+                logger.error("Failed to delete Ingress.", e);
+            }
+        });
     }
 
     public void deleteIngress(final V1beta1Ingress ingress) throws ApiException {

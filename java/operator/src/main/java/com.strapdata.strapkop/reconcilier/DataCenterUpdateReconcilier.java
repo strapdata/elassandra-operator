@@ -4,8 +4,8 @@ import com.strapdata.model.Key;
 import com.strapdata.model.k8s.cassandra.*;
 import com.strapdata.strapkop.ReaperClient;
 import com.strapdata.strapkop.cql.CqlConnectionManager;
-import com.strapdata.strapkop.cql.CqlCredentialsManager;
-import com.strapdata.strapkop.cql.KeyspacesManager;
+import com.strapdata.strapkop.cql.CqlRoleManager;
+import com.strapdata.strapkop.cql.KeyspaceReplicationManager;
 import com.strapdata.strapkop.exception.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
@@ -27,16 +27,16 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
     
     private final ApplicationContext context;
     private final K8sResourceUtils k8sResourceUtils;
-    private final CqlCredentialsManager cqlCredentialsManager;
-    private final KeyspacesManager keyspacesManager;
+    private final CqlRoleManager cqlRoleManager;
+    private final KeyspaceReplicationManager keyspaceReplicationManager;
     private final CqlConnectionManager cqlConnectionManager;
     private final CoreV1Api coreApi;
     
-    public DataCenterUpdateReconcilier(final ApplicationContext context, K8sResourceUtils k8sResourceUtils, CqlCredentialsManager cqlCredentialsManager, KeyspacesManager keyspacesManager, CqlConnectionManager cqlConnectionManager, CoreV1Api coreApi) {
+    public DataCenterUpdateReconcilier(final ApplicationContext context, K8sResourceUtils k8sResourceUtils, CqlRoleManager cqlRoleManager, KeyspaceReplicationManager keyspaceReplicationManager, CqlConnectionManager cqlConnectionManager, CoreV1Api coreApi) {
         this.context = context;
         this.k8sResourceUtils = k8sResourceUtils;
-        this.cqlCredentialsManager = cqlCredentialsManager;
-        this.keyspacesManager = keyspacesManager;
+        this.cqlRoleManager = cqlRoleManager;
+        this.keyspaceReplicationManager = keyspaceReplicationManager;
         this.cqlConnectionManager = cqlConnectionManager;
         this.coreApi = coreApi;
     }
@@ -62,13 +62,13 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
             context.createBean(DataCenterUpdateAction.class, dc).reconcileDataCenter();
             
             // reconcile cql connection
-            cqlConnectionManager.reconcileConnection(dc, cqlCredentialsManager);
+            cqlConnectionManager.reconcileConnection(dc, cqlRoleManager);
             
             // reconcile credentials
-            cqlCredentialsManager.reconcileCredentials(dc);
+            cqlRoleManager.reconcileCredentials(dc);
             
             // reconcile keyspaces
-            keyspacesManager.reconcileKeyspaces(dc);
+            keyspaceReplicationManager.reconcileKeyspaces(dc);
             
             // reconcile reaper cluster registration
             reconcileReaperRegistration(dc);
