@@ -1,8 +1,8 @@
 package com.strapdata.strapkop.source;
 
-import com.strapdata.model.sidecar.ElassandraPodStatus;
+import com.strapdata.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.cache.DataCenterCache;
-import com.strapdata.strapkop.cache.ElassandraPodStatusCache;
+import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.event.NodeStatusEvent;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import io.reactivex.Observable;
@@ -21,12 +21,12 @@ public class ElassandraPodStatusSource implements EventSource<NodeStatusEvent> {
     private final Logger logger = LoggerFactory.getLogger(ElassandraPodStatusSource.class);
     
     
-    private final ElassandraPodStatusCache elassandraPodStatusCache;
+    private final ElassandraNodeStatusCache elassandraNodeStatusCache;
     private final DataCenterCache dataCenterCache;
     private final SidecarClientFactory sidecarClientFactory;
     
-    public ElassandraPodStatusSource(ElassandraPodStatusCache elassandraPodStatusCache, DataCenterCache dataCenterCache, SidecarClientFactory sidecarClientFactory) {
-        this.elassandraPodStatusCache = elassandraPodStatusCache;
+    public ElassandraPodStatusSource(ElassandraNodeStatusCache elassandraNodeStatusCache, DataCenterCache dataCenterCache, SidecarClientFactory sidecarClientFactory) {
+        this.elassandraNodeStatusCache = elassandraNodeStatusCache;
         this.dataCenterCache = dataCenterCache;
         this.sidecarClientFactory = sidecarClientFactory;
     }
@@ -50,16 +50,16 @@ public class ElassandraPodStatusSource implements EventSource<NodeStatusEvent> {
                                             logger.warn("failed to get the status from sidecar pod {}", event.getPod().getName(), throwable);
                                             sidecarClientFactory.invalidateClient(event.getPod());
                                         })
-                                        .onErrorReturn(throwable -> event.setCurrentMode(ElassandraPodStatus.UNKNOWN));
+                                        .onErrorReturn(throwable -> event.setCurrentMode(ElassandraNodeStatus.UNKNOWN));
                             } catch (Exception e) {
                                 logger.warn("failed to get the status of pod={}", event.getPod().getName(), e);
                                 sidecarClientFactory.invalidateClient(event.getPod());
-                                return Single.just(event.setCurrentMode(ElassandraPodStatus.UNKNOWN));
+                                return Single.just(event.setCurrentMode(ElassandraNodeStatus.UNKNOWN));
                             }
                         }
                 )
-                .map(event -> event.setPreviousMode(elassandraPodStatusCache.get(event.getPod())))
-                .doOnNext(event -> elassandraPodStatusCache.put(event.getPod(), event.getCurrentMode()))
+                .map(event -> event.setPreviousMode(elassandraNodeStatusCache.get(event.getPod())))
+                .doOnNext(event -> elassandraNodeStatusCache.put(event.getPod(), event.getCurrentMode()))
                 .filter(event -> !Objects.equals(event.getCurrentMode(), event.getPreviousMode()));
     }
     

@@ -2,7 +2,7 @@ package com.strapdata.strapkop.sidecar;
 
 import com.strapdata.model.backup.BackupArguments;
 import com.strapdata.model.sidecar.BackupResponse;
-import com.strapdata.model.sidecar.ElassandraPodStatus;
+import com.strapdata.model.sidecar.ElassandraNodeStatus;
 import io.micronaut.http.client.RxHttpClient;
 import io.reactivex.Completable;
 import io.reactivex.Single;
@@ -24,8 +24,8 @@ public class SidecarClient {
         httpClient = RxHttpClient.create(url);
     }
     
-    public Single<ElassandraPodStatus> status() {
-        return httpClient.retrieve(GET("/status"), ElassandraPodStatus.class).singleOrError();
+    public Single<ElassandraNodeStatus> status() {
+        return httpClient.retrieve(GET("/status"), ElassandraNodeStatus.class).singleOrError();
     }
     
     public Completable decommission() {

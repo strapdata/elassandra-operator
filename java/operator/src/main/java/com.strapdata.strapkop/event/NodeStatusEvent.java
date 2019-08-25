@@ -1,6 +1,6 @@
 package com.strapdata.strapkop.event;
 
-import com.strapdata.model.sidecar.ElassandraPodStatus;
+import com.strapdata.model.sidecar.ElassandraNodeStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -10,6 +10,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class NodeStatusEvent {
     private ElassandraPod pod;
-    private ElassandraPodStatus previousMode;
-    private ElassandraPodStatus currentMode;
+    private ElassandraNodeStatus previousMode;
+    private ElassandraNodeStatus currentMode;
 }

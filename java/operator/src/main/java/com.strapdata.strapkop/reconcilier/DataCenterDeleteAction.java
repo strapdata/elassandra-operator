@@ -2,7 +2,7 @@ package com.strapdata.strapkop.reconcilier;
 
 import com.google.gson.JsonSyntaxException;
 import com.strapdata.model.k8s.cassandra.DataCenter;
-import com.strapdata.strapkop.cache.ElassandraPodStatusCache;
+import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.cache.SidecarConnectionCache;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
@@ -26,14 +26,14 @@ public class DataCenterDeleteAction {
     private final K8sResourceUtils k8sResourceUtils;
     private final CoreV1Api coreV1Api;
     private final DataCenter dataCenter;
-    private final ElassandraPodStatusCache elassandraPodStatusCache;
+    private final ElassandraNodeStatusCache elassandraNodeStatusCache;
     private final SidecarConnectionCache sidecarConnectionCache;
     
-    public DataCenterDeleteAction(K8sResourceUtils k8sResourceUtils, CoreV1Api coreV1Api, AppsV1Api appsV1Api, @Parameter("dataCenter") DataCenter dataCenter, ElassandraPodStatusCache elassandraPodStatusCache, SidecarConnectionCache sidecarConnectionCache) {
+    public DataCenterDeleteAction(K8sResourceUtils k8sResourceUtils, CoreV1Api coreV1Api, AppsV1Api appsV1Api, @Parameter("dataCenter") DataCenter dataCenter, ElassandraNodeStatusCache elassandraNodeStatusCache, SidecarConnectionCache sidecarConnectionCache) {
         this.k8sResourceUtils = k8sResourceUtils;
         this.coreV1Api = coreV1Api;
         this.dataCenter = dataCenter;
-        this.elassandraPodStatusCache = elassandraPodStatusCache;
+        this.elassandraNodeStatusCache = elassandraNodeStatusCache;
         this.sidecarConnectionCache = sidecarConnectionCache;
     }
     
@@ -41,7 +41,7 @@ public class DataCenterDeleteAction {
         final String labelSelector = OperatorLabels.toSelector(OperatorLabels.datacenter(dataCenter));
         
         // cleanup local caches
-        elassandraPodStatusCache.purgeDataCenter(dataCenter);
+        elassandraNodeStatusCache.purgeDataCenter(dataCenter);
         sidecarConnectionCache.purgeDataCenter(dataCenter);
         
         // delete StatefulSets

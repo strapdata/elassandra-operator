@@ -1,6 +1,6 @@
 package com.strapdata.strapkop.sidecar.controllers;
 
-import com.strapdata.model.sidecar.ElassandraPodStatus;
+import com.strapdata.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.sidecar.cassandra.CassandraModule;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
@@ -23,13 +23,13 @@ public class StatusController {
     }
 
     @Get("/")
-    public ElassandraPodStatus getStatus() {
+    public ElassandraNodeStatus getStatus() {
         try {
-            return ElassandraPodStatus.valueOf(storageServiceMBean.getOperationMode());
+            return ElassandraNodeStatus.valueOf(storageServiceMBean.getOperationMode());
         }
         catch (RuntimeException e) {
             logger.error("error while getting operation mode", e);
-            return ElassandraPodStatus.UNKNOWN;
+            return ElassandraNodeStatus.UNKNOWN;
         }
     }
 }

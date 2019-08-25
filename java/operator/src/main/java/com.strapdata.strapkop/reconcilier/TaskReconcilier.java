@@ -4,10 +4,10 @@ import com.google.common.base.Strings;
 import com.strapdata.model.Key;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.k8s.cassandra.DataCenterPhase;
-import com.strapdata.model.k8s.cassandra.ElassandraPodCrdStatus;
 import com.strapdata.model.k8s.task.Task;
 import com.strapdata.model.k8s.task.TaskPhase;
 import com.strapdata.model.k8s.task.TaskStatus;
+import com.strapdata.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import io.kubernetes.client.ApiException;
@@ -16,10 +16,7 @@ import io.vavr.Tuple2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
 public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier.Action, Task>> {
 
@@ -160,8 +157,8 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
             task.getStatus().setPods(new HashMap<>());
         }
         
-        for (ElassandraPodCrdStatus podStatuses : dc.getStatus().getPodStatuses()) {
-            task.getStatus().getPods().put(podStatuses.getPodName(), TaskPhase.WAITING);
+        for (Map.Entry<String, ElassandraNodeStatus> entry : dc.getStatus().getElassandraNodeStatuses().entrySet()) {
+            task.getStatus().getPods().put(entry.getKey(), TaskPhase.WAITING);
         }
     }
     

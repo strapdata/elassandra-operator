@@ -4,8 +4,8 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSet;
 import com.strapdata.model.k8s.cassandra.*;
 import com.strapdata.model.k8s.task.CleanupTaskSpec;
-import com.strapdata.model.sidecar.ElassandraPodStatus;
-import com.strapdata.strapkop.cache.ElassandraPodStatusCache;
+import com.strapdata.model.sidecar.ElassandraNodeStatus;
+import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.exception.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
@@ -38,7 +38,7 @@ class CarefulStatefulSetUpdateManager {
     private final K8sResourceUtils k8sResourceUtils;
     private final SidecarClientFactory sidecarClientFactory;
     
-    private final ElassandraPodStatusCache elassandraPodStatusCache;
+    private final ElassandraNodeStatusCache elassandraNodeStatusCache;
     
     private DataCenter dataCenter;
     
@@ -47,19 +47,19 @@ class CarefulStatefulSetUpdateManager {
     private TreeMap<String, V1StatefulSet> existingStsMap;
     
     private Map<Boolean, List<String>> rackByReadiness;
-    private Map<com.strapdata.model.sidecar.ElassandraPodStatus, List<String>> podsByStatus;
-    private static Set<ElassandraPodStatus> MOVING_ELASSANDRA_POD_STATUSES = ImmutableSet.of(
-            ElassandraPodStatus.JOINING, ElassandraPodStatus.DRAINING, com.strapdata.model.sidecar.ElassandraPodStatus.LEAVING, ElassandraPodStatus.MOVING, ElassandraPodStatus.STARTING, com.strapdata.model.sidecar.ElassandraPodStatus.UNKNOWN);
+    private Map<ElassandraNodeStatus, List<String>> podsByStatus;
+    private static Set<ElassandraNodeStatus> MOVING_ELASSANDRA_POD_STATUSES = ImmutableSet.of(
+            ElassandraNodeStatus.JOINING, ElassandraNodeStatus.DRAINING, ElassandraNodeStatus.LEAVING, ElassandraNodeStatus.MOVING, ElassandraNodeStatus.STARTING, ElassandraNodeStatus.UNKNOWN);
     
     // tree set is ordered by rack ascending (rack1, rack2, ...)
     private Map<RackMode, TreeSet<String>> racksByRackMode;
     
     
-    CarefulStatefulSetUpdateManager(AppsV1Api appsApi, K8sResourceUtils k8sResourceUtils, SidecarClientFactory sidecarClientFactory, ElassandraPodStatusCache elassandraPodStatusCache) {
+    CarefulStatefulSetUpdateManager(AppsV1Api appsApi, K8sResourceUtils k8sResourceUtils, SidecarClientFactory sidecarClientFactory, ElassandraNodeStatusCache elassandraNodeStatusCache) {
         this.appsApi = appsApi;
         this.k8sResourceUtils = k8sResourceUtils;
         this.sidecarClientFactory = sidecarClientFactory;
-        this.elassandraPodStatusCache = elassandraPodStatusCache;
+        this.elassandraNodeStatusCache = elassandraNodeStatusCache;
     }
     
     /**
@@ -251,17 +251,17 @@ class CarefulStatefulSetUpdateManager {
     /**
      * Retrieve elassandra pod statuses (cassandra operation mode) from the cache
      */
-    private Map<ElassandraPodStatus, List<String>> getStatusesFromCache() {
+    private Map<ElassandraNodeStatus, List<String>> getStatusesFromCache() {
         
-        Map<ElassandraPodStatus, List<String>> statuses = new HashMap<>();
-        for (ElassandraPodStatus status : com.strapdata.model.sidecar.ElassandraPodStatus.values()) {
+        Map<ElassandraNodeStatus, List<String>> statuses = new HashMap<>();
+        for (ElassandraNodeStatus status : ElassandraNodeStatus.values()) {
             statuses.put(status, new ArrayList<>());
         }
         
         for (String podName : enumeratePods()) {
-            com.strapdata.model.sidecar.ElassandraPodStatus nodeStatus = Optional
-                    .ofNullable(elassandraPodStatusCache.get(new ElassandraPod(dataCenter, podName)))
-                    .orElse(com.strapdata.model.sidecar.ElassandraPodStatus.UNKNOWN);
+            ElassandraNodeStatus nodeStatus = Optional
+                    .ofNullable(elassandraNodeStatusCache.get(new ElassandraPod(dataCenter, podName)))
+                    .orElse(ElassandraNodeStatus.UNKNOWN);
             statuses.get(nodeStatus).add(podName);
         }
         
@@ -354,7 +354,7 @@ class CarefulStatefulSetUpdateManager {
         // the name of the pod to remove
         final String podName = statefulSetToScale.getMetadata().getName() + "-" + replicas;
         
-        if (podsByStatus.get(com.strapdata.model.sidecar.ElassandraPodStatus.NORMAL).contains(podName)) {
+        if (podsByStatus.get(ElassandraNodeStatus.NORMAL).contains(podName)) {
             logger.info("Scaling down sts {} to {}, decommissioning {}", statefulSetToScale.getMetadata().getName(), replicas, podName);
             
             // blocking call to decommission, max 5 times, with 2 second delays between each try
@@ -368,7 +368,7 @@ class CarefulStatefulSetUpdateManager {
                 dataCenter.getStatus().setLastErrorMessage(throwable.getMessage());
             }
         }
-        else if (podsByStatus.get(ElassandraPodStatus.DECOMMISSIONED).contains(podName)) {
+        else if (podsByStatus.get(ElassandraNodeStatus.DECOMMISSIONED).contains(podName)) {
             logger.info("Scaling down sts {} to {}, removing {}", statefulSetToScale.getMetadata().getName(), replicas, podName);
             
             
@@ -405,12 +405,12 @@ class CarefulStatefulSetUpdateManager {
         dataCenter.getStatus()
                 .setReplicas(replicasStatus._1)
                 .setReadyReplicas(replicasStatus._2)
-                .setJoinedReplicas(this.podsByStatus.get(ElassandraPodStatus.NORMAL).size());
+                .setJoinedReplicas(this.podsByStatus.get(ElassandraNodeStatus.NORMAL).size());
 
         
         // initialize pod statuses
-        final List<ElassandraPodCrdStatus> podStatuses = new ArrayList<>();
-        dataCenter.getStatus().setPodStatuses(podStatuses);
+        final Map<String, ElassandraNodeStatus> podStatuses = new HashMap<>();
+        dataCenter.getStatus().setElassandraNodeStatuses(podStatuses);
     
         // initialize rack statuses
         final List<RackStatus> rackStatuses = new ArrayList<>();
@@ -440,11 +440,7 @@ class CarefulStatefulSetUpdateManager {
             
             for (int i = 0; i < replicas; i++) {
                 String podName = OperatorNames.podName(dataCenter, rack, i);
-                podStatuses.add(new ElassandraPodCrdStatus()
-                        // TODO: add more information in ElassandraPodCrdStatus
-                        .setPodName(podName)
-                        .setMode(elassandraPodStatusCache.getOrDefault(new ElassandraPod(dataCenter, podName), ElassandraPodStatus.UNKNOWN))
-                );
+                podStatuses.put(podName, elassandraNodeStatusCache.getOrDefault(new ElassandraPod(dataCenter, podName), ElassandraNodeStatus.UNKNOWN));
             }
         }
     }

@@ -51,15 +51,17 @@ public class DataCenterStatus {
     @SerializedName("rackStatuses")
     @Expose
     private List<RackStatus> rackStatuses;
-    
-    @SerializedName("podStatuses")
+
+    /**
+     * Cassandra node status of pods
+     */
+    @SerializedName("elassandraNodeStatuses")
     @Expose
-    private List<ElassandraPodCrdStatus> podStatuses;
-    
-    @SerializedName("keyspaceStatuses")
-    @Expose
-    private KeyspaceStatuses keyspaceStatuses = new KeyspaceStatuses();
-    
+    private Map<String, ElassandraNodeStatus> elassandraNodeStatuses;
+
+    /**
+     * Cassandra reaper deployment status
+     */
     @SerializedName("reaperStatus")
     private ReaperStatus reaperStatus = ReaperStatus.NONE;
 }

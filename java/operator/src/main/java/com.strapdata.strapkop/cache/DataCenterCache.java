@@ -23,10 +23,10 @@ public class DataCenterCache extends Cache<Key, DataCenter> {
                 .flatMap(dataCenter ->
                         // filter out the dc with empty status
                         Optional.ofNullable(dataCenter.getStatus())
-                                .map(DataCenterStatus::getPodStatuses)
+                                .map(DataCenterStatus::getElassandraNodeStatuses)
                                 // map each dc to a stream of ElassandraPods
-                                .map(podStatuses -> podStatuses.stream()
-                                        .map(podStatus -> new ElassandraPod(dataCenter, podStatus.getPodName())))
+                                .map(elassandraNodeStatusMap -> elassandraNodeStatusMap.keySet().stream()
+                                        .map(podName -> new ElassandraPod(dataCenter, podName)))
                                 // filtered dc will got an empty stream instead
                                 .orElseGet(Stream::empty)
                 ).collect(Collectors.toList());
