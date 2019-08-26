@@ -44,27 +44,27 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
     }
     
     @Override
-    public void accept(K8sWatchEvent<Task> data) {
-        logger.info("processing a Task event");
+    public void accept(K8sWatchEvent<Task> event) {
+        logger.debug("Processing a Task event={}", event);
         
         final ClusterKey key = new ClusterKey(
-                data.getResource().getSpec().getCluster(),
-                data.getResource().getMetadata().getNamespace()
+                event.getResource().getSpec().getCluster(),
+                event.getResource().getMetadata().getNamespace()
         );
         
         final List<Tuple2<TaskReconcilier, Function<TaskSpec, Object>>> candidates = taskFamily.stream()
-                .filter(tuple -> tuple._2.apply(data.getResource().getSpec()) != null)
+                .filter(tuple -> tuple._2.apply(event.getResource().getSpec()) != null)
                 .collect(Collectors.toList());
         
         if (candidates.size() != 1) {
-            handleWrongTaskType(data);
+            handleWrongTaskType(event);
             return ;
         }
         
-        if (creationEventTypes.contains(data.getType())) {
-            workQueue.submit(key, candidates.get(0)._1.prepareSubmitCompletable(data.getResource()));
+        if (creationEventTypes.contains(event.getType())) {
+            workQueue.submit(key, candidates.get(0)._1.prepareSubmitCompletable(event.getResource()));
         }
-        else if (deletionEventTypes.contains(data.getType())) {
+        else if (deletionEventTypes.contains(event.getType())) {
             // TODO: implement task cancellation
         }
     }

@@ -32,17 +32,17 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
     }
     
     @Override
-    public void accept(K8sWatchEvent<V1StatefulSet> data) {
-        if (!acceptedEventTypes.contains(data.getType())) {
+    public void accept(K8sWatchEvent<V1StatefulSet> event) {
+        if (!acceptedEventTypes.contains(event.getType())) {
             return ;
         }
 
-        logger.info("processing a sts event");
+        logger.debug("Processing a Statefulset event={}", event);
         
-        final V1StatefulSet sts = data.getResource();
+        final V1StatefulSet sts = event.getResource();
 
         // abort if the sts scaling up/down replicas
-        if (!data.getType().equals(DELETED) &&
+        if (!event.getType().equals(DELETED) &&
                 (!Objects.equals(sts.getStatus().getReplicas(), ObjectUtils.defaultIfNull(sts.getStatus().getReadyReplicas(), 0))
                 || !Objects.equals(ObjectUtils.defaultIfNull(sts.getStatus().getCurrentReplicas(), 0), sts.getStatus().getReplicas()))) {
             logger.info("sts is not ready, skipping");

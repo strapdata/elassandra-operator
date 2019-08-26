@@ -28,7 +28,7 @@ public class DeploymentHandler extends TerminalHandler<K8sWatchEvent<V1Deploymen
     
     @Override
     public void accept(K8sWatchEvent<V1Deployment> event) {
-        logger.info("processing a deployment event");
+        logger.debug("Processing a Deployment event={}", event);
         
         final V1Deployment deployment = event.getResource();
         

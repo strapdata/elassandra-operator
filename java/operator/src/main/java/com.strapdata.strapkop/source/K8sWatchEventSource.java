@@ -50,7 +50,7 @@ public class K8sWatchEventSource<ResourceT, ResourceListT>
     @Override
     public Observable<K8sWatchEvent<ResourceT>> createObservable() throws ApiException {
         
-        logger.info("(re)creating k8s event observable for {}", this.getClass().getSimpleName());
+        logger.debug("(re)creating k8s event observable for {}", this.getClass().getSimpleName());
         
         // if last resource version is not null, restart watching where we stopped
         if (lastResourceVersion != null) {
@@ -68,7 +68,7 @@ public class K8sWatchEventSource<ResourceT, ResourceListT>
      * @throws ApiException
      */
     private Observable<K8sWatchEvent<ResourceT>> createInitialObservable() throws ApiException {
-        logger.info("Fetching existing k8s resources synchronously : {}", adapter.getName());
+        logger.debug("Fetching existing k8s resources synchronously : {}", adapter.getName());
         final ApiResponse<ResourceListT> apiResponse = apiClient.execute(adapter.createListApiCall(false, null), adapter.getResourceListType());
         // TODO: is it necessary to handle different response statuses here...
         final ResourceListT resourceList = apiResponse.getData();
@@ -86,7 +86,7 @@ public class K8sWatchEventSource<ResourceT, ResourceListT>
      * @throws ApiException
      */
     private Observable<K8sWatchEvent<ResourceT>> createWatchObservable() throws ApiException {
-        logger.info("Creating k8s watch for resource : {}", adapter.getName());
+        logger.debug("Creating k8s watch for resource : {}", adapter.getName());
         final Watch<JsonObject> watch = Watch.createWatch(apiClient, adapter.createListApiCall(true, lastResourceVersion),
                 new TypeToken<Watch.Response<JsonObject>>() {
                 }.getType());

@@ -3,12 +3,14 @@ package com.strapdata.strapkop.event;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 import java.util.EnumSet;
 
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+@ToString
 public class K8sWatchEvent<ResourceT> {
 
     public static final EnumSet<Type> creationEventTypes = EnumSet.of(Type.ADDED, Type.MODIFIED, Type.INITIAL);
