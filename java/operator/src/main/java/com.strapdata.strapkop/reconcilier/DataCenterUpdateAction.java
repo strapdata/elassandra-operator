@@ -1000,7 +1000,7 @@ public class DataCenterUpdateAction {
                     "password = ${PASSWORD}";
             
             if (Optional.ofNullable(dataCenterSpec.getEnterprise()).map(Enterprise::getAaa).map(Aaa::getEnabled).orElse(false)) {
-                cqlshrc += "user = strapkop:${PASSWORD}\n";
+                curlrc += "user = strapkop:${PASSWORD}\n";
             }
             
         }
@@ -1010,7 +1010,7 @@ public class DataCenterUpdateAction {
         configMapVolumeAddFile(configMap, volumeSource, "curlrc", curlrc);
         
         // replace template ${PASSWORD} with env var ${STRAPKOP_PASSWORD}
-        final String sedTemplating = "sed -e \"s/\\${PASSWORD}/1/\" -e \"s/${STRAPKOP_PASSWORD}/dog/\"";
+        final String sedTemplating = "sed -e \"s/\\${PASSWORD}/${STRAPKOP_PASSWORD}/\"";
         
         final String envScript = "" +
                 "mkdir -p ~/.cassandra\n" +
