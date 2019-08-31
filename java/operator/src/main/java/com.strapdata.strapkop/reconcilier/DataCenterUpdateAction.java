@@ -1483,9 +1483,9 @@ public class DataCenterUpdateAction {
 
         // create reaper ingress
         String ingressDomain = System.getenv("INGRESS_DOMAIN");
-        if (ingressDomain != null) {
-            String reaperHost = "reaper." + dataCenter.getMetadata().getName() + "." + ingressDomain;
-            logger.info("Creating reaper ingress host={}", reaperHost);
+        if (!Strings.isNullOrEmpty(ingressDomain)) {
+            String reaperHost = "reaper-" + dataCenterSpec.getClusterName() + "-" + dataCenterSpec.getDatacenterName() + "." + ingressDomain;
+            logger.info("Creating reaper ingress for host={}", reaperHost);
             final V1beta1Ingress ingress = new V1beta1Ingress()
                     .metadata(meta)
                     .spec(new V1beta1IngressSpec()
@@ -1493,7 +1493,7 @@ public class DataCenterUpdateAction {
                                     .host(reaperHost)
                                     .http(new V1beta1HTTPIngressRuleValue()
                                             .addPathsItem(new V1beta1HTTPIngressPath()
-                                                    .path("/")
+                                                    .path("/webui")
                                                     .backend(new V1beta1IngressBackend().serviceName(APP_SERVICE_NAME).servicePort(new IntOrString(APP_SERVICE_PORT)))
                                             )
                                             .addPathsItem(new V1beta1HTTPIngressPath()
