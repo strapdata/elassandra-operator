@@ -279,8 +279,9 @@ public class DataCenterUpdateAction {
             createKeystoreIfNotExists();
         }
         
-        createClusterSecretIfNotExists();
-        
+        Tuple2<String, String> strapkopCredential = createClusterSecretIfNotExists();
+        createOrUpdateRcFileSecret(strapkopCredential._1, strapkopCredential._2);
+
         // create configmaps and their volume mounts (operator-defined config, and user overrides)
         // vavr.List is used here because it allows multiple head singly linked list (heads contain the rack-specific config map)
         io.vavr.collection.List<ConfigMapVolumeMount> configMapVolumeMounts = io.vavr.collection.List.empty();
@@ -435,6 +436,14 @@ public class DataCenterUpdateAction {
                         .name("sidecar-config-volume")
                         .mountPath("/tmp/sidecar-config-volume")
                 )
+                .addVolumeMountsItem(new V1VolumeMount()
+                        .name("cqlshrc")
+                        .mountPath("/home/cassandra/.cassandra")
+                )
+                .addVolumeMountsItem(new V1VolumeMount()
+                        .name("curlrc")
+                        .mountPath("/home/cassandra")
+                )
                 .addArgsItem("/tmp/sidecar-config-volume")
                 .addEnvItem(new V1EnvVar().name("NAMESPACE").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.namespace"))))
                 .addEnvItem(new V1EnvVar().name("POD_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.name"))))
@@ -549,8 +558,37 @@ public class DataCenterUpdateAction {
                 .addVolumesItem(new V1Volume()
                         .name("nodeinfo")
                         .emptyDir(new V1EmptyDirVolumeSource())
-                );
-        
+                )
+                .addVolumesItem(new V1Volume()
+                        .name("cqlshrc")
+                        .secret(new V1SecretVolumeSource()
+                            .secretName(OperatorNames.clusterRcFilesSecret(dataCenter))
+                            .addItemsItem(new V1KeyToPath()
+                                    .key("cqlshrc").path("cqlshrc").mode(256)
+                            )
+                        )
+                )
+                .addVolumesItem(new V1Volume()
+                        .name("curlrc")
+                        .secret(new V1SecretVolumeSource()
+                                .secretName(OperatorNames.clusterRcFilesSecret(dataCenter))
+                                .addItemsItem(new V1KeyToPath()
+                                    .key("curlrc").path(".curlrc").mode(256)
+                                )
+                        )
+                )
+                ;
+
+        // Add the nodeinfo init container if we have the nodeinfo secret name provided in the env var NODEINFO_SECRET
+        // To create such a service account:
+        // kubectl create serviceaccount --namespace default nodeinfo
+        // kubectl create clusterrolebinding nodeinfo-cluster-rule --clusterrole=nodeinfo --serviceaccount=default:nodeinfo
+        // kubectl get serviceaccount nodeinfo -o json | jq ".secrets[0].name"
+        String nodeInfoSecretName = System.getenv("NODEINFO_SECRET");
+        if (!Strings.isNullOrEmpty(nodeInfoSecretName))
+            podSpec.addInitContainersItem(nodeInfoInit(nodeInfoSecretName));
+
+
         {
             final String secret = dataCenterSpec.getImagePullSecret();
             if (!Strings.isNullOrEmpty(secret)) {
@@ -1265,6 +1303,53 @@ public class DataCenterUpdateAction {
                 .putStringDataItem("shared-secret.yaml", "aaa.shared_secret: " + UUID.randomUUID().toString());
         
         coreApi.createNamespacedSecret(dataCenterMetadata.getNamespace(), secret, null, null, null);
+        return new Tuple2<>("strapkop", strapkopPassword);
+    }
+
+    /**
+     * Generate rc files as secret (.curlrc and cqlshrc)
+     * TODO: avoid generation on each reconciliation
+     * @param username
+     * @param password
+     */
+    private void createOrUpdateRcFileSecret(String username, String password) throws ApiException {
+        String cqlshrc = "";
+        String curlrc = "";
+
+        if (dataCenterSpec.getSsl()) {
+            cqlshrc +=  "[connection]\n" +
+                            "factory = cqlshlib.ssl.ssl_transport_factory\n" +
+                            "port = " + dataCenterSpec.getNativePort() + "\n" +
+                            "ssl = true\n" +
+                            "\n" +
+                            "[ssl]\n" +
+                            "certfile = /tmp/operator-truststore/cacert.pem\n" +
+                            "validate = true\n";
+            if (Optional.ofNullable(dataCenterSpec.getEnterprise()).map(Enterprise::getSsl).orElse(false)) {
+                curlrc += "cacert = /tmp/operator-truststore/cacert.pem\n";
+            }
+        } else {
+            cqlshrc += "[connection]\n" +
+                            "factory = cqlshlib.ssl.ssl_transport_factory\n" +
+                            "port = " + dataCenterSpec.getNativePort() + "\n";
+        }
+
+        if (!dataCenterSpec.getAuthentication().equals(Authentication.NONE)) {
+            cqlshrc += String.format(Locale.ROOT, "[authentication]\n" +
+                    "username = %s\n" +
+                    "password = %s", username, password);
+            if (Optional.ofNullable(dataCenterSpec.getEnterprise()).map(Enterprise::getAaa).map(Aaa::getEnabled).orElse(false)) {
+                curlrc += String.format(Locale.ROOT, "user = %s:%s\n", username, password);
+            }
+        }
+
+        final V1ObjectMeta secretMetadata = clusterChildObjectMetadata(OperatorNames.clusterRcFilesSecret(dataCenter));
+        final V1Secret secret = new V1Secret()
+                .metadata(secretMetadata)
+                .putStringDataItem("cqlshrc", cqlshrc)
+                .putStringDataItem("curlrc", curlrc);
+
+        k8sResourceUtils.createOrReplaceNamespacedSecret(secret);
     }
 
     private void createOrReplaceReaperObjects() throws ApiException, StrapkopException {
