@@ -14,11 +14,17 @@ do
 done
 )
 
+if [ -f "/nodeinfo/public-ip" ]; then
+   NODE_IP=$(cat /nodeinfo/public-ip)
+fi
+
 # In order to bind rpc to 0.0.0.0, broadcast_rpc_address must be set explicitly, and it can only be done at runtime.
-if [ -z "$POD_IP" ]; then
-  echo "warning during startup: POD_IP is not defined" >&2
+# BROADCAST_RPC_ADDRESS = NODE_IP if defined, otherwise POD_IP
+BROADCAST_RPC_ADDRESS=${NODE_IP:-$POD_IP}
+if [ -z "BROADCAST_RPC_ADDRESS" ]; then
+  echo "warning during startup: BROADCAST_RPC_ADDRESS is not defined, POD_IP=$POD_IP NODE_IP=$NODE_IP" >&2
 else
-  echo "broadcast_rpc_address: $POD_IP" > /etc/cassandra/cassandra.yaml.d/002-broadcast_rpc_address.yaml
+  echo "broadcast_rpc_address: $BROADCAST_RPC_ADDRESS" > /etc/cassandra/cassandra.yaml.d/002-broadcast_rpc_address.yaml
 fi
 
 # Generate /etc/cassandra/jmxremote.password
