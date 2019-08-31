@@ -987,70 +987,15 @@ public class DataCenterUpdateAction {
         
         // elasticsearch config support
         addElasticsearchConfig(configMap, volumeSource);
-        
-        // add cqlshrc and curlrc
-        addCqlshAndCurlConfig(configMap, volumeSource);
-        
-        
+
         k8sResourceUtils.createOrReplaceNamespacedConfigMap(configMap);
         
         final String configMapFingerprint = DigestUtils.sha1Hex(appsApi.getApiClient().getJSON().getGson().toJson(configMap.getData()));
         
         return Tuple.of(new ConfigMapVolumeMount("operator-spec-config-volume", "/tmp/operator-spec-config", volumeSource), configMapFingerprint);
     }
-    
-    private void addCqlshAndCurlConfig(V1ConfigMap configMap, V1ConfigMapVolumeSource volumeSource) {
-        String cqlshrc = "";
-        String curlrc = "";
-        
-        if (dataCenterSpec.getSsl()) {
-            cqlshrc +=
-                    "[connection]\n" +
-                            "factory = cqlshlib.ssl.ssl_transport_factory\n" +
-                            "port = " + dataCenterSpec.getNativePort() + "\n" +
-                            "ssl = true\n" +
-                            "\n" +
-                            "[ssl]\n" +
-                            "certfile = /tmp/operator-truststore/cacert.pem\n" +
-                            "validate = true\n";
-            
-            if (Optional.ofNullable(dataCenterSpec.getEnterprise()).map(Enterprise::getSsl).orElse(false)) {
-                curlrc += "cacert = /tmp/operator-truststore/cacert.pem\n";
-            }
-            
-        } else {
-            cqlshrc +=
-                    "[connection]\n" +
-                            "factory = cqlshlib.ssl.ssl_transport_factory\n" +
-                            "port = " + dataCenterSpec.getNativePort() + "\n";
-        }
-        
-        
-        if (!dataCenterSpec.getAuthentication().equals(Authentication.NONE)) {
-            cqlshrc += "[authentication]\n" +
-                    "username = strapkop\n" +
-                    "password = ${PASSWORD}";
-            
-            if (Optional.ofNullable(dataCenterSpec.getEnterprise()).map(Enterprise::getAaa).map(Aaa::getEnabled).orElse(false)) {
-                cqlshrc += "user = strapkop:${PASSWORD}\n";
-            }
-            
-        }
-        
-        configMapVolumeAddFile(configMap, volumeSource, "cqlshrc", cqlshrc);
-        
-        configMapVolumeAddFile(configMap, volumeSource, "curlrc", curlrc);
-        
-        // replace template ${PASSWORD} with env var ${STRAPKOP_PASSWORD}
-        final String sedTemplating = "sed -e \"s/\\${PASSWORD}/1/\" -e \"s/${STRAPKOP_PASSWORD}/dog/\"";
-        
-        final String envScript = "" +
-                "mkdir -p ~/.cassandra\n" +
-                "cat ${CASSANDRA_CONF}/cqlshrc | " + sedTemplating + " > ~/.cassandra/cqlshrc\n" +
-                "cat ${CASSANDRA_CONF}/curlrc | " + sedTemplating + " > ~/.curlrc\n";
-        
-        configMapVolumeAddFile(configMap, volumeSource, "cassandra-env.sh.d/002-cqlshrc-curlrc.sh", envScript);
-    }
+
+
     
     private void addSslConfig(V1ConfigMap configMap, V1ConfigMapVolumeSource volumeSource) {
         if (!dataCenterSpec.getSsl()) {

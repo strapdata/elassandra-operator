@@ -122,6 +122,21 @@ public class K8sResourceUtils {
         );
     }
 
+    public void createOrReplaceNamespacedSecret(final V1Secret secret) throws ApiException {
+        final String namespace = secret.getMetadata().getNamespace();
+        logger.debug("Creating/replacing namespaced secret.");
+        createOrReplaceResource(
+                () -> {
+                    coreApi.createNamespacedSecret(namespace, secret, null, null, null);
+                    logger.debug("Created namespaced Deployment.");
+                },
+                () -> {
+                    coreApi.replaceNamespacedSecret(secret.getMetadata().getName(), namespace, secret, null, null);
+                    logger.debug("Replaced namespaced Deployment.");
+                }
+        );
+    }
+
     public void deleteService(String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) throws ApiException {
         listNamespacedServices(namespace, null, labelSelector).forEach(service -> {
             try {

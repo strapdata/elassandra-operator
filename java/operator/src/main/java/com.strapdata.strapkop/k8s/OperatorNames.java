@@ -29,6 +29,10 @@ public class OperatorNames {
     public static String clusterSecret(final DataCenter dataCenter) {
         return OperatorNames.clusterChildObjectName("%s", dataCenter);
     }
+
+    public static String clusterRcFilesSecret(final DataCenter dataCenter) {
+        return OperatorNames.clusterChildObjectName("%s-rc", dataCenter);
+    }
     
     public static String keystore(final DataCenter dataCenter) {
         return OperatorNames.dataCenterChildObjectName("%s-keystore", dataCenter);
