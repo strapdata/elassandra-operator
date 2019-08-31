@@ -20,12 +20,13 @@ public class PreflightService {
 
     private final ApplicationEventPublisher eventPublisher;
     private final Collection<Preflight<?>> preflights;
-    
+    private volatile boolean executed = false;
+
     public PreflightService(ApplicationEventPublisher eventPublisher, Collection<Preflight<?>> preflights) {
         this.eventPublisher = eventPublisher;
         this.preflights = preflights;
     }
-    
+
     public static class PreflightCompletedEvent {
     }
     
@@ -42,8 +43,12 @@ public class PreflightService {
                 // TODO: should we refuse to start here ?
             }
         }
-        
+
+        executed = true;
         eventPublisher.publishEvent(new PreflightCompletedEvent());
     }
-    
+
+    public boolean isExecuted() {
+        return executed;
+    }
 }
