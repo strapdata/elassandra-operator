@@ -310,7 +310,7 @@ public class DataCenterUpdateAction {
         
         createOrScaleAllStatefulsets(newStatefulSetMap, existingStsMap);
 
-        if (dataCenterSpec.getReaperSupport()) {
+        if (dataCenterSpec.getReaperEnabled()) {
             createOrReplaceReaperObjects();
         } else {
             final String reaperLabelSelector = OperatorLabels.toSelector(OperatorLabels.reaper(dataCenter));
@@ -479,7 +479,7 @@ public class DataCenterUpdateAction {
             cassandraContainer.addEnvItem(new V1EnvVar().name("CASSANDRA_DAEMON").value("org.apache.cassandra.service.CassandraDaemon"));
         }
         
-        if (dataCenterSpec.getPrometheusSupport()) {
+        if (dataCenterSpec.getPrometheusEnabled()) {
             cassandraContainer.addPortsItem(new V1ContainerPort().name("prometheus").containerPort(9500));
         }
         
@@ -728,7 +728,7 @@ public class DataCenterUpdateAction {
                 .putAnnotationsItem(OperatorLabels.CONFIGMAP_FINGERPRINT, configmapFingerprint);
         
         // add prometheus annotations to scrap nodes
-        if (dataCenterSpec.getPrometheusSupport()) {
+        if (dataCenterSpec.getPrometheusEnabled()) {
             String[] annotations = new String[]{"prometheus.io/scrape", "true", "prometheus.io/port", "9500"};
             for (int i = 0; i < annotations.length; i += 2)
                 templateMetadata.putAnnotationsItem(annotations[i], annotations[i + 1]);
@@ -885,7 +885,7 @@ public class DataCenterUpdateAction {
         }
         
         // prometheus support (see prometheus annotations)
-        if (dataCenterSpec.getPrometheusSupport()) {
+        if (dataCenterSpec.getPrometheusEnabled()) {
             // instaclustr jmx agent
             /*
             configMapVolumeAddFile(configMap, volumeSource, "cassandra-env.sh.d/001-cassandra-exporter.sh",
@@ -1134,7 +1134,7 @@ public class DataCenterUpdateAction {
             service.getSpec().addPortsItem(new V1ServicePort().name("elasticsearch").port(9200));
         }
         
-        if (dataCenterSpec.getPrometheusSupport()) {
+        if (dataCenterSpec.getPrometheusEnabled()) {
             service.getSpec().addPortsItem(new V1ServicePort().name("prometheus").port(9500));
         }
         

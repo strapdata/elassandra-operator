@@ -49,12 +49,13 @@ spec:
   userSecretVolumeSource:
 {{ toYaml .Values.userSecretVolumeSource | indent 4 }}
 {{- end }}
-  prometheusSupport: {{ .Values.prometheusEnabled }}
-  privilegedSupported: {{ .Values.privilegedSupported }}
-  hostPortEnabled: {{ .Values.hostPortEnabled }}
-  nativePort : {{ .Values.nativePort }}
-  storagePort : {{ .Values.storagePort }}
-  sslStoragePort : {{ .Values.sslStoragePort }}
+  prometheusEnabled: {{ default "false" .Values.prometheusEnabled }}
+  reaperEnabled: {{ default "false" .Values.reaperEnabled }}
+  privilegedSupported: {{ default "false" .Values.privilegedSupported }}
+  hostPortEnabled: {{ default "false" .Values.hostPortEnabled }}
+  nativePort : {{ default "9042" .Values.nativePort | quote }}
+  storagePort : {{ default "7000" .Values.storagePort | quote }}
+  sslStoragePort : {{ default "7001" .Values.sslStoragePort | quote }}
 {{- if .Values.jdbPort }}
   jdbPort: {{ .Values.jdbPort }}
 {{- end }}
