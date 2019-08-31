@@ -76,6 +76,7 @@ dependencies {
     compile "io.micronaut:micronaut-management"
     compile "io.micronaut.configuration:micronaut-cassandra"
 
+
     testAnnotationProcessor "io.micronaut:micronaut-inject-java"
     compile "javax.annotation:javax.annotation-api"
 
@@ -89,7 +90,8 @@ dependencies {
     compile "io.kubernetes:client-java:4.0.0"
     compile "javax.inject:javax.inject:1"
     runtime "ch.qos.logback:logback-classic:1.2.3"
-    
+    compile group: 'com.google.guava', name: 'guava', version: '23.0'
+
     compile "com.datastax.cassandra:cassandra-driver-core:3.7.1"
 
     compile project(':java:model')
