@@ -29,11 +29,17 @@ public class K8sModule {
     public ApiextensionsV1beta1Api providesApiExtensionsV1beta1Api() {
         return new ApiextensionsV1beta1Api(apiClient);
     }
-    
+
     @Bean
     @Singleton
     public CustomObjectsApi provideCustomObjectsApi() {
         return new CustomObjectsApi(apiClient);
+    }
+
+    @Bean
+    @Singleton
+    public ExtensionsV1beta1Api provideExtensionsV1beta1Api() {
+        return new ExtensionsV1beta1Api(apiClient);
     }
     
     @Bean
