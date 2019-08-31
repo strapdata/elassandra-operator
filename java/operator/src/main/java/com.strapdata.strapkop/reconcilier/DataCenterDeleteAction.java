@@ -53,7 +53,7 @@ public class DataCenterDeleteAction {
         final String reaperLabelSelector = OperatorLabels.toSelector(OperatorLabels.reaper(dataCenter));
         k8sResourceUtils.deleteIngress(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector);
         k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector);
-        k8sResourceUtils.deleteDeployment(OperatorNames.reaper(dataCenter), dataCenter.getMetadata().getNamespace());
+        k8sResourceUtils.deleteDeployment(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector);
 
         final String labelSelector = OperatorLabels.toSelector(OperatorLabels.datacenter(dataCenter));
         

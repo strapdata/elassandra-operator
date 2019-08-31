@@ -51,7 +51,6 @@ public class K8sResourceUtils {
         try {
             logger.trace("Attempting to create resource.");
             createResourceCallable.call();
-
         } catch (final ApiException e) {
             if (e.getCode() != 409)
                 throw e;
@@ -63,9 +62,7 @@ public class K8sResourceUtils {
 
     public void createOrReplaceNamespacedService(final V1Service service) throws ApiException {
         final String namespace = service.getMetadata().getNamespace();
-
         logger.debug("Creating/replacing namespaced Service.");
-
         createOrReplaceResource(
                 () -> {
                     coreApi.createNamespacedService(namespace, service, null, null, null);
@@ -81,9 +78,7 @@ public class K8sResourceUtils {
 
     public void createOrReplaceNamespacedIngress(final V1beta1Ingress ingress) throws ApiException {
         final String namespace = ingress.getMetadata().getNamespace();
-
         logger.debug("Creating/replacing namespaced Ingress.");
-
         createOrReplaceResource(
                 () -> {
                     extensionsV1beta1Api.createNamespacedIngress(namespace, ingress, null, null, null);
@@ -142,7 +137,6 @@ public class K8sResourceUtils {
 
     public void deleteService(final V1Service service) throws ApiException {
         final V1ObjectMeta metadata = service.getMetadata();
-
         coreApi.deleteNamespacedService(metadata.getName(), metadata.getNamespace(), new V1DeleteOptions(), null, null, null, null, null);
     }
 
@@ -161,20 +155,16 @@ public class K8sResourceUtils {
 
     public void deleteIngress(final V1beta1Ingress ingress) throws ApiException {
         final V1ObjectMeta metadata = ingress.getMetadata();
-
         extensionsV1beta1Api.deleteNamespacedIngress(metadata.getName(), metadata.getNamespace(), new V1DeleteOptions(), null, null, null, null, null);
     }
 
     public void deleteConfigMap(final V1ConfigMap configMap) throws ApiException {
         final V1ObjectMeta configMapMetadata = configMap.getMetadata();
-
         coreApi.deleteNamespacedConfigMap(configMapMetadata.getName(), configMapMetadata.getNamespace(), new V1DeleteOptions(), null, null, null, null, null);
     }
 
     public void deleteStatefulSet(final V1StatefulSet statefulSet) throws ApiException {
-        V1DeleteOptions deleteOptions = new V1DeleteOptions()
-                .propagationPolicy("Foreground");
-
+        V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
 
 //        //Scale the statefulset down to zero (https://github.com/kubernetes/client-go/issues/91)
 //        statefulSet.getSpec().setReplicas(0);
@@ -192,35 +182,47 @@ public class K8sResourceUtils {
 //        logger.debug("done with scaling to 0");
 
         final V1ObjectMeta statefulSetMetadata = statefulSet.getMetadata();
-
         appsApi.deleteNamespacedStatefulSet(statefulSetMetadata.getName(), statefulSetMetadata.getNamespace(), deleteOptions, null, null, null, false, "Foreground");
     }
-    
+
+    public void deleteDeployment(String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) throws ApiException {
+        listNamespacedDeployment(namespace, null, labelSelector).forEach(deployment -> {
+            try {
+                deleteDeployment(deployment);
+                logger.debug("Deleted Ingress namespace={} name={}", deployment.getMetadata().getNamespace(), deployment.getMetadata().getName());
+            } catch (final JsonSyntaxException e) {
+                logger.debug("Caught JSON exception while deleting Ingress. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
+            } catch (final ApiException e) {
+                logger.error("Failed to delete Ingress.", e);
+            }
+        });
+    }
+
+    public void deleteDeployment(final ExtensionsV1beta1Deployment deployment) throws ApiException {
+        final V1ObjectMeta metadata = deployment.getMetadata();
+        V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
+        extensionsV1beta1Api.deleteNamespacedDeployment(metadata.getName(), metadata.getNamespace(), deleteOptions, null, null, null, null, "Foreground");
+    }
+
     public void deleteDeployment(final String name, final String namespace) throws ApiException {
-        V1DeleteOptions deleteOptions = new V1DeleteOptions()
-                .propagationPolicy("Foreground");
-        
+        V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
         appsApi.deleteNamespacedDeployment(name, namespace, deleteOptions, null, null, null, false, "Foreground");
     }
     
     public void deleteService(final String name, final String namespace) throws ApiException {
-        V1DeleteOptions deleteOptions = new V1DeleteOptions()
-                .propagationPolicy("Foreground");
-        
+        V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
         coreApi.deleteNamespacedService(name, namespace, deleteOptions, null, null, null, false, "Foreground");
     }
     
     public void deletePersistentVolumeClaim(final V1Pod pod) throws ApiException {
-
-        final V1DeleteOptions deleteOptions = new V1DeleteOptions()
-            .propagationPolicy("Foreground");
+        final V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
 
         // TODO: maybe delete all volumes?
         final String pvcName = pod.getSpec().getVolumes().get(0).getPersistentVolumeClaim().getClaimName();
         final V1PersistentVolumeClaim pvc = coreApi.readNamespacedPersistentVolumeClaim(pvcName, pod.getMetadata().getNamespace(), null, null, null);
 
         logger.debug("Deleting PVC name={}", pvcName);
-        coreApi.deleteNamespacedPersistentVolumeClaim(pvcName, pod.getMetadata().getNamespace(), deleteOptions, null, null, null, null, null);
+        coreApi.deleteNamespacedPersistentVolumeClaim(pvcName, pod.getMetadata().getNamespace(), deleteOptions, null, null, null, null, "Foreground");
     }
 
     /*
@@ -361,7 +363,6 @@ public class K8sResourceUtils {
         }
 
         final V1ConfigMapPage firstPage = new V1ConfigMapPage(null);
-
         return new ResourceListIterable<>(firstPage);
     }
 
@@ -390,7 +391,6 @@ public class K8sResourceUtils {
         }
 
         final V1ServicePage firstPage = new V1ServicePage(null);
-
         return new ResourceListIterable<>(firstPage);
     }
 
@@ -419,7 +419,34 @@ public class K8sResourceUtils {
         }
 
         final V1IngressPage firstPage = new V1IngressPage(null);
+        return new ResourceListIterable<>(firstPage);
+    }
 
+    public Iterable<ExtensionsV1beta1Deployment> listNamespacedDeployment(final String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) throws ApiException {
+        class V1DeploymentPage implements ResourceListIterable.Page<ExtensionsV1beta1Deployment> {
+            private final ExtensionsV1beta1DeploymentList deploymentList;
+
+            private V1DeploymentPage(final String continueToken) throws ApiException {
+                deploymentList = extensionsV1beta1Api.listNamespacedDeployment(namespace, null, null, continueToken, fieldSelector, labelSelector, null, null, null, null);
+            }
+
+            @Override
+            public Collection<ExtensionsV1beta1Deployment> items() {
+                return deploymentList.getItems();
+            }
+
+            @Override
+            public ResourceListIterable.Page<ExtensionsV1beta1Deployment> nextPage() throws ApiException {
+                final String continueToken = deploymentList.getMetadata().getContinue();
+
+                if (Strings.isNullOrEmpty(continueToken))
+                    return null;
+
+                return new V1DeploymentPage(continueToken);
+            }
+        }
+
+        final V1DeploymentPage firstPage = new V1DeploymentPage(null);
         return new ResourceListIterable<>(firstPage);
     }
     
