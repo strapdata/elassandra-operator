@@ -462,15 +462,6 @@ public class DataCenterUpdateAction {
         addPortsItem(cassandraContainer, dataCenterSpec.getJmxPort(), "jmx", false);
         addPortsItem(cassandraContainer, dataCenterSpec.getJdbPort(), "jdb", false);
         
-        for (V1EnvVar envVar : this.dataCenterSpec.getEnv()) {
-            if (envVar.getName().equals("NODEINFO_SECRET")) {
-                cassandraContainer.addEnvItem(new V1EnvVar()
-                        .name("NODEINFO_TOKEN")
-                        .valueFrom(new V1EnvVarSource().secretKeyRef(new V1SecretKeySelector().name(envVar.getValue()).key("token"))));
-                break;
-            }
-        }
-        
         if (dataCenterSpec.getElasticsearchEnabled()) {
             cassandraContainer.addPortsItem(new V1ContainerPort().name("elasticsearch").containerPort(9200));
             cassandraContainer.addPortsItem(new V1ContainerPort().name("transport").containerPort(9300));
@@ -772,8 +763,8 @@ public class DataCenterUpdateAction {
                 .command(ImmutableList.of("sysctl", "-w", "vm.max_map_count=1048575"));
     }
     
-    // Nodeinfo init container
-    private V1Container nodeInfoInit() {
+    // Nodeinfo init container if NODEINFO_SECRET is available as env var
+    private V1Container nodeInfoInit(String nodeInfoSecretName) {
         return new V1Container()
                 .securityContext(new V1SecurityContext().privileged(dataCenterSpec.getPrivilegedSupported()))
                 .name("nodeinfo")
@@ -788,7 +779,9 @@ public class DataCenterUpdateAction {
                 .addVolumeMountsItem(new V1VolumeMount()
                         .name("nodeinfo")
                         .mountPath("/nodeinfo")
-                );
+                )
+                .addEnvItem(new V1EnvVar().name("NODE_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("spec.nodeName"))))
+                .addEnvItem(new V1EnvVar().name("NODEINFO_TOKEN").valueFrom(new V1EnvVarSource().secretKeyRef(new V1SecretKeySelector().name(nodeInfoSecretName).key("token"))));
     }
     
     private static void configMapVolumeAddFile(final V1ConfigMap configMap, final V1ConfigMapVolumeSource volumeSource, final String path, final String content) {
