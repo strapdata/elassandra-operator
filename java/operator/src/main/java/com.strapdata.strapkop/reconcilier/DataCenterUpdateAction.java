@@ -1408,6 +1408,10 @@ public class DataCenterUpdateAction {
                 .addEnvItem(new V1EnvVar()
                         .name("REAPER_CASS_LOCAL_DC")
                         .value(dataCenterSpec.getDatacenterName())
+                )
+                .addEnvItem(new V1EnvVar()
+                        .name("JWT_SECRET")
+                        .value(Base64.getEncoder().encodeToString(UUID.randomUUID().toString().getBytes()))
                 );
 
 
