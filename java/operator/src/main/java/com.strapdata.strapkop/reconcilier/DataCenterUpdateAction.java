@@ -1322,7 +1322,8 @@ public class DataCenterUpdateAction {
         // common configuration
         container
                 .name("reaper")
-                .image("thelastpickle/cassandra-reaper")
+                .image(dataCenterSpec.getReaper().getImage())
+                .terminationMessagePolicy("FallbackToLogsOnError")
                 .addPortsItem(new V1ContainerPort()
                         .name("app")
                         .containerPort(8080)

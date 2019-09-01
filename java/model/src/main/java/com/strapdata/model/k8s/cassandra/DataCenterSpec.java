@@ -111,6 +111,14 @@ public class DataCenterSpec {
     private Boolean reaperEnabled;
 
     /**
+     * Reaper configuration.
+     *
+     */
+    @SerializedName("reaper")
+    @Expose
+    private Reaper reaper = new Reaper();
+
+    /**
      * Attempt to run privileged configuration options for better performance
      * 
      */
