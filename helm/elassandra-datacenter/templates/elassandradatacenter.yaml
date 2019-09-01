@@ -14,16 +14,12 @@ metadata:
 spec:
   clusterName: {{ template "elassandra.clusterName" . }}
   datacenterName: {{ template "elassandra.datacenterName" . }}
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ .Values.replicas }}
   elassandraImage: "{{ .Values.image.elassandraRepository }}:{{ .Values.image.elassandraTag }}"
   sidecarImage: "{{ .Values.image.sidecarRepository }}:{{ .Values.image.sidecarTag }}"
   imagePullPolicy: {{ .Values.imagePullPolicy }}
   elasticsearchEnabled: {{ .Values.elasticsearchEnabled }}
-  {{- if  .Values.imagePullSecret }}
-  imagePullSecret: {{ .Values.imagePullSecret }}
-  {{- else }}
-  imagePullSecret: ""
-  {{- end }}
+  imagePullSecret: {{ default "" .Values.imagePullSecret }}
   resources:
 {{ toYaml .Values.resources | indent 4 }}
   dataVolumeClaim:

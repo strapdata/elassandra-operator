@@ -5,7 +5,7 @@ import com.strapdata.model.k8s.cassandra.*;
 import com.strapdata.strapkop.ReaperClient;
 import com.strapdata.strapkop.cql.CqlConnectionManager;
 import com.strapdata.strapkop.cql.CqlRoleManager;
-import com.strapdata.strapkop.cql.KeyspaceReplicationManager;
+import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.exception.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
@@ -28,15 +28,17 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
     private final ApplicationContext context;
     private final K8sResourceUtils k8sResourceUtils;
     private final CqlRoleManager cqlRoleManager;
-    private final KeyspaceReplicationManager keyspaceReplicationManager;
+    private final CqlKeyspaceManager cqlKeyspaceManager;
     private final CqlConnectionManager cqlConnectionManager;
     private final CoreV1Api coreApi;
-    
-    public DataCenterUpdateReconcilier(final ApplicationContext context, K8sResourceUtils k8sResourceUtils, CqlRoleManager cqlRoleManager, KeyspaceReplicationManager keyspaceReplicationManager, CqlConnectionManager cqlConnectionManager, CoreV1Api coreApi) {
+
+    private String reaperAdminPassword = null; // keep password to avoid secret reloading.
+
+    public DataCenterUpdateReconcilier(final ApplicationContext context, K8sResourceUtils k8sResourceUtils, CqlRoleManager cqlRoleManager, CqlKeyspaceManager cqlKeyspaceManager, CqlConnectionManager cqlConnectionManager, CoreV1Api coreApi) {
         this.context = context;
         this.k8sResourceUtils = k8sResourceUtils;
         this.cqlRoleManager = cqlRoleManager;
-        this.keyspaceReplicationManager = keyspaceReplicationManager;
+        this.cqlKeyspaceManager = cqlKeyspaceManager;
         this.cqlConnectionManager = cqlConnectionManager;
         this.coreApi = coreApi;
     }
@@ -56,20 +58,20 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
                 logger.debug("do not reconcile datacenter as a task is already being executed ({})", dc.getStatus().getCurrentTask());
                 return ;
             }
-            
-            // call the main reconciliation
+
+            // reconcile cql connection
+            cqlConnectionManager.reconcileConnection(dc);
+
+            // reconcile keyspaces (when CQL connection is up)
+            cqlKeyspaceManager.reconcileKeyspaces(dc);
+
+            // reconcile credentials (after keyspace creation)
+            cqlRoleManager.reconcileRole(dc);
+
+            // call the statefullset reconciliation  (before scaling up/down to properly stream data according to the adjusted RF)
             logger.debug("processing a dc reconciliation request for {} in thread {}", dc.getMetadata().getName(), Thread.currentThread().getName());
             context.createBean(DataCenterUpdateAction.class, dc).reconcileDataCenter();
-            
-            // reconcile cql connection
-            cqlConnectionManager.reconcileConnection(dc, cqlRoleManager);
-            
-            // reconcile credentials
-            cqlRoleManager.reconcileCredentials(dc);
-            
-            // reconcile keyspaces
-            keyspaceReplicationManager.reconcileKeyspaces(dc);
-            
+
             // reconcile reaper cluster registration
             reconcileReaperRegistration(dc);
             
@@ -95,9 +97,13 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
      */
     private void reconcileReaperRegistration(DataCenter dc) throws StrapkopException, ApiException {
     
-        if (dc.getStatus().getReaperStatus().equals(ReaperStatus.KEYSPACE_INITIALIZED)) {
+        if (!ReaperStatus.REGISTERED.equals(dc.getStatus().getReaperStatus()) && (
+                (dc.getSpec().getAuthentication().equals(Authentication.NONE) && ReaperStatus.KEYSPACE_CREATED.equals(dc.getStatus().getReaperStatus())) ||
+                !dc.getSpec().getAuthentication().equals(Authentication.NONE) && ReaperStatus.ROLE_CREATED.equals(dc.getStatus().getReaperStatus())
+        )) {
             
-            final String reaperAdminPassword = loadReaperAdminPassword(dc);
+            if (reaperAdminPassword == null)
+                reaperAdminPassword = loadReaperAdminPassword(dc);
             
             try (ReaperClient reaperClient = new ReaperClient(dc, "admin", reaperAdminPassword)) {
         
@@ -133,6 +139,5 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
             throw new StrapkopException(String.format("secret %s does not contain reaper.admin_password", secretName));
         }
         return new String(password);
-    
     }
 }

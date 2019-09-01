@@ -18,6 +18,7 @@ import com.strapdata.strapkop.exception.StrapkopException;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import io.kubernetes.client.ApiException;
+import io.kubernetes.client.apis.CoreV1Api;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
@@ -35,25 +36,27 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Create and store cql connections
+ * Create and store cql connections and manager super user roles (cassandra, admin, strapkop)
  */
 @Singleton
 public class CqlConnectionManager implements AutoCloseable {
     
     private static final Logger logger = LoggerFactory.getLogger(CqlConnectionManager.class);
-    
+
     private final AuthorityManager authorityManager;
     private final CqlConnectionCache cache;
-    
-    public CqlConnectionManager(AuthorityManager authorityManager, CqlConnectionCache cache) {
+    private final CoreV1Api coreApi;
+
+    public CqlConnectionManager(AuthorityManager authorityManager, CqlConnectionCache cache, final CoreV1Api coreApi) {
         this.authorityManager = authorityManager;
         this.cache = cache;
+        this.coreApi = coreApi;
     }
 
     /**
      * CQL connection reconciliation : ensure there is always a cql session activated
      */
-    public void reconcileConnection(final DataCenter dc, final CqlRoleManager cqlRoleManager) throws StrapkopException, ApiException, SSLException {
+    public void reconcileConnection(final DataCenter dc) throws StrapkopException, ApiException, SSLException {
         
         // abort if dc is not running
         if (!Objects.equals(dc.getStatus().getPhase(), DataCenterPhase.RUNNING)) {
@@ -62,22 +65,20 @@ public class CqlConnectionManager implements AutoCloseable {
         
         final Session session = getConnection(dc);
         if (session == null || session.isClosed()) {
-            updateConnection(dc, cqlRoleManager);
+            updateConnection(dc);
         }
     }
-    
+
     /**
      * Close existing connection to the dc and create a new one that will be stored for later retrieval
      * @param dc the datacenter to connect  to
-     * @param cqlRoleManager
      * @return a cql session
      * @throws DriverException
      * @throws StrapkopException
      * @throws ApiException
      * @throws SSLException
      */
-    public Session updateConnection(final DataCenter dc, final CqlRoleManager cqlRoleManager) throws DriverException, StrapkopException, ApiException, SSLException {
-        
+    public Session updateConnection(final DataCenter dc) throws DriverException, StrapkopException, ApiException, SSLException {
         try {
             final Key key = new Key(dc.getMetadata());
     
@@ -86,17 +87,24 @@ public class CqlConnectionManager implements AutoCloseable {
             logger.info("creating a new CQL connection for {}", dc.getMetadata().getName());
             Cluster cluster;
             Session session;
-            CqlRole role = (dc.getSpec().getAuthentication().equals(Authentication.NONE)) ? null : cqlRoleManager.getRole(dc, "strapkop");
+            CqlRole role = null;
+
+            if (!dc.getSpec().getAuthentication().equals(Authentication.NONE)) {
+                role = CqlRole.STRAPKOP_ROLE;
+                if (role.password == null)
+                    // load the password from k8s secret
+                    role.loadPassword(CqlRoleManager.getSecret(dc, this.coreApi));
+            }
+
             try {
                 cluster = createClusterObject(dc, role);
                 session = cluster.connect();
                 logger.debug("Connected with the role={} to cluster={} dc={}", role, dc.getSpec().getClusterName(), dc.getMetadata().getName());
-                cqlRoleManager.updateCassandraPassword(dc, session); // change the cassandra default password with k8s secret.
             } catch(AuthenticationException e) {
-                // retry with default cassandra
+                // retry with default cassandra user and password
                 cluster = createClusterObject(dc, CqlRole.DEFAULT_CASSANDRA_ROLE);
                 session = cluster.connect();
-                logger.debug("Connected with the default cassandra role to cluster={} dc={}", CqlRole.DEFAULT_CASSANDRA_ROLE, dc.getSpec().getClusterName(), dc.getMetadata().getName());
+                logger.debug("Connected with the default cassandra role to dc={}", CqlRole.DEFAULT_CASSANDRA_ROLE.getUsername(), dc.getMetadata().getName());
             }
             dc.getStatus().setCqlStatus(CqlStatus.ESTABLISHED);
             dc.getStatus().setCqlErrorMessage("");
@@ -154,7 +162,12 @@ public class CqlConnectionManager implements AutoCloseable {
                         DCAwareRoundRobinPolicy.builder()
                                 .withLocalDc(dc.getSpec().getDatacenterName())
                                 .build()));
-        
+
+        // add remote seeds to contact points to be able to adjust RF of system keyspace before starting the first local node.
+        if (dc.getSpec().getRemoteSeeds() != null)
+            for(String remoteSeed : dc.getSpec().getRemoteSeeds())
+                builder.addContactPoint(remoteSeed);
+
         if (Objects.equals(dc.getSpec().getSsl(), Boolean.TRUE)) {
             builder.withSSL(getSSLOptions());
         }

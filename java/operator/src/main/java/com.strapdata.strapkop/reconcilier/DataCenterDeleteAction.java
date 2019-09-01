@@ -4,10 +4,9 @@ import com.google.gson.JsonSyntaxException;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.cache.SidecarConnectionCache;
-import com.strapdata.strapkop.cql.KeyspaceReplicationManager;
+import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
-import com.strapdata.strapkop.k8s.OperatorNames;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
@@ -28,7 +27,7 @@ public class DataCenterDeleteAction {
     private final DataCenter dataCenter;
     private final ElassandraNodeStatusCache elassandraNodeStatusCache;
     private final SidecarConnectionCache sidecarConnectionCache;
-    private final KeyspaceReplicationManager keyspaceReplicationManager;
+    private final CqlKeyspaceManager cqlKeyspaceManager;
     
     public DataCenterDeleteAction(K8sResourceUtils k8sResourceUtils,
                                   CoreV1Api coreV1Api,
@@ -36,18 +35,18 @@ public class DataCenterDeleteAction {
                                   @Parameter("dataCenter") DataCenter dataCenter,
                                   ElassandraNodeStatusCache elassandraNodeStatusCache,
                                   SidecarConnectionCache sidecarConnectionCache,
-                                  KeyspaceReplicationManager keyspaceReplicationManager) {
+                                  CqlKeyspaceManager cqlKeyspaceManager) {
         this.k8sResourceUtils = k8sResourceUtils;
         this.coreV1Api = coreV1Api;
         this.dataCenter = dataCenter;
         this.elassandraNodeStatusCache = elassandraNodeStatusCache;
         this.sidecarConnectionCache = sidecarConnectionCache;
-        this.keyspaceReplicationManager = keyspaceReplicationManager;
+        this.cqlKeyspaceManager = cqlKeyspaceManager;
     }
     
     void deleteDataCenter() throws Exception {
         // remove the datacenter from replication maps of managed keyspaces
-        keyspaceReplicationManager.removeDatacenter(this.dataCenter);
+        cqlKeyspaceManager.removeDatacenter(this.dataCenter);
 
         // delete reaper objects
         final String reaperLabelSelector = OperatorLabels.toSelector(OperatorLabels.reaper(dataCenter));

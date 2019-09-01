@@ -295,7 +295,7 @@ public class DataCenterUpdateAction {
             configMapVolumeMounts = configMapVolumeMounts.prepend
                     (new ConfigMapVolumeMount("user-config-volume", "/tmp/user-config", dataCenterSpec.getUserConfigMapVolumeSource()));
         }
-        
+
         // sorted map of zone -> statefulset (sorted by zone name)
         TreeMap<String, V1StatefulSet> newStatefulSetMap = new TreeMap<>();
         // TODO: ensure validation of zones > 0
@@ -449,12 +449,7 @@ public class DataCenterUpdateAction {
                 .addEnvItem(new V1EnvVar().name("POD_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.name"))))
                 .addEnvItem(new V1EnvVar().name("POD_IP").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("status.podIP"))))
                 .addEnvItem(new V1EnvVar().name("NODE_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("spec.nodeName"))))
-                .addEnvItem(new V1EnvVar().name("STRAPKOP_PASSWORD").valueFrom(new V1EnvVarSource()
-                        .secretKeyRef(new V1SecretKeySelector()
-                                .name(OperatorNames.clusterSecret(dataCenter))
-                                .key("cassandra.strapkop_password")
-                        )
-                ));
+                ;
         
         addPortsItem(cassandraContainer, dataCenterSpec.getStoragePort(), "internode", true);
         addPortsItem(cassandraContainer, dataCenterSpec.getSslStoragePort(), "internode-ssl", true);
@@ -518,7 +513,6 @@ public class DataCenterUpdateAction {
         final V1PodSpec podSpec = new V1PodSpec()
                 .securityContext(new V1PodSecurityContext().fsGroup(999L))
                 .addInitContainersItem(vmMaxMapCountInit())
-                .addInitContainersItem(nodeInfoInit())
                 .addContainersItem(cassandraContainer)
                 .addContainersItem(sidecarContainer)
                 .addVolumesItem(new V1Volume()
@@ -1209,13 +1203,19 @@ public class DataCenterUpdateAction {
         
         coreApi.createNamespacedSecret(dataCenterMetadata.getNamespace(), certificatesSecret, null, null, null);
     }
-    
-    private void createClusterSecretIfNotExists() throws ApiException {
+
+    /**
+     * Creates and stores credentials in a K8S secret if not exists
+     * @return strapkop login and password
+     * @throws ApiException
+     */
+    private Tuple2<String, String> createClusterSecretIfNotExists() throws ApiException {
         final V1ObjectMeta secretMetadata = clusterChildObjectMetadata(OperatorNames.clusterSecret(dataCenter));
         // check if secret exists
         try {
-            coreApi.readNamespacedSecret(secretMetadata.getName(), secretMetadata.getNamespace(), null, null, null);
-            return; // do not create the secret if already exists
+            V1Secret secret = coreApi.readNamespacedSecret(secretMetadata.getName(), secretMetadata.getNamespace(), null, null, null);
+            byte[] passBytes = secret.getData().get(String.format(Locale.ROOT, "cassandra.%s_password", "strapkop"));
+            return new Tuple2<>("strapkop", new String(passBytes));
         } catch (ApiException e) {
             if (e.getCode() != 404) {
                 throw e;
@@ -1223,10 +1223,13 @@ public class DataCenterUpdateAction {
         }
         
         // because this is created once, we should put things even if we don't need it yet (e.g shared secret if AAA is disabled)
+        String strapkopPassword = UUID.randomUUID().toString();
         final V1Secret secret = new V1Secret()
                 .metadata(secretMetadata)
+                // replace the default cassandra password
+                .putStringDataItem("cassandra.cassandra_password", UUID.randomUUID().toString())
                 // strapkop role is used by the operator and sidecar
-                .putStringDataItem("cassandra.strapkop_password", UUID.randomUUID().toString())
+                .putStringDataItem("cassandra.strapkop_password", strapkopPassword)
                 // admin is intended to be distributed to human administrator, so the credentials lifecycle is decoupled
                 .putStringDataItem("cassandra.admin_password", UUID.randomUUID().toString())
                 // password used by reaper to access its cassandra backend
@@ -1239,7 +1242,7 @@ public class DataCenterUpdateAction {
                 .putStringDataItem("jmx_password", UUID.randomUUID().toString())
                 // elassandra-enterprise shared secret is intended to be mounted as a config fragment
                 .putStringDataItem("shared-secret.yaml", "aaa.shared_secret: " + UUID.randomUUID().toString());
-        
+
         coreApi.createNamespacedSecret(dataCenterMetadata.getNamespace(), secret, null, null, null);
         return new Tuple2<>("strapkop", strapkopPassword);
     }
@@ -1309,7 +1312,10 @@ public class DataCenterUpdateAction {
                 .metadata(meta)
                 .spec(new V1DeploymentSpec()
                         // delay the creation of the reaper pod, after we have created the reaper_db keyspace
-                        .replicas(dataCenterStatus.getReaperStatus().isInitialized() ? 1 : 0)
+                        .replicas(
+                                (dataCenterSpec.getAuthentication().equals(Authentication.NONE) && ReaperStatus.KEYSPACE_CREATED.equals(dataCenterStatus.getReaperStatus()) ||
+                                (!dataCenterSpec.getAuthentication().equals(Authentication.NONE) && ReaperStatus.ROLE_CREATED.equals(dataCenterStatus.getReaperStatus())))
+                                ? 1 : 0)
                         .selector(new V1LabelSelector()
                                 .matchLabels(labels)
                         )
@@ -1500,10 +1506,6 @@ public class DataCenterUpdateAction {
                                             .addPathsItem(new V1beta1HTTPIngressPath()
                                                     .path("/webui")
                                                     .backend(new V1beta1IngressBackend().serviceName(APP_SERVICE_NAME).servicePort(new IntOrString(APP_SERVICE_PORT)))
-                                            )
-                                            .addPathsItem(new V1beta1HTTPIngressPath()
-                                                    .path("/")
-                                                    .backend(new V1beta1IngressBackend().serviceName(ADMIN_SERVICE_NAME).servicePort(new IntOrString(ADMIN_SERVICE_PORT)))
                                             )
                                     )
                             )

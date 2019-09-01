@@ -6,17 +6,18 @@ import com.strapdata.model.sidecar.ElassandraNodeStatus;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 @Data
 @NoArgsConstructor
 public class DataCenterStatus {
-    
-    
+
     @SerializedName("phase")
     @Expose
-    private DataCenterPhase phase;
+    private DataCenterPhase phase = DataCenterPhase.CREATING;
     
     @SerializedName("lastErrorMessage")
     @Expose
@@ -63,24 +64,26 @@ public class DataCenterStatus {
      */
     @SerializedName("rackStatuses")
     @Expose
-    private List<RackStatus> rackStatuses;
+    private List<RackStatus> rackStatuses = new ArrayList<>();
 
     /**
      * Cassandra node status of pods
      */
     @SerializedName("elassandraNodeStatuses")
     @Expose
-    private Map<String, ElassandraNodeStatus> elassandraNodeStatuses;
+    private Map<String, ElassandraNodeStatus> elassandraNodeStatuses = new HashMap<>();
 
     /**
-     * Cassandra reaper deployment status
+     * Cassandra reaper status
      */
     @SerializedName("reaperStatus")
     private ReaperStatus reaperStatus = ReaperStatus.NONE;
 
     /**
-     * KeyspaceManager last update replicas count.
+     * keyspace manager status
      */
-    @SerializedName("keyspaceManagerReplicas")
-    private Integer keyspaceManagerReplicas = 0;
+    @SerializedName("keyspaceManagerStatus")
+    private KeyspaceManagerStatus keyspaceManagerStatus = new KeyspaceManagerStatus();
+
+
 }

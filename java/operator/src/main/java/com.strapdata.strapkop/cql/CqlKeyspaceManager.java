@@ -5,69 +5,73 @@ import com.datastax.driver.core.Session;
 import com.strapdata.model.k8s.cassandra.CqlStatus;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.k8s.cassandra.DataCenterPhase;
+import com.strapdata.model.k8s.cassandra.ReaperStatus;
 import com.strapdata.strapkop.exception.StrapkopException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 
 /**
- * Only adjust the replication factor for some <b>existing</b> keyspaces, and trigger repairs/cleanups accordingly.
+ * Manage keyspace creation, adjust the replication factor for some <b>existing</b> keyspaces, and trigger repairs/cleanups accordingly.
+ * Keyspace reconciliation must be made before role reconciliation.
  */
 @Singleton
-public class KeyspaceReplicationManager {
-    private static final Logger logger = LoggerFactory.getLogger(KeyspaceReplicationManager.class);
+public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
+    private static final Logger logger = LoggerFactory.getLogger(CqlKeyspaceManager.class);
     private static final Set<String> SYSTEM_KEYSPACES = new HashSet<>(Arrays.asList(new String[] { "system_auth", "system_distributed", "system_traces" }));
 
-    private final CqlConnectionManager cqlConnectionManager;
-    private final ConcurrentMap<String, Integer> userKeyspaces = new ConcurrentHashMap<>();
+    public static final CqlKeyspace REAPER_KEYSPACE = new CqlKeyspace("reaper_db", 3) {
+        @Override
+        CqlKeyspace createIfNotExistsKeyspace(DataCenter dataCenter, Session session) {
+            CqlKeyspace ks = super.createIfNotExistsKeyspace(dataCenter, session);
+            dataCenter.getStatus().setReaperStatus(ReaperStatus.KEYSPACE_CREATED);
+            return ks;
+        }
+    };
 
-    public KeyspaceReplicationManager(CqlConnectionManager cqlConnectionManager) {
-        this.cqlConnectionManager = cqlConnectionManager;
-    }
-
-    private String keyspaceKey(final DataCenter dataCenter, final String keyspace) {
-        return dataCenter.getMetadata().getNamespace()+"/"+dataCenter.getSpec().getClusterName()+"/"+dataCenter.getMetadata().getName()+"/"+keyspace;
+    public CqlKeyspaceManager(CqlConnectionManager cqlConnectionManager) {
+        super(cqlConnectionManager);
     }
 
     private String elasticAdminKeyspaceName(DataCenter dataCenter) {
         return (dataCenter.getSpec().getDatacenterGroup() != null) ? "elastic_admin_" + dataCenter.getSpec().getDatacenterGroup() : "elastic_admin";
     }
 
-    /**
-     * Add a user keyspace.
-     * @param keyspace
-     * @param targetReplicationFactor is the desired replication factor in the datacenter
-     */
-    public void addUserKeyspace(final DataCenter dataCenter, final String keyspace, final int targetReplicationFactor) {
-        userKeyspaces.put(keyspaceKey(dataCenter, keyspace), targetReplicationFactor);
-    }
-
-    /**
-     * Remove a user keyspace from managed keyspaces
-     * @param keyspace
-     */
-    public void removeUserKeyspace(final DataCenter dataCenter, final String keyspace) {
-        userKeyspaces.remove(keyspaceKey(dataCenter, keyspace));
-    }
-
     public void reconcileKeyspaces(final DataCenter dataCenter) throws StrapkopException {
-        // abort if dc is not running normally or not connected
-        if (!dataCenter.getStatus().getPhase().equals(DataCenterPhase.RUNNING) || !dataCenter.getStatus().getCqlStatus().equals(CqlStatus.ESTABLISHED)) {
-            return;
+
+        if (dataCenter.getSpec().getReaperEnabled()) {
+            add(dataCenter, REAPER_KEYSPACE.name, REAPER_KEYSPACE);
+        } else {
+            remove(dataCenter, REAPER_KEYSPACE.name);
+        }
+
+        final Session session = cqlConnectionManager.getConnection(dataCenter);
+        if (session == null)
+            return; // not connected
+
+        // create keyspace if needed
+        if (get(dataCenter) != null) {
+            for (CqlKeyspace keyspace : get(dataCenter).values()) {
+                try {
+                    if (!dataCenter.getStatus().getKeyspaceManagerStatus().getKeyspaces().contains(keyspace.name)) {
+                        keyspace.createIfNotExistsKeyspace(dataCenter, session);
+                        dataCenter.getStatus().getKeyspaceManagerStatus().getKeyspaces().add(keyspace.name);
+                    }
+                } catch (Exception e) {
+                    logger.error("Failed to create keyspace=" + keyspace.name, e);
+                }
+            }
         }
 
         // if the last observed replicas and current replicas differ, update keyspaces
-        if (!Optional.ofNullable(dataCenter.getStatus().getKeyspaceManagerReplicas()).orElse(0).equals(dataCenter.getStatus().getReplicas())) {
+        if (!Optional.ofNullable(dataCenter.getStatus().getKeyspaceManagerStatus().getReplicas()).orElse(0).equals(dataCenter.getStatus().getReplicas())) {
 
             // adjust RF for system keyspaces
-            for(String keyspace : SYSTEM_KEYSPACES) {
-                int targetRf = Math.max(1, Math.min(3, dataCenter.getStatus().getReplicas()));
-                updateKeyspaceReplcationMap(dataCenter, keyspace, targetRf);
+            for (String keyspace : SYSTEM_KEYSPACES) {
+                updateKeyspaceReplcationMap(dataCenter, keyspace, effectiveRF(dataCenter, 3));
             }
 
             // monitor elastic_admin keyspace to reduce RF when scaling down the DC.
@@ -75,14 +79,25 @@ public class KeyspaceReplicationManager {
             updateKeyspaceReplcationMap(dataCenter, elasticAdminKeyspace, dataCenter.getSpec().getReplicas());
 
             // adjust user keyspace RF
-            for(String keyspace : userKeyspaces.keySet()) {
-                int targetRf = Math.max(1, Math.min(userKeyspaces.get(keyspace), dataCenter.getStatus().getReplicas()));
-                updateKeyspaceReplcationMap(dataCenter, keyspace, targetRf);
+            if (get(dataCenter) != null) {
+                for (CqlKeyspace keyspace : get(dataCenter).values()) {
+                    updateKeyspaceReplcationMap(dataCenter, keyspace.name, effectiveRF(dataCenter, keyspace.rf));
+                }
             }
-
             // we set the current replicas in observed replicas to know if we need to update rf map
-            dataCenter.getStatus().setKeyspaceManagerReplicas(dataCenter.getStatus().getReplicas());
+            dataCenter.getStatus().getKeyspaceManagerStatus().setReplicas(dataCenter.getStatus().getReplicas());
         }
+    }
+
+    /**
+     * Compute the effective target RF.
+     * If DC is scaling up, increase the RF by 1 to automatically stream data to the new node.
+     * @param dataCenter
+     * @param targetRf
+     * @return
+     */
+    int effectiveRF(DataCenter dataCenter, int targetRf) {
+        return Math.max(1, Math.min(targetRf, Math.min(dataCenter.getStatus().getReadyReplicas() + 1, dataCenter.getSpec().getReplicas())));
     }
 
     /**
@@ -104,9 +119,11 @@ public class KeyspaceReplicationManager {
         updateKeyspaceReplcationMap(dataCenter, elasticAdminKeyspaceName(dataCenter), 0);
 
         // adjust user keyspace RF
-        for(String keyspace : userKeyspaces.keySet()) {
-            updateKeyspaceReplcationMap(dataCenter, keyspace, 0);
+        for(CqlKeyspace keyspace : get(dataCenter).values()) {
+            updateKeyspaceReplcationMap(dataCenter, keyspace.name, 0);
         }
+
+        remove(dataCenter);
     }
 
     /**
@@ -117,16 +134,12 @@ public class KeyspaceReplicationManager {
         final Session session = cqlConnectionManager.getSessionRequireNonNull(dc);
         final Row row = session.execute("SELECT keyspace_name, replication FROM system_schema.keyspaces WHERE keyspace_name = ?", keyspace).one();
         if (row == null) {
-            logger.warn("keyspace={} does not exist in cluster={} dc={}, ignoring.", keyspace, dc.getSpec().getClusterName(), dc.getMetadata().getName());
+            logger.warn("keyspace={} does not exist in dc={}, ignoring.", keyspace, dc.getMetadata().getName());
             return;
         }
         final Map<String, String> replication = row.getMap("replication", String.class, String.class);
         final String strategy = replication.get("class");
         Objects.requireNonNull(strategy, "replication strategy cannot be null");
-        if (!strategy.contains("NetworkTopologyStrategy")) {
-            logger.warn("keyspace={} does not use the NetworkTopologyStrategy in cluster={} dc={}, ignoring.", keyspace, dc.getSpec().getClusterName(), dc.getMetadata().getName());
-            return;
-        }
 
         final Map<String, Integer> currentRfMap = replication.entrySet().stream()
                 .filter(e -> !e.getKey().equals("class") && !e.getKey().equals("replication_factor"))
@@ -134,20 +147,24 @@ public class KeyspaceReplicationManager {
                         Map.Entry::getKey,
                         e -> Integer.parseInt(e.getValue())
                 ));
-        final int currentRf = currentRfMap.getOrDefault(dc.getMetadata().getName(), 0);
+        final int currentRf = currentRfMap.getOrDefault(dc.getSpec().getDatacenterName(), 0);
 
         if (currentRf != targetRf) {
-            currentRfMap.put(dc.getMetadata().getName(), targetRf);
+            currentRfMap.put(dc.getSpec().getDatacenterName(), targetRf);
+
+            if (currentRfMap.entrySet().stream().filter(e->e.getValue() > 0).count() == 0)
+                return; // replication map is empty, ignoring update
+
             alterKeyspace(dc, keyspace, currentRfMap);
             if (targetRf > currentRf) {
                 // increase RF
-                logger.info("Trigger a repair for keyspace={} in cluster={} dc={}", keyspace, dc.getSpec().getClusterName(), dc.getMetadata().getName());
-                // TODO: trigger repair
+                logger.info("Trigger a repair for keyspace={} in dc={}", keyspace, dc.getMetadata().getName());
+                // TODO: trigger repair if RF is manually increased while DC was RUNNING (if RF is incremented just before scaling up, streaming propely pull data)
             } else {
                 // deacrease RF
                 if (targetRf < dc.getStatus().getReplicas()) {
-                    logger.info("Trigger a cleanup for keyspace={} in cluster={} dc={}", keyspace, dc.getSpec().getClusterName(), dc.getMetadata().getName());
-                    // TODO: trigger cleanup
+                    logger.info("Trigger a cleanup for keyspace={} in dc={}", keyspace, dc.getMetadata().getName());
+                    // TODO: trigger cleanup when RF is manually decrease while DC was RUNNING.
                 }
             }
         }
@@ -158,7 +175,7 @@ public class KeyspaceReplicationManager {
         final String query = String.format(Locale.ROOT,
                 "ALTER KEYSPACE %s WITH replication = {'class': 'NetworkTopologyStrategy', %s};",
                 name, stringifyRfMap(rfMap));
-        logger.debug("cluster={} dc={} execute: {}", dc.getSpec().getClusterName(), dc.getMetadata().getName(), query);
+        logger.debug("dc={} execute: {}", dc.getMetadata().getName(), query);
         session.execute(query);
     }
 

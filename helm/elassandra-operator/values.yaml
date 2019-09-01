@@ -7,13 +7,14 @@ replicaCount: 1
 apiVersion: stable.strapdata.com/v1
 
 image:
-  repository: strapdata/strapkop-operator-dev
+  repository: strapdata.azurecr.io/strapdata/strapkop-operator-dev
   tag: latest
 
 imagePullPolicy: Always
+imagePullSecrets: azurecr
 
 resources: {}
-  # Suggested resource limits for the operator itself (not elassandra), works with a reasonable sized minikube.
+# Suggested resource limits for the operator itself (not elassandra), works with a reasonable sized minikube.
 #  limits:
 #    cpu: 200m
 #    memory: 100Mi

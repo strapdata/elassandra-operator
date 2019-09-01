@@ -1,20 +1,20 @@
 # Default values for elassandra.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
-clusterName: Elassandra
-replicaCount: 1
+replicas: 1
 
 # STRICT or SLACK
 nodeAffinityPolicy: STRICT
 
 image:
-  elassandraRepository: strapdata/strapkop-elassandra-dev
-  sidecarRepository: strapdata/strapkop-sidecar-dev
+  elassandraRepository: strapdata.azurecr.io/strapdata/strapkop-elassandra-dev
+  sidecarRepository: strapdata.azurecr.io/strapdata/strapkop-sidecar-dev
   elassandraTag: latest
   sidecarTag: latest
 
 imagePullPolicy: Always
-imagePullSecret: ""
+imagePullSecret: "azurecr"
+
 
 # TODO: we do not support unprivileged setup yet
 privilegedSupported: true
@@ -24,6 +24,7 @@ resources:
     memory: 1024Mi
   requests:
     memory: 1024Mi
+
 dataVolumeClaim:
   accessModes:
     - ReadWriteOnce
@@ -88,12 +89,15 @@ enterprise:
 
 #restoreFromBackup: backup-hostname
 
+# Cassandra reaper
+reaperEnabled: true
+
 prometheusEnabled: true
 elasticsearchEnabled: true
 ssl: true
 authentication: CASSANDRA
 
-hostPortEnabled: false
+hostPortEnabled: true
 storagePort: 37000
 sslStoragePort: 37001
 nativePort: 39042
