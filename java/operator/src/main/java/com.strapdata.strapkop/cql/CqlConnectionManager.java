@@ -103,6 +103,7 @@ public class CqlConnectionManager implements AutoCloseable {
     
         }
         catch (DriverException exception) {
+            dc.getStatus().getCredentialsStatus().setUnknown(true);
             dc.getStatus().setCqlStatus(CqlStatus.ERRORED);
             dc.getStatus().setCqlErrorMessage(exception.getMessage());
             throw exception;
