@@ -18,6 +18,9 @@ COPY nodetool /usr/bin/nodetool
 # replace ready-probe.sh
 COPY ready-probe.sh /
 
+# override cassandra.in.sh
+COPY cassandra.in.sh /usr/share/cassandra/cassandra.in.sh
+
 # authorize cassandra (and all non-root user) to change system limits (ulimit) using
 # ulimit can not be set at the host level because, when user is changed from root to cassandra, it lost existing limits.
 # ulimit has to be set after the user has changes, but this require some capabilities to be set on the entrypoint executable,

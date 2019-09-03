@@ -856,6 +856,8 @@ public class DataCenterUpdateAction {
             config.put("ssl_storage_port", dataCenterSpec.getSslStoragePort());
             config.put("native_transport_port", dataCenterSpec.getNativePort());
             
+            config.put("endpoint_snitch", "GossipingPropertyFileSnitch");
+            
             configMapVolumeAddFile(configMap, volumeSource, "cassandra.yaml.d/001-operator-spec-overrides.yaml", toYamlString(config));
         }
         

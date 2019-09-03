@@ -4,9 +4,9 @@ echoerr() { >&2 echo $@; }
 
 dagi cpio
 
-# package "cleanup"
-mkdir -p /usr/share/cassandra/agents
-mv /usr/share/cassandra/lib/jamm-0.3.0.jar /usr/share/cassandra/agents/jamm-0.3.0.jar
+# we will override the default cassandra.in.sh
+mv /usr/share/cassandra/cassandra.in.sh /usr/share/cassandra/default-cassandra.in.sh
+
 cp /etc/cassandra/hotspot_compiler /usr/share/cassandra/
 cp /etc/cassandra/cassandra.yaml /usr/share/cassandra/
 cp /etc/cassandra/elasticsearch.yml /usr/share/cassandra/
@@ -26,6 +26,10 @@ mkdir /etc/cassandra/elasticsearch.yml.d
 
 # remove curl and cqlsh config
 rm -vf /root/.curlrc /root/.cassandra/cqlshrc
+
+# remove tool cassandra.in.sh as it does not contains fragment yaml configuration loader.
+# /usr/share/cassandra/cassandra.in.sh will be used instead
+rm /usr/share/cassandra/tools/bin/cassandra.in.sh
 
 # install the instaclustr cassandra-exporter (Prometheus monitoring support)
 (cd "/usr/share/cassandra/agents" &&

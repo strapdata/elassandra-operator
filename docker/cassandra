@@ -1,28 +1,11 @@
-#!/bin/bash -xue
+#!/bin/bash -xe
 
 shopt -s nullglob
 
 . /usr/share/cassandra/cassandra.in.sh
 
-JVM_OPTS=${JVM_OPTS:=}
-
-# elasticsearch requires -Dcassandra.storagedir to start properly
-JVM_OPTS="${JVM_OPTS} -Dcassandra.storagedir=/var/lib/cassandra"
-
-JVM_OPTS="${JVM_OPTS} -Dcassandra.config.loader=com.strapdata.cassandra.k8s.ConcatenatedYamlConfigurationLoader"
-JVM_OPTS="${JVM_OPTS} -Dcassandra.config=/usr/share/cassandra/cassandra.yaml:/etc/cassandra/cassandra.yaml:/etc/cassandra/cassandra.yaml.d"
-
-JVM_OPTS="${JVM_OPTS} -Delasticsearch.config.loader=com.strapdata.cassandra.k8s.ElasticConcatenatedEnvironmentLoader"
-JVM_OPTS="${JVM_OPTS} -Delasticsearch.config=/usr/share/cassandra/elasticsearch.yml:/etc/cassandra/elasticsearch.yml:/etc/cassandra/elasticsearch.yml.d"
-
 # provides hints to the JIT compiler
 JVM_OPTS="${JVM_OPTS} -XX:CompileCommandFile=${CASSANDRA_HOME}/hotspot_compiler"
-
-# add the jamm agent
-JVM_OPTS="${JVM_OPTS} -javaagent:${CASSANDRA_HOME}/agents/jamm-0.3.0.jar"
-
-# sigar support
-JVM_OPTS="${JVM_OPTS} -Djava.library.path=${CASSANDRA_HOME}/lib/sigar-bin"
 
 # heap dumps to tmp
 JVM_OPTS="${JVM_OPTS} -XX:HeapDumpPath=/tmp/cassandra-`date +%s`-pid$$.hprof"
@@ -77,7 +60,7 @@ do
 done
 
 exec -a cassandra /usr/bin/java \
-    -cp "${CASSANDRA_CLASSPATH}" \
+    -cp "${CLASSPATH}" \
     ${JVM_OPTS} \
     -Dcassandra-foreground=yes \
      ${CASSANDRA_DAEMON:-org.apache.cassandra.service.CassandraDaemon}
