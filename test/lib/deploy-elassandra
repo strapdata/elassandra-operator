@@ -32,6 +32,7 @@ helm ${helm_cmd} \
     --set hostPortEnabled=false \
     --set resources.limits.memory=${MEMORY_LIMIT} \
     --set resources.requests.memory=${MEMORY_REQUEST} \
+    --set dataVolumeClaim.resources.requests.storage=${DISK_SIZE} \
     helm/elassandra-datacenter
 
 #    --set userSecretVolumeSource.secretName=${name} \
