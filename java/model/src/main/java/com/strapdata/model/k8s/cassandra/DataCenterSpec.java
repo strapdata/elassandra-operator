@@ -199,10 +199,20 @@ public class DataCenterSpec {
     @SerializedName("enterprise")
     @Expose
     private Enterprise enterprise;
-    
+
+    /**
+     * Remote seed IP addresses.
+     */
     @SerializedName("remoteSeeds")
     @Expose
     private List<String> remoteSeeds;
+
+    /**
+     * List of URL providing dynamic seed list.
+     */
+    @SerializedName("remoteSeeders")
+    @Expose
+    private List<String> remoteSeeders;
 
     /**
      * Elassandra datacenter group
