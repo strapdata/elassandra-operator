@@ -14,17 +14,40 @@ do
 done
 )
 
-if [ -f "/nodeinfo/public-ip" ]; then
-   NODE_IP=$(cat /nodeinfo/public-ip)
+ES_USE_INTERNAL_ADDRESS=""
+if [ -f "/nodeinfo/node-ip" ] && [ -s "/nodeinfo/node-ip" ]; then
+    NODE_IP=$(cat /nodeinfo/node-ip)
+    BROADCAST_ADDRESS=$NODE_IP
+    BROADCAST_RPC_ADDRESS=$NODE_IP
+    ES_USE_INTERNAL_ADDRESS="-Des.use_internal_address=true"
 fi
 
-# In order to bind rpc to 0.0.0.0, broadcast_rpc_address must be set explicitly, and it can only be done at runtime.
-# BROADCAST_RPC_ADDRESS = NODE_IP if defined, otherwise POD_IP
-BROADCAST_RPC_ADDRESS=${NODE_IP:-$POD_IP}
+if [ -f "/nodeinfo/public-ip" ] && [ -s "/nodeinfo/public-ip" ]; then
+   PUBLIC_IP=$(cat /nodeinfo/public-ip)
+   BROADCAST_ADDRESS=$PUBLIC_IP
+   BROADCAST_RPC_ADDRESS=$PUBLIC_IP
+   ES_USE_INTERNAL_ADDRESS="-Des.use_internal_address=true"
+fi
+
+# Define broadcast address
+if [ -z "BROADCAST_ADDRESS" ]; then
+  echo "warning during startup: BROADCAST_ADDRESS is not defined, POD_IP=$POD_IP NODE_IP=$NODE_IP PUBLIC_IP=$PUBLIC_IP" >&2
+else
+  echo "broadcast_address: $BROADCAST_ADDRESS" > /etc/cassandra/cassandra.yaml.d/002-broadcast_address.yaml
+fi
+
+# Define RPC broadcast address
 if [ -z "BROADCAST_RPC_ADDRESS" ]; then
-  echo "warning during startup: BROADCAST_RPC_ADDRESS is not defined, POD_IP=$POD_IP NODE_IP=$NODE_IP" >&2
+  echo "warning during startup: BROADCAST_RPC_ADDRESS is not defined, POD_IP=$POD_IP NODE_IP=$NODE_IP PUBLIC_IP=$PUBLIC_IP" >&2
 else
   echo "broadcast_rpc_address: $BROADCAST_RPC_ADDRESS" > /etc/cassandra/cassandra.yaml.d/002-broadcast_rpc_address.yaml
+fi
+export JVM_OPTS="$ES_USE_INTERNAL_ADDRESS"
+
+# Load node IPs of local seeds for the strapkop SeedProvider
+if [ -f "/nodeinfo/seeds-ip" ] && [ -s "/nodeinfo/seeds-ip" ]; then
+    export SEEDS_IP=$(cat /nodeinfo/seeds-ip)
+    echo "SEEDS_IP=$SEEDS_IP"
 fi
 
 # Generate /etc/cassandra/jmxremote.password
