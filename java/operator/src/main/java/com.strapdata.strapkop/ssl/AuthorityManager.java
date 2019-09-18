@@ -118,10 +118,11 @@ public class AuthorityManager {
         coreApi.createNamespacedSecret(DEFAULT_CA_SECRET_NAMESPACE, publicSecret, null, null, null);
 
         final V1Secret privateSecret = new V1Secret()
-            .metadata(new V1ObjectMeta()
-                .name(getPrivateCaSecretName())
-                .labels(OperatorLabels.MANAGED))
-            .putStringDataItem(SECRET_CA_KEY, ca.getPrivateKeyAsString());
+                .metadata(new V1ObjectMeta()
+                        .name(getPrivateCaSecretName())
+                        .namespace(DEFAULT_CA_SECRET_NAMESPACE)
+                        .labels(OperatorLabels.MANAGED))
+                .putStringDataItem(SECRET_CA_KEY, ca.getPrivateKeyAsString());
         logger.info("Storing private CA in secret {} in namespace {}", getPrivateCaSecretName(), DEFAULT_CA_SECRET_NAMESPACE);
         coreApi.createNamespacedSecret(DEFAULT_CA_SECRET_NAMESPACE, privateSecret, null, null, null);
     }
