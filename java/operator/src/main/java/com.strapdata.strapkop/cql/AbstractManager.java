@@ -6,7 +6,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Manage T for datacenters
+ * Manage T for datacenters in a map where the key is a unique datacenter name.
  * @param <T>
  */
 public abstract class AbstractManager<T> {

@@ -35,9 +35,8 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
     }
 
     public CqlRole addRole(DataCenter dataCenter, CqlRole role) throws ApiException, StrapkopException {
-        if (role.username.matches(".*[\"\';].*")) {
+        if (role.username.matches(".*[\"\';].*"))
             throw new StrapkopException(String.format("invalid character in cassandra username %s", role.username));
-        }
         add(dataCenter, role.username, role);
         return role;
     }
@@ -50,7 +49,6 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
      * @throws StrapkopException
      */
     public void reconcileRole(DataCenter dataCenter) throws ApiException, StrapkopException, SSLException {
-
         if (Authentication.NONE.equals(dataCenter.getSpec().getAuthentication()))
             return;
 
@@ -105,5 +103,4 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                 null,
                 null);
     }
-
 }
