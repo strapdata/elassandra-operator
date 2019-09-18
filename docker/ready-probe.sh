@@ -1,15 +1,11 @@
 #!/bin/bash
+#
+# Check for elassandra service ports
+# $1=cassandra CQL port, default=9042
+# $2=elasticsearch http port, default=9200
 
-# TODO: moving this to the sidecar could be more reliable : true nodetool check with long-lived jmx connection
-
-# the port to scan
-case $1 in
-9042)
-   port=2352
-   ;;
-9200)
-   port=23F0
-   ;;
-esac
-
-exec grep "00000000:$port" /proc/net/tcp
+if [[ "${CASSANDRA_DAEMON:-org.apache.cassandra.service.CassandraDaemon}" == "org.apache.cassandra.service.CassandraDaemon" ]]; then
+   exec grep "00000000:$(printf '%X' ${1:-9042})" /proc/net/tcp
+else
+   exec grep "00000000:$(printf '%X' ${2:-9200})" /proc/net/tcp
+fi
