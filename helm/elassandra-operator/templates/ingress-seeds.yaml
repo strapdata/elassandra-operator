@@ -1,0 +1,25 @@
+{{- if .Values.ingress.enabled -}}
+{{- $serviceAPIName := include "elassandra-operator.fullname" . -}}
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  labels:
+    app: {{ template "elassandra-operator.name" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    heritage: {{ .Release.Service }}
+    operator: elassandra
+    release: {{ .Release.Name }}
+  name: {{ template "elassandra-operator.fullname" . }}-internal
+  annotations:
+    {{- range $key, $value := .Values.ingress.annotations }}
+      {{ $key }}: {{ $value | quote }}
+    {{- end }}
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /seeds
+        backend:
+          serviceName: {{ $serviceAPIName }}
+          servicePort: 8080
+{{- end -}}
