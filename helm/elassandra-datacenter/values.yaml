@@ -20,10 +20,12 @@ imagePullSecret: "azurecr"
 privilegedSupported: true
 
 resources:
-  limits:
-    memory: 1024Mi
   requests:
-    memory: 1024Mi
+    cpu: 500m
+    memory: 2Gi
+  limits:
+    cpu: 800m
+    memory: 4Gi
 
 dataVolumeClaim:
   accessModes:
@@ -105,6 +107,7 @@ jmxPort: 7199
 # jdbPort: 4242
 
 remoteSeeds: []
+remoteSeeders:
 
 # Override some config files in /etc/cassandra
 configs:

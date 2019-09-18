@@ -74,6 +74,10 @@ spec:
   remoteSeeds:
 {{ toYaml .Values.remoteSeeds | indent 4 }}
 {{- end }}
+{{- if .Values.remoteSeeders }}
+  remoteSeeders:
+{{ toYaml .Values.remoteSeeders | indent 4 }}
+{{- end }}
 {{- if .Values.datacenterGroup }}
   datacenterGroup:
 {{ toYaml .Values.datacenterGroup | indent 4 }}
