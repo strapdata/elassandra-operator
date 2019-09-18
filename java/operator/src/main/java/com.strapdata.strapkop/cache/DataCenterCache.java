@@ -6,6 +6,7 @@ import com.strapdata.model.k8s.cassandra.DataCenterStatus;
 import com.strapdata.strapkop.event.ElassandraPod;
 
 import javax.inject.Singleton;
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -16,7 +17,7 @@ public class DataCenterCache extends Cache<Key, DataCenter> {
     /**
      * Collect a list of ElassandraPod using the datacenter cache, specifically the podStatuses section
      */
-    public Iterable<ElassandraPod> listPods() {
+    public List<ElassandraPod> listPods() {
         
         return this.values().stream()
                 // for each dc, get a stream of pods, and flat map everything
