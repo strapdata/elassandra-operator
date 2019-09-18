@@ -37,6 +37,8 @@ public class AuthorityManager {
 
     // secret names
     public static final String DEFAULT_PUBLIC_CA_SECRET_NAME = "ca-pub"; // public CA certificate, secret available for all pods
+    public static final String DEFAULT_PUBLIC_CA_MOUNT_PATH = "/tmp/operator-truststore"; // public CA certificate mount path
+
     public static final String DEFAULT_PRIVATE_CA_SECRET_NAME = "ca-key"; // secret for issuing certificates, only for some privileged pods
     public static final String DEFAULT_CA_SECRET_NAMESPACE = "default";
 
@@ -72,6 +74,17 @@ public class AuthorityManager {
         if (caSecretName == null)
             caSecretName = AuthorityManager.DEFAULT_PUBLIC_CA_SECRET_NAME;
         return caSecretName;
+    }
+
+    /**
+     * Public CA files mount path where cacert.pem + truststore.p12 will be visible from pods.
+     * @return
+     */
+    public String getPublicCaMountPath() {
+        String caMountPath = System.getenv("PUBLIC_CA_MOUNT_PATH");
+        if (caMountPath == null)
+            caMountPath = AuthorityManager.DEFAULT_PUBLIC_CA_MOUNT_PATH;
+        return caMountPath;
     }
 
     /**

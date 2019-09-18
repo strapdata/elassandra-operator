@@ -650,7 +650,7 @@ public class DataCenterUpdateAction {
                     .secret(new V1SecretVolumeSource().secretName(OperatorNames.keystore(dataCenter))
                             .addItemsItem(new V1KeyToPath().key("keystore.p12").path("keystore.p12"))));
             
-            cassandraContainer.addVolumeMountsItem(new V1VolumeMount().name("operator-truststore").mountPath("/tmp/operator-truststore"));
+            cassandraContainer.addVolumeMountsItem(new V1VolumeMount().name("operator-truststore").mountPath(this.authorityManager.getPublicCaMountPath()));
             podSpec.addVolumesItem(new V1Volume().name("operator-truststore")
                     .secret(new V1SecretVolumeSource()
                             .secretName(this.authorityManager.getPublicCaSecretName())
@@ -995,7 +995,7 @@ public class DataCenterUpdateAction {
                 .put("internode_encryption", "all")
                 .put("keystore", "/tmp/operator-keystore/keystore.p12")
                 .put("keystore_password", "changeit")
-                .put("truststore", "/tmp/operator-truststore/truststore.p12")
+                .put("truststore", this.authorityManager.getPublicCaMountPath() + "/truststore.p12")
                 .put("truststore_password", "changeit")
                 .put("protocol", "TLSv1.2")
                 .put("algorithm", "SunX509")
@@ -1009,7 +1009,7 @@ public class DataCenterUpdateAction {
                 .put("enabled", true)
                 .put("keystore", "/tmp/operator-keystore/keystore.p12")
                 .put("keystore_password", "changeit")
-                .put("truststore", "/tmp/operator-truststore/truststore.p12")
+                .put("truststore", this.authorityManager.getPublicCaMountPath() + "/truststore.p12")
                 .put("truststore_password", "changeit")
                 .put("protocol", "TLSv1.2")
                 .put("store_type", "PKCS12")
@@ -1264,10 +1264,10 @@ public class DataCenterUpdateAction {
                             "ssl = true\n" +
                             "\n" +
                             "[ssl]\n" +
-                            "certfile = /tmp/operator-truststore/cacert.pem\n" +
+                            "certfile = " + this.authorityManager.getPublicCaMountPath() + "/cacert.pem\n" +
                             "validate = true\n";
             if (Optional.ofNullable(dataCenterSpec.getEnterprise()).map(Enterprise::getSsl).orElse(false)) {
-                curlrc += "cacert = /tmp/operator-truststore/cacert.pem\n";
+                curlrc += "cacert = " + this.authorityManager.getPublicCaMountPath() + "/cacert.pem\n";
             }
         } else {
             cqlshrc += "[connection]\n" +
