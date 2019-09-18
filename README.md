@@ -16,7 +16,7 @@ Build the docker images (operator + sidecar + latest elassandra):
 
 Publish the docker images (operator + sidecar + latest elassandra):
 ```bash
-./gradlew dockerPush -PregistryUsername=user -PregistryPassword=password
+./gradlew dockerPush -PregistryUsername=$DOCKER_USERNAME -PregistryPassword=$DOCKER_PASSWORD -PregistryUrl=$DOCKER_URL
 ```
 
 Build parameters are located in `gradle.properties`.
