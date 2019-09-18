@@ -35,31 +35,37 @@ public class ElassandraPodStatusSource implements EventSource<NodeStatusEvent> {
     public Observable<NodeStatusEvent> createObservable() {
         return Observable.interval(10, TimeUnit.SECONDS)
                 .observeOn(Schedulers.io())
-                .doOnNext(i -> logger.debug("run node status health check on thread {}", Thread.currentThread().getName()))
+                .map(i -> { logger.debug("run node status health check on thread {}", Thread.currentThread().getName()); return i; })
                 .flatMap(i -> Observable.fromIterable(dataCenterCache.listPods()))
-                .map(pod -> new NodeStatusEvent()
-                        .setPod(pod)
-                )
+                .map(pod -> new NodeStatusEvent().setPod(pod))
                 .flatMapSingle(event -> {
                             try {
                                 return sidecarClientFactory.clientForPod(event.getPod()).status()
                                         .observeOn(Schedulers.io())
-                                        .doOnSubscribe(d -> logger.debug("requesting pod {} sidecar for health check on thread {}", event.getPod().getName(), Thread.currentThread().getName()))
-                                        .map(event::setCurrentMode)
-                                        .doOnError(throwable -> {
-                                            logger.warn("failed to get the status from sidecar pod {}", event.getPod().getName(), throwable);
-                                            sidecarClientFactory.invalidateClient(event.getPod());
+                                        .map(nodeStatus -> {
+                                            logger.debug("requesting pod={} sidecar for health check={} on thread {}", event.getPod().getName(), nodeStatus, Thread.currentThread().getName());
+                                            event.setCurrentMode(nodeStatus);
+                                            return event;
                                         })
-                                        .onErrorReturn(throwable -> event.setCurrentMode(ElassandraNodeStatus.UNKNOWN));
+                                        .onErrorReturn(throwable -> {
+                                            logger.debug("failed to get the status from sidecar pod=" + event.getPod().getName(), throwable.getMessage());
+                                            sidecarClientFactory.invalidateClient(event.getPod());
+                                            event.setCurrentMode(ElassandraNodeStatus.UNKNOWN);
+                                            return event;
+                                        });
                             } catch (Exception e) {
-                                logger.warn("failed to get the status of pod={}", event.getPod().getName(), e);
+                                logger.warn("failed to get the status of pod=" + event.getPod().getName(), e);
                                 sidecarClientFactory.invalidateClient(event.getPod());
-                                return Single.just(event.setCurrentMode(ElassandraNodeStatus.UNKNOWN));
+                                return Single.just(event).map(v -> { v.setCurrentMode(ElassandraNodeStatus.UNKNOWN); return v;});
                             }
                         }
                 )
-                .map(event -> event.setPreviousMode(elassandraNodeStatusCache.get(event.getPod())))
-                .doOnNext(event -> elassandraNodeStatusCache.put(event.getPod(), event.getCurrentMode()))
+                .map(event -> {
+                    event.setPreviousMode(elassandraNodeStatusCache.getOrDefault(event.getPod(), ElassandraNodeStatus.UNKNOWN));
+                    logger.debug("caching {}={} previous={}", event.getPod(), event.getCurrentMode(),  event.getPreviousMode());
+                    elassandraNodeStatusCache.put(event.getPod(), event.getCurrentMode());
+                    return event;
+                })
                 .filter(event -> !Objects.equals(event.getCurrentMode(), event.getPreviousMode()));
     }
     

@@ -48,35 +48,43 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
         
         DataCenter dc = null;
         try {
-            // this is a "read-before-write" to ensure we are processing the latest resource version (otherwise, status update will failed with a 409 conflict)
-            // TODO: maybe we can use the datacenter cache in a smart way.
-            //      ...something like : when we update the dc status, we notify the cache to invalidate the data until we receive an update
-            dc = k8sResourceUtils.readDatacenter(key);
-            
-            // abort if there is a task currently executing
-            if (dc.getStatus() != null && Objects.equals(dc.getStatus().getPhase(), DataCenterPhase.EXECUTING_TASK)) {
-                logger.debug("do not reconcile datacenter as a task is already being executed ({})", dc.getStatus().getCurrentTask());
-                return ;
+            try {
+                // this is a "read-before-write" to ensure we are processing the latest resource version (otherwise, status update will failed with a 409 conflict)
+                // TODO: maybe we can use the datacenter cache in a smart way.
+                //      ...something like : when we update the dc status, we notify the cache to invalidate the data until we receive an update
+                dc = k8sResourceUtils.readDatacenter(key);
+
+                // abort if there is a task currently executing
+                if (dc.getStatus() != null && Objects.equals(dc.getStatus().getPhase(), DataCenterPhase.EXECUTING_TASK)) {
+                    logger.debug("do not reconcile datacenter as a task is already being executed ({})", dc.getStatus().getCurrentTask());
+                    return;
+                }
+
+                // reconcile cql connection
+                cqlConnectionManager.reconcileConnection(dc);
+
+                // reconcile keyspaces (when CQL connection is up)
+                cqlKeyspaceManager.reconcileKeyspaces(dc);
+
+                // reconcile credentials (after keyspace creation)
+                cqlRoleManager.reconcileRole(dc);
+
+                // call the statefullset reconciliation  (before scaling up/down to properly stream data according to the adjusted RF)
+                logger.trace("processing a dc reconciliation request for {} in thread {}", dc.getMetadata().getName(), Thread.currentThread().getName());
+                context.createBean(DataCenterUpdateAction.class, dc).reconcileDataCenter();
+
+                // reconcile reaper cluster registration
+                reconcileReaperRegistration(dc);
+
+                // update status can only happen at the end
+                k8sResourceUtils.updateDataCenterStatus(dc);
+            } catch(io.kubernetes.client.ApiException e) {
+                if (e.getCode() == 404) {
+                    logger.info("Datacenter with key={} removed", key.getName());
+                    return;
+                }
+                throw e;
             }
-
-            // reconcile cql connection
-            cqlConnectionManager.reconcileConnection(dc);
-
-            // reconcile keyspaces (when CQL connection is up)
-            cqlKeyspaceManager.reconcileKeyspaces(dc);
-
-            // reconcile credentials (after keyspace creation)
-            cqlRoleManager.reconcileRole(dc);
-
-            // call the statefullset reconciliation  (before scaling up/down to properly stream data according to the adjusted RF)
-            logger.debug("processing a dc reconciliation request for {} in thread {}", dc.getMetadata().getName(), Thread.currentThread().getName());
-            context.createBean(DataCenterUpdateAction.class, dc).reconcileDataCenter();
-
-            // reconcile reaper cluster registration
-            reconcileReaperRegistration(dc);
-            
-            // update status can only happen at the end
-            k8sResourceUtils.updateDataCenterStatus(dc);
         } catch (Exception e) {
             logger.error("an error occurred while processing DataCenter update reconciliation for {}", key.getName(), e);
             if (dc != null) {

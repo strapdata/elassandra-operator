@@ -242,7 +242,7 @@ public class DataCenterUpdateAction {
     }
     
     void reconcileDataCenter() throws Exception {
-        logger.info("Reconciling DataCenter {}.", dataCenterMetadata.getName());
+        logger.info("Reconciling DataCenter {} in namespace={}", dataCenterMetadata.getName(), dataCenterMetadata.getNamespace());
         
         validateSpec();
         
@@ -269,18 +269,20 @@ public class DataCenterUpdateAction {
         
         // create the public service to access elasticsearch
         createOrReplaceElasticsearchService();
-        
-        // create the seed-node service (what C* nodes use to discover the DC seeds)
-        // currently there is only one seed per dc, so we need to choose a rack for the seed
-        final String seedRack = selectSeedRack(existingStsMap, zones);
-        final V1Service seedNodesService = createOrReplaceSeedNodesService(seedRack);
-        
+
+        // create a seed service per DC
+        for(String rack : existingStsMap.keySet())
+            createOrReplaceSeedService(rack);
+
+        // create a NodePort service for all nodes
+        createOrReplaceExternalNodesService();
+
         if (dataCenterSpec.getSsl()) {
             createKeystoreIfNotExists();
         }
         
-        Tuple2<String, String> strapkopCredential = createClusterSecretIfNotExists();
-        createOrUpdateRcFileSecret(strapkopCredential._1, strapkopCredential._2);
+        Tuple2<String, String> adminCredential = createClusterSecretIfNotExists();
+        createOrUpdateRcFileSecret(adminCredential._1, adminCredential._2);
 
         // create configmaps and their volume mounts (operator-defined config, and user overrides)
         // vavr.List is used here because it allows multiple head singly linked list (heads contain the rack-specific config map)
@@ -289,9 +291,9 @@ public class DataCenterUpdateAction {
         configMapVolumeMounts = configMapVolumeMounts.prepend(tuple._1);
         // the hash of the spec config map used to trigger automatic rolling restart when config map changed
         final String configFingerprint = tuple._2;
-        configMapVolumeMounts = configMapVolumeMounts.prepend(createOrReplaceVarConfigMap(seedNodesService));
+        configMapVolumeMounts = configMapVolumeMounts.prepend(createOrReplaceVarConfigMap());
         if (dataCenterSpec.getUserConfigMapVolumeSource() != null) {
-            logger.debug("Adding UserConfigMapVolumeSource={}", dataCenterSpec.getUserConfigMapVolumeSource().getName());
+            logger.trace("Adding UserConfigMapVolumeSource={}", dataCenterSpec.getUserConfigMapVolumeSource().getName());
             configMapVolumeMounts = configMapVolumeMounts.prepend
                     (new ConfigMapVolumeMount("user-config-volume", "/tmp/user-config", dataCenterSpec.getUserConfigMapVolumeSource()));
         }
@@ -321,7 +323,7 @@ public class DataCenterUpdateAction {
 
         updateStatus();
         
-        logger.info("Reconciled DataCenter.");
+        logger.debug("Reconciled DataCenter={} in namespace={}", dataCenterMetadata.getName(), dataCenterMetadata.getNamespace());
     }
     
     /**
@@ -415,7 +417,8 @@ public class DataCenterUpdateAction {
                 .readinessProbe(new V1Probe()
                         .exec(new V1ExecAction()
                                 .addCommandItem("/ready-probe.sh")
-                                .addCommandItem(dataCenterSpec.getElasticsearchEnabled() ? "9200" : dataCenterSpec.getNativePort().toString())
+                                .addCommandItem(dataCenterSpec.getNativePort().toString())
+                                .addCommandItem("9200")
                         )
                         .initialDelaySeconds(15)
                         .timeoutSeconds(5)
@@ -603,7 +606,7 @@ public class DataCenterUpdateAction {
         
         // add configmap volumes
         for (final ConfigMapVolumeMount configMapVolumeMount : configMapVolumeMounts) {
-            logger.debug("Adding configMapVolumeMount name={} path={}", configMapVolumeMount.name, configMapVolumeMount.mountPath);
+            logger.trace("Adding configMapVolumeMount name={} path={}", configMapVolumeMount.name, configMapVolumeMount.mountPath);
             cassandraContainer.addVolumeMountsItem(new V1VolumeMount()
                     .name(configMapVolumeMount.name)
                     .mountPath(configMapVolumeMount.mountPath)
@@ -639,7 +642,7 @@ public class DataCenterUpdateAction {
                 .name("JMX_PASSWORD")
                 .valueFrom(new V1EnvVarSource().secretKeyRef(new V1SecretKeySelector()
                         .name(OperatorNames.clusterSecret(dataCenter))
-                        .key("jmx_password")));
+                        .key("cassandra.jmx_password")));
         cassandraContainer.addEnvItem(jmxPasswordEnvVar);
         sidecarContainer.addEnvItem(jmxPasswordEnvVar);
         
@@ -766,10 +769,13 @@ public class DataCenterUpdateAction {
                 .imagePullPolicy("IfNotPresent")
                 .terminationMessagePolicy("FallbackToLogsOnError")
                 .command(ImmutableList.of("sh", "-c",
-                        "kubectl get no -Lfailure-domain.beta.kubernetes.io/zone --token=\"$NODEINFO_TOKEN\" | grep ${NODE_NAME} | awk '{printf(\"%s\",$6)}' > /nodeinfo/zone && " +
-                                "kubectl get no -Lbeta.kubernetes.io/instance-type --token=\"$NODEINFO_TOKEN\" | grep ${NODE_NAME} | awk '{printf(\"%s\",$6)}' > /nodeinfo/instance-type && " +
-                                "kubectl get no -Lstoragetier --token=\"$NODEINFO_TOKEN\" | grep ${NODEINFO_TOKEN} | awk '{printf(\"%s\",$6)}' > /nodeinfo/storagetier && " +
-                                "kubectl get no -Lkubernetes.strapdata.com/public-ip --token=\"$NODEINFO_TOKEN\" | grep ${NODE_NAME} | awk '{printf(\"%s\",$6)}' > /nodeinfo/public-ip"))
+                        "kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"failure-domain.beta.kubernetes.io/zone\"}}' | awk '!/<no value>/ { print $0 }' > /nodeinfo/zone && " +
+                                "kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"beta.kubernetes.io/instance-type\"}}'| awk '!/<no value>/ { print $0 }' > /nodeinfo/instance-type && " +
+                                "kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"storagetier\"}}' | awk '!/<no value>/ { print $0 }' > /nodeinfo/storagetier && " +
+                                "kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"kubernetes.strapdata.com/public-ip\"}}' | awk '!/<no value>/ { print $0 }' > /nodeinfo/public-ip && " +
+                                "kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}' > /nodeinfo/node-ip && " +
+                                "kubectl get pod $(yq .seed_provider[0].parameters[0].seeds /etc/cassandra/cassandra.yaml.d/001-operator-var-overrides.yaml | tr -d '\"' | awk -F \",\" '{for(i=1;i<=NF; i++) { printf(\"%s \", substr($i,1, index($i, \".\")-1))}}') -o jsonpath='{.items[*].status.hostIP}' > /nodeinfo/seeds-ip"
+                ))
                 .addVolumeMountsItem(new V1VolumeMount()
                         .name("nodeinfo")
                         .mountPath("/nodeinfo")
@@ -796,7 +802,7 @@ public class DataCenterUpdateAction {
     private static final long GB = MB * 1024;
     
     // configuration that is supposed to be variable over the cluster life and does not require a rolling restart when changed
-    private ConfigMapVolumeMount createOrReplaceVarConfigMap(final V1Service seedNodesService) throws ApiException {
+    private ConfigMapVolumeMount createOrReplaceVarConfigMap() throws ApiException {
         final V1ConfigMap configMap = new V1ConfigMap()
                 .metadata(dataCenterChildObjectMetadata(OperatorNames.varConfig(dataCenter)));
         
@@ -804,19 +810,43 @@ public class DataCenterUpdateAction {
         
         // cassandra.yaml overrides
         {
-            final Map<String, Object> config = new HashMap<>(); // can't use ImmutableMap as some values are null
-            
-            List<String> seedList = new ArrayList<>();
-            seedList.add(seedNodesService.getMetadata().getName());
-            if (dataCenterSpec.getRemoteSeeds() != null) {
-                seedList.addAll(dataCenterSpec.getRemoteSeeds());
+            Set<String> remoteSeeds = new HashSet<>();
+            if (dataCenterSpec.getRemoteSeeds() != null && !dataCenterSpec.getRemoteSeeds().isEmpty()) {
+                remoteSeeds.addAll(dataCenterSpec.getRemoteSeeds().stream().map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList()));
             }
-            
+
+            Set<String> remoteSeeders = new HashSet<>();
+            if (dataCenterSpec.getRemoteSeeders() != null && !dataCenterSpec.getRemoteSeeders().isEmpty()) {
+                remoteSeeders.addAll(dataCenterSpec.getRemoteSeeders().stream().map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList()));
+            }
+
+            Set<String> seeds = new HashSet<>();
+            seeds.addAll(remoteSeeds);
+            Map<String, Boolean> rackSeedBootstraped = dataCenter.getStatus().getRackStatuses().stream().collect(Collectors.toMap(s -> s.getName(), s -> s.getSeedBootstrapped()));
+            int firstSeedableRack = 0;
+            if (remoteSeeds.isEmpty() && remoteSeeders.isEmpty()) {
+                // if we are the first rack, no question, first node is a seed.
+                firstSeedableRack = 1;
+                seeds.add(OperatorNames.podName(dataCenter, "0", 0)+"."+OperatorNames.nodesService(dataCenter)+"."+dataCenterMetadata.getNamespace()+".svc.cluster.local");
+            }
+            // add bootstrapped rack
+            for(int i = firstSeedableRack; i < rackSeedBootstraped.size(); i++) {
+                if (rackSeedBootstraped.getOrDefault(Integer.toString(i), false))
+                    seeds.add(OperatorNames.podName(dataCenter, Integer.toString(i), 0) + "." + OperatorNames.nodesService(dataCenter) + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local");
+            }
+            logger.debug("remoteSeeds={} remoteSeeders={}, rackSeedBootstraped={} seeds={}", remoteSeeds, remoteSeeders, rackSeedBootstraped, seeds);
+
+            Map<String, String> parameters = new HashMap<>();
+            if (!seeds.isEmpty())
+                parameters.put("seeds", String.join(", ", seeds));
+            if (!remoteSeeders.isEmpty())
+                parameters.put("seeders", String.join(", ", remoteSeeders));
+            logger.debug("seed parameters={}", parameters);
+            final Map<String, Object> config = new HashMap<>(); // can't use ImmutableMap as some values are null
             config.put("seed_provider", ImmutableList.of(ImmutableMap.of(
                     "class_name", "com.strapdata.cassandra.k8s.SeedProvider",
-                    "parameters", ImmutableList.of(ImmutableMap.of("services", String.join(",", seedList)))
-            )));
-            
+                    "parameters", ImmutableList.of(parameters))
+            ));
             configMapVolumeAddFile(configMap, volumeSource, "cassandra.yaml.d/001-operator-var-overrides.yaml", toYamlString(config));
         }
         
@@ -1089,8 +1119,15 @@ public class DataCenterUpdateAction {
             configMapVolumeAddFile(configMap, volumeSource, "elasticsearch.yml.d/003-datacentergroup.yaml", toYamlString(esConfig));
         }
     }
-    
-    private V1Service createOrReplaceSeedNodesService(String seedRack) throws ApiException {
+
+    /**
+     * Create a headless seed service per rack.
+     * @param rack
+     * @return
+     * @throws ApiException
+     */
+    // No used any more
+    private V1Service createOrReplaceSeedService(String rack) throws ApiException {
         final V1ObjectMeta serviceMetadata = dataCenterChildObjectMetadata(OperatorNames.seedsService(dataCenter))
                 // tolerate-unready-endpoints - allow the seed provider can discover the other seeds (and itself) before the readiness-probe gives the green light
                 .putAnnotationsItem("service.alpha.kubernetes.io/tolerate-unready-endpoints", "true");
@@ -1104,14 +1141,33 @@ public class DataCenterUpdateAction {
                         .ports(ImmutableList.of(
                                 new V1ServicePort().name("internode").port(
                                         dataCenterSpec.getSsl() ? dataCenterSpec.getSslStoragePort() : dataCenterSpec.getStoragePort())))
-                        // only select the pod number 0 as seed
-                        .selector(OperatorLabels.pod(dataCenter, seedRack, OperatorNames.podName(dataCenter, seedRack, 0)))
+                        // only select the pod 0 in a rack as seed, which is not good for local DC discovery (if rack X is unavailable).
+                        // We should use
+                        .selector(OperatorLabels.rack(dataCenter, rack))
                 );
         k8sResourceUtils.createOrReplaceNamespacedService(service);
-        
         return service;
     }
-    
+
+    /**
+     * The NodePort service has a DNS name and redirect to STS seed pods
+     * see https://stackoverflow.com/questions/46456239/how-to-expose-a-headless-service-for-a-statefulset-externally-in-kubernetes
+     */
+    private V1Service createOrReplaceExternalNodesService() throws ApiException {
+        final V1Service service = new V1Service()
+                .metadata(dataCenterChildObjectMetadata(OperatorNames.externalService(dataCenter)))
+                .spec(new V1ServiceSpec()
+                        .type("NodePort")
+                        .addPortsItem(new V1ServicePort().name("internode").port(dataCenterSpec.getSsl() ? dataCenterSpec.getSslStoragePort() : dataCenterSpec.getStoragePort()))
+                        .addPortsItem(new V1ServicePort().name("cql").port(dataCenterSpec.getNativePort()))
+                        .addPortsItem(new V1ServicePort().name("elasticsearch").port(9200))
+                        // select any available pod in the DC, which is good only if internal seed service is good !
+                        .selector(ImmutableMap.of(OperatorLabels.DATACENTER, dataCenter.getSpec().getDatacenterName()))
+                );
+        k8sResourceUtils.createOrReplaceNamespacedService(service);
+        return service;
+    }
+
     private void createOrReplaceNodesService() throws ApiException {
         final V1ObjectMeta serviceMetadata = dataCenterChildObjectMetadata(OperatorNames.nodesService(dataCenter));
         
@@ -1121,6 +1177,8 @@ public class DataCenterUpdateAction {
                         .clusterIP("None")
                         .addPortsItem(new V1ServicePort().name("cql").port(dataCenterSpec.getNativePort()))
                         .addPortsItem(new V1ServicePort().name("jmx").port(dataCenterSpec.getJmxPort()))
+                        .addPortsItem(new V1ServicePort().name("internode").port(
+                                dataCenterSpec.getSsl() ? dataCenterSpec.getSslStoragePort() : dataCenterSpec.getStoragePort()))
                         .selector(dataCenterLabels)
                 );
         
@@ -1206,7 +1264,7 @@ public class DataCenterUpdateAction {
 
     /**
      * Creates and stores credentials in a K8S secret if not exists
-     * @return strapkop login and password
+     * @return admin login and password for RC files
      * @throws ApiException
      */
     private Tuple2<String, String> createClusterSecretIfNotExists() throws ApiException {
@@ -1214,8 +1272,8 @@ public class DataCenterUpdateAction {
         // check if secret exists
         try {
             V1Secret secret = coreApi.readNamespacedSecret(secretMetadata.getName(), secretMetadata.getNamespace(), null, null, null);
-            byte[] passBytes = secret.getData().get(String.format(Locale.ROOT, "cassandra.%s_password", "strapkop"));
-            return new Tuple2<>("strapkop", new String(passBytes));
+            byte[] passBytes = secret.getData().get(String.format(Locale.ROOT, "cassandra.%s_password", "admin"));
+            return new Tuple2<>("admin", new String(passBytes));
         } catch (ApiException e) {
             if (e.getCode() != 404) {
                 throw e;
@@ -1223,15 +1281,15 @@ public class DataCenterUpdateAction {
         }
         
         // because this is created once, we should put things even if we don't need it yet (e.g shared secret if AAA is disabled)
-        String strapkopPassword = UUID.randomUUID().toString();
+        String adminPassword = UUID.randomUUID().toString();
         final V1Secret secret = new V1Secret()
                 .metadata(secretMetadata)
                 // replace the default cassandra password
                 .putStringDataItem("cassandra.cassandra_password", UUID.randomUUID().toString())
                 // strapkop role is used by the operator and sidecar
-                .putStringDataItem("cassandra.strapkop_password", strapkopPassword)
+                .putStringDataItem("cassandra.strapkop_password", UUID.randomUUID().toString())
                 // admin is intended to be distributed to human administrator, so the credentials lifecycle is decoupled
-                .putStringDataItem("cassandra.admin_password", UUID.randomUUID().toString())
+                .putStringDataItem("cassandra.admin_password", adminPassword)
                 // password used by reaper to access its cassandra backend
                 .putStringDataItem("cassandra.reaper_password", UUID.randomUUID().toString())
                 
@@ -1239,12 +1297,12 @@ public class DataCenterUpdateAction {
                 .putStringDataItem("reaper.admin_password", UUID.randomUUID().toString())
                 
                 // cassandra JMX password, mounted as /etc/cassandra/jmxremote.password
-                .putStringDataItem("jmx_password", UUID.randomUUID().toString())
+                .putStringDataItem("cassandra.jmx_password", UUID.randomUUID().toString())
                 // elassandra-enterprise shared secret is intended to be mounted as a config fragment
                 .putStringDataItem("shared-secret.yaml", "aaa.shared_secret: " + UUID.randomUUID().toString());
 
         coreApi.createNamespacedSecret(dataCenterMetadata.getNamespace(), secret, null, null, null);
-        return new Tuple2<>("strapkop", strapkopPassword);
+        return new Tuple2<>("admin", adminPassword);
     }
 
     /**
@@ -1293,6 +1351,22 @@ public class DataCenterUpdateAction {
         k8sResourceUtils.createOrReplaceNamespacedSecret(secret);
     }
 
+    /**
+     * @return The number of reaper pods depending on ReaperStatus
+     */
+    private int reaperReplicas() {
+        switch(dataCenterStatus.getReaperStatus()) {
+            case NONE:
+                return 0;
+            case KEYSPACE_CREATED:
+                return (dataCenterSpec.getAuthentication().equals(Authentication.NONE)) ? 1 : 0;
+            case ROLE_CREATED:
+            case REGISTERED:
+            default:
+                return 1;
+        }
+    }
+
     private void createOrReplaceReaperObjects() throws ApiException, StrapkopException {
 
         final Map<String, String> labels = OperatorLabels.reaper(dataCenter);
@@ -1312,38 +1386,37 @@ public class DataCenterUpdateAction {
                 .metadata(meta)
                 .spec(new V1DeploymentSpec()
                         // delay the creation of the reaper pod, after we have created the reaper_db keyspace
-                        .replicas(
-                                (dataCenterSpec.getAuthentication().equals(Authentication.NONE) && ReaperStatus.KEYSPACE_CREATED.equals(dataCenterStatus.getReaperStatus()) ||
-                                (!dataCenterSpec.getAuthentication().equals(Authentication.NONE) && ReaperStatus.ROLE_CREATED.equals(dataCenterStatus.getReaperStatus())))
-                                ? 1 : 0)
-                        .selector(new V1LabelSelector()
-                                .matchLabels(labels)
-                        )
+                        .replicas(reaperReplicas())
+                        .selector(new V1LabelSelector().matchLabels(labels))
                         .template(new V1PodTemplateSpec()
                                 .metadata(new V1ObjectMeta().labels(labels))
                                 .spec(podSpec)
                         )
                 );
 
+        final String APP_SERVICE_NAME = "app";
+        final String ADMIN_SERVICE_NAME = "admin";
+        final int APP_SERVICE_PORT = 8080;      // the webui
+        final int ADMIN_SERVICE_PORT = 8081;    // the REST API
         // common configuration
         container
                 .name("reaper")
                 .image(dataCenterSpec.getReaper().getImage())
                 .terminationMessagePolicy("FallbackToLogsOnError")
                 .addPortsItem(new V1ContainerPort()
-                        .name("app")
-                        .containerPort(8080)
+                        .name(APP_SERVICE_NAME)
+                        .containerPort(APP_SERVICE_PORT)
                         .protocol("TCP")
                 )
                 .addPortsItem(new V1ContainerPort()
-                        .name("admin")
-                        .containerPort(8081)
+                        .name(ADMIN_SERVICE_NAME)
+                        .containerPort(ADMIN_SERVICE_PORT)
                         .protocol("TCP")
                 )
                 .livenessProbe(new V1Probe()
                         .httpGet(new V1HTTPGetAction()
                                 .path("/")
-                                .port(new IntOrString("admin"))
+                                .port(new IntOrString(ADMIN_SERVICE_PORT))
                         )
                         .initialDelaySeconds(60)
                         .periodSeconds(20)
@@ -1352,7 +1425,7 @@ public class DataCenterUpdateAction {
                 .readinessProbe(new V1Probe()
                         .httpGet(new V1HTTPGetAction()
                                 .path("/")
-                                .port(new IntOrString("admin"))
+                                .port(new IntOrString(ADMIN_SERVICE_PORT))
                         )
                         .initialDelaySeconds(10)
                         .periodSeconds(10)
@@ -1371,7 +1444,7 @@ public class DataCenterUpdateAction {
                         .valueFrom(new V1EnvVarSource()
                                 .secretKeyRef(new V1SecretKeySelector()
                                         .name(OperatorNames.clusterSecret(dataCenter))
-                                        .key("jmx_password")
+                                        .key("cassandra.jmx_password")
                                 )
                         )
                 )
@@ -1418,7 +1491,7 @@ public class DataCenterUpdateAction {
                 )
                 .addEnvItem(new V1EnvVar()
                         .name("JWT_SECRET")
-                        .value(Base64.getEncoder().encodeToString(UUID.randomUUID().toString().getBytes()))
+                        .value(Base64.getEncoder().encodeToString(dataCenterSpec.getReaper().getJwtSecret().getBytes()))
                 );
 
 
@@ -1478,10 +1551,6 @@ public class DataCenterUpdateAction {
         }
 
         // create reaper service
-        final String APP_SERVICE_NAME = "app";
-        final String ADMIN_SERVICE_NAME = "admin";
-        final int APP_SERVICE_PORT = 8080;
-        final int ADMIN_SERVICE_PORT = 8081;
         final V1Service service = new V1Service()
                 .metadata(meta)
                 .spec(new V1ServiceSpec()
@@ -1496,7 +1565,7 @@ public class DataCenterUpdateAction {
         String ingressDomain = System.getenv("INGRESS_DOMAIN");
         if (!Strings.isNullOrEmpty(ingressDomain)) {
             String reaperHost = "reaper-" + dataCenterSpec.getClusterName() + "-" + dataCenterSpec.getDatacenterName() + "." + ingressDomain;
-            logger.info("Creating reaper ingress for host={}", reaperHost);
+            logger.trace("Creating reaper ingress for host={}", reaperHost);
             final V1beta1Ingress ingress = new V1beta1Ingress()
                     .metadata(meta)
                     .spec(new V1beta1IngressSpec()
@@ -1505,9 +1574,14 @@ public class DataCenterUpdateAction {
                                     .http(new V1beta1HTTPIngressRuleValue()
                                             .addPathsItem(new V1beta1HTTPIngressPath()
                                                     .path("/webui")
-                                                    .backend(new V1beta1IngressBackend().serviceName(APP_SERVICE_NAME).servicePort(new IntOrString(APP_SERVICE_PORT)))
+                                                    .backend(new V1beta1IngressBackend()
+                                                            .serviceName(OperatorNames.reaper(dataCenter))
+                                                            .servicePort(new IntOrString(APP_SERVICE_PORT)))
                                             )
                                     )
+                            )
+                            .addTlsItem(new V1beta1IngressTLS()
+                                    .addHostsItem(reaperHost)
                             )
                     );
             k8sResourceUtils.createOrReplaceNamespacedIngress(ingress);

@@ -45,6 +45,10 @@ public class OperatorNames {
     public static String elasticsearchService(final DataCenter dataCenter) {
         return OperatorNames.dataCenterChildObjectName("%s-elasticsearch", dataCenter);
     }
+
+    public static String externalService(final DataCenter dataCenter) {
+        return OperatorNames.dataCenterChildObjectName("%s-external", dataCenter);
+    }
     
     public static String seedsService(DataCenter dataCenter) {
         return OperatorNames.dataCenterChildObjectName("%s-seeds", dataCenter);

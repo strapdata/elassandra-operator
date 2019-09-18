@@ -8,6 +8,7 @@ import com.datastax.driver.core.exceptions.AuthenticationException;
 import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.policies.DCAwareRoundRobinPolicy;
 import com.datastax.driver.core.policies.TokenAwarePolicy;
+import com.strapdata.cassandra.k8s.SeedProvider;
 import com.strapdata.model.Key;
 import com.strapdata.model.k8s.cassandra.Authentication;
 import com.strapdata.model.k8s.cassandra.CqlStatus;
@@ -31,6 +32,7 @@ import javax.annotation.PreDestroy;
 import javax.inject.Singleton;
 import javax.net.ssl.SSLException;
 import java.io.ByteArrayInputStream;
+import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Objects;
@@ -59,7 +61,7 @@ public class CqlConnectionManager implements AutoCloseable {
     public void reconcileConnection(final DataCenter dc) throws StrapkopException, ApiException, SSLException {
         
         // abort if dc is not running
-        if (!Objects.equals(dc.getStatus().getPhase(), DataCenterPhase.RUNNING)) {
+        if (dc.getStatus() == null || !Objects.equals(dc.getStatus().getPhase(), DataCenterPhase.RUNNING)) {
             return ;
         }
         
@@ -133,7 +135,7 @@ public class CqlConnectionManager implements AutoCloseable {
     public Session getSessionRequireNonNull(final DataCenter dc) throws StrapkopException {
         final Session session = getConnection(dc);
         if (session == null) {
-            throw new StrapkopException("no cql connection available to initialize reaper keyspace");
+            throw new StrapkopException("no cql connection available to initialize keyspace");
         }
         return session;
     }
@@ -157,7 +159,6 @@ public class CqlConnectionManager implements AutoCloseable {
         final Cluster.Builder builder = Cluster.builder()
                 .withClusterName(dc.getSpec().getClusterName())
                 .withPort(dc.getSpec().getNativePort())
-                .addContactPoint(OperatorNames.nodesService(dc))
                 .withLoadBalancingPolicy(new TokenAwarePolicy(
                         DCAwareRoundRobinPolicy.builder()
                                 .withLocalDc(dc.getSpec().getDatacenterName())
@@ -167,6 +168,28 @@ public class CqlConnectionManager implements AutoCloseable {
         if (dc.getSpec().getRemoteSeeds() != null)
             for(String remoteSeed : dc.getSpec().getRemoteSeeds())
                 builder.addContactPoint(remoteSeed);
+
+        // add seeds from remote seeders.
+        if (dc.getSpec().getRemoteSeeders() != null) {
+            for(String remoteSeeder : dc.getSpec().getRemoteSeeders()) {
+                try {
+                    for(InetAddress addr : SeedProvider.seederCall(remoteSeeder)) {
+                        logger.debug("Add remote seed={} from seeder={}", addr.getHostAddress(), remoteSeeder);
+                        builder.addContactPoint(addr.getHostAddress());
+                    }
+                } catch (Exception e) {
+                    logger.error("Seeder error", e);
+                }
+            }
+        }
+
+        // contact local nodes is boostraped or first DC in the cluster
+        boolean hasSeedBootstrapped = dc.getStatus().getRackStatuses().stream().anyMatch(s -> s.getSeedBootstrapped());
+        if (hasSeedBootstrapped ||
+                ((dc.getSpec().getRemoteSeeds() == null || dc.getSpec().getRemoteSeeds().isEmpty()) && (dc.getSpec().getRemoteSeeders() == null || dc.getSpec().getRemoteSeeders().isEmpty()))) {
+            builder.addContactPoint(OperatorNames.nodesService(dc));
+        }
+
 
         if (Objects.equals(dc.getSpec().getSsl(), Boolean.TRUE)) {
             builder.withSSL(getSSLOptions());

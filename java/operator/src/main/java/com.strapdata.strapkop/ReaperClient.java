@@ -65,14 +65,18 @@ public class ReaperClient implements Closeable {
         
         final String seedHost = OperatorNames.seedsService(dataCenter);
         final int jmxPort = dataCenter.getSpec().getJmxPort();
-        
-        return authenticate().flatMap(jwt -> httpClient.exchange(
-                    POST(String.format("/cluster?seedHost=%s&jmxPort=%d", seedHost, jmxPort), "")
-                    .header("Authorization", String.format("Bearer %s", jwt))
-            )
-                .observeOn(Schedulers.io())
-                .singleOrError()
-        ).map(res -> true);
+
+        return authenticate()
+                .flatMap(jwt -> httpClient.exchange(
+                        POST(String.format("/cluster?seedHost=%s&jmxPort=%d", seedHost, jmxPort), "")
+                                .header("Authorization", String.format("Bearer %s", jwt))
+                        )
+                                .observeOn(Schedulers.io())
+                                .singleOrError()
+                ).map(res -> {
+                    logger.debug("reaper registration rc={}", res.getStatus());
+                    return res.getStatus().getCode() == 200;
+                });
     }
     
     private String jwt = null;

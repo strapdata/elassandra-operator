@@ -2,7 +2,10 @@ package com.strapdata.strapkop.reconcilier;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSet;
-import com.strapdata.model.k8s.cassandra.*;
+import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.model.k8s.cassandra.DataCenterPhase;
+import com.strapdata.model.k8s.cassandra.RackMode;
+import com.strapdata.model.k8s.cassandra.RackStatus;
 import com.strapdata.model.k8s.task.CleanupTaskSpec;
 import com.strapdata.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
@@ -25,6 +28,7 @@ import org.slf4j.LoggerFactory;
 import java.net.MalformedURLException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * This class implement the complex logic of updating, scaling up or down statefulsets with multiple rack, one by one.
@@ -415,12 +419,21 @@ class CarefulStatefulSetUpdateManager {
         // initialize rack statuses
         final List<RackStatus> rackStatuses = new ArrayList<>();
         dataCenter.getStatus().setRackStatuses(rackStatuses);
-    
+
+        // current bootstrapped rack
+        Map<String, Boolean> rackSeedBootstraped = dataCenter.getStatus().getRackStatuses()
+                .stream().collect(Collectors.toMap(s -> s.getName(), s -> s.getSeedBootstrapped()));
+
         // for each rack
         for (Map.Entry<String, V1StatefulSet> entry : newtStsMap.entrySet()) {
             String rack = entry.getKey();
             V1StatefulSet sts = entry.getValue();
-    
+
+            // pod-0 in the rack
+            String pod0 = OperatorNames.podName(dataCenter, rack, 0);
+            ElassandraNodeStatus ens = this.elassandraNodeStatusCache.get(new ElassandraPod(dataCenter, pod0));
+            logger.trace("dc={} rack={} pod={} status={}", dataCenter.getMetadata().getName(), rack, pod0, ens);
+
             // set rack status
             rackStatuses.add(new RackStatus()
                     .setName(rack)
@@ -430,6 +443,8 @@ class CarefulStatefulSetUpdateManager {
                             .map(Map.Entry::getKey)
                             .findFirst().orElse(RackMode.UNKNOWN))
                     .setReplicas(existingStsMap.get(rack).getSpec().getReplicas())
+                    // become bootstrapped when pod-0 has been seen NORMAL.
+                    .setSeedBootstrapped(rackSeedBootstraped.getOrDefault(rack, false) || ElassandraNodeStatus.NORMAL.equals(ens))
             );
             
             // set pod statuses

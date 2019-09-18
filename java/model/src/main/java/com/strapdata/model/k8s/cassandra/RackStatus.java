@@ -24,4 +24,14 @@ public class RackStatus {
     @SerializedName("replicas")
     @Expose
     private Integer replicas;
+
+    /**
+     * Track if the seed (the first node in the rack) has already bootstrapped.
+     * When seedBootstrapped = true, the rack first pod is included in local seeds.
+     * Should become true when the first rack pod become NORMAL.
+     */
+    @SerializedName("seedBootstrapped")
+    @Expose
+    private Boolean seedBootstrapped = false;
+
 }
