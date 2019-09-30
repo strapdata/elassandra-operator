@@ -4,6 +4,7 @@ package com.strapdata.strapkop.sidecar.controllers;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.reactivex.Single;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,7 +16,7 @@ import java.util.stream.Collectors;
 /**
  * Allow to list and download GC logs from Elassandra
  */
-//@Tag(name = "gclog")
+@Tag(name = "gclog")
 @Controller("/gclog")
 public class GclogController {
 

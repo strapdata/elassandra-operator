@@ -7,6 +7,7 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
 import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jmx.org.apache.cassandra.service.StorageServiceMBean;
 
 import java.util.List;
@@ -14,7 +15,7 @@ import java.util.List;
 /**
  * Run a cassandra operation
  */
-//@Tag(name = "operations")
+@Tag(name = "operations")
 @Controller("/operations")
 @Produces(MediaType.APPLICATION_JSON)
 public class OperationController {

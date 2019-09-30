@@ -10,8 +10,9 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
 import io.reactivex.Completable;
 import io.reactivex.Single;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
-//@Tag(name = "search")
+@Tag(name = "search")
 @Controller("/enterprise/search")
 @Produces(MediaType.APPLICATION_JSON)
 public class SearchController {

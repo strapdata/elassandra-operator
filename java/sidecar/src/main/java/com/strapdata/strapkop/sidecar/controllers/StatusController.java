@@ -6,6 +6,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Produces;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jmx.org.apache.cassandra.service.StorageServiceMBean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,7 +14,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Get Cassandra node status
  */
-//@Tag(name = "status")
+@Tag(name = "status")
 @Controller("/status")
 @Produces(MediaType.APPLICATION_JSON)
 public class StatusController {

@@ -1,8 +1,11 @@
 package com.strapdata.strapkop.sidecar;
 
 import io.micronaut.runtime.Micronaut;
+import io.swagger.v3.oas.annotations.OpenAPIDefinition;
+import io.swagger.v3.oas.annotations.info.Info;
+import io.swagger.v3.oas.annotations.info.License;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
-/*
 @OpenAPIDefinition(
         info = @Info(
                 title = "Strapkop",
@@ -18,7 +21,6 @@ import io.micronaut.runtime.Micronaut;
                 @Tag(name = "gclog")
         }
 )
- */
 public class Application {
 
     public static void main(String[] args) {

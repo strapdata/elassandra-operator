@@ -8,6 +8,7 @@ import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,7 +17,7 @@ import javax.inject.Inject;
 /**
  * Create Cassandra backups
  */
-//@Tag(name = "backups")
+@Tag(name = "backups")
 @Controller("/backups")
 @Produces(MediaType.APPLICATION_JSON)
 public class BackupController {
