@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'application'
     id 'com.google.cloud.tools.jib'
+    id 'org.hidetake.swagger.generator' version '2.18.1'
 }
 
 mainClassName = 'com.strapdata.strapkop.sidecar.Application'
@@ -39,7 +40,13 @@ jib {
                     '-XX:+UseCGroupMemoryLimitForHeap',
                     '-XX:MaxRAMFraction=2',
                     '-XX:+ExitOnOutOfMemoryError',
-                    '-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005' // TODO: make this optional
+                    '-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005',
+                    '-Dcom.sun.management.jmxremote',
+                    '-Dcom.sun.management.jmxremote.port=7199',
+                    '-Dcom.sun.management.jmxremote.rmi.port=7199',
+                    '-Dcom.sun.management.jmxremote.ssl=false',
+                    '-Dcom.sun.management.jmxremote.authenticate=false',
+                    '-Djava.rmi.server.hostname=127.0.0.1'
         ]
         mainClass = mainClassName
         ports = ['8080']
@@ -51,15 +58,21 @@ tasks.jibDockerBuild.dependsOn project(':java:backup').jar
 tasks.jibDockerBuild.dependsOn project(':java:model').jar
 
 compileJava {
-    sourceCompatibility = 8
-    targetCompatibility = 8
+    sourceCompatibility = 1.8
+    targetCompatibility = 1.8
     options.encoding = 'UTF-8'
     options.compilerArgs = [ '-parameters', '-Xlint:all', '-Xlint:-processing', '-Xlint:-serial', '-Werror']
 }
 
+compileTestJava {
+    options.compilerArgs += '-parameters'
+}
+
 dependencies {
+    annotationProcessor "io.micronaut.configuration:micronaut-openapi"
     annotationProcessor "io.micronaut:micronaut-inject-java"
     annotationProcessor "io.micronaut:micronaut-validation"
+
     compile "io.micronaut:micronaut-http-client"
     compile "info.picocli:picocli"
     compile "io.micronaut.configuration:micronaut-picocli"
@@ -68,7 +81,11 @@ dependencies {
     compile "io.micronaut:micronaut-validation"
     compile "io.micronaut:micronaut-runtime"
     runtime "ch.qos.logback:logback-classic:1.2.3"
+
     testAnnotationProcessor "io.micronaut:micronaut-inject-java"
+    compile "javax.annotation:javax.annotation-api"
+
+    compile "io.swagger.core.v3:swagger-annotations"
 
     compile project(':java:model')
     compile project(':java:backup')

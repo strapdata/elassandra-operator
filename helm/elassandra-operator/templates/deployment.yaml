@@ -37,6 +37,10 @@ spec:
           ports:
             - containerPort: 8080
               name: http
+            - containerPort: 5005
+              name: jdb
+            - containerPort: 7199
+              name: jmx
           readinessProbe:
             httpGet:
               path: /ready

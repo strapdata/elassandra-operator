@@ -1,4 +1,4 @@
-#!/bin/bash -xue
+#!/bin/bash -xe
 
 source ./systune.sh
 
@@ -14,12 +14,22 @@ do
 done
 )
 
+# default settings
 ES_USE_INTERNAL_ADDRESS=""
+LISTEN_ADDRESS="$POD_IP"
+BROADCAST_ADDRESS="$POD_IP"
+BROADCAST_RPC_ADDRESS="$POD_IP"
+
 if [ -f "/nodeinfo/node-ip" ] && [ -s "/nodeinfo/node-ip" ]; then
     NODE_IP=$(cat /nodeinfo/node-ip)
     BROADCAST_ADDRESS=$NODE_IP
     BROADCAST_RPC_ADDRESS=$NODE_IP
     ES_USE_INTERNAL_ADDRESS="-Des.use_internal_address=true"
+
+    if [ "$HOST_NETWORK" == "true" ]; then
+        LISTEN_ADDRESS=$NODE_IP
+        echo "listen_address: $LISTEN_ADDRESS" > /etc/cassandra/cassandra.yaml.d/002-listen_address.yaml
+    fi
 fi
 
 if [ -f "/nodeinfo/public-ip" ] && [ -s "/nodeinfo/public-ip" ]; then
@@ -30,19 +40,10 @@ if [ -f "/nodeinfo/public-ip" ] && [ -s "/nodeinfo/public-ip" ]; then
 fi
 
 # Define broadcast address
-if [ -z "BROADCAST_ADDRESS" ]; then
-  echo "warning during startup: BROADCAST_ADDRESS is not defined, POD_IP=$POD_IP NODE_IP=$NODE_IP PUBLIC_IP=$PUBLIC_IP" >&2
-else
-  echo "broadcast_address: $BROADCAST_ADDRESS" > /etc/cassandra/cassandra.yaml.d/002-broadcast_address.yaml
-fi
+echo "broadcast_address: $BROADCAST_ADDRESS" > /etc/cassandra/cassandra.yaml.d/002-broadcast_address.yaml
+echo "broadcast_rpc_address: $BROADCAST_RPC_ADDRESS" > /etc/cassandra/cassandra.yaml.d/002-broadcast_rpc_address.yaml
 
-# Define RPC broadcast address
-if [ -z "BROADCAST_RPC_ADDRESS" ]; then
-  echo "warning during startup: BROADCAST_RPC_ADDRESS is not defined, POD_IP=$POD_IP NODE_IP=$NODE_IP PUBLIC_IP=$PUBLIC_IP" >&2
-else
-  echo "broadcast_rpc_address: $BROADCAST_RPC_ADDRESS" > /etc/cassandra/cassandra.yaml.d/002-broadcast_rpc_address.yaml
-fi
-export JVM_OPTS="$ES_USE_INTERNAL_ADDRESS"
+export JVM_OPTS="$JVM_OPTS $ES_USE_INTERNAL_ADDRESS"
 
 # Load node IPs of local seeds for the strapkop SeedProvider
 if [ -f "/nodeinfo/seeds-ip" ] && [ -s "/nodeinfo/seeds-ip" ]; then

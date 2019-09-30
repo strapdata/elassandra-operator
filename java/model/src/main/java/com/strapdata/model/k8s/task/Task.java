@@ -10,7 +10,11 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 public class Task {
-    
+
+    public static final String NAME = "elassandratask";
+    public static final String PLURAL = "elassandratasks";
+    public static final String VERSION = "v1";
+
     @SerializedName("apiVersion")
     @Expose
     private String apiVersion = "stable.strapdata.com/v1";

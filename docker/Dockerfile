@@ -24,7 +24,8 @@ COPY ready-probe.sh /
 # ulimit has to be set after the user has changes, but this require some capabilities to be set on the entrypoint executable,
 # which is bash actually...
 # unfortunalty, this does not work with unpriviledged mode... TODO: we'll have to find a workaround if we want to support unpriviledged setup
-RUN dagi libcap2-bin && setcap cap_ipc_lock=+ep /bin/bash && setcap cap_sys_resource=+ep /bin/bash
+RUN dagi libcap2-bin sysstat net-tools iotop dstat htop strace linux-perf && setcap cap_ipc_lock=+ep /bin/bash && setcap cap_sys_resource=+ep /bin/bash
+
 # this file is sourced from the entrypoint.sh
 COPY systune.sh /
 

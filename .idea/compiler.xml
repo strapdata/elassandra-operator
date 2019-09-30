@@ -23,7 +23,7 @@
       <module name="strapkop.java.model.test" target="1.8" />
       <module name="strapkop.java.operator.main" target="8" />
       <module name="strapkop.java.operator.test" target="1.8" />
-      <module name="strapkop.java.sidecar.main" target="8" />
+      <module name="strapkop.java.sidecar.main" target="1.8" />
       <module name="strapkop.java.sidecar.test" target="1.8" />
     </bytecodeTargetLevel>
   </component>

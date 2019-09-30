@@ -184,7 +184,8 @@ configs:
     <logger name="org.elassandra.indices" level="${LOGBACK_org_elassandra_indices:-INFO}" />
     <logger name="org.elassandra.index" level="${LOGBACK_org_elassandra_index:-WARN}" />
     <logger name="org.elassandra.discovery" level="${LOGBACK_org_elassandra_discovery:-WARN}" />
-    <logger name="org.elasticsearch.cluster.service" level="${LOGBACK_org_elassandra_cluster_service:-INFO}" />
+    <logger name="org.elasticsearch.cluster.service" level="${LOGBACK_org_elassandra_cluster_service:-DEBUG}" />
+    <logger name="org.elasticsearch.cluster.metadata" level="DEBUG" />
     <logger name="org.elasticsearch" level="${LOGBACK_org_elasticsearch:-WARN}" />
 
     <root level="INFO">

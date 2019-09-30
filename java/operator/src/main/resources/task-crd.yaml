@@ -15,7 +15,7 @@ spec:
     # plural name to be used in the URL: /apis/<group>/<version>/<plural>
     plural: elassandratasks
     # singular name to be used as an alias on the CLI and for display
-    singular: elassandratasks
+    singular: elassandratask
     # kind is normally the CamelCased singular type. Your resource manifests use this.
     kind: ElassandraTask
     # shortNames allow shorter string to match your resource on the CLI

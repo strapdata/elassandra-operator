@@ -11,6 +11,10 @@ import jmx.org.apache.cassandra.service.StorageServiceMBean;
 
 import java.util.List;
 
+/**
+ * Run a cassandra operation
+ */
+//@Tag(name = "operations")
 @Controller("/operations")
 @Produces(MediaType.APPLICATION_JSON)
 public class OperationController {

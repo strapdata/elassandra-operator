@@ -1,5 +1,13 @@
 micronaut:
     application:
         name: sidecar
+    router:
+        static-resources:
+            swagger:
+                enabled: true
+                paths:
+                    - classpath:META-INF/swagger
+                    - classpath:swagger
+                mapping: /swagger/**
 jackson:
     module-scan: false

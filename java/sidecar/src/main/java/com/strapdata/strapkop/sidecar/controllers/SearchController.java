@@ -11,6 +11,7 @@ import io.micronaut.http.annotation.Produces;
 import io.reactivex.Completable;
 import io.reactivex.Single;
 
+//@Tag(name = "search")
 @Controller("/enterprise/search")
 @Produces(MediaType.APPLICATION_JSON)
 public class SearchController {

@@ -15,6 +15,14 @@ spec:
       targetPort: 8080
       protocol: TCP
       name: strapkop
+    - port: 5005
+      targetPort: 5005
+      protocol: TCP
+      name: jdb
+    - port: 7199
+      targetPort: 7199
+      protocol: TCP
+      name: jmx
   selector:
     app: {{ template "elassandra-operator.name" . }}
     release: {{ .Release.Name }}

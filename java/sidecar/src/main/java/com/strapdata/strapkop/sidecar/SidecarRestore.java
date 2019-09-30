@@ -27,7 +27,8 @@ public class SidecarRestore implements Callable<Void> {
     
     @CommandLine.Spec
     private CommandLine.Model.CommandSpec commandSpec;
-    
+
+    @SuppressWarnings( "deprecation" )
     public static void main(final String[] args) throws IOException {
         CommandLine.call(new SidecarRestore(), System.err, CommandLine.Help.Ansi.ON, args);
     }

@@ -22,6 +22,9 @@
 
 
 -XX:+ExitOnOutOfMemoryError
+-XX:+CrashOnOutOfMemoryError
+-XX:HeapDumpPath=/tmp
+
 -XX:MaxDirectMemorySize=18G
 
 -Xss1m
@@ -52,7 +55,7 @@
 -XX:+PrintTenuringDistribution
 -XX:+PrintGCApplicationStoppedTime
 -XX:+PrintPromotionFailure
--Xloggc:/var/log/cassandra/gc.log
+-Xloggc:/tmp/gc.log
 -XX:+UseGCLogFileRotation
 -XX:NumberOfGCLogFiles=10
 -XX:GCLogFileSize=10M

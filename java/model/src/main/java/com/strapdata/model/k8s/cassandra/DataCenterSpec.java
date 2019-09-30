@@ -119,6 +119,13 @@ public class DataCenterSpec {
     private Reaper reaper = new Reaper();
 
     /**
+     * Kibana user spaces (key = space name)
+     */
+    @SerializedName("kibanaSpaces")
+    @Expose
+    private List<KibanaSpace> kibanaSpaces = new ArrayList<>();
+
+    /**
      * Attempt to run privileged configuration options for better performance
      * 
      */
@@ -139,6 +146,15 @@ public class DataCenterSpec {
     @SerializedName("hostPortEnabled")
     @Expose
     private Boolean hostPortEnabled = true;
+
+    /**
+     * Enable hostNetwork, allowing to bind on host IP addresses.
+     */
+    @SerializedName("hostNetworkEnabled")
+    @Expose
+    private Boolean hostNetworkEnabled = true;
+
+
 
     /**
      * CQL native port (also hostPort)

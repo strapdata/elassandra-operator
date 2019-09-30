@@ -6,10 +6,7 @@ import com.strapdata.model.sidecar.ElassandraNodeStatus;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Data
 @NoArgsConstructor
@@ -85,5 +82,9 @@ public class DataCenterStatus {
     @SerializedName("keyspaceManagerStatus")
     private KeyspaceManagerStatus keyspaceManagerStatus = new KeyspaceManagerStatus();
 
-
+    /**
+     * Kibana deployed spaces
+     */
+    @SerializedName("kibanaSpaces")
+    private Set<String> kibanaSpaces = new HashSet<>();
 }
