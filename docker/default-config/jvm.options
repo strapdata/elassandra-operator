@@ -55,7 +55,7 @@
 -XX:+PrintTenuringDistribution
 -XX:+PrintGCApplicationStoppedTime
 -XX:+PrintPromotionFailure
--Xloggc:/tmp/gc.log
+-Xloggc:/var/log/cassandra/gc.log
 -XX:+UseGCLogFileRotation
 -XX:NumberOfGCLogFiles=10
 -XX:GCLogFileSize=10M
