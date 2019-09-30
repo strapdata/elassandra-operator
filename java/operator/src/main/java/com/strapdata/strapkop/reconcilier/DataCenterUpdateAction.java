@@ -443,6 +443,13 @@ public class DataCenterUpdateAction {
                 .addEnvItem(new V1EnvVar().name("NODE_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("spec.nodeName"))))
                 ;
 
+        if (dataCenterSpec.getSsl()) {
+            cassandraContainer.addVolumeMountsItem(new V1VolumeMount()
+                    .name("nodetool-ssl-volume")
+                    .mountPath("/home/cassandra/.cassandra/nodetool-ssl.properties")
+                    .subPath("nodetool-ssl.properties")
+            );
+        }
         addPortsItem(cassandraContainer, dataCenterSpec.getStoragePort(), "internode", true);
         addPortsItem(cassandraContainer, dataCenterSpec.getSslStoragePort(), "internode-ssl", true);
         addPortsItem(cassandraContainer, dataCenterSpec.getNativePort(), "cql", true);
@@ -556,6 +563,18 @@ public class DataCenterUpdateAction {
                         )
                 )
                 ;
+
+        if (dataCenterSpec.getSsl()) {
+            podSpec.addVolumesItem(new V1Volume()
+                    .name("nodetool-ssl-volume")
+                    .secret(new V1SecretVolumeSource()
+                            .secretName(OperatorNames.clusterRcFilesSecret(dataCenter))
+                            .addItemsItem(new V1KeyToPath()
+                                    .key("nodetool-ssl.properties").path("nodetool-ssl.properties").mode(256)
+                            )
+                    )
+            );
+        }
 
         // Add the nodeinfo init container if we have the nodeinfo secret name provided in the env var NODEINFO_SECRET
         // To create such a service account:
@@ -1320,13 +1339,14 @@ public class DataCenterUpdateAction {
     }
 
     /**
-     * Generate rc files as secret (.curlrc and cqlshrc)
+     * Generate rc files as secret (.curlrc and .cassandra/cqlshrc + .cassandra/nodetool-ssl.properties)
      * TODO: avoid generation on each reconciliation
      * @param username
      * @param password
      */
     private void createOrUpdateRcFileSecret(String username, String password) throws ApiException {
         String cqlshrc = "";
+        String nodetoolSsl = null;
         String curlrc = "";
 
         if (dataCenterSpec.getSsl()) {
@@ -1338,6 +1358,11 @@ public class DataCenterUpdateAction {
                             "[ssl]\n" +
                             "certfile = " + this.authorityManager.getPublicCaMountPath() + "/cacert.pem\n" +
                             "validate = true\n";
+
+            nodetoolSsl = "-Djavax.net.ssl.trustStore=" + this.authorityManager.getPublicCaMountPath() + "/" + AuthorityManager.SECRET_TRUSTSTORE_P12 + " " +
+                    "-Djavax.net.ssl.trustStorePassword='" + this.authorityManager.getCaTrustPass() + "' " +
+                    "-Dcom.sun.management.jmxremote.registry.ssl=true";
+
             if (Optional.ofNullable(dataCenterSpec.getEnterprise()).map(Enterprise::getSsl).orElse(false)) {
                 curlrc += "cacert = " + this.authorityManager.getPublicCaMountPath() + "/cacert.pem\n";
             }
@@ -1361,6 +1386,8 @@ public class DataCenterUpdateAction {
                 .metadata(secretMetadata)
                 .putStringDataItem("cqlshrc", cqlshrc)
                 .putStringDataItem("curlrc", curlrc);
+        if (nodetoolSsl != null)
+            secret.putStringDataItem("nodetool-ssl.properties", nodetoolSsl);
 
         k8sResourceUtils.createOrReplaceNamespacedSecret(secret);
     }
