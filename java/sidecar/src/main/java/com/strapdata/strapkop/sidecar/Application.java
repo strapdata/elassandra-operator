@@ -8,9 +8,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 @OpenAPIDefinition(
         info = @Info(
-                title = "Strapkop",
+                title = "Strapkop sidecar",
                 version = "0.1",
-                description = "Strapdata Kuberenetes Operator for Elassandra",
+                description = "Strapdata Elassandra sidecar",
                 license = @License(name = "Strapdata license", url = "http://petstore.notreal")
         ),
         tags = {

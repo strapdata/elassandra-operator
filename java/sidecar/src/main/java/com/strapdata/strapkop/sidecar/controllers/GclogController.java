@@ -25,7 +25,7 @@ public class GclogController {
     File gclogDir;
 
     public GclogController() {
-        gclogDir = new File(System.getenv("GCLOG_DIR") == null ? "/var/log/cassandra" : System.getenv("GCLOG_DIR"));
+        gclogDir = new File(System.getenv("GCLOG_DIR") == null ? "/var/log/cassandra/" : System.getenv("GCLOG_DIR"));
         if (!gclogDir.exists()) {
             logger.error("GC log directory does not exists:"+gclogDir.getAbsolutePath());
         }

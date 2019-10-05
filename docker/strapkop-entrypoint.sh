@@ -53,7 +53,8 @@ fi
 
 # Generate /etc/cassandra/jmxremote.password
 if [ -n "$JMX_PASSWORD" ]; then
-   echo "cassandra $JMX_PASSWORD\n" > /etc/cassandra/jmxremote.password
+   echo "cassandra $JMX_PASSWORD" > /etc/cassandra/jmxremote.password
+   chmod 400 /etc/cassandra/jmxremote.password
 fi
 
 # handle kubernetes SIGTERM and gracefully stop elassandra
@@ -73,8 +74,9 @@ _term() {
   kill -9 "$pid" 2>/dev/null
 }
 
+trap _term SIGTERM
+
 /usr/sbin/cassandra &
 pid=$!
-trap _term SIGTERM
 wait ${pid}
 echo "cassandra has exited"

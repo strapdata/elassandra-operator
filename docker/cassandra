@@ -6,41 +6,17 @@ shopt -s nullglob
 
 JVM_OPTS=${JVM_OPTS:=}
 
-# elasticsearch requires -Dcassandra.storagedir to start properly
-JVM_OPTS="${JVM_OPTS} -Dcassandra.storagedir=/var/lib/cassandra"
-
-JVM_OPTS="${JVM_OPTS} -Dcassandra.config.loader=com.strapdata.cassandra.k8s.ConcatenatedYamlConfigurationLoader"
-JVM_OPTS="${JVM_OPTS} -Dcassandra.config=/usr/share/cassandra/cassandra.yaml:/etc/cassandra/cassandra.yaml:/etc/cassandra/cassandra.yaml.d"
-
-JVM_OPTS="${JVM_OPTS} -Delasticsearch.config.loader=com.strapdata.cassandra.k8s.ElasticConcatenatedEnvironmentLoader"
-JVM_OPTS="${JVM_OPTS} -Delasticsearch.config=/usr/share/cassandra/elasticsearch.yml:/etc/cassandra/elasticsearch.yml:/etc/cassandra/elasticsearch.yml.d"
-
-# provides hints to the JIT compiler
-JVM_OPTS="${JVM_OPTS} -XX:CompileCommandFile=${CASSANDRA_HOME}/hotspot_compiler"
-
-# add the jamm agent
-JVM_OPTS="${JVM_OPTS} -javaagent:${CASSANDRA_HOME}/agents/jamm-0.3.0.jar"
-
-# sigar support
-JVM_OPTS="${JVM_OPTS} -Djava.library.path=${CASSANDRA_HOME}/lib/sigar-bin"
-
-# heap dumps to tmp
-JVM_OPTS="${JVM_OPTS} -XX:HeapDumpPath=/tmp/cassandra-`date +%s`-pid$$.hprof"
-
 # JMX configuration
-JMX_PORT="${JMX_PORT:-7199}"
-JVM_OPTS="$JVM_OPTS -Dcassandra.jmx.remote.port=$JMX_PORT"
-# if ssl is enabled the same port cannot be used for both jmx and rmi so either
-# pick another value for this property or comment out to use a random port (though see CASSANDRA-7087 for origins)
-JVM_OPTS="$JVM_OPTS -Dcom.sun.management.jmxremote.rmi.port=$JMX_PORT"
+# Remote JMX is alway over SSL on a fixed port, otherwise JMX is clear and local = default conf
+#JMX_PORT="${JMX_PORT:-7199}"
 
 # turn on JMX authentication. See below for further options
-JVM_OPTS="$JVM_OPTS -Dcom.sun.management.jmxremote.authenticate=true"
+#JVM_OPTS="$JVM_OPTS -Dcom.sun.management.jmxremote.authenticate=true"
 
 # jmx authentication and authorization options. By default, auth is only
 # activated for remote connections but they can also be enabled for local only JMX
 ## Basic file based authn & authz
-JVM_OPTS="$JVM_OPTS -Dcom.sun.management.jmxremote.password.file=/etc/cassandra/jmxremote.password"
+#JVM_OPTS="$JVM_OPTS -Dcom.sun.management.jmxremote.password.file=/etc/cassandra/jmxremote.password"
 #JVM_OPTS="$JVM_OPTS -Dcom.sun.management.jmxremote.access.file=/etc/cassandra/jmxremote.access"
 ## Custom auth settings which can be used as alternatives to JMX's out of the box auth utilities.
 ## JAAS login modules can be used for authentication by uncommenting these two properties.
