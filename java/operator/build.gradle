@@ -54,10 +54,14 @@ tasks.jibDockerBuild.dependsOn project(':java:backup').jar
 tasks.jibDockerBuild.dependsOn project(':java:model').jar
 
 compileJava {
-    sourceCompatibility = 8
-    targetCompatibility = 8
+    sourceCompatibility = 1.8
+    targetCompatibility = 1.8
     options.encoding = 'UTF-8'
     options.compilerArgs = [ '-parameters', '-Xlint:all', '-Xlint:-processing', '-Xlint:-serial', '-Werror']
+}
+
+compileTestJava {
+    options.compilerArgs += '-parameters'
 }
 
 dependencies {
