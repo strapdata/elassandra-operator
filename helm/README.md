@@ -1,5 +1,19 @@
 # Strapkop HELM
 
+## Package HELM charts
+
+```bash
+./gradlew :helm:helmPackageElassandraDatacenterChart
+./gradlew :helm:helmPackageElassandraOperatorChart
+```
+
+## Upload charts to azure blobstore
+
+```bash
+./gradlew :helm:uploadElassandraDatacenter
+./gradlew :helm:uploadElassandraOperator
+```
+
 ## Confure Azure Registry secret
 
 Create a Service Principal to connect to the azure registry:
