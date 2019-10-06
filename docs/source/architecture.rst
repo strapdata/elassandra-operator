@@ -1,26 +1,3 @@
-Strapkop
-========
-
-Strapkop is a Kubernetes operator for Elassandra.
-
-Strapkop features
------------------
-
-* Manage a Kuberentes statefulset of Elassandra nodes per cloud-provider zone to ensure high availability.
-* Manage Cassandra seeds when datacenters are deployed on several Kuberenetes clusters.
-* Generates SSL/TLS certificates for Elassandra nodes
-* Manage backups and restores from/to your blobstore (S3, Azure, GCS)
-* Automatically adjust the Cassandra replication factor for managed Keyspaces
-* Update Cassandra passwords when a Kubernetes secret change.
-* Create Cassandra roles and automatically grants the desired permissions on keyspaces.
-* Mange Cassandra cleanup after a scale-up
-* Allow to disable/enable Elasticsearch search on a node
-* Copy Cassandra GC logs and Heapdump on your blogbstore for analysis
-* Monitor the Elassandra JVM health and crash-it
-* Efficiently expose Elassandra metrics for the prometheus-operator
-* Deploy Cassandra reaper to ensure continuous Cassandra repairs.
-* Deploy multiple Kibana instances with a dedicated index in Elassandra.
-
 Architecture
 ------------
 
@@ -29,6 +6,9 @@ High Availibility
 
 Elassandra high availibilty across cloud-provider zones is achieve by using one StatfulSet per Cassandra rack.
 
+
+Strapkop sidecar
+................
 
 Getting started
 ---------------
