@@ -53,7 +53,7 @@ do
 done
 
 exec -a cassandra /usr/bin/java \
-    -cp "${CASSANDRA_CLASSPATH}" \
+    -cp "${CLASSPATH}" \
     ${JVM_OPTS} \
     -Dcassandra-foreground=yes \
      ${CASSANDRA_DAEMON:-org.apache.cassandra.service.CassandraDaemon}

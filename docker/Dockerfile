@@ -9,12 +9,14 @@ ARG cassandra_k8s_addons_jar
 # remove /etc/cassandra/jmxremote.password, rewritten with JMX_PASSWORD
 # remove default keystore.jks
 # add image config .d directories
+# add cassandra JMX readwrite permission
 RUN rm -rf /var/lib/cassandra/* /root/.curlrc /root/.cassandra/cqlshrc /etc/cassandra/jmxremote.password /etc/cassandra/keystore.jks && \
     mkdir /etc/cassandra/cassandra.yaml.d && \
     mkdir /etc/cassandra/cassandra-env.sh.d && \
     mkdir /etc/cassandra/jvm.options.d && \
     mkdir /etc/cassandra/logback.xml.d && \
-    mkdir /etc/cassandra/elasticsearch.yml.d
+    mkdir /etc/cassandra/elasticsearch.yml.d && \
+    echo "cassandra readwrite" >> /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/management/jmxremote.access
 
 # wrap the entrtpoint
 COPY strapkop-entrypoint.sh /usr/local/bin/strapkop-entrypoint.sh
@@ -30,7 +32,7 @@ COPY dagi /usr/local/bin/
 RUN dagi cpio libcap2-bin sysstat net-tools iotop dstat htop strace linux-perf && setcap cap_ipc_lock=+ep /bin/bash && setcap cap_sys_resource=+ep /bin/bash
 
 COPY cassandra /usr/sbin/cassandra
-COPY nodetool /usr/bin/nodetool
+#COPY nodetool /usr/bin/nodetool
 COPY cassandra.in.sh /usr/share/cassandra/
 
 # this file is sourced from the entrypoint.sh
