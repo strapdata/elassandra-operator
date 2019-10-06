@@ -1,7 +1,14 @@
+import com.github.jk1.license.filter.LicenseBundleNormalizer
+import com.github.jk1.license.render.CsvReportRenderer
+import com.github.jk1.license.render.InventoryHtmlReportRenderer
+import com.github.jk1.license.render.TextReportRenderer
+
 plugins {
   id 'idea'
   id 'com.bmuschko.docker-remote-api' version '4.10.0' apply false
+  id 'com.github.jk1.dependency-license-report' version '1.11'
 }
+
 
 def getGitCommitHash = { ->
   def stdout = new ByteArrayOutputStream()
@@ -25,6 +32,7 @@ allprojects {
     mavenCentral()
     maven { url "https://jcenter.bintray.com" }
     maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
+    maven { url 'https://plugins.gradle.org/m2/' }
     jcenter() // or Maven central, required for Lombok dependency
   }
 }
@@ -39,6 +47,13 @@ configure(subprojects.findAll { it.name.contains("docker") }) {
       email = registryEmail
     }
   }
+}
+
+licenseReport {
+  renderers = [new CsvReportRenderer(separator:';'), new TextReportRenderer(), new InventoryHtmlReportRenderer('index.html', 'Strapkop License Report')]
+  filters = [new LicenseBundleNormalizer(bundlePath: rootProject.file('license-normalizer-bundle.json'))]
+  projects = [project] + project.subprojects
+  excludes = [  ]
 }
 
 task dockerBuild {

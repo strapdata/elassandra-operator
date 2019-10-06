@@ -68,3 +68,10 @@ To remove the suffix, use the cli option `-PdockerImageSuffix=""`.
 When building the images with `./gradlew dockerBuild`, only the latest elassandra version is built.
 There is also `dockerBuildAllVersions` and `dockerPushAllVersions` that build and push images for all supported
 elassandra version, according to the file `docker/supportedElassandraVersions.txt` (first line should be the latest).
+
+## License Report
+
+Generate a [license report](build/reports/dependency-license/index.html):
+```bash
+./gradlew generateLicenseReport
+```
