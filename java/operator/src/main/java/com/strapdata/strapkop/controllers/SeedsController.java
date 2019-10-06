@@ -11,7 +11,6 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.reactivex.Single;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,7 +20,7 @@ import java.util.List;
 /**
  * Return nodes IP of pod 0 for active racks
  */
-@Tag(name = "seeds")
+//@Tag(name = "seeds")
 @Controller("/seeds")
 public class SeedsController {
 
