@@ -79,3 +79,20 @@ task dockerPushAllVersions {
   dependsOn ':java:sidecar:jib'
   dependsOn ':docker:dockerPushAllVersions'
 }
+
+// see storage account -> access keys for connectionString
+task uploadLicenseReport(type: com.strapdata.AzureStorageDeployTask) {
+  dependsOn generateLicenseReport
+  connectionString 'DefaultEndpointsProtocol=https;AccountName=strapdata;AccountKey=R83KvCF2MzZzzFXnqi6yi5MoUgS90/CcPMakbQBSJMpQJSyIBIn13QtfKQm/oC/CDplVKdgn11fEagGlcrpPIA==;EndpointSuffix=core.windows.net'
+  container 'strapkop'
+  fileToDeploy 'build/reports/dependency-license/index.html'
+  mimeType 'text/html'
+}
+
+task uploadLicenseNotices(type: com.strapdata.AzureStorageDeployTask) {
+  dependsOn generateLicenseReport
+  connectionString 'DefaultEndpointsProtocol=https;AccountName=strapdata;AccountKey=R83KvCF2MzZzzFXnqi6yi5MoUgS90/CcPMakbQBSJMpQJSyIBIn13QtfKQm/oC/CDplVKdgn11fEagGlcrpPIA==;EndpointSuffix=core.windows.net'
+  container 'strapkop'
+  fileToDeploy 'build/reports/dependency-license/THIRD-PARTY-NOTICES.txt'
+  mimeType 'text/plain'
+}

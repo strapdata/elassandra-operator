@@ -75,3 +75,9 @@ Generate a [license report](build/reports/dependency-license/index.html):
 ```bash
 ./gradlew generateLicenseReport
 ```
+
+Upload the license report the the strapdata azure blobstore (available on web):
+```bash
+./gradlew uploadLicenseReport
+./gradlew uploadLicenseNotices
+```
