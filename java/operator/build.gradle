@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'application'
     id 'com.google.cloud.tools.jib'
+    id 'org.hidetake.swagger.generator' version '2.18.1'
 }
 
 mainClassName = 'com.strapdata.strapkop.Application'
@@ -86,7 +87,6 @@ dependencies {
     testAnnotationProcessor "io.micronaut:micronaut-inject-java"
     compile "javax.annotation:javax.annotation-api"
 
-    annotationProcessor "io.micronaut.configuration:micronaut-openapi"
     compile "io.swagger.core.v3:swagger-annotations"
 
     compile "com.github.akarnokd:rxjava2-interop:0.13.5"
