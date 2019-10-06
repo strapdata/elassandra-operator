@@ -18,11 +18,6 @@ RUN rm -rf /var/lib/cassandra/* /root/.curlrc /root/.cassandra/cqlshrc /etc/cass
     mkdir /etc/cassandra/elasticsearch.yml.d && \
     echo "cassandra readwrite" >> /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/management/jmxremote.access
 
-# wrap the entrtpoint
-COPY strapkop-entrypoint.sh /usr/local/bin/strapkop-entrypoint.sh
-RUN ln -s usr/local/bin/strapkop-entrypoint.sh /strapkop-entrypoint.sh # backwards compat
-ENTRYPOINT ["strapkop-entrypoint.sh"]
-
 # authorize cassandra (and all non-root user) to change system limits (ulimit) using
 # ulimit can not be set at the host level because, when user is changed from root to cassandra, it lost existing limits.
 # ulimit has to be set after the user has changes, but this require some capabilities to be set on the entrypoint executable,
@@ -46,3 +41,8 @@ ADD default-config /etc/cassandra
 RUN chown -R cassandra:cassandra /etc/cassandra /usr/share/cassandra
 
 VOLUME /etc/cassandra
+
+# wrap the entrtpoint
+COPY strapkop-entrypoint.sh /usr/local/bin/strapkop-entrypoint.sh
+RUN ln -s usr/local/bin/strapkop-entrypoint.sh /strapkop-entrypoint.sh # backwards compat
+ENTRYPOINT ["strapkop-entrypoint.sh"]
