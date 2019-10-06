@@ -14,7 +14,7 @@
 -Delasticsearch.config=/usr/share/cassandra/elasticsearch.yml:/etc/cassandra/elasticsearch.yml:/etc/cassandra/elasticsearch.yml.d
 
 # provides hints to the JIT compiler
--XX:CompileCommandFile=/usr/share/cassandra/hotspot_compiler
+#-XX:CompileCommandFile=/etc/cassandra/hotspot_compiler
 
 # add the jamm agent
 -javaagent:/usr/share/cassandra/lib/jamm-0.3.0.jar
@@ -28,4 +28,3 @@
 
 # By default, direct memory access == heap size
 #-XX:MaxDirectMemorySize=18G
-
