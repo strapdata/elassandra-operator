@@ -40,9 +40,8 @@ public class KibanaPlugin extends AbstractPlugin {
     @Override
     public void syncKeyspaces(final CqlKeyspaceManager cqlKeyspaceManager, final DataCenter dataCenter) {
         for(KibanaSpace kibana : dataCenter.getSpec().getKibanaSpaces()) {
-            String kibanaName = "kibana" + (kibana.getName().length() > 0 ? "-" : "") + kibana.getName();
-            cqlKeyspaceManager.addIfAbsent(dataCenter, kibanaName, () -> new CqlKeyspace()
-                    .withName(kibanaName)
+            cqlKeyspaceManager.addIfAbsent(dataCenter, kibana.keyspace(), () -> new CqlKeyspace()
+                    .withName(kibana.keyspace())
                     .withRf(3)
             );
         }
@@ -52,19 +51,18 @@ public class KibanaPlugin extends AbstractPlugin {
     public void syncRoles(final CqlRoleManager cqlRoleManager, final DataCenter dataCenter) {
         for(KibanaSpace kibana : dataCenter.getSpec().getKibanaSpaces()) {
             try {
-                String kibanaName = "kibana" + (kibana.getName().length() > 0 ? "-" : "") + kibana.getName();
                 createKibanaSecretIfNotExists(dataCenter, kibana.getName());
-                cqlRoleManager.addIfAbsent(dataCenter, kibanaName, () -> new CqlRole()
-                        .withUsername(kibanaName)
+                cqlRoleManager.addIfAbsent(dataCenter, kibana.keyspace(), () -> new CqlRole()
+                        .withUsername(kibana.role())
                         .withSecretKey("kibana.kibana_password")
-                        .withSecretNameProvider( dc -> OperatorNames.clusterChildObjectName("%s-"+kibanaName, dc))
+                        .withSecretNameProvider( dc -> OperatorNames.clusterChildObjectName("%s-"+kibana.role(), dc))
                         .withApplied(false)
-                        .withSuperUser(kibanaName.equals("kibana"))
+                        .withSuperUser(true)
                         .withGrantStatements(
                                 ImmutableList.of(
-                                        String.format(Locale.ROOT,"GRANT ALL PERMISSIONS ON KEYSPACE %s TO %s", kibanaName, kibanaName),
-                                        String.format(Locale.ROOT,"INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','cluster:monitor/.*','.*')", kibanaName),
-                                        String.format(Locale.ROOT,"INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','indices:.*','.*')", kibanaName)
+                                        String.format(Locale.ROOT,"GRANT ALL PERMISSIONS ON KEYSPACE %s TO %s", kibana.keyspace(), kibana.role()),
+                                        String.format(Locale.ROOT,"INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','cluster:monitor/.*','.*')", kibana.index()),
+                                        String.format(Locale.ROOT,"INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','indices:.*','.*')", kibana.index())
                                 )
                         )
                 );

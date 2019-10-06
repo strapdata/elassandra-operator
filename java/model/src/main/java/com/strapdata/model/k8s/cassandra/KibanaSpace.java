@@ -1,5 +1,6 @@
 package com.strapdata.model.k8s.cassandra;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 import lombok.Data;
@@ -16,6 +17,10 @@ import java.util.Set;
 @NoArgsConstructor
 public class KibanaSpace {
 
+    public static final String KIBANA_INDEX_PREFIX = ".kibana";
+    public static final String KIBANA_KEYSPACE_PREFIX = "_kibana";
+    public static final String KIBANA_ROLE_PREFIX = "kibana";
+
     /**
      * Kibana space name (default is "")
      */
@@ -30,4 +35,18 @@ public class KibanaSpace {
     @Expose
     private Set<String> keyspaces = new HashSet<>();
 
+    @JsonIgnore
+    public String index() {
+        return KIBANA_INDEX_PREFIX + (name.length() > 0 ? "-" : "") + name;
+    }
+
+    @JsonIgnore
+    public String keyspace() {
+        return KIBANA_KEYSPACE_PREFIX + (name.length() > 0 ? "-" : "") + name;
+    }
+
+    @JsonIgnore
+    public String role() {
+        return KIBANA_ROLE_PREFIX + (name.length() > 0 ? "-" : "") + name;
+    }
 }
