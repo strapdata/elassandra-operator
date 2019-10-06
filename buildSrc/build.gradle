@@ -8,4 +8,5 @@ dependencies {
     compile gradleApi()
     compile localGroovy()
     compile 'com.microsoft.azure:azure-storage:8.4.0'
+    compile 'com.google.guava:guava:28.1-jre'
 }
