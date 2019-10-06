@@ -15,6 +15,9 @@
       <module name="operator_test" target="1.8" />
       <module name="sidecar_main" target="8" />
       <module name="sidecar_test" target="1.8" />
+      <module name="strapdata.strapkop.test" target="1.8" />
+      <module name="strapkop.buildSrc.main" target="1.8" />
+      <module name="strapkop.buildSrc.test" target="1.8" />
       <module name="strapkop.java.backup.main" target="8" />
       <module name="strapkop.java.backup.test" target="1.8" />
       <module name="strapkop.java.k8s-addons.main" target="8" />
@@ -25,6 +28,7 @@
       <module name="strapkop.java.operator.test" target="1.8" />
       <module name="strapkop.java.sidecar.main" target="1.8" />
       <module name="strapkop.java.sidecar.test" target="1.8" />
+      <module name="strapkop.main" target="1.8" />
     </bytecodeTargetLevel>
   </component>
 </project>
