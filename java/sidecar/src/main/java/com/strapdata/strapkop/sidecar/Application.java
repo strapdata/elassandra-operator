@@ -18,7 +18,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
                 @Tag(name = "operations"),
                 @Tag(name = "status"),
                 @Tag(name = "search"),
-                @Tag(name = "gclog")
+                @Tag(name = "logs")
         }
 )
 public class Application {

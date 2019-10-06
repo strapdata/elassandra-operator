@@ -13,7 +13,7 @@ import jmx.org.apache.cassandra.service.StorageServiceMBean;
 import java.util.List;
 
 /**
- * Run a cassandra operation
+ * Run a cassandra operation.
  */
 @Tag(name = "operations")
 @Controller("/operations")

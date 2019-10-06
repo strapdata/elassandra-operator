@@ -23,6 +23,10 @@ public class SearchController {
         this.elasticNodeMetricsMBean = cassandraModule.elasticNodeMetricsMBeanProvider();
     }
 
+    /**
+     * Return Elassandra ENterprise search status.
+     * @return
+     */
     @Get("/")
     public Single<Boolean> isSearchEnabled() {
         return Single.create(emitter -> {
@@ -30,6 +34,10 @@ public class SearchController {
         });
     }
 
+    /**
+     * Enable search (the node contributes to distributed Elasticseach search requests).
+     * @return
+     */
     @Post("/enable")
     public Completable enable() {
         return Completable.create(emitter -> {
@@ -38,6 +46,10 @@ public class SearchController {
         });
     }
 
+    /**
+     * Disable search (the node does not contribute to distributed Elasticseach search requests).
+     * @return
+     */
     @Post("/disable")
     public Completable disable() {
         return Completable.create(emitter -> {

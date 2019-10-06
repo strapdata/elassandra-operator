@@ -27,6 +27,10 @@ public class StatusController {
         this.storageServiceMBean = cassandraModule.storageServiceMBeanProvider();
     }
 
+    /**
+     * Get the Cassandra node status.
+     * @return
+     */
     @Get("/")
     public ElassandraNodeStatus getStatus() {
         try {

@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
 import javax.inject.Inject;
 
 /**
- * Create Cassandra backups
+ * Create Cassandra backups.
  */
 @Tag(name = "backups")
 @Controller("/backups")
