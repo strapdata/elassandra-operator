@@ -438,9 +438,11 @@ public class DataCenterUpdateAction {
                 )
                 .addArgsItem("/tmp/sidecar-config-volume")
                 .addEnvItem(new V1EnvVar().name("JMX_PORT").value(Integer.toString(dataCenterSpec.getJmxPort())))
-                .addEnvItem(new V1EnvVar().name("HOST_NETWORK").value( Boolean.toString(dataCenterSpec.getHostNetworkEnabled())))
+                .addEnvItem(new V1EnvVar().name("CASSANDRA_CGROUP_MEMORY_LIMIT").value("true"))
                 .addEnvItem(new V1EnvVar().name("CQLS_OPTS").value( dataCenterSpec.getSsl() ? "--ssl" : ""))
+                .addEnvItem(new V1EnvVar().name("NODETOOL_OPTS").value( (dataCenterSpec.getSsl() ? "--ssl" : "") +  " -u cassandra -pwf /etc/cassandra/jmxremote.password"))
                 .addEnvItem(new V1EnvVar().name("ES_SCHEME").value( dataCenterSpec.getSsl() ? "https" : "http"))
+                .addEnvItem(new V1EnvVar().name("HOST_NETWORK").value( Boolean.toString(dataCenterSpec.getHostNetworkEnabled())))
                 .addEnvItem(new V1EnvVar().name("NAMESPACE").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.namespace"))))
                 .addEnvItem(new V1EnvVar().name("POD_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.name"))))
                 .addEnvItem(new V1EnvVar().name("POD_IP").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("status.podIP"))))
@@ -454,9 +456,9 @@ public class DataCenterUpdateAction {
                     .subPath("nodetool-ssl.properties")
             );
         }
-        addPortsItem(cassandraContainer, dataCenterSpec.getStoragePort(), "internode", true);
-        addPortsItem(cassandraContainer, dataCenterSpec.getSslStoragePort(), "internode-ssl", true);
-        addPortsItem(cassandraContainer, dataCenterSpec.getNativePort(), "cql", true);
+        addPortsItem(cassandraContainer, dataCenterSpec.getStoragePort(), "internode", dataCenterSpec.getHostPortEnabled());
+        addPortsItem(cassandraContainer, dataCenterSpec.getSslStoragePort(), "internode-ssl", dataCenterSpec.getHostPortEnabled());
+        addPortsItem(cassandraContainer, dataCenterSpec.getNativePort(), "cql", dataCenterSpec.getHostPortEnabled());
         addPortsItem(cassandraContainer, dataCenterSpec.getJmxPort(), "jmx", false);
         addPortsItem(cassandraContainer, dataCenterSpec.getJdbPort(), "jdb", false);
         
@@ -645,7 +647,7 @@ public class DataCenterUpdateAction {
             
             // the Cassandra container entrypoint overlays configmap volumes
             cassandraContainer.addArgsItem(configMapVolumeMount.mountPath);
-            
+
             podSpec.addVolumesItem(new V1Volume()
                     .name(configMapVolumeMount.name)
                     .configMap(configMapVolumeMount.volumeSource)
@@ -720,7 +722,7 @@ public class DataCenterUpdateAction {
                     .imagePullPolicy(dataCenterSpec.getImagePullPolicy())
                     .securityContext(new V1SecurityContext().runAsUser(999L).runAsGroup(999L))
                     .command(ImmutableList.of(
-                            "java", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseCGroupMemoryLimitForHeap",
+                            "java", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseCGroupMemoryLimitForHeap", "-XX:MaxRAMFraction=2",
                             "-cp", "/app/resources:/app/classes:/app/libs/*",
                             "com.strapdata.strapkop.sidecar.SidecarRestore",
                             "-bb", backup.getSpec().getBackup().getTarget(), // bucket name
