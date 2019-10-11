@@ -1030,9 +1030,13 @@ public class DataCenterUpdateAction {
                     MB * coreCount,
                     jvmHeapSize / 4
             );
-            
-            final boolean useG1GC = (jvmHeapSize > 8 * GB);
-            
+
+            logger.debug("memory limit={} coreCount={} heapSize={} youngGenSize={}", memoryLimit, coreCount, jvmHeapSize, youngGenSize);
+            if (jvmHeapSize < 1 * GB) {
+                throw new IllegalArgumentException("Cannot deploy elassandra with less than 1Gb heap, please increase your kuberenetes memory limits");
+            }
+
+            final boolean useG1GC = (jvmHeapSize > 16 * GB);
             final StringWriter writer = new StringWriter();
             try (final PrintWriter printer = new PrintWriter(writer)) {
                 printer.format("-Xms%d%n", jvmHeapSize); // min heap size
