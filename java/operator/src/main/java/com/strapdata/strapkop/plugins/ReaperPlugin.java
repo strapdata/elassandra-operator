@@ -32,6 +32,11 @@ public class ReaperPlugin extends AbstractPlugin {
 
     private String reaperAdminPassword = null; // keep password to avoid secret reloading.
 
+    public static final String APP_SERVICE_NAME = "app";
+    public static final String ADMIN_SERVICE_NAME = "admin";
+    public static final int APP_SERVICE_PORT = 8080;      // the webui
+    public static final int ADMIN_SERVICE_PORT = 8081;    // the REST API
+
     public ReaperPlugin(final ApplicationContext context,
                         K8sResourceUtils k8sResourceUtils,
                         AuthorityManager authorityManager,
@@ -153,10 +158,6 @@ public class ReaperPlugin extends AbstractPlugin {
                         )
                 );
 
-        final String APP_SERVICE_NAME = "app";
-        final String ADMIN_SERVICE_NAME = "admin";
-        final int APP_SERVICE_PORT = 8080;      // the webui
-        final int ADMIN_SERVICE_PORT = 8081;    // the REST API
         // common configuration
         container
                 .name("reaper")
@@ -323,20 +324,27 @@ public class ReaperPlugin extends AbstractPlugin {
         // create reaper ingress
         String ingressDomain = System.getenv("INGRESS_DOMAIN");
         if (!Strings.isNullOrEmpty(ingressDomain)) {
-            String reaperHost = "reaper-" + dataCenterSpec.getClusterName() + "-" + dataCenterSpec.getDatacenterName() + "." + ingressDomain;
-            logger.trace("Creating reaper ingress for host={}", reaperHost);
+            String reaperAppHost = "reaper-" + dataCenterSpec.getClusterName() + "-" + dataCenterSpec.getDatacenterName() + "." + ingressDomain;
+            String reaperAdminHost = "admin-reaper-" + dataCenterSpec.getClusterName() + "-" + dataCenterSpec.getDatacenterName() + "." + ingressDomain;
+            logger.trace("Creating reaper ingress for host={}", reaperAppHost);
             final V1beta1Ingress ingress = new V1beta1Ingress()
                     .metadata(meta)
                     .spec(new V1beta1IngressSpec()
                             .addRulesItem(new V1beta1IngressRule()
-                                    .host(reaperHost)
+                                    .host(reaperAppHost)
                                     .http(new V1beta1HTTPIngressRuleValue()
                                             .addPathsItem(new V1beta1HTTPIngressPath()
-                                                    .path("/webui")
+                                                    .path("/")
                                                     .backend(new V1beta1IngressBackend()
                                                             .serviceName(reaperName(dataCenter))
                                                             .servicePort(new IntOrString(APP_SERVICE_PORT)))
                                             )
+                                    )
+                            )
+                            .addTlsItem(new V1beta1IngressTLS().addHostsItem(reaperAppHost))
+                            .addRulesItem(new V1beta1IngressRule()
+                                    .host(reaperAdminHost)
+                                    .http(new V1beta1HTTPIngressRuleValue()
                                             .addPathsItem(new V1beta1HTTPIngressPath()
                                                     .path("/")
                                                     .backend(new V1beta1IngressBackend()
@@ -345,9 +353,8 @@ public class ReaperPlugin extends AbstractPlugin {
                                             )
                                     )
                             )
-                            .addTlsItem(new V1beta1IngressTLS()
-                                    .addHostsItem(reaperHost)
-                            )
+                            .addTlsItem(new V1beta1IngressTLS().addHostsItem(reaperAdminHost))
+
                     );
             k8sResourceUtils.createOrReplaceNamespacedIngress(ingress);
         }
