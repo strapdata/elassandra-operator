@@ -185,6 +185,13 @@ public class DataCenterSpec {
     private Integer jmxPort = 7199;
 
     /**
+     * Enable JMXMP.
+     */
+    @SerializedName("jmxmpEnabled")
+    @Expose
+    private Boolean jmxmpEnabled = true;
+
+    /**
      * Java debugger port (also hostPort)
      */
     @SerializedName("jdbPort")

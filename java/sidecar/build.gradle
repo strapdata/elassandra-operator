@@ -41,7 +41,7 @@ jib {
                     '-XX:MaxRAMFraction=2',
                     '-XX:+ExitOnOutOfMemoryError',
                     '-XshowSettings:vm',
-                    '-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005'
+                    '-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005',
                     /*
                     '-Dcom.sun.management.jmxremote',
                     '-Dcom.sun.management.jmxremote.port=7199',
@@ -64,7 +64,8 @@ compileJava {
     sourceCompatibility = 1.8
     targetCompatibility = 1.8
     options.encoding = 'UTF-8'
-    options.compilerArgs = [ '-parameters', '-Xlint:all', '-Xlint:-processing', '-Xlint:-serial', '-Werror']
+    // Disable ALL warnings because of use of com.sun.security.sasl.Provider (cannot be suppressed)
+    options.compilerArgs = [ '-parameters', '-Xlint:none' ]
 }
 
 compileTestJava {
@@ -89,6 +90,8 @@ dependencies {
     compile "javax.annotation:javax.annotation-api"
 
     compile "io.swagger.core.v3:swagger-annotations"
+
+    compile group: 'org.glassfish.main.external', name: 'jmxremote_optional-repackaged', version: '5.0'
 
     compile project(':java:model')
     compile project(':java:backup')
