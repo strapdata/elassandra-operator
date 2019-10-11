@@ -5,6 +5,9 @@ import com.google.common.collect.ImmutableList;
 import javax.inject.Singleton;
 import java.util.List;
 
+/**
+ * List of available plugins
+ */
 @Singleton
 public class PluginRegistry {
 
