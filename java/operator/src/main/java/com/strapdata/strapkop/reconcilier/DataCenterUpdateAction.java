@@ -1021,26 +1021,26 @@ public class DataCenterUpdateAction {
             final long memoryLimit = dataCenterSpec.getResources().getLimits().get("memory").getNumber().longValue();
             
             // same as stock cassandra-env.sh
-            final long jvmHeapSize = Math.max(
+            final long jvmHeapSizeInGb = Math.max(
                     Math.min(memoryLimit / 2, GB),
                     Math.min(memoryLimit / 4, 8 * GB)
             );
-            
-            final long youngGenSize = Math.min(
-                    MB * coreCount,
-                    jvmHeapSize / 4
+
+            final long youngGenSizeInMb = Math.min(
+                    100 * MB * coreCount,
+                    jvmHeapSizeInGb * 1024 / 4
             );
 
-            logger.debug("memory limit={} coreCount={} heapSize={} youngGenSize={}", memoryLimit, coreCount, jvmHeapSize, youngGenSize);
-            if (jvmHeapSize < 1 * GB) {
+            logger.debug("memory limit={} coreCount={} heapSize={} youngGenSizeInMb={}", memoryLimit, coreCount, jvmHeapSizeInGb, youngGenSizeInMb);
+            if (jvmHeapSizeInGb < 1 * GB) {
                 throw new IllegalArgumentException("Cannot deploy elassandra with less than 1Gb heap, please increase your kuberenetes memory limits");
             }
 
-            final boolean useG1GC = (jvmHeapSize > 16 * GB);
+            final boolean useG1GC = (jvmHeapSizeInGb > 16 * GB);
             final StringWriter writer = new StringWriter();
             try (final PrintWriter printer = new PrintWriter(writer)) {
-                printer.format("-Xms%d%n", jvmHeapSize); // min heap size
-                printer.format("-Xmx%d%n", jvmHeapSize); // max heap size
+                printer.format("-Xms%d%n", jvmHeapSizeInGb); // min heap size
+                printer.format("-Xmx%d%n", jvmHeapSizeInGb); // max heap size
                 
                 // copied from stock jvm.options
                 if (useG1GC) {
@@ -1048,13 +1048,13 @@ public class DataCenterUpdateAction {
                     printer.println("-XX:G1RSetUpdatingPauseTimePercent=5");
                     printer.println("-XX:MaxGCPauseMillis=500");
 
-                    if (jvmHeapSize > 16 * GB) {
+                    if (jvmHeapSizeInGb > 16 * GB) {
                         printer.println("-XX:InitiatingHeapOccupancyPercent=70");
                     }
 
                     // TODO: tune -XX:ParallelGCThreads, -XX:ConcGCThreads
                 } else {
-                    printer.format("-Xmn%d%n", youngGenSize); // young gen size
+                    printer.format("-Xmn%d%n", youngGenSizeInMb); // young gen size
                     
                     printer.println("-XX:+UseParNewGC");
                     printer.println("-XX:+UseConcMarkSweepGC");
