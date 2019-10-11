@@ -78,7 +78,8 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
 
                 for(Plugin plugin : pluginRegistry.plugins()) {
                     try {
-                        plugin.reconcile(dc);
+                        if (plugin.isActive(dc))
+                            plugin.reconcile(dc);
                     } catch(Exception e) {
                         logger.error("Plugin class="+plugin.getClass().getSimpleName()+" reconcilation failed:", e);
                     }

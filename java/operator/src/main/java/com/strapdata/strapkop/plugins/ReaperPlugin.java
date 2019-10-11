@@ -78,6 +78,11 @@ public class ReaperPlugin extends AbstractPlugin {
     }
 
     @Override
+    public boolean isActive(final DataCenter dataCenter) {
+        return dataCenter.getSpec().getReaperEnabled();
+    }
+
+    @Override
     public void syncRoles(final CqlRoleManager cqlRoleManager, final DataCenter dataCenter) {
         cqlRoleManager.addIfAbsent(dataCenter, REAPER_ROLE.getUsername(), () -> REAPER_ROLE.duplicate());
     }

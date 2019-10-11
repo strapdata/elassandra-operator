@@ -89,6 +89,11 @@ public class KibanaPlugin extends AbstractPlugin {
     }
 
     @Override
+    public boolean isActive(final DataCenter dataCenter) {
+        return dataCenter.getSpec().getElasticsearchEnabled();
+    }
+
+    @Override
     public void reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
             // remove deleted kibana spaces
             Set<String> deployedKibanaSpaces = dataCenter.getStatus().getKibanaSpaces();
