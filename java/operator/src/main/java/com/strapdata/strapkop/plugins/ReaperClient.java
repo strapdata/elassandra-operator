@@ -26,13 +26,12 @@ import static io.micronaut.http.HttpRequest.GET;
 import static io.micronaut.http.HttpRequest.POST;
 
 /**
- * This is the http client for the reaper api.
+ * This is the http client for the reaper admin api.
  * It use reaper authentication mechanism as described in http://cassandra-reaper.io/docs/api/
  */
 @SuppressWarnings("rawtypes")
 public class ReaperClient implements Closeable {
-    
-    
+
     private final Logger logger = LoggerFactory.getLogger(ReaperClient.class);
     
     private final RxHttpClient httpClient;
@@ -41,7 +40,7 @@ public class ReaperClient implements Closeable {
     private final String password;
     
     public ReaperClient(DataCenter dc, String username, String password) throws MalformedURLException {
-        httpClient = RxHttpClient.create(new URL("http", ReaperPlugin.reaperName(dc), 8080, "/"));
+        httpClient = RxHttpClient.create(new URL("http", ReaperPlugin.reaperName(dc), ReaperPlugin.ADMIN_SERVICE_PORT, "/"));
         this.dataCenter = dc;
         this.username = username;
         this.password = password;
@@ -53,7 +52,7 @@ public class ReaperClient implements Closeable {
     public Single<Boolean> ping() {
         return httpClient.exchange(GET("/ping"))
                 .observeOn(Schedulers.io())
-                .map(res -> res.code() == 204)
+                .map(res -> res.code() == 200)
                 .onErrorReturnItem(false)
                 .single(false);
     }
