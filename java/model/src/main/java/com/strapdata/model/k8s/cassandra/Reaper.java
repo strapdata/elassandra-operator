@@ -19,7 +19,7 @@ public class Reaper {
      */
     @SerializedName("image")
     @Expose
-    private String image  = "thelastpickle/cassandra-reaper:1.4.4";
+    private String image  = "thelastpickle/cassandra-reaper:latest";
 
     /**
      * Reaper JWT secret
