@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext;
 
 import javax.inject.Singleton;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -51,7 +52,7 @@ public class KibanaPlugin extends AbstractPlugin {
     public void syncRoles(final CqlRoleManager cqlRoleManager, final DataCenter dataCenter) {
         for(KibanaSpace kibana : dataCenter.getSpec().getKibanaSpaces()) {
             try {
-                createKibanaSecretIfNotExists(dataCenter, kibana.getName());
+                createKibanaSecretIfNotExists(dataCenter, kibana);
                 cqlRoleManager.addIfAbsent(dataCenter, kibana.keyspace(), () -> new CqlRole()
                         .withUsername(kibana.role())
                         .withSecretKey("kibana.kibana_password")
@@ -60,7 +61,7 @@ public class KibanaPlugin extends AbstractPlugin {
                         .withSuperUser(true)
                         .withGrantStatements(
                                 ImmutableList.of(
-                                        String.format(Locale.ROOT,"GRANT ALL PERMISSIONS ON KEYSPACE %s TO %s", kibana.keyspace(), kibana.role()),
+                                        String.format(Locale.ROOT,"GRANT ALL PERMISSIONS ON KEYSPACE \"%s\" TO %s", kibana.keyspace(), kibana.role()),
                                         String.format(Locale.ROOT,"INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','cluster:monitor/.*','.*')", kibana.index()),
                                         String.format(Locale.ROOT,"INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','indices:.*','.*')", kibana.index())
                                 )
@@ -72,8 +73,8 @@ public class KibanaPlugin extends AbstractPlugin {
         }
     }
 
-    public static String kibanaName(DataCenter dataCenter, String space) {
-        return "elassandra-" + dataCenter.getSpec().getClusterName() + "-kibana" + (space.length() > 0 ? "-" : "") + space;
+    public static String kibanaName(DataCenter dataCenter, KibanaSpace space) {
+        return "elassandra-" + dataCenter.getSpec().getClusterName() + "-" + space.name();
     }
 
     public static String kibanaNameDc(DataCenter dataCenter, String space) {
@@ -81,37 +82,38 @@ public class KibanaPlugin extends AbstractPlugin {
     }
 
 
-    public static Map<String, String> kibanaLabels(DataCenter dataCenter, String space) {
+    public static Map<String, String> kibanaLabels(DataCenter dataCenter, KibanaSpace space) {
         final Map<String, String> labels = new HashMap<>(OperatorLabels.datacenter(dataCenter));
-        labels.put("app", "kibana" + (space.length() > 0 ? "-" : "") + space); // overwrite label app
+        labels.put("app", space.name()); // overwrite label app
         return labels;
     }
 
     @Override
     public void reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
-        // remove deleted kibana spaces
-        Set<String> deployedKibanaSpaces = dataCenter.getStatus().getKibanaSpaces();
-        for(String spaceToDelete : Sets.difference(deployedKibanaSpaces, dataCenter.getSpec().getKibanaSpaces().stream().map(KibanaSpace::getName).collect(Collectors.toSet()))) {
-            logger.debug("Deleting kibana space={}", spaceToDelete);
-            delete(dataCenter, spaceToDelete);
-            dataCenter.getStatus().getKibanaSpaces().remove(spaceToDelete);
-        }
+            // remove deleted kibana spaces
+            Set<String> deployedKibanaSpaces = dataCenter.getStatus().getKibanaSpaces();
+            Map<String, KibanaSpace> kibanaMap = dataCenter.getSpec().getKibanaSpaces().stream().collect(Collectors.toMap(KibanaSpace::getName, Function.identity()));
+            for(String spaceToDelete : Sets.difference(deployedKibanaSpaces, dataCenter.getSpec().getKibanaSpaces().stream().map(KibanaSpace::getName).collect(Collectors.toSet()))) {
+                logger.debug("Deleting kibana space={}", spaceToDelete);
+                delete(dataCenter, kibanaMap.get(spaceToDelete));
+                dataCenter.getStatus().getKibanaSpaces().remove(spaceToDelete);
+            }
 
-        // create or update kibana spaces
-        for(KibanaSpace kibana : dataCenter.getSpec().getKibanaSpaces()) {
-            createOrReplaceReaperObjects(dataCenter, kibana.getName());
-            dataCenter.getStatus().getKibanaSpaces().add(kibana.getName());
-        }
+            // create or update kibana spaces
+            for(KibanaSpace kibanaSpace : dataCenter.getSpec().getKibanaSpaces()) {
+                createOrReplaceReaperObjects(dataCenter, kibanaSpace);
+                dataCenter.getStatus().getKibanaSpaces().add(kibanaSpace.getName());
+            }
     }
 
     @Override
     public void delete(final DataCenter dataCenter) throws ApiException {
         for(KibanaSpace kibana : dataCenter.getSpec().getKibanaSpaces()) {
-            delete(dataCenter, kibana.getName());
+            delete(dataCenter, kibana);
         }
     }
 
-    public void delete(final DataCenter dataCenter, String space) throws ApiException {
+    public void delete(final DataCenter dataCenter, KibanaSpace space) throws ApiException {
         final String kibanaLabelSelector = OperatorLabels.toSelector(kibanaLabels(dataCenter, space));
         k8sResourceUtils.deleteIngress(dataCenter.getMetadata().getNamespace(), null, kibanaLabelSelector);
         k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, kibanaLabelSelector);
@@ -122,12 +124,11 @@ public class KibanaPlugin extends AbstractPlugin {
     /**
      * @return The number of reaper pods depending on ReaperStatus
      */
-    private int kibanaReplicas(final DataCenter dataCenter, String space) {
-        String kibanaName = "kibana" + (space.length() > 0 ? "-" : "") + space;
-        return (dataCenter.getStatus().getKeyspaceManagerStatus().getKeyspaces().contains(kibanaName)) ? 1 : 0;
+    private int kibanaReplicas(final DataCenter dataCenter, KibanaSpace kibanaSpace) {
+        return (dataCenter.getStatus().getKeyspaceManagerStatus().getKeyspaces().contains(kibanaSpace.keyspace())) ? 1 : 0;
     }
 
-    public void createOrReplaceReaperObjects(final DataCenter dataCenter, String space) throws ApiException, StrapkopException {
+    public void createOrReplaceReaperObjects(final DataCenter dataCenter, KibanaSpace space) throws ApiException, StrapkopException {
         final V1ObjectMeta dataCenterMetadata = dataCenter.getMetadata();
         final DataCenterSpec dataCenterSpec = dataCenter.getSpec();
         final DataCenterStatus dataCenterStatus = dataCenter.getStatus();
@@ -198,7 +199,7 @@ public class KibanaPlugin extends AbstractPlugin {
                 )
                 .addEnvItem(new V1EnvVar()
                         .name("KIBANA_INDEX")
-                        .value(".kibana" + (space.length() > 0 ? "-" : "") + space)
+                        .value(space.index())
                 )
                 .addEnvItem(new V1EnvVar().name("LOGGING_VERBOSE").value("true"))
                 //.addEnvItem(new V1EnvVar().name("XPACK_MONITORING_ENABLED").value("false"))
@@ -214,7 +215,7 @@ public class KibanaPlugin extends AbstractPlugin {
             container
                     .addEnvItem(new V1EnvVar()
                             .name("ELASTICSEARCH_USERNAME")
-                            .value("kibana" + (space.length() > 0 ? "-" : "") + space)
+                            .value(space.role())
                     )
                     .addEnvItem(new V1EnvVar()
                             .name("ELASTICSEARCH_PASSWORD")
@@ -267,7 +268,7 @@ public class KibanaPlugin extends AbstractPlugin {
         // create reaper ingress
         String ingressDomain = System.getenv("INGRESS_DOMAIN");
         if (!Strings.isNullOrEmpty(ingressDomain)) {
-            String kibanaHost = "kibana" + (space.length() > 0 ? "-" : "") + space + "-" + dataCenterSpec.getClusterName() + "-" + dataCenterSpec.getDatacenterName() + "." + ingressDomain;
+            String kibanaHost = space.name() + "-" + dataCenterSpec.getClusterName() + "-" + dataCenterSpec.getDatacenterName() + "." + ingressDomain;
             logger.trace("Creating kibana ingress for host={}", kibanaHost);
             final V1beta1Ingress ingress = new V1beta1Ingress()
                     .metadata(meta)
@@ -314,8 +315,8 @@ public class KibanaPlugin extends AbstractPlugin {
     }
 
 
-    private void createKibanaSecretIfNotExists(DataCenter dataCenter, String space) throws ApiException {
-        String kibanaSecretName = kibanaName(dataCenter, space);
+    private void createKibanaSecretIfNotExists(DataCenter dataCenter, KibanaSpace kibanaSpace) throws ApiException {
+        String kibanaSecretName = kibanaName(dataCenter, kibanaSpace);
         final V1ObjectMeta secretMetadata = new V1ObjectMeta()
                 .name(kibanaSecretName)
                 .namespace(dataCenter.getMetadata().getNamespace())

@@ -19,7 +19,8 @@ public class KibanaSpace {
 
     public static final String KIBANA_INDEX_PREFIX = ".kibana";
     public static final String KIBANA_KEYSPACE_PREFIX = "_kibana";
-    public static final String KIBANA_ROLE_PREFIX = "kibana";
+    public static final String KIBANA_PREFIX = "kibana";
+    public static final String KIBANA_APP_PREFIX = "kibana";
 
     /**
      * Kibana space name (default is "")
@@ -47,6 +48,11 @@ public class KibanaSpace {
 
     @JsonIgnore
     public String role() {
-        return KIBANA_ROLE_PREFIX + (name.length() > 0 ? "-" : "") + name;
+        return KIBANA_PREFIX + (name.length() > 0 ? "-" : "") + name;
+    }
+
+    @JsonIgnore
+    public String name() {
+        return KIBANA_PREFIX + (name.length() > 0 ? "-" : "") + name;
     }
 }
