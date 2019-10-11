@@ -27,7 +27,6 @@ COPY dagi /usr/local/bin/
 RUN dagi cpio libcap2-bin sysstat net-tools iotop dstat htop strace linux-perf && setcap cap_ipc_lock=+ep /bin/bash && setcap cap_sys_resource=+ep /bin/bash
 
 COPY cassandra /usr/sbin/cassandra
-#COPY nodetool /usr/bin/nodetool
 COPY cassandra.in.sh /usr/share/cassandra/
 
 # this file is sourced from the entrypoint.sh
