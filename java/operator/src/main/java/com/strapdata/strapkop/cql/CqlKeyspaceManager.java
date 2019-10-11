@@ -41,8 +41,10 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
         if (session == null)
             return; // not connected
 
-        for(Plugin plugin : pluginRegistry.plugins())
-            plugin.syncKeyspaces(this, dataCenter);
+        for(Plugin plugin : pluginRegistry.plugins()) {
+            if (plugin.isActive(dataCenter))
+                plugin.syncKeyspaces(this, dataCenter);
+        }
 
         // create keyspace if needed
         if (get(dataCenter) != null) {

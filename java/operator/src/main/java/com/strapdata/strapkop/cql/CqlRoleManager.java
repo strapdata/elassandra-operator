@@ -55,8 +55,11 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
         addIfAbsent(dataCenter, CqlRole.ADMIN_ROLE.username, () -> CqlRole.ADMIN_ROLE.duplicate());
         addIfAbsent(dataCenter, CqlRole.STRAPKOP_ROLE.username, () -> CqlRole.STRAPKOP_ROLE.duplicate());
 
-        for(Plugin plugin : pluginRegistry.plugins())
-            plugin.syncRoles(this, dataCenter);
+        for(Plugin plugin : pluginRegistry.plugins()) {
+            if (plugin.isActive(dataCenter))
+                plugin.syncRoles(this, dataCenter);
+        }
+
 
         final Session session = cqlConnectionManager.getConnection(dataCenter);
         if (session == null)

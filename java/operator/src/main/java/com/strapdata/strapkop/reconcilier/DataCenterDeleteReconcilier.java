@@ -36,7 +36,8 @@ public class DataCenterDeleteReconcilier extends Reconcilier<DataCenter> {
             // ordering may be important ?
             for(Plugin plugin : pluginRegistry.plugins()) {
                 try {
-                    plugin.delete(dc);
+                    if (plugin.isActive(dc))
+                        plugin.delete(dc);
                 } catch(Exception e) {
                     logger.error("Plugin class="+plugin.getClass().getSimpleName()+" reconcilation failed:", e);
                 }

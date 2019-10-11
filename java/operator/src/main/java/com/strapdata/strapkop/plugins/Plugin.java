@@ -9,6 +9,13 @@ import io.kubernetes.client.ApiException;
 public interface Plugin {
 
     /**
+     * Check the plugin is active in the specified datacenter.
+     * @param dataCenter
+     * @return
+     */
+    boolean isActive(final DataCenter dataCenter);
+
+    /**
      * Add/Remove keyspaces to/from the cqlKeyspaceManager for the dataCenter
      */
     default void syncKeyspaces(final CqlKeyspaceManager cqlKeyspaceManager, final DataCenter dataCenter) {
