@@ -22,10 +22,10 @@ privilegedSupported: true
 resources:
   requests:
     cpu: 500m
-    memory: 2Gi
-  limits:
-    cpu: 800m
     memory: 4Gi
+  limits:
+    cpu: 900m
+    memory: 6Gi
 
 dataVolumeClaim:
   accessModes:
