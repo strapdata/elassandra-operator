@@ -28,3 +28,8 @@
 
 # By default, direct memory access == heap size
 #-XX:MaxDirectMemorySize=18G
+
+# cgroup memory limits
+-XX:+UnlockExperimentalVMOptions
+-XX:+UseCGroupMemoryLimitForHeap
+-XX:MaxRAMFraction=2

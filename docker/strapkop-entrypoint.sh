@@ -76,11 +76,7 @@ _term() {
 
 trap _term SIGTERM
 
-#/usr/sbin/cassandra &
-#pid=$!
-#wait ${pid}
-#echo "cassandra has exited"
-
-# kick off the upstream command
-set /usr/sbin/cassandra
-exec /docker-entrypoint-enterprise.sh "$@"
+/usr/sbin/cassandra &
+pid=$!
+wait ${pid}
+echo "cassandra has exited"
