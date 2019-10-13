@@ -1015,11 +1015,11 @@ public class DataCenterUpdateAction {
         //);
         
         // heap size and GC settings
-        // TODO: tune
         {
-            final long coreCount = 4; // TODO: not hard-coded
             final long memoryLimit = dataCenterSpec.getResources().getLimits().get("memory").getNumber().longValue();
-            
+            final long cpuLimit =  dataCenterSpec.getResources().getLimits().get("cpu").getNumber().longValue();
+            final int coreCount = (int) cpuLimit/1000;
+
             // same as stock cassandra-env.sh
             final long jvmHeapSizeInGb = Math.max(
                     Math.min(memoryLimit / 2, GB),
@@ -1031,7 +1031,9 @@ public class DataCenterUpdateAction {
                     jvmHeapSizeInGb * 1024 / 4
             );
 
-            logger.debug("memory limit={} coreCount={} heapSize={} youngGenSizeInMb={}", memoryLimit, coreCount, jvmHeapSizeInGb, youngGenSizeInMb);
+            logger.debug("cluster={} dc={} namespace={} memoryLimit={} cpuLimit={} coreCount={} jvmHeapSizeInGb={} youngGenSizeInMb={}",
+                    dataCenterSpec.getClusterName(), dataCenterSpec.getDatacenterName(), dataCenterMetadata.getNamespace(),
+                    memoryLimit, cpuLimit, coreCount, jvmHeapSizeInGb, youngGenSizeInMb);
             if (jvmHeapSizeInGb < 1 * GB) {
                 throw new IllegalArgumentException("Cannot deploy elassandra with less than 1Gb heap, please increase your kuberenetes memory limits");
             }
@@ -1048,7 +1050,7 @@ public class DataCenterUpdateAction {
                     printer.println("-XX:G1RSetUpdatingPauseTimePercent=5");
                     printer.println("-XX:MaxGCPauseMillis=500");
 
-                    if (jvmHeapSizeInGb > 16 * GB) {
+                    if (jvmHeapSizeInGb > 12 * GB) {
                         printer.println("-XX:InitiatingHeapOccupancyPercent=70");
                     }
 
