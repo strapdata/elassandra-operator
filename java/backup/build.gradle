@@ -10,8 +10,7 @@ tasks.withType(JavaCompile) {
 dependencies {
     testCompile "org.apache.commons:commons-compress:1.18"
 
-    // TODO: change to BOM style to only include s3 deps
-    compile "com.amazonaws:aws-java-sdk:1.11.106"
+    compile "com.amazonaws:aws-java-sdk-s3:1.11.653"
     compile "com.microsoft.azure:azure-storage:7.0.0"
     compile "com.google.cloud:google-cloud-storage:0.5.1"
     compile "com.datastax.cassandra:cassandra-driver-core:3.7.1"
