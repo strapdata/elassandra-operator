@@ -49,6 +49,7 @@ configure(subprojects.findAll { it.name.contains("docker") }) {
   }
 }
 
+
 licenseReport {
   renderers = [new CsvReportRenderer(separator:';'), new TextReportRenderer(), new InventoryHtmlReportRenderer('index.html', 'Strapkop License Report')]
   filters = [new LicenseBundleNormalizer(bundlePath: rootProject.file('license-normalizer-bundle.json'))]
@@ -56,7 +57,14 @@ licenseReport {
   excludes = [  ]
 }
 
+
+task prepareDependenciesSources(type:Exec) {
+  // download the source code of the thirdparty libraries under GPL & LGPL license
+  commandLine './download-sources.sh', 'sources-url.csv'
+}
+
 task dockerBuild {
+  dependsOn 'prepareDependenciesSources'
   dependsOn ':java:operator:jibDockerBuild'
   dependsOn ':java:sidecar:jibDockerBuild'
   dependsOn ':docker:dockerBuildImage'
