@@ -10,6 +10,8 @@ env:
     - PULL_SECRET=nexus-registry
     - MEMORY_REQUEST=2048Mi
     - MEMORY_LIMIT=2048Mi
+    - HELM_URL=https://get.helm.sh
+    - HELM_TGZ=helm-v2.14.3-linux-amd64.tar.gz
 
 cache:
   directories:
@@ -27,6 +29,11 @@ branches:
 
 install:
   - ./gradlew --version
+  # Installing Helm
+  - wget -q ${HELM_URL}/${HELM_TGZ}
+  - tar xzfv ${HELM_TGZ}
+  - PATH=`pwd`/linux-amd64/:$PATH
+  - helm init --client-only
   # install AZ / GCloud / (Kubectl?)
 
 script:
