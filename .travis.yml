@@ -1,0 +1,52 @@
+language: java
+
+jdk:
+  - openjdk8
+
+env:
+  global:
+    #- AKS_NAME=${aksName}
+    - IMAGE_SUFFIX=-staging
+    - PULL_SECRET=nexus-registry
+    - MEMORY_REQUEST=2048Mi
+    - MEMORY_LIMIT=2048Mi
+
+cache:
+  directories:
+    - $HOME/.gradle/caches/
+    - $HOME/.gradle/wrapper/
+    # Cache our Gcloud SDK between commands
+    - $HOME/google-cloud-sdk/
+
+services:
+  - docker
+
+branches:
+  only:
+    - ele-gke-develop-vr2
+
+install:
+  - ./gradlew --version
+  # install AZ / GCloud / (Kubectl?)
+
+script:
+  - ./gradlew build
+##
+# créer un script az & gcloud
+deploy:
+  - provider: script
+    skip_cleanup: true
+    script:
+      - ./gradlew dockerPush -PregistryUsername=$NEXUS_USERNAME -PregistryPassword=$NEXUS_PASSWORD -Dorg.gradle.project.dockerImagePrefix="docker.repo.strapdata.com/strapdata/strapkop-" -Dorg.gradle.project.dockerImageSuffix="-dev"
+#      - ./gradlew dockerPush -PregistryUsername=$AZ_USERNAME -PregistryPassword=$AZ_PASSWORD -Dorg.gradle.project.dockerImagePrefix="strapdata.azurecr.io/strapdata/strapkop-" -Dorg.gradle.project.dockerImageSuffix="-dev"
+    on:
+      tags: false
+
+  - provider: script
+    skip_cleanup: true
+    script:
+      - ./gradlew dockerPush -PregistryUsername=$NEXUS_USERNAME -PregistryPassword=$NEXUS_PASSWORD -Dorg.gradle.project.dockerImagePrefix="docker.repo.strapdata.com/strapdata/strapkop-" -Dorg.gradle.project.dockerImageSuffix=""
+#      - ./gradlew dockerPush -PregistryUsername=$AZ_USERNAME -PregistryPassword=$AZ_PASSWORD -Dorg.gradle.project.dockerImagePrefix="strapdata.azurecr.io/strapdata/strapkop-" -Dorg.gradle.project.dockerImageSuffix=""
+#      - ./gradlew dockerPush -PregistryUsername=$GCR_USERNAME -PregistryPassword=$GCR_PASSWORD -Dorg.gradle.project.dockerImagePrefix="gcr.io/strapdata/strapkop-" -Dorg.gradle.project.dockerImageSuffix=""
+    on:
+      tags: true
