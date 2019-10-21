@@ -1,59 +1,55 @@
 language: java
-
 jdk:
-  - openjdk8
-
+- openjdk8
 env:
   global:
-    #- AKS_NAME=${aksName}
-    - IMAGE_SUFFIX=-staging
-    - PULL_SECRET=nexus-registry
-    - MEMORY_REQUEST=2048Mi
-    - MEMORY_LIMIT=2048Mi
-    - HELM_URL=https://get.helm.sh
-    - HELM_TGZ=helm-v2.14.3-linux-amd64.tar.gz
-
+  - IMAGE_SUFFIX=-staging
+  - PULL_SECRET=nexus-registry
+  - MEMORY_REQUEST=2048Mi
+  - MEMORY_LIMIT=2048Mi
+  - HELM_URL=https://get.helm.sh
+  - HELM_TGZ=helm-v2.14.3-linux-amd64.tar.gz
+  - secure: TiNtg/r4v4wUteKlhjxhdcM4NIN9592mI6TOnhfGBZavxnoAIqumYuM69UligT0KmfAnblxxQ6ZTPCjKurccKhI8ALvPkZCxrbv8AAbN1cmzxiyYwUgA3J9z2CAUsI+2IR4vW8LYzi8srflFfb7ud6VcFJgU7amWvz1gNy7OzgNgXzd4M6xgIH2JbntB/Umqaz5Y1UbZ22w9vXayJQxI77mlXY2yhQy8h/wys7MRDIR/cDTh3GauQtGLclURnkAr32rzY1RrZfaGaMFs74jYA3M19r7rq4J3LR2vbnRM3a/fstRFhAzsfgFfxkM5GCaNZqcMESL6HWjW/TiS66Z3YdClIp5KHRZTMb5LO3oTceANiP2eI/ODzKTN/ttHQq+mVpkz6Tw57dpB/hfLk8aTIJvhNdAxlQwFpoVUURxavqRJlT6FxpzR3DHqugyGjM2TWuMMxW1EEF0XGW35fJsfJtF7nIJng2HYBIXtLzNY7W0VmVs+31X/FDq4xdJB++6wUS3pH+AvdlvIkOqpLZ80hP88fvq5HQmxSRmoUzwVT7qdhCbKLDeISwzBk1fCTQnc9AMBpdz7zU3whWu6jHVZ91+7/qxeIqYvVr3Yi86r+0voMQLm3s5/vfsdxUZ7+ldxn2y2V0/OY34k6nLdSOMh+G7pkYp3DvX800e/rwyC6nk=
+  - secure: J8pFYjs6Pie1aT3qb40hjptyMup5yoiewCnT7EGCGgRyNwP5cV0CGU+STwnLhLnsN+qfu/8T6ZR+aDskPk5lvvkCksQSrDQR0y3Qr4hoWpS/jZNGC8x4DApt9BSlWlWI/8P5x0RS25jX9whwHmgwdK3BtGA4CkatArepigokvZ7h/ySis5hiU83AxhqVRS4tTk46UOD9KOhgZlb548YMmJmoOnigZL3rzMbfHbt5WeKjIo55tS40jy/E1JWRSRiu8zWJqziwsnkOXeZ6OSzIJp+gYiqvKnImbGZ8pktl7Wn+ORL4VHYhQxxcYb5LqY4kjAG3UFyNn/NbQDFJ1GE3KPiJDszVOc5uog4RZ2KbqTRbZ4N8Hgg1lbC1NM4auh8swn/5+QYpwhpET31mMyYU2yp/fxnmM/BcVTz/g1q5or9zitiG3yRtJZ31b4bCW2AOoApxnb2K/jZOpbE3nmNOl5gUeEp6zkPP8UO4D0AIMkXpanqqtus0ar12ls6bWRMo9Y77SbCehiHlt5TlbGaNar64uQ2XcYQ0Gnpr/eaEC/m/IiJzs/4b6i6IpG2eG1l6ZNeLS1DfRY/eIL4an9/0an4SwzAKurPXagGWjejAyqKrOOreYUcT8KcpNFH+M9nodIlMpa3TEPanO9iVQa78WLBv0jYVarjypCS9IHiFKis=
 cache:
   directories:
-    - $HOME/.gradle/caches/
-    - $HOME/.gradle/wrapper/
-    # Cache our Gcloud SDK between commands
-    - $HOME/google-cloud-sdk/
-
+  - "$HOME/.gradle/caches/"
+  - "$HOME/.gradle/wrapper/"
+  - "$HOME/google-cloud-sdk/"
 services:
-  - docker
-
+- docker
 branches:
   only:
-    - ele-gke-develop-vr2
-
+  - ele-gke-develop-vr2
 install:
-  - ./gradlew --version
-  # Installing Helm
-  - wget -q ${HELM_URL}/${HELM_TGZ}
-  - tar xzfv ${HELM_TGZ}
-  - PATH=`pwd`/linux-amd64/:$PATH
-  - helm init --client-only
-  # install AZ / GCloud / (Kubectl?)
-
+- "./gradlew --version"
+# Installing Helm
+- wget -q ${HELM_URL}/${HELM_TGZ}
+- tar xzfv ${HELM_TGZ}
+- PATH=`pwd`/linux-amd64/:$PATH
+- helm init --client-only
+# TODO install AZ & GCloud
 script:
-  - ./gradlew build
-##
-# créer un script az & gcloud
+- "./gradlew build"
 deploy:
-  - provider: script
-    skip_cleanup: true
-    script:
-      - ./gradlew dockerPush -PregistryUsername=$NEXUS_USERNAME -PregistryPassword=$NEXUS_PASSWORD -Dorg.gradle.project.dockerImagePrefix="docker.repo.strapdata.com/strapdata/strapkop-" -Dorg.gradle.project.dockerImageSuffix="-dev"
+- provider: script
+  skip_cleanup: true
+  script:
+  - ./gradlew dockerPush -PregistryUsername=$NEXUS_USERNAME -PregistryPassword=$NEXUS_PASSWORD
+    -Dorg.gradle.project.dockerImagePrefix="docker.repo.strapdata.com/strapdata/strapkop-"
+    -Dorg.gradle.project.dockerImageSuffix="-dev"
 #      - ./gradlew dockerPush -PregistryUsername=$AZ_USERNAME -PregistryPassword=$AZ_PASSWORD -Dorg.gradle.project.dockerImagePrefix="strapdata.azurecr.io/strapdata/strapkop-" -Dorg.gradle.project.dockerImageSuffix="-dev"
-    on:
-      tags: false
-
-  - provider: script
-    skip_cleanup: true
-    script:
-      - ./gradlew dockerPush -PregistryUsername=$NEXUS_USERNAME -PregistryPassword=$NEXUS_PASSWORD -Dorg.gradle.project.dockerImagePrefix="docker.repo.strapdata.com/strapdata/strapkop-" -Dorg.gradle.project.dockerImageSuffix=""
+  on:
+    tags: false
+    branch:
+    - ele-gke-develop-vr2
+- provider: script
+  skip_cleanup: true
+  script:
+  - ./gradlew dockerPush -PregistryUsername=$NEXUS_USERNAME -PregistryPassword=$NEXUS_PASSWORD
+    -Dorg.gradle.project.dockerImagePrefix="docker.repo.strapdata.com/strapdata/strapkop-"
+    -Dorg.gradle.project.dockerImageSuffix=""
 #      - ./gradlew dockerPush -PregistryUsername=$AZ_USERNAME -PregistryPassword=$AZ_PASSWORD -Dorg.gradle.project.dockerImagePrefix="strapdata.azurecr.io/strapdata/strapkop-" -Dorg.gradle.project.dockerImageSuffix=""
 #      - ./gradlew dockerPush -PregistryUsername=$GCR_USERNAME -PregistryPassword=$GCR_PASSWORD -Dorg.gradle.project.dockerImagePrefix="gcr.io/strapdata/strapkop-" -Dorg.gradle.project.dockerImageSuffix=""
-    on:
-      tags: true
+  on:
+    tags: true
