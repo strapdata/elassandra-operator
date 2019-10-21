@@ -165,7 +165,7 @@ public class KibanaPlugin extends AbstractPlugin {
 
         container
                 .name("kibana")
-                .image("docker.elastic.co/kibana/kibana-oss:6.2.3")
+                .image(dataCenter.getSpec().getKibanaImage())
                 .terminationMessagePolicy("FallbackToLogsOnError")
                 .addPortsItem(new V1ContainerPort()
                         .name("kibana")

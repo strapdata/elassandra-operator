@@ -126,6 +126,12 @@ public class DataCenterSpec {
     private List<KibanaSpace> kibanaSpaces = new ArrayList<>();
 
     /**
+     * Kibana docker image
+     */
+    @SerializedName("kibanaImage")
+    @Expose
+    private String kibanaImage = "docker.elastic.co/kibana/kibana-oss:6.2.3";
+    /**
      * Attempt to run privileged configuration options for better performance
      * 
      */
