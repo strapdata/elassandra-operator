@@ -19,6 +19,18 @@ helm {
       sourceDir = file('src/main/helm/elassandra-operator')
     }
   }
+  releases {
+    datacenter {
+      from charts.elassandraDatacenter
+      releaseName.set("elassandra-datacenter")
+      valueFiles.from 'src/main/minikube/values-datacenter.yaml'
+    }
+    operator {
+      from charts.elassandraOperator
+      releaseName.set("elassandra-operator")
+      valueFiles.from 'src/main/minikube/values-operator.yaml'
+    }
+  }
 }
 
 task uploadElassandraDatacenter(type: com.strapdata.AzureStorageDeployTask) {

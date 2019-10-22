@@ -50,6 +50,6 @@ deploy:
     -Dorg.gradle.project.dockerImagePrefix="docker.repo.strapdata.com/strapdata/strapkop-"
     -Dorg.gradle.project.dockerImageSuffix=""
 #      - ./gradlew dockerPush -PregistryUsername=$AZ_USERNAME -PregistryPassword=$AZ_PASSWORD -Dorg.gradle.project.dockerImagePrefix="strapdata.azurecr.io/strapdata/strapkop-" -Dorg.gradle.project.dockerImageSuffix=""
-#      - ./gradlew dockerPush -PregistryUsername=$GCR_USERNAME -PregistryPassword=$GCR_PASSWORD -Dorg.gradle.project.dockerImagePrefix="gcr.io/strapdata/strapkop-" -Dorg.gradle.project.dockerImageSuffix=""
+#      - ./gradlew dockerPush -PregistryUsername=$GCR_USERNAME -PregistryPassword=$GCR_PASSWORD -Dorg.gradle.project.dockerImagePrefix="gcr.io/strapdata-factory/strapkop-" -Dorg.gradle.project.dockerImageSuffix=""
   on:
     tags: true
