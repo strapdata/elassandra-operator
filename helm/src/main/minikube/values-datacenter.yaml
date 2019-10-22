@@ -1,0 +1,152 @@
+# Default values for elassandra.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+replicas: 1
+
+# STRICT or SLACK
+nodeAffinityPolicy: STRICT
+
+image:
+  elassandraRepository: docker.repo.strapdata.com/strapdata/strapkop-elassandra-dev
+  sidecarRepository: docker.repo.strapdata.com/strapdata/strapkop-sidecar-dev
+  elassandraTag: latest
+  sidecarTag: latest
+
+imagePullPolicy: Always
+imagePullSecret: "strapdata-cr"
+
+
+# TODO: we do not support unprivileged setup yet
+privilegedSupported: true
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+
+dataVolumeClaim:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi
+
+enterprise:
+  enabled: true
+  jmx: true
+  https: true
+  ssl: true
+  aaa:
+    enabled: true
+    audit: true
+  cbs: true
+
+# Cassandra reaper
+reaperEnabled: false
+
+prometheusEnabled: false
+elasticsearchEnabled: true
+ssl: true
+authentication: CASSANDRA
+
+hostPortEnabled: true
+storagePort: 37000
+sslStoragePort: 37001
+nativePort: 39042
+jmxPort: 7199
+# jdbPort: 4242
+
+remoteSeeds: []
+remoteSeeders:
+
+# Override some config files in /etc/cassandra
+configs:
+  logback.xml: |-
+    <!--
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    KIND, either express or implied.  See the License for the
+    specific language governing permissions and limitations
+    under the License.
+    -->
+
+    <configuration scan="true" debug="false">
+    <jmxConfigurator />
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${CASSANDRA_LOGDIR}/system.log</file>
+    <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+    <fileNamePattern>${CASSANDRA_LOGDIR}/system.log.%i.zip</fileNamePattern>
+    <minIndex>1</minIndex>
+    <maxIndex>20</maxIndex>
+    </rollingPolicy>
+
+    <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+    <maxFileSize>500MB</maxFileSize>
+    </triggeringPolicy>
+    <encoder>
+    <pattern>%date{ISO8601} %-5level [%thread] %F:%L %M %msg%n</pattern>
+    <!-- old-style log format
+    <pattern>%5level [%thread] %date{ISO8601} %F (line %L) %msg%n</pattern>
+    -->
+    </encoder>
+    </appender>
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+    <pattern>%date{ISO8601} %-5level [%thread] %C.%M:%L %msg%n</pattern>
+    </encoder>
+    </appender>
+
+    <appender name="AUDIT" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${CASSANDRA_LOGDIR}/audit.log</file>
+    <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+    <fileNamePattern>${CASSANDRA_LOGDIR}/audit.log.%i.zip</fileNamePattern>
+    <minIndex>1</minIndex>
+    <maxIndex>20</maxIndex>
+    </rollingPolicy>
+    <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+    <maxFileSize>500MB</maxFileSize>
+    </triggeringPolicy>
+    <encoder>
+    <pattern>%date{ISO8601} %msg%n</pattern>
+    </encoder>
+    </appender>
+
+    <logger name="com.thinkaurelius.thrift" level="ERROR"/>
+    <logger name="org.apache" level="WARN" />
+
+    <!-- Use env variables to customize logging level from docker -->
+    <logger name="org.apache.cassandra" level="${LOGBACK_org_apache_cassandra:-WARN}" />
+    <logger name="org.apache.cassandra.service.CassandraDaemon" level="${LOGBACK_org_apache_cassandra_service_CassandraDaemon:-INFO}" />
+
+    <logger name="org.elassandra.shard" level="${LOGBACK_org_elassandra_shard:-INFO}" />
+    <logger name="org.elassandra.indices" level="${LOGBACK_org_elassandra_indices:-INFO}" />
+    <logger name="org.elassandra.index" level="${LOGBACK_org_elassandra_index:-WARN}" />
+    <logger name="org.elassandra.discovery" level="${LOGBACK_org_elassandra_discovery:-WARN}" />
+    <logger name="org.elasticsearch.cluster.service" level="${LOGBACK_org_elassandra_cluster_service:-DEBUG}" />
+    <logger name="org.elasticsearch.cluster.metadata" level="DEBUG" />
+    <logger name="org.elasticsearch" level="${LOGBACK_org_elasticsearch:-WARN}" />
+
+    <root level="INFO">
+      <appender-ref ref="STDOUT" />
+    </root>
+
+    <logger name="LogbackAuditor" level="DEBUG" additivity="false" >
+       <appender-ref ref="AUDIT" />
+    </logger>
+
+    </configuration>
