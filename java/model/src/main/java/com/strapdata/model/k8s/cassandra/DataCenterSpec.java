@@ -100,7 +100,7 @@ public class DataCenterSpec {
      */
     @SerializedName("prometheusEnabled")
     @Expose
-    private Boolean prometheusEnabled;
+    private Boolean prometheusEnabled = false;
 
     /**
      * Enable Cassandra Reaper support.
@@ -108,7 +108,7 @@ public class DataCenterSpec {
      */
     @SerializedName("reaperEnabled")
     @Expose
-    private Boolean reaperEnabled;
+    private Boolean reaperEnabled = false;
 
     /**
      * Reaper configuration.
