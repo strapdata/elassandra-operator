@@ -3,6 +3,7 @@ package com.strapdata.strapkop.k8s;
 import io.kubernetes.client.ApiClient;
 import io.kubernetes.client.apis.*;
 import io.kubernetes.client.util.ClientBuilder;
+import io.kubernetes.client.util.Config;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 
@@ -14,10 +15,14 @@ import java.io.IOException;
 public class K8sModule {
 
     private final ApiClient apiClient;
+    private final ApiClient watchClient;
     private final ApiClient debuggableApiClient;
 
     public K8sModule() throws IOException {
         apiClient = ClientBuilder.standard().build();
+
+        // watch client continous read, see https://github.com/kubernetes-client/java/issues/178
+        watchClient =  Config.defaultClient();
 
         // trick to debug k8s calls except for the Watch (not supported)
         if (System.getenv("K8S_API_DEBUG") != null) {
@@ -69,6 +74,13 @@ public class K8sModule {
     @Named("apiClient")
     public ApiClient provideApiClient() {
         return this.apiClient;
+    }
+
+    @Bean
+    @Singleton
+    @Named("watchClient")
+    public ApiClient provideWatchClient() {
+        return this.watchClient;
     }
 
     @Bean

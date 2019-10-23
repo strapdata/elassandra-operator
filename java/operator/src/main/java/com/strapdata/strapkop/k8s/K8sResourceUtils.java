@@ -18,12 +18,16 @@ import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.apis.CustomObjectsApi;
 import io.kubernetes.client.apis.ExtensionsV1beta1Api;
 import io.kubernetes.client.models.*;
+import io.reactivex.Completable;
+import io.reactivex.Single;
+import io.reactivex.functions.Action;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.Collection;
 import java.util.Iterator;
@@ -51,23 +55,29 @@ public class K8sResourceUtils {
         void call() throws ApiException;
     }
 
-    public static void createOrReplaceResource(final ApiCallable createResourceCallable, final ApiCallable replaceResourceCallable) throws ApiException {
-        try {
-            logger.trace("Attempting to create resource.");
-            createResourceCallable.call();
-        } catch (final ApiException e) {
-            if (e.getCode() != 409)
-                throw e;
+    public static Completable createOrReplaceResource(final ApiCallable createResourceCallable, final ApiCallable replaceResourceCallable) throws ApiException {
+        return Completable.fromAction(new Action() {
+            @Override
+            public void run() throws Exception {
+                try {
+                    logger.trace("Attempting to create resource.");
+                    createResourceCallable.call();
+                } catch (final ApiException e) {
+                    if (e.getCode() != 409)
+                        throw e;
 
-            logger.trace("Resource already exists. Attempting to replace.");
-            replaceResourceCallable.call();
-        }
+                    logger.trace("Resource already exists. Attempting to replace.");
+                    replaceResourceCallable.call();
+                }
+            }
+        });
+
     }
 
-    public void createOrReplaceNamespacedService(final V1Service service) throws ApiException {
+    public Single<V1Service> createOrReplaceNamespacedService(final V1Service service) throws ApiException {
         final String namespace = service.getMetadata().getNamespace();
         logger.debug("Creating/replacing namespaced Service.");
-        createOrReplaceResource(
+        return createOrReplaceResource(
                 () -> {
                     coreApi.createNamespacedService(namespace, service, null, null, null);
                     logger.debug("Created namespaced Service.");
@@ -77,13 +87,13 @@ public class K8sResourceUtils {
 //                        coreApi.replaceNamespacedService(service.getMetadata().getName(), service.getMetadata().getNamespace(), service, null, null);
 //                        logger.debug("Replaced namespaced Service.");
                 }
-        );
+        ).toSingleDefault(service);
     }
 
-    public void createOrReplaceNamespacedIngress(final V1beta1Ingress ingress) throws ApiException {
+    public Single<V1beta1Ingress> createOrReplaceNamespacedIngress(final V1beta1Ingress ingress) throws ApiException {
         final String namespace = ingress.getMetadata().getNamespace();
         logger.debug("Creating/replacing namespaced Ingress.");
-        createOrReplaceResource(
+        return createOrReplaceResource(
                 () -> {
                     extensionsV1beta1Api.createNamespacedIngress(namespace, ingress, null, null, null);
                     logger.debug("Created namespaced Ingress.");
@@ -93,13 +103,13 @@ public class K8sResourceUtils {
 //                        coreApi.replaceNamespacedService(service.getMetadata().getName(), service.getMetadata().getNamespace(), service, null, null);
 //                        logger.debug("Replaced namespaced Service.");
                 }
-        );
+        ).toSingleDefault(ingress);
     }
 
-    public void createOrReplaceNamespacedConfigMap(final V1ConfigMap configMap) throws ApiException {
+    public Single<V1ConfigMap> createOrReplaceNamespacedConfigMap(final V1ConfigMap configMap) throws ApiException {
         final String namespace = configMap.getMetadata().getNamespace();
         logger.debug("Creating/replacing namespaced ConfigMap.");
-        createOrReplaceResource(
+        return createOrReplaceResource(
                 () -> {
                     coreApi.createNamespacedConfigMap(namespace, configMap, null, null, null);
                     logger.debug("Created namespaced ConfigMap.");
@@ -108,13 +118,13 @@ public class K8sResourceUtils {
                     coreApi.replaceNamespacedConfigMap(configMap.getMetadata().getName(), namespace, configMap, null, null);
                     logger.debug("Replaced namespaced ConfigMap.");
                 }
-        );
+        ).toSingleDefault(configMap);
     }
     
-    public void createOrReplaceNamespacedDeployment(final V1Deployment deployment) throws ApiException {
+    public Single<V1Deployment> createOrReplaceNamespacedDeployment(final V1Deployment deployment) throws ApiException {
         final String namespace = deployment.getMetadata().getNamespace();
         logger.debug("Creating/replacing namespaced Deployment.");
-        createOrReplaceResource(
+        return createOrReplaceResource(
                 () -> {
                     appsApi.createNamespacedDeployment(namespace, deployment, null, null, null);
                     logger.debug("Created namespaced Deployment.");
@@ -123,13 +133,13 @@ public class K8sResourceUtils {
                     appsApi.replaceNamespacedDeployment(deployment.getMetadata().getName(), namespace, deployment, null, null);
                     logger.debug("Replaced namespaced Deployment.");
                 }
-        );
+        ).toSingleDefault(deployment);
     }
 
-    public void createOrReplaceNamespacedSecret(final V1Secret secret) throws ApiException {
+    public Single<V1Secret> createOrReplaceNamespacedSecret(final V1Secret secret) throws ApiException {
         final String namespace = secret.getMetadata().getNamespace();
         logger.debug("Creating/replacing namespaced secret.");
-        createOrReplaceResource(
+        return createOrReplaceResource(
                 () -> {
                     coreApi.createNamespacedSecret(namespace, secret, null, null, null);
                     logger.debug("Created namespaced Deployment.");
@@ -138,25 +148,35 @@ public class K8sResourceUtils {
                     coreApi.replaceNamespacedSecret(secret.getMetadata().getName(), namespace, secret, null, null);
                     logger.debug("Replaced namespaced Deployment.");
                 }
-        );
+        ).toSingleDefault(secret);
     }
 
-    public void deleteService(String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) throws ApiException {
-        listNamespacedServices(namespace, null, labelSelector).forEach(service -> {
-            try {
-                deleteService(service);
-                logger.debug("Deleted Service namespace={} name={}", service.getMetadata().getNamespace(), service.getMetadata().getName());
-            } catch (final JsonSyntaxException e) {
-                logger.debug("Caught JSON exception while deleting Service. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
-            } catch (final ApiException e) {
-                logger.error("Failed to delete Service.", e);
-            }
-        });
+    public Completable deleteService(String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) throws ApiException {
+
+        return Completable.fromAction(new Action() {
+               @Override
+               public void run() throws Exception {
+                   listNamespacedServices(namespace, null, labelSelector).forEach(service -> {
+                       try {
+                           deleteService(service);
+                           logger.debug("Deleted Service namespace={} name={}", service.getMetadata().getNamespace(), service.getMetadata().getName());
+                       } catch (final JsonSyntaxException e) {
+                           logger.debug("Caught JSON exception while deleting Service. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
+                       } catch (final ApiException | IOException e) {
+                           logger.error("Failed to delete Service.", e);
+                       }
+                   });
+               }
+           });
     }
 
-    public void deleteService(final V1Service service) throws ApiException {
+    public Single<V1Service> deleteService(final V1Service service) throws ApiException, IOException {
         final V1ObjectMeta metadata = service.getMetadata();
-        coreApi.deleteNamespacedService(metadata.getName(), metadata.getNamespace(), new V1DeleteOptions(), null, null, null, null, null);
+        return Single.fromCallable(() -> {
+            coreApi.deleteNamespacedServiceAsync(metadata.getName(), metadata.getNamespace(), new V1DeleteOptions(), null, null, null, null, null, null)
+                    .execute();
+            return service;
+        });
     }
 
     public void deleteIngress(String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) throws ApiException {

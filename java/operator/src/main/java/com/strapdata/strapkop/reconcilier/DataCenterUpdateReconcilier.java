@@ -74,6 +74,7 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
 
                 // call the statefullset reconciliation  (before scaling up/down to properly stream data according to the adjusted RF)
                 logger.trace("processing a dc reconciliation request for {} in thread {}", dc.getMetadata().getName(), Thread.currentThread().getName());
+
                 context.createBean(DataCenterUpdateAction.class, dc).reconcileDataCenter();
 
                 for(Plugin plugin : pluginRegistry.plugins()) {
