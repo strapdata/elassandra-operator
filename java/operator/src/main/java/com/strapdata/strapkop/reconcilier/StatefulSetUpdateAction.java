@@ -37,46 +37,23 @@ import java.util.stream.Collectors;
 class StatefulSetUpdateAction {
     
     private final Logger logger = LoggerFactory.getLogger(StatefulSetUpdateAction.class);
-    
+
+    private static Set<ElassandraNodeStatus> MOVING_ELASSANDRA_POD_STATUSES = ImmutableSet.of(
+            ElassandraNodeStatus.JOINING, ElassandraNodeStatus.DRAINING, ElassandraNodeStatus.LEAVING, ElassandraNodeStatus.MOVING, ElassandraNodeStatus.STARTING);
+
     private final AppsV1Api appsApi;
     private final K8sResourceUtils k8sResourceUtils;
     private final SidecarClientFactory sidecarClientFactory;
-    
     private final ElassandraNodeStatusCache elassandraNodeStatusCache;
-    
-    private DataCenter dataCenter;
-    
-    // tree maps are ordered by rack ascending (rack1, rack2, ...)
-    private TreeMap<String, V1StatefulSet> newtStsMap;
-    private TreeMap<String, V1StatefulSet> existingStsMap;
-    
-    private Map<Boolean, List<String>> rackByReadiness;
-    private Map<ElassandraNodeStatus, List<String>> podsByStatus;
-    private static Set<ElassandraNodeStatus> MOVING_ELASSANDRA_POD_STATUSES = ImmutableSet.of(
-            ElassandraNodeStatus.JOINING, ElassandraNodeStatus.DRAINING, ElassandraNodeStatus.LEAVING, ElassandraNodeStatus.MOVING, ElassandraNodeStatus.STARTING, ElassandraNodeStatus.UNKNOWN);
-    
-    // tree set is ordered by rack ascending (rack1, rack2, ...)
-    private Map<RackMode, TreeSet<String>> racksByRackMode;
-    
-    
-    StatefulSetUpdateAction(AppsV1Api appsApi, K8sResourceUtils k8sResourceUtils, SidecarClientFactory sidecarClientFactory, ElassandraNodeStatusCache elassandraNodeStatusCache) {
+
+    public StatefulSetUpdateAction(AppsV1Api appsApi,
+                                   K8sResourceUtils k8sResourceUtils,
+                                   SidecarClientFactory sidecarClientFactory,
+                                   ElassandraNodeStatusCache elassandraNodeStatusCache) {
         this.appsApi = appsApi;
         this.k8sResourceUtils = k8sResourceUtils;
         this.sidecarClientFactory = sidecarClientFactory;
         this.elassandraNodeStatusCache = elassandraNodeStatusCache;
-    }
-    
-    /**
-     * Initialize some data structure with the observed state (node status, statefulset, ...)
-     */
-    private void observe(DataCenter dataCenter, TreeMap<String, V1StatefulSet> newtStsMap, TreeMap<String, V1StatefulSet> existingStsMap) {
-        this.dataCenter = dataCenter;
-        this.newtStsMap = newtStsMap;
-        this.existingStsMap = existingStsMap;
-        
-        this.racksByRackMode = fetchRackModes();
-        this.rackByReadiness = fetchReadinesses();
-        this.podsByStatus = getStatusesFromCache();
     }
     
     /**
@@ -86,21 +63,23 @@ class StatefulSetUpdateAction {
      *
      * Only one expected rack should have a different replicas value than the existing one.
      */
-    void updateNextStatefulSet(DataCenter dataCenter, TreeMap<String, V1StatefulSet> newtStsMap, TreeMap<String, V1StatefulSet> existingStsMap) throws ApiException, MalformedURLException, StrapkopException {
-    
-        // make a lot of observations and build some data structures in order to take the best decision
-        observe(dataCenter, newtStsMap, existingStsMap);
-        
+    void updateNextStatefulSet(DataCenter dataCenter,
+                               TreeMap<String, V1StatefulSet> existingStsMap,
+                               TreeMap<String, V1StatefulSet> newtStsMap) throws ApiException, MalformedURLException, StrapkopException {
+
+        Map<ElassandraNodeStatus, List<String>> podsByStatus = getStatusesFromCache(dataCenter, existingStsMap);
+        Map<Boolean, List<String>> rackByReadiness = fetchReadinesses(existingStsMap);
+        Map<RackMode, TreeSet<String>> racksByRackMode = fetchRackModes(dataCenter, existingStsMap, newtStsMap);
+
         // update dc status with what we observed
-        updateDatacenterStatus();
+        updateDatacenterStatus(dataCenter, existingStsMap, newtStsMap, podsByStatus, rackByReadiness, racksByRackMode);
 
         // "garde-fou" 1
         if (racksByRackMode.get(RackMode.SCALE_UP).size() > 0 && racksByRackMode.get(RackMode.SCALE_DOWN).size() > 0) {
             // here we have some racks to scale-up and some racks to scale-down... it should not happens
             dataCenter.getStatus().setPhase(DataCenterPhase.ERROR);
-            logger.error("inconsistent state, racks [{}] must scale up while racks [{}] must scale down",
+            logger.warn("inconsistent state, racks [{}] must scale up while racks [{}] must scale down",
                     racksByRackMode.get(RackMode.SCALE_UP), racksByRackMode.get(RackMode.SCALE_DOWN));
-            return;
         }
     
         // "garde-fou" 2
@@ -110,23 +89,24 @@ class StatefulSetUpdateAction {
             // be scaled at this point of the reconciliation.
             
             dataCenter.getStatus().setPhase(DataCenterPhase.ERROR);
-            logger.error("inconsistent state, multiple racks request scaling dc={}", dataCenter.getMetadata().getName());
-            return;
+            logger.warn("inconsistent state, multiple racks request scaling dc={}", dataCenter.getMetadata().getName());
         }
     
         // ensure all statefulsets are ready
+        /*
         if (rackByReadiness.get(false).size() > 0) {
-            logger.debug("some statefulsets are not ready, skipping sts replacement : {}", rackByReadiness.get(false));
+            logger.warn("some statefulsets are not ready, skipping sts replacement : {}", rackByReadiness.get(false));
             
             // TODO: check if some pods are stuck with old configuration and restart it manually
             //        see https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#forced-rollback
             
             return ;
         }
+        */
         
         // ensure all nodes are joined or decommissioned
         if (MOVING_ELASSANDRA_POD_STATUSES.stream().anyMatch(status -> podsByStatus.get(status).size() > 0)) {
-            logger.debug("some pods are in a moving operational status, skipping sts replacement");
+            logger.warn("some pods are in a moving operational status, delaying sts replacement");
             return;
         }
         
@@ -134,15 +114,16 @@ class StatefulSetUpdateAction {
     
         // first, we update a rack that does not need to scale
         if (racksByRackMode.get(RackMode.BEHIND).size() > 0) {
-            updateRack(racksByRackMode.get(RackMode.BEHIND).first());
+            String rack = racksByRackMode.get(RackMode.BEHIND).first();
+            updateRack(dataCenter, newtStsMap.get(rack));
         }
         // when all racks are up-to-date except the one we need to scale-up, we trigger the scale+1 as well as rack update in one shot
         else if (racksByRackMode.get(RackMode.SCALE_UP).size() > 0) {
-            scaleUp(racksByRackMode.get(RackMode.SCALE_UP).first());
+            scaleUp(dataCenter, racksByRackMode.get(RackMode.SCALE_UP).first(), existingStsMap, newtStsMap);
         }
         // ...scale down is almost the same except that we start by decommissioning the node
         else if (racksByRackMode.get(RackMode.SCALE_DOWN).size() > 0) {
-            scaleDown(racksByRackMode.get(RackMode.SCALE_DOWN).first());
+            scaleDown(dataCenter, racksByRackMode.get(RackMode.SCALE_DOWN).first(), existingStsMap, newtStsMap, podsByStatus);
         }
         // otherwise all racks are OK, we might need to trigger a cleanup
         else {
@@ -151,7 +132,7 @@ class StatefulSetUpdateAction {
             if (dataCenter.getStatus().getPhase().equals(DataCenterPhase.SCALING_DOWN) ||
                     (dataCenter.getStatus().getPhase().equals(DataCenterPhase.SCALING_UP) && dataCenter.getSpec().getReplicas() > 1)) {
                 logger.info("Scaling of dc={} terminated, triggering a dc cleanup", dataCenter.getMetadata().getName());
-                triggerCleanupTask();
+                triggerCleanupTask(dataCenter);
             }
 
             dataCenter.getStatus().setPhase(DataCenterPhase.RUNNING);
@@ -179,7 +160,7 @@ class StatefulSetUpdateAction {
      * Build a map of rack -> RackMode.
      * The RackMode describes if the rack is up-to-date or if it needs scale-up, down, or rolling update.
      */
-    private Map<RackMode, TreeSet<String>> fetchRackModes() {
+    private Map<RackMode, TreeSet<String>> fetchRackModes(DataCenter dataCenter, TreeMap<String, V1StatefulSet> existingStsMap, TreeMap<String, V1StatefulSet> newtStsMap) {
         
         Map<RackMode, TreeSet<String>> modes = new HashMap<>();
         for (RackMode mode : RackMode.values()) {
@@ -212,7 +193,7 @@ class StatefulSetUpdateAction {
      * Enumerate the list of pods name based on existing statefulsets and .spec.replicas
      * This does not execute any network operation
      */
-    private List<String> enumeratePods() {
+    private List<String> enumeratePods(DataCenter dataCenter, TreeMap<String, V1StatefulSet> existingStsMap) {
         
         List<String> pods = new ArrayList<>();
         
@@ -230,7 +211,7 @@ class StatefulSetUpdateAction {
     /**
      * Build a map of rack readiness by inspecting statefulset status
      */
-    private Map<Boolean, List<String>> fetchReadinesses() {
+    private Map<Boolean, List<String>> fetchReadinesses(TreeMap<String, V1StatefulSet> existingStsMap) {
         Map<Boolean, List<String>> readinesses = new HashMap<>();
         readinesses.put(true, new ArrayList<>());
         readinesses.put(false, new ArrayList<>());
@@ -255,14 +236,14 @@ class StatefulSetUpdateAction {
     /**
      * Retrieve elassandra pod statuses (cassandra operation mode) from the cache
      */
-    private Map<ElassandraNodeStatus, List<String>> getStatusesFromCache() {
+    private Map<ElassandraNodeStatus, List<String>> getStatusesFromCache(DataCenter dataCenter, TreeMap<String, V1StatefulSet> existingStsMap) {
         
         Map<ElassandraNodeStatus, List<String>> statuses = new HashMap<>();
         for (ElassandraNodeStatus status : ElassandraNodeStatus.values()) {
             statuses.put(status, new ArrayList<>());
         }
         
-        for (String podName : enumeratePods()) {
+        for (String podName : enumeratePods(dataCenter, existingStsMap)) {
             ElassandraNodeStatus nodeStatus = Optional
                     .ofNullable(elassandraNodeStatusCache.get(new ElassandraPod(dataCenter, podName)))
                     .orElse(ElassandraNodeStatus.UNKNOWN);
@@ -275,7 +256,7 @@ class StatefulSetUpdateAction {
     /**
      * Create an ElassandraTask of type cleanup
      */
-    private void triggerCleanupTask() throws ApiException {
+    private void triggerCleanupTask(DataCenter dataCenter) throws ApiException {
         k8sResourceUtils.createTask(dataCenter, "cleanup", spec -> spec.setCleanup(new CleanupTaskSpec()));
     }
     
@@ -326,7 +307,7 @@ class StatefulSetUpdateAction {
     /**
      * Scale up a specific rack (+1)
      */
-    private void scaleUp(String rack) throws ApiException {
+    private void scaleUp(DataCenter dataCenter, String rack, TreeMap<String, V1StatefulSet> existingStsMap, TreeMap<String, V1StatefulSet> newtStsMap) throws ApiException {
         
         dataCenter.getStatus().setPhase(DataCenterPhase.SCALING_UP);
     
@@ -343,7 +324,10 @@ class StatefulSetUpdateAction {
     /**
      * Scale up a specific rack (+1)
      */
-    private void scaleDown(String rack) throws ApiException, MalformedURLException, StrapkopException {
+    private void scaleDown(DataCenter dataCenter, String rack,
+                           TreeMap<String, V1StatefulSet> existingStsMap,
+                           TreeMap<String, V1StatefulSet> newtStsMap,
+                           Map<ElassandraNodeStatus, List<String>> podsByStatus) throws ApiException, MalformedURLException, StrapkopException {
     
         
         dataCenter.getStatus().setPhase(DataCenterPhase.SCALING_DOWN);
@@ -374,8 +358,6 @@ class StatefulSetUpdateAction {
         }
         else if (podsByStatus.get(ElassandraNodeStatus.DECOMMISSIONED).contains(podName)) {
             logger.info("Scaling down sts {} to {}, removing {}", statefulSetToScale.getMetadata().getName(), replicas, podName);
-            
-            
             appsApi.replaceNamespacedStatefulSet(statefulSetToScale.getMetadata().getName(), statefulSetToScale.getMetadata().getNamespace(), statefulSetToScale, null, null);
         }
         else {
@@ -383,14 +365,18 @@ class StatefulSetUpdateAction {
         }
     }
     
-    private void updateRack(String rack) throws ApiException {
+    public void updateRack(DataCenter dataCenter, V1StatefulSet newStatefulSet) throws ApiException {
         dataCenter.getStatus().setPhase(DataCenterPhase.UPDATING);
-        final V1StatefulSet newStatefulSet = newtStsMap.get(rack);
-        logger.info("Update spec of sts {} (rolling restart)", newStatefulSet.getMetadata().getName());
+        logger.info("Update spec of sts={} (rolling restart)", newStatefulSet.getMetadata().getName());
+        logger.debug("Updating sts={}", newStatefulSet);
         appsApi.replaceNamespacedStatefulSet(newStatefulSet.getMetadata().getName(), newStatefulSet.getMetadata().getNamespace(), newStatefulSet, null, null);
     }
     
-    private void updateDatacenterStatus() {
+    private void updateDatacenterStatus(DataCenter dataCenter, TreeMap<String, V1StatefulSet> existingStsMap,
+                                        TreeMap<String, V1StatefulSet> newtStsMap,
+                                        Map<ElassandraNodeStatus, List<String>> podsByStatus,
+                                        Map<Boolean, List<String>> rackByReadiness,
+                                        Map<RackMode, TreeSet<String>> racksByRackMode) {
     
         // set replicas status
         Tuple2<Integer,Integer> replicasStatus = existingStsMap.values().stream()
@@ -407,7 +393,7 @@ class StatefulSetUpdateAction {
         dataCenter.getStatus()
                 .setReplicas(replicasStatus._1)
                 .setReadyReplicas(replicasStatus._2)
-                .setJoinedReplicas(this.podsByStatus.get(ElassandraNodeStatus.NORMAL).size());
+                .setJoinedReplicas(podsByStatus.get(ElassandraNodeStatus.NORMAL).size());
 
         
         // initialize pod statuses

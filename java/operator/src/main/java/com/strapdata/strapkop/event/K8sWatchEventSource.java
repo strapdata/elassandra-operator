@@ -3,6 +3,7 @@ package com.strapdata.strapkop.event;
 import com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonSyntaxException;
 import com.strapdata.strapkop.pipeline.K8sWatchResourceAdapter;
 import io.kubernetes.client.ApiClient;
 import io.kubernetes.client.ApiException;
@@ -14,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Named;
+import java.util.concurrent.TimeUnit;
 
 import static com.strapdata.strapkop.event.K8sWatchEvent.Type.ERROR;
 import static com.strapdata.strapkop.event.K8sWatchEvent.Type.INITIAL;
@@ -29,16 +31,19 @@ public class K8sWatchEventSource<ResourceT, ResourceListT> implements EventSourc
     
     private final Logger logger = LoggerFactory.getLogger(K8sWatchEventSource.class);
     
-    private final ApiClient apiClient;
+    private final ApiClient watchClient;
     private final K8sWatchResourceAdapter<ResourceT, ResourceListT> adapter;
     private final Gson gson;
     
     private String lastResourceVersion = null;
     
-    public K8sWatchEventSource(final @Named("apiClient") ApiClient apiClient, final K8sWatchResourceAdapter<ResourceT, ResourceListT> adapter) {
-        this.apiClient = apiClient;
+    public K8sWatchEventSource(final @Named("watchClient") ApiClient watchClient, final K8sWatchResourceAdapter<ResourceT, ResourceListT> adapter) {
+        this.watchClient = watchClient;
+        watchClient.getHttpClient().setReadTimeout(180, TimeUnit.SECONDS);
+        logger.debug("watchClient read timeout={}", watchClient.getHttpClient().getReadTimeout());
+
         this.adapter = adapter;
-        this.gson = apiClient.getJSON().getGson();
+        this.gson = watchClient.getJSON().getGson();
     }
     
     /**
@@ -69,7 +74,7 @@ public class K8sWatchEventSource<ResourceT, ResourceListT> implements EventSourc
      */
     private Observable<K8sWatchEvent<ResourceT>> createInitialObservable() throws ApiException {
         logger.debug("Fetching existing k8s resources synchronously : {}", adapter.getName());
-        final ApiResponse<ResourceListT> apiResponse = apiClient.execute(adapter.createListApiCall(false, null), adapter.getResourceListType());
+        final ApiResponse<ResourceListT> apiResponse = watchClient.execute(adapter.createListApiCall(false, null), adapter.getResourceListType());
         // TODO: is it necessary to handle different response statuses here...
         final ResourceListT resourceList = apiResponse.getData();
         logger.info("Fetched {} existing {}", adapter.getListItems(resourceList).size(), adapter.getName());
@@ -87,12 +92,14 @@ public class K8sWatchEventSource<ResourceT, ResourceListT> implements EventSourc
      */
     private Observable<K8sWatchEvent<ResourceT>> createWatchObservable() throws ApiException {
         logger.debug("Creating k8s watch for resource : {}", adapter.getName());
-        final Watch<JsonObject> watch = Watch.createWatch(apiClient, adapter.createListApiCall(true, lastResourceVersion),
+        final Watch<JsonObject> watch = Watch.createWatch(watchClient, adapter.createListApiCall(true, lastResourceVersion),
                 new TypeToken<Watch.Response<JsonObject>>() {
                 }.getType());
         return Observable.fromIterable(watch)
                 .observeOn(Schedulers.io()).observeOn(Schedulers.io()) // blocking io seemed to happen on computational thread...
-                .map(this::objectJsonToEvent).doFinally(watch::close);
+                .doOnError(t -> logger.warn("error", t))
+                .map(this::objectJsonToEvent)
+                .doFinally(watch::close);
     }
     
     /**
@@ -108,12 +115,21 @@ public class K8sWatchEventSource<ResourceT, ResourceListT> implements EventSourc
         if (type == ERROR) {
             logger.error("{} list watch failed with {}.", adapter.getName(), response.status);
         } else {
-            resource = gson.fromJson(response.object, adapter.getResourceType());
-            lastResourceVersion = adapter.getMetadata(resource).getResourceVersion();
+            // TODO: unit test with bad a datacenter CRD causing JsonSyntaxException
+            try {
+                resource = gson.fromJson(response.object, adapter.getResourceType());
+                lastResourceVersion = adapter.getMetadata(resource).getResourceVersion();
+            } catch(JsonSyntaxException e) {
+                logger.warn("lastResourceVersion={} unrecoverable JSON syntax exception for type={}: {}", lastResourceVersion, type, e.getMessage());
+                // inc version to ignore it on next retry
+                lastResourceVersion = Long.toString( Long.parseLong(lastResourceVersion) + 1);
+            }
         }
-        
-        return new K8sWatchEvent<ResourceT>()
+
+        K8sWatchEvent<ResourceT> watchEvent = new K8sWatchEvent<ResourceT>()
                 .setType(type)
                 .setResource(resource);
+        logger.debug("new event={} lastResourceVersion={} type={} resource={}", watchEvent, lastResourceVersion, type, resource);
+        return watchEvent;
     }
 }
