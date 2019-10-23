@@ -52,6 +52,13 @@ public class DataCenterStatus {
     @Expose
     private Integer joinedReplicas = 0;
 
+    /**
+     * Current config map spec fingerprint.
+     */
+    @SerializedName("configMapFingerPrint")
+    @Expose
+    private String configMapFingerPrint;
+
     @SerializedName("currentTask")
     @Expose
     private String currentTask;
