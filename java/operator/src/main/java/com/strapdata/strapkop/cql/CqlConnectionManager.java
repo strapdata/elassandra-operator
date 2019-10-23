@@ -94,6 +94,9 @@ public class CqlConnectionManager implements AutoCloseable {
                 connect(dc, role);
                 return;
             } catch(AuthenticationException e) {
+            } catch(java.lang.IllegalArgumentException e) {
+                // thrown when a service has no endpoints, because DNS resolution failed.
+                logger.warn("Cannot connect: "+e.getMessage());
             } catch(DriverException exception) {
                 dc.getStatus().setCqlStatus(CqlStatus.ERRORED);
                 dc.getStatus().setCqlErrorMessage(exception.getMessage());
