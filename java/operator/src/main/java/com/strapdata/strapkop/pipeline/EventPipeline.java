@@ -100,14 +100,12 @@ public class EventPipeline<DataT> {
         
         @Override
         public void onError(Throwable e) {
-            // should be unreachable
-            logger.error("pipeline {} errored with {}", EventPipeline.this.getClass().getSimpleName(), e);
+            logger.error("pipeline=" + EventPipeline.this.getClass().getSimpleName() + " failed", e);
         }
         
         @Override
         public void onComplete() {
-            // should be unreachable
-            logger.error("pipeline {} completed", EventPipeline.this.getClass().getSimpleName());
+            logger.debug("pipeline={} completed", EventPipeline.this.getClass().getSimpleName());
         }
         
         @Override
