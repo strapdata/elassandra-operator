@@ -268,7 +268,7 @@ public class KibanaPlugin extends AbstractPlugin {
                         .addPortsItem(new V1ServicePort().name("kibana").port(5601))
                         .selector(labels)
                 );
-        k8sResourceUtils.createOrReplaceNamespacedService(service);
+        k8sResourceUtils.createOrReplaceNamespacedService(service).subscribe();
 
         // create reaper ingress
         String ingressDomain = System.getenv("INGRESS_DOMAIN");
@@ -293,7 +293,7 @@ public class KibanaPlugin extends AbstractPlugin {
                                     .addHostsItem(kibanaHost)
                             )
                     );
-            k8sResourceUtils.createOrReplaceNamespacedIngress(ingress);
+            k8sResourceUtils.createOrReplaceNamespacedIngress(ingress).subscribe();
         }
 
         // abort deployment replacement if it is already up to date (according to the annotation datacenter-generation and to spec.replicas)
@@ -316,7 +316,7 @@ public class KibanaPlugin extends AbstractPlugin {
             }
         }
 
-        k8sResourceUtils.createOrReplaceNamespacedDeployment(deployment);
+        k8sResourceUtils.createOrReplaceNamespacedDeployment(deployment).subscribe();
     }
 
 

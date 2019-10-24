@@ -425,7 +425,7 @@ public class DataCenterUpdateAction {
 
         public ConfigMapVolumeMount createOrReplaceNamespacedConfigMap() throws ApiException {
             if (configMap != null)
-                k8sResourceUtils.createOrReplaceNamespacedConfigMap(configMap);
+                k8sResourceUtils.createOrReplaceNamespacedConfigMap(configMap).subscribe();
             return this;
         }
 
