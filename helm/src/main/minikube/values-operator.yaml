@@ -23,7 +23,7 @@ resources: {}
 #    memory: 50Mi
 
 env:
-#  NODEINFO_SECRET: "nodeinfo-token-lqfhl"
+  NODEINFO_SECRET: "nodeinfo-token-zxpxk"
   INGRESS_DOMAIN: "minikube.strapcloud.localnet"
 #  K8S_API_DEBUG: true
 
