@@ -111,7 +111,7 @@ public class ReaperPlugin extends AbstractPlugin {
     public void delete(final DataCenter dataCenter) throws ApiException {
         final String reaperLabelSelector = OperatorLabels.toSelector(reaperLabels(dataCenter));
         k8sResourceUtils.deleteIngress(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector);
-        k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector);
+        k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector).subscribe();
         k8sResourceUtils.deleteDeployment(reaperName(dataCenter), dataCenter.getMetadata().getNamespace());
     }
 

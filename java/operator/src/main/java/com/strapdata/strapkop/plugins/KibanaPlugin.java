@@ -121,7 +121,7 @@ public class KibanaPlugin extends AbstractPlugin {
     public void delete(final DataCenter dataCenter, KibanaSpace space) throws ApiException {
         final String kibanaLabelSelector = OperatorLabels.toSelector(kibanaLabels(dataCenter, space));
         k8sResourceUtils.deleteIngress(dataCenter.getMetadata().getNamespace(), null, kibanaLabelSelector);
-        k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, kibanaLabelSelector);
+        k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, kibanaLabelSelector).subscribe();
         k8sResourceUtils.deleteDeployment(kibanaName(dataCenter, space), dataCenter.getMetadata().getNamespace());
     }
 
