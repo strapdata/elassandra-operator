@@ -25,7 +25,6 @@ resources: {}
 env:
   NODEINFO_SECRET: "nodeinfo-token-zhfc7"
   INGRESS_DOMAIN: "minikube.strapcloud.localnet"
-#  K8S_API_DEBUG: true
 
 ingress:
   enabled: true
