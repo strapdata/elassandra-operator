@@ -134,7 +134,13 @@ kubectl create secret docker-registry strapdata-cr --docker-server=docker.repo.s
 ```
 
 * adapt the chart values define into the helm project (path : src/main/minikube)
-
+  * set the NODEINFO_SECRET to the one created by your ServiceAccount creation (here : nodeinfo-token-zhfc7)
+```bash
+kubectl get secret
+NAME                   TYPE                                  DATA   AGE
+default-token-b5pzc    kubernetes.io/service-account-token   3      4m9s
+nodeinfo-token-zhfc7   kubernetes.io/service-account-token   3      10s
+```
 * install the Operator chart
 ```bash
 strapkop$ ./gradlew helmInstallOperator 

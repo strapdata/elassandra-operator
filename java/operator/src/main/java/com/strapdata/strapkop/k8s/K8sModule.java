@@ -22,7 +22,7 @@ public class K8sModule {
         apiClient = ClientBuilder.standard().build();
 
         // watch client continous read, see https://github.com/kubernetes-client/java/issues/178
-        watchClient =  Config.defaultClient();
+        watchClient =   ClientBuilder.standard().build();//Config.defaultClient();
 
         // trick to debug k8s calls except for the Watch (not supported)
         if (System.getenv("K8S_API_DEBUG") != null) {
