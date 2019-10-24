@@ -51,7 +51,7 @@ jib {
         ]
         mainClass = mainClassName
         ports = ['8080']
-        labels = [ description:'Strapkop Elassandra operator for K8S']
+        labels = [ description:'Strapkop Elassandra operator for K8S' ]
     }
     extraDirectories {
         // add the source code of the thirdparty libraries under GPL & LGPL license

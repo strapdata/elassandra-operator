@@ -328,7 +328,7 @@ public class DataCenterUpdateAction {
             }
         }
 
-        if (DataCenterPhase.RUNNING.equals(dataCenterStatus.getPhase())) {
+        if (DataCenterPhase.RUNNING.equals(dataCenterStatus.getPhase()) || DataCenterPhase.CREATING.equals(dataCenterStatus.getPhase())) {
             updateDatacenterScale(existingStsMap, configMapVolumeMountList, configFingerprint);
             logger.debug("Datacenter SCALE reconciled for DataCenter={} in namespace={}", dataCenterMetadata.getName(), dataCenterMetadata.getNamespace());
         } else {
