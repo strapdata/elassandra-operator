@@ -67,10 +67,38 @@ run ./publish.sh to upload HELM package on the Azure blogstore and in the Azure 
 ```bash
 minikube start --cpus 4 --memory 4096 --kubernetes-version v1.15.3 --profile strapdata-operator
 ```
+
+* add a label to the minikube node:
+```bash
+kubectl label nodes minikube failure-domain.beta.kubernetes.io/zone=local
+```
+
+* create the nodeinfo service account
+```bash
+cat << EOF > rbac-node-reader.yml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  namespace: default
+  name: node-reader
+rules:
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+EOF
+
+kubectl apply -f rbac-node-reader.yml 
+kubectl create serviceaccount --namespace default nodeinfo
+kubectl create clusterrolebinding nodeinfo-cluster-rule --clusterrole=node-reader --serviceaccount=default:nodeinfo
+```
+
 * install [helm](https://helm.sh/docs/using_helm/#installing-helm)
 * create a [tiller account](https://helm.sh/docs/using_helm/#role-based-access-control)
 ```bash
-cat << EOF > rback.yml 
+cat << EOF > rbac.yml 
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -119,3 +147,9 @@ strapkop$ ./gradlew helmInstallDatacenter
 
 __NOTE__ : If you had deleted a chart before the installation, and if the helm install fails with the error `Error: UPGRADE FAILED: "elassandra-datacenter" has no deployed releases
 ` then execute `helm delete --purge elassandra-datacenter`.
+
+If you want to delete the chart :
+```bash
+strapkop$ ./gradlew helmDeleteInstallDatacenter 
+strapkop$ ./gradlew helmDeleteOperator 
+```
