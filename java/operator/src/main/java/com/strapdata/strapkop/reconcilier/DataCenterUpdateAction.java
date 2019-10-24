@@ -263,11 +263,11 @@ public class DataCenterUpdateAction {
         final TreeMap<String, V1StatefulSet> existingStsMap = fetchExistingStatefulSetsByZone();
 
         // Deploy Kuberenetes Services
-        k8sResourceUtils.createOrReplaceNamespacedService(builder.buildNodesService());
-        k8sResourceUtils.createOrReplaceNamespacedService(builder.buildElasticsearchService());
-        k8sResourceUtils.createOrReplaceNamespacedService(builder.buildExternalNodesService());
+        k8sResourceUtils.createOrReplaceNamespacedService(builder.buildNodesService()).subscribe();
+        k8sResourceUtils.createOrReplaceNamespacedService(builder.buildElasticsearchService()).subscribe();
+        k8sResourceUtils.createOrReplaceNamespacedService(builder.buildExternalNodesService()).subscribe();
         for(String rack : existingStsMap.keySet()) // create a seed service per DC
-            k8sResourceUtils.createOrReplaceNamespacedService(builder.buildSeedService(rack));
+            k8sResourceUtils.createOrReplaceNamespacedService(builder.buildSeedService(rack)).subscribe();
 
         // Deploy Secrets if needed
         V1ObjectMeta clusterSecretObjectMeta = builder.clusterObjectMeta(OperatorNames.clusterSecret(dataCenter));
