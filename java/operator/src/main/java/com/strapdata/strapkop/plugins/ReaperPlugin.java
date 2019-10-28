@@ -148,6 +148,13 @@ public class ReaperPlugin extends AbstractPlugin {
 
         final V1Container container = new V1Container();
 
+        // Create an accumulator for JAVA_OPTS
+        // TODO do we have to make HEAP values configurable in the reaper section of DCSpec ??
+        StringBuilder javaOptsBuilder = new StringBuilder(200);
+        if (dataCenterSpec.getJmxmpEnabled()) {
+            javaOptsBuilder.append(" -Ddw.jmxmp.enabled=true ");
+        }
+
         final V1PodSpec podSpec = new V1PodSpec()
                 .addContainersItem(container);
 
@@ -300,20 +307,24 @@ public class ReaperPlugin extends AbstractPlugin {
                             .name("REAPER_CASS_NATIVE_PROTOCOL_SSL_ENCRYPTION_ENABLED")
                             .value("true")
                     )
-                    .addEnvItem(new V1EnvVar()
-                            .name("JAVA_OPTS")
-                            .value("-Djavax.net.ssl.trustStore=/truststore/truststore.p12 -Djavax.net.ssl.trustStorePassword=changeit")
-                    )
                     .addVolumeMountsItem(new V1VolumeMount()
                             .mountPath("/truststore")
                             .name("truststore")
                     );
+            // accumulate trustore options into JAVA_OPTS builder
+            javaOptsBuilder.append(" -Djavax.net.ssl.trustStore=/truststore/truststore.p12 -Djavax.net.ssl.trustStorePassword=changeit ");
+
         } else {
             container.addEnvItem(new V1EnvVar()
                     .name("REAPER_CASS_NATIVE_PROTOCOL_SSL_ENCRYPTION_ENABLED")
                     .value("false")
             );
         }
+
+        container.addEnvItem(new V1EnvVar()
+                .name("JAVA_OPTS")
+                .value(javaOptsBuilder.toString()));
+
 
         // create reaper service
         final V1Service service = new V1Service()
