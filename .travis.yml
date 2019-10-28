@@ -3,6 +3,9 @@ jdk:
 - openjdk8
 env:
   global:
+  - CLOUDSDK_CORE_DISABLE_PROMPTS: 1
+  - GCLOUD_PROJECT: strapdata-gcp-partnership
+  - GCLOUD_ZONE: europe-west1-b
   - IMAGE_SUFFIX=-staging
   - PULL_SECRET=nexus-registry
   - MEMORY_REQUEST=2048Mi
@@ -21,6 +24,16 @@ services:
 branches:
   only:
   - ele-gke-develop-vr2
+
+before_install:
+  # Authenticate docker CLI on GCR.IO
+  - if [ ! -d "$HOME/google-cloud-sdk/bin" ]; then rm -rf $HOME/google-cloud-sdk; curl https://sdk.cloud.google.com | bash; fi
+  - source /home/travis/google-cloud-sdk/path.bash.inc
+  - gcloud -v
+  - echo "$GCLOUD_SECRET_KEY" | base64 -d > gcloud-secret.json
+  - gcloud auth activate-service-account --key-file gcloud-secret.json
+  - cat gcloud-secret.json | docker login -u _json_key --password-stdin https://gcr.io
+
 install:
 - "./gradlew --version"
 # Installing Helm
@@ -52,6 +65,11 @@ deploy:
     -Dorg.gradle.project.dockerImageSuffix=""
     -Dorg.gradle.project.elassandraParentImage="strapdata/elassandra-enterprise"
 #      - ./gradlew dockerPush -PregistryUsername=$AZ_USERNAME -PregistryPassword=$AZ_PASSWORD -Dorg.gradle.project.dockerImagePrefix="strapdata.azurecr.io/strapdata/strapkop-" -Dorg.gradle.project.dockerImageSuffix=""
-#      - ./gradlew dockerPush -PregistryUsername=$GCR_USERNAME -PregistryPassword=$GCR_PASSWORD -Dorg.gradle.project.dockerImagePrefix="gcr.io/strapdata-factory/strapkop-" -Dorg.gradle.project.dockerImageSuffix=""
+  - docker tag docker.repo.strapdata.com/strapdata/strapkop-elassandra:${TRAVIS_TAG} gcr.io/strapdata-gcp-partnership/strapkop-elassandra:${TRAVIS_TAG}
+  - docker tag docker.repo.strapdata.com/strapdata/strapkop-sidecar:${TRAVIS_TAG} gcr.io/strapdata-gcp-partnership/strapkop-sidecar:${TRAVIS_TAG}
+  - docker tag docker.repo.strapdata.com/strapdata/strapkop-operator:${TRAVIS_TAG} gcr.io/strapdata-gcp-partnership/strapkop-operator:${TRAVIS_TAG}
+  - docker push gcr.io/strapdata-gcp-partnership/strapkop-elassandra:${TRAVIS_TAG}
+  - docker push gcr.io/strapdata-gcp-partnership/strapkop-sidecar:${TRAVIS_TAG}
+  - docker push gcr.io/strapdata-gcp-partnership/strapkop-operator:${TRAVIS_TAG}
   on:
     tags: true
