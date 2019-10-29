@@ -30,6 +30,22 @@ helm {
       releaseName.set("elassandra-operator")
       valueFiles.from 'src/main/minikube/values-operator.yaml'
     }
+
+    strapkop {
+      from 'src/main/helm/elassandra-operator'
+      version = '0.1.0'
+
+      // pass value files (like -f on the command line)
+      valueFiles.from 'src/main/resources/strapkop-values.yml'
+    }
+
+    cl1_dc1 {
+      from 'src/main/helm/elassandra-datacenter'
+      version = '0.1.0'
+
+      // pass value files (like -f on the command line)
+      valueFiles.from 'src/main/resources/cl1-dc1-values.yml'
+    }
   }
 }
 
