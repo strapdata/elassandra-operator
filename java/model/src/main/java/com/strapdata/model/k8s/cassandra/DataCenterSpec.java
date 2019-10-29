@@ -64,7 +64,7 @@ public class DataCenterSpec {
      */
     @SerializedName("resources")
     @Expose
-    private V1ResourceRequirements resources;
+    private V1ResourceRequirements resources = null;
 
     @SerializedName("dataVolumeClaim")
     @Expose
@@ -76,7 +76,7 @@ public class DataCenterSpec {
      */
     @SerializedName("restoreFromBackup")
     @Expose
-    private java.lang.String restoreFromBackup;
+    private java.lang.String restoreFromBackup = null;
 
     /**
      * Name of an optional config map that contains cassandra configuration in the form of yaml fragments
@@ -84,7 +84,7 @@ public class DataCenterSpec {
      */
     @SerializedName("userConfigMapVolumeSource")
     @Expose
-    private V1ConfigMapVolumeSource userConfigMapVolumeSource;
+    private V1ConfigMapVolumeSource userConfigMapVolumeSource = null;
 
     /**
      * Name of an optional secret that contains cassandra related secrets
@@ -227,21 +227,21 @@ public class DataCenterSpec {
 
     @SerializedName("enterprise")
     @Expose
-    private Enterprise enterprise;
+    private Enterprise enterprise = new Enterprise();
 
     /**
      * Remote seed IP addresses.
      */
     @SerializedName("remoteSeeds")
     @Expose
-    private List<String> remoteSeeds;
+    private List<String> remoteSeeds = new ArrayList<>();
 
     /**
      * List of URL providing dynamic seed list.
      */
     @SerializedName("remoteSeeders")
     @Expose
-    private List<String> remoteSeeders;
+    private List<String> remoteSeeders = new ArrayList<>();
 
     /**
      * Elassandra datacenter group

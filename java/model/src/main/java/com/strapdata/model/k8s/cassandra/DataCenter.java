@@ -26,5 +26,5 @@ public class DataCenter {
     
     @SerializedName("status")
     @Expose
-    private DataCenterStatus status;
+    private DataCenterStatus status = new DataCenterStatus();
 }
