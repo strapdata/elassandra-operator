@@ -15,11 +15,14 @@ init:
 start:
 	minikube start --cpus 4 --memory 4096 --insecure-registry "10.0.0.0/24"  --kubernetes-version v1.15.3 # --profile strapdata-operator
 
-nodeinfo:
+# Add zone label to nodes
+zone:
 	kubectl label nodes minikube failure-domain.beta.kubernetes.io/zone=local
-	kubectl apply -f helm/src/main/resources/rbac-nodeinfo.yml 
-	kubectl create serviceaccount --namespace default nodeinfo
-	kubectl create clusterrolebinding nodeinfo-cluster-rule --clusterrole=node-reader --serviceaccount=default:nodeinfo	
+
+# enable minikube docker registry localhost.localdomain:5000
+# Add a k8s port-forward tunnel to the registry pod on port 5000 to push
+setup:
+	minikube addons enable registry
 
 helm-init:
 	kubectl apply -f helm/src/main/resources/rbac-tiller.yml
@@ -28,10 +31,7 @@ helm-init:
 dashboard:
 	minikube dashboard
 
-# enable minikube docker registry localhost.localdomain:5000
-# Add a k8s port-forward tunnel to the registry pod on port 5000 to push
-setup:
-	minikube addons enable registry
+
 
 deploy:
 	./gradlew :helm:helmInstallStrapkop
