@@ -5,10 +5,31 @@ import com.github.jk1.license.render.TextReportRenderer
 
 plugins {
   id 'idea'
-  id 'com.bmuschko.docker-remote-api' version '4.10.0' apply false
+  id 'com.bmuschko.docker-remote-api' version '5.2.0' apply false
   id 'com.github.jk1.dependency-license-report' version '1.11'
 }
 
+ext {
+  allowInsecureRegistries = true
+  registryUrl = System.getenv("DOCKER_REGISTRY")
+  registryUsername = System.getenv("DOCKER_USERNAME")
+  registryPassword = System.getenv("DOCKER_PASSWORD")
+
+  println "registryUrl=$registryUrl"
+  println "registryUsername=$registryUsername"
+}
+
+configure(subprojects.findAll { it.name.contains("docker") }) {
+  apply plugin: 'com.bmuschko.docker-remote-api'
+  docker {
+    registryCredentials {
+      url = registryUrl
+      username = registryUsername
+      password = registryPassword
+      email = registryEmail
+    }
+  }
+}
 
 def getGitCommitHash = { ->
   def stdout = new ByteArrayOutputStream()
@@ -38,17 +59,7 @@ allprojects {
   }
 }
 
-configure(subprojects.findAll { it.name.contains("docker") }) {
-  apply plugin: 'com.bmuschko.docker-remote-api'
-  docker {
-    registryCredentials {
-      url = registryUrl
-      username = registryUsername
-      password = registryPassword
-      email = registryEmail
-    }
-  }
-}
+
 
 
 licenseReport {

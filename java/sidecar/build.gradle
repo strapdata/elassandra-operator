@@ -63,6 +63,7 @@ jib {
         // add the source code of the thirdparty libraries under GPL & LGPL license
         paths = ["../../build/thirdparty-libs", "../../build/reports/dependency-license"]
     }
+    allowInsecureRegistries = rootProject.allowInsecureRegistries
 }
 
 tasks.jibDockerBuild.dependsOn project(':java:backup').jar
