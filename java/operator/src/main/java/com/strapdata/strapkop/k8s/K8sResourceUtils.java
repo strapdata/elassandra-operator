@@ -76,7 +76,7 @@ public class K8sResourceUtils {
         });
     }
 
-    public static <T> Single<T> getOrCreateResource(final Callable<T> getResourceCallable, final Callable<T> createResourceCallable) throws ApiException {
+    public static <T> Single<T> readOrCreateResource(final Callable<T> getResourceCallable, final Callable<T> createResourceCallable) throws ApiException {
         return Single.fromCallable(new Callable<T>() {
             @Override
             public T call() throws Exception {
@@ -164,7 +164,7 @@ public class K8sResourceUtils {
         );
     }
 
-    public Single<V1ConfigMap> getConfigMap(final String namespace, final String name) {
+    public Single<V1ConfigMap> readNamespacedConfigMap(final String namespace, final String name) {
         return Single.fromCallable(new Callable<V1ConfigMap>() {
             @Override
             public V1ConfigMap call() throws Exception {
@@ -234,6 +234,39 @@ public class K8sResourceUtils {
         );
     }
 
+    public Single<V1Secret> readNamespacedSecret(final String namespace, final String name) {
+        return Single.fromCallable(new Callable<V1Secret>() {
+            @Override
+            public V1Secret call() throws Exception {
+                try {
+                    V1Secret secret = coreApi.readNamespacedSecret(name, namespace, null, null, null);
+                    logger.debug("read namespaced secret={}", secret.getMetadata().getName());
+                    return secret;
+                } catch(ApiException e) {
+                    if (e.getCode() == 404) {
+                        logger.warn("secret namespace={} name={} not found", namespace, name);
+                    }
+                    throw e;
+                }
+            }
+        });
+    }
+
+    public V1ServiceAccount readNamespacedServiceAccount(final String namespace, final String name) throws ApiException {
+            try {
+                coreApi.getApiClient().setDebugging(true);
+                V1ServiceAccount sa = coreApi.readNamespacedServiceAccount(name, namespace, null, null, null);
+                logger.debug("read namespaced serviceaccount={}", sa.getMetadata().getName());
+                coreApi.getApiClient().setDebugging(false);
+                return sa;
+            } catch(ApiException e) {
+                if (e.getCode() == 404) {
+                    logger.warn("serviceaccount namespace={} name={} not found", namespace, name);
+                }
+                throw e;
+            }
+    }
+
     public Single<V1Secret> createOrReplaceNamespacedSecret(final V1Secret secret) throws ApiException {
         final String namespace = secret.getMetadata().getNamespace();
         return createOrReplaceResource(
@@ -250,8 +283,8 @@ public class K8sResourceUtils {
         );
     }
 
-    public Single<V1Secret> getOrCreateNamespacedSecret(V1ObjectMeta secretObjectMeta, final ThrowingSupplier<V1Secret> secretSupplier) throws ApiException {
-        return getOrCreateResource(
+    public Single<V1Secret> readOrCreateNamespacedSecret(V1ObjectMeta secretObjectMeta, final ThrowingSupplier<V1Secret> secretSupplier) throws ApiException {
+        return readOrCreateResource(
                 () -> {
                         V1Secret secret2 = coreApi.readNamespacedSecret(secretObjectMeta.getName(), secretObjectMeta.getNamespace(), null, null, null);
                         logger.debug("Replaced namespaced secret={} in namespace={}", secret2.getMetadata().getName(), secret2.getMetadata().getNamespace());
@@ -476,10 +509,7 @@ public class K8sResourceUtils {
                 return new V1PodPage(continueToken);
             }
         }
-
-        final V1PodPage firstPage = new V1PodPage(null);
-
-        return new ResourceListIterable<>(firstPage);
+        return new ResourceListIterable<>( new V1PodPage(null));
     }
 
     public Iterable<V1StatefulSet> listNamespacedStatefulSets(final String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) throws ApiException {
@@ -505,10 +535,7 @@ public class K8sResourceUtils {
                 return new V1StatefulSetPage(continueToken);
             }
         }
-
-        final V1StatefulSetPage firstPage = new V1StatefulSetPage(null);
-
-        return new ResourceListIterable<>(firstPage);
+        return new ResourceListIterable<>(new V1StatefulSetPage(null));
     }
 
 
@@ -535,9 +562,59 @@ public class K8sResourceUtils {
                 return new V1ConfigMapPage(continueToken);
             }
         }
+        return new ResourceListIterable<>(new V1ConfigMapPage(null));
+    }
 
-        final V1ConfigMapPage firstPage = new V1ConfigMapPage(null);
-        return new ResourceListIterable<>(firstPage);
+    public Iterable<V1Secret> listNamespacedSecret(final String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) throws ApiException {
+        class V1SecretPage implements ResourceListIterable.Page<V1Secret> {
+            private final V1SecretList secretList;
+
+            private V1SecretPage(final String continueToken) throws ApiException {
+                secretList = coreApi.listNamespacedSecret(namespace, null, null, continueToken, fieldSelector, labelSelector, null, null, null, null);
+            }
+
+            @Override
+            public Collection<V1Secret> items() {
+                return secretList.getItems();
+            }
+
+            @Override
+            public ResourceListIterable.Page<V1Secret> nextPage() throws ApiException {
+                final String continueToken = secretList.getMetadata().getContinue();
+
+                if (Strings.isNullOrEmpty(continueToken))
+                    return null;
+
+                return new V1SecretPage(continueToken);
+            }
+        }
+        return new ResourceListIterable<>(new V1SecretPage(null));
+    }
+
+    public Iterable<V1ServiceAccount> listNamespacedServiceAccount(final String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) throws ApiException {
+        class V1ServiceAccountPage implements ResourceListIterable.Page<V1ServiceAccount> {
+            private final V1ServiceAccountList secretList;
+
+            private V1ServiceAccountPage(final String continueToken) throws ApiException {
+                secretList = coreApi.listNamespacedServiceAccount(namespace, null, null, continueToken, fieldSelector, labelSelector, null, null, null, null);
+            }
+
+            @Override
+            public Collection<V1ServiceAccount> items() {
+                return secretList.getItems();
+            }
+
+            @Override
+            public ResourceListIterable.Page<V1ServiceAccount> nextPage() throws ApiException {
+                final String continueToken = secretList.getMetadata().getContinue();
+
+                if (Strings.isNullOrEmpty(continueToken))
+                    return null;
+
+                return new V1ServiceAccountPage(continueToken);
+            }
+        }
+        return new ResourceListIterable<>(new V1ServiceAccountPage(null));
     }
 
     public Iterable<V1Service> listNamespacedServices(final String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) throws ApiException {
@@ -633,7 +710,12 @@ public class K8sResourceUtils {
             private final ExtensionsV1beta1DeploymentList deploymentList;
 
             private V1DeploymentPage(final String continueToken) throws ApiException {
-                deploymentList = extensionsV1beta1Api.listNamespacedDeployment(namespace, null, null, continueToken, fieldSelector, labelSelector, null, null, null, null);
+                try {
+                    deploymentList = extensionsV1beta1Api.listNamespacedDeployment(namespace, null, null, continueToken, fieldSelector, labelSelector, null, null, null, null);
+                } catch(ApiException e) {
+                    logger.warn("Failed to list deployments in namespace="+namespace+" labelSelector="+labelSelector, e);
+                    throw e;
+                }
             }
 
             @Override

@@ -346,7 +346,7 @@ public class KibanaPlugin extends AbstractPlugin {
                 .namespace(dataCenter.getMetadata().getNamespace())
                 .labels(OperatorLabels.cluster(dataCenter.getSpec().getClusterName()));
 
-        return this.k8sResourceUtils.getOrCreateNamespacedSecret(secretMetadata, () -> {
+        return this.k8sResourceUtils.readOrCreateNamespacedSecret(secretMetadata, () -> {
             logger.debug("Creating kibana secret name={}", kibanaSecretName);
             return new V1Secret()
                     .metadata(secretMetadata)

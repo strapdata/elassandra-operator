@@ -183,7 +183,7 @@ public class DataCenterUpdateAction {
                     passwords.put("cassandra.jmx_password", UUID.randomUUID().toString());
                     passwords.put("shared-secret.yaml", "aaa.shared_secret: " + UUID.randomUUID().toString());
                     passwords.put("cassandra.reaper_password", UUID.randomUUID().toString());
-                    return k8sResourceUtils.getOrCreateNamespacedSecret(clusterSecret, () -> {
+                    return k8sResourceUtils.readOrCreateNamespacedSecret(clusterSecret, () -> {
                                 V1Secret secret = new V1Secret().metadata(clusterSecret);
                                 for(Map.Entry<String,String> entry : passwords.entrySet())
                                     secret.putStringDataItem(entry.getKey(), entry.getValue());
@@ -193,7 +193,7 @@ public class DataCenterUpdateAction {
                 })
                 .flatMap(passwords -> {
                     // create rc file
-                    return k8sResourceUtils.getOrCreateNamespacedSecret(builder.clusterObjectMeta(OperatorNames.clusterRcFilesSecret(dataCenter)),
+                    return k8sResourceUtils.readOrCreateNamespacedSecret(builder.clusterObjectMeta(OperatorNames.clusterRcFilesSecret(dataCenter)),
                             () -> builder.buildSecretRcFile("admin", passwords.get("cassandra.admin_password")))
                             .map(s -> {
                                 passwords.clear();
@@ -203,7 +203,7 @@ public class DataCenterUpdateAction {
                 .flatMap(passwords -> {
                     // update elassandra keystores
                     return (dataCenterSpec.getSsl()) ?
-                            k8sResourceUtils.getOrCreateNamespacedSecret(builder.dataCenterObjectMeta(OperatorNames.keystore(dataCenter)),
+                            k8sResourceUtils.readOrCreateNamespacedSecret(builder.dataCenterObjectMeta(OperatorNames.keystore(dataCenter)),
                                     () -> builder.buildSecretKeystore()).map(s2 -> passwords) :
                             Single.just(passwords);
                 })
@@ -509,7 +509,7 @@ public class DataCenterUpdateAction {
                     // load and make unique user configmap
                     .andThen((dataCenterSpec.getUserConfigMapVolumeSource() == null) ?
                             Completable.complete() :
-                            k8sResourceUtils.getConfigMap(dataCenterMetadata.getNamespace(), dataCenterSpec.getUserConfigMapVolumeSource().getName())
+                            k8sResourceUtils.readNamespacedConfigMap(dataCenterMetadata.getNamespace(), dataCenterSpec.getUserConfigMapVolumeSource().getName())
                                     .flatMapCompletable(configMap -> {
                                         V1ObjectMeta meta = new V1ObjectMeta()
                                                 .name(configMap.getMetadata().getName())
@@ -1312,10 +1312,15 @@ public class DataCenterUpdateAction {
             // kubectl create serviceaccount --namespace default nodeinfo
             // kubectl create clusterrolebinding nodeinfo-cluster-rule --clusterrole=nodeinfo --serviceaccount=default:nodeinfo
             // kubectl get serviceaccount nodeinfo -o json | jq ".secrets[0].name"
-            String nodeInfoSecretName = System.getenv("NODEINFO_SECRET");
-            if (!Strings.isNullOrEmpty(nodeInfoSecretName))
+            if (!Strings.isNullOrEmpty(System.getenv("k"))) {
+                // lookup nodeinfo secret name.
+                String name = System.getenv("ELASSANDRA_OPERATOR_NAME")+"-nodeinfo";
+                String nodeInfoSecretName = k8sResourceUtils.readNamespacedServiceAccount(dataCenterMetadata.getNamespace(), name).getSecrets().get(0).getName();
                 podSpec.addInitContainersItem(buildInitContainerNodeInfo(nodeInfoSecretName));
-
+            } else if (!Strings.isNullOrEmpty(System.getenv("NODEINFO_SECRET"))) {
+                String nodeInfoSecretName = System.getenv("NODEINFO_SECRET");
+                podSpec.addInitContainersItem(buildInitContainerNodeInfo(nodeInfoSecretName));
+            }
 
             {
                 final String secret = dataCenterSpec.getImagePullSecret();
@@ -1509,7 +1514,6 @@ public class DataCenterUpdateAction {
                                     " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"storagetier\"}}' | awk '!/<no value>/ { print $0 }' > /nodeinfo/storagetier " +
                                     ((dataCenterSpec.getHostPortEnabled()) ? " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"kubernetes.strapdata.com/public-ip\"}}' | awk '!/<no value>/ { print $0 }' > /nodeinfo/public-ip " : "") +
                                     ((dataCenterSpec.getHostPortEnabled()) ? " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}' > /nodeinfo/node-ip " : "") +
-                                    (" && kubectl get pod $(yq .seed_provider[0].parameters[0].seeds /etc/cassandra/cassandra.yaml.d/001-operator-var-overrides.yaml | tr -d '\"' | awk -F \",\" '{for(i=1;i<=NF; i++) { printf(\"%s \", substr($i,1, index($i, \".\")-1))}}') -o jsonpath='{.items[*].status.hostIP}' > /nodeinfo/seeds-ip ") +
                                     " && grep ^ /nodeinfo/*"
                     ))
                     .addVolumeMountsItem(new V1VolumeMount()
