@@ -48,13 +48,15 @@ rules:
 - apiGroups: ['']
   resources:
   - pods
-  verbs: ['list', 'delete']
+  - serviceaccounts
+  verbs: ['list']
 - apiGroups: ['']
   resources:
   - services
   - endpoints
   - persistentvolumeclaims
   - persistentvolumes
+  - ingresses
   verbs: ['get', 'create', 'update', 'delete', 'list']
 - nonResourceURLs: ["/version", "/version/*"]
   verbs: ['get']
@@ -66,4 +68,21 @@ rules:
   resources:
   - namespaces
   verbs: ['list']
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app: {{ template "elassandra-operator.name" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+  name: {{ template "elassandra-operator.fullname" . }}-node-reader
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
 {{- end }}

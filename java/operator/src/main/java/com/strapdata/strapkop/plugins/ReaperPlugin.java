@@ -422,7 +422,7 @@ public class ReaperPlugin extends AbstractPlugin {
                 .addOwnerReferencesItem(OperatorNames.ownerReference(dataCenter))
                 .labels(OperatorLabels.cluster(dataCenter.getSpec().getClusterName()));
 
-        return k8sResourceUtils.getOrCreateNamespacedSecret(secretMeta, () -> {
+        return k8sResourceUtils.readOrCreateNamespacedSecret(secretMeta, () -> {
             V1Secret secret = new V1Secret().metadata(secretMeta);
             secret.putStringDataItem("reaper.admin_password", UUID.randomUUID().toString());
             return secret;

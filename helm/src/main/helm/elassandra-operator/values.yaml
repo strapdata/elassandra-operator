@@ -23,8 +23,8 @@ resources: {}
 #    memory: 50Mi
 
 env:
-  NODEINFO_SECRET: "nodeinfo-token-lqfhl"
-  INGRESS_DOMAIN: "941a7aa2-kube1-azure-northeurope.azure.strapcloud.com"
+#  NODEINFO_SECRET: "nodeinfo-token-lqfhl"
+#  INGRESS_DOMAIN: "941a7aa2-kube1-azure-northeurope.azure.strapcloud.com"
 #  K8S_API_DEBUG: true
 
 ingress:
