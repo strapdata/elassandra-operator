@@ -28,10 +28,10 @@ helm-init:
 dashboard:
 	minikube dashboard
 
-# enable minikube registry + registry service with hostPort=30500
+# enable minikube docker registry localhost.localdomain:5000
+# Add a k8s port-forward tunnel to the registry pod on port 5000 to push
 setup:
 	minikube addons enable registry
-	kubectl create -f helm/src/main/resources/registry-nodeport-service.yml
 
 deploy:
 	./gradlew :helm:helmInstallStrapkop
@@ -44,7 +44,7 @@ undeploy:
 	helm delete --purge strapkop
 
 deploy-dc1:
-	helm install --namespace default --name cl1-dc1 -f helm/src/main/resources/cl1-dc1-values.yml helm/src/main/helm/elassandra-datacenter
+	helm install --namespace default --name cl1-dc1 -f helm/src/main/minikube/values-datacenter-cl1-dc1.yml helm/src/main/helm/elassandra-datacenter
 
 undeploy-dc1:
 	helm delete --purge cl1-dc1

@@ -32,19 +32,15 @@ helm {
     }
 
     strapkop {
-      from 'src/main/helm/elassandra-operator'
-      version = '0.1.0'
-
-      // pass value files (like -f on the command line)
-      valueFiles.from 'src/main/resources/strapkop-values.yml'
+      from charts.elassandraOperator
+      releaseName.set("strapkop")
+      valueFiles.from 'src/main/minikube/values-operator-localregistry.yml'
     }
 
     cl1_dc1 {
-      from 'src/main/helm/elassandra-datacenter'
-      version = '0.1.0'
-
-      // pass value files (like -f on the command line)
-      valueFiles.from 'src/main/resources/cl1-dc1-values.yml'
+      from charts.elassandraDatacenter
+      releaseName.set("cl1-dc1")
+      valueFiles.from 'src/main/minikube/values-datacenter-cl1-dc1.yml'
     }
   }
 }
