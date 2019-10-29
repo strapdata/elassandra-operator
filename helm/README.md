@@ -49,7 +49,10 @@ kubectl create secret docker-registry azurecr \
 ```
 ## Publish for Strapkube
 
-run ./publish.sh to upload HELM package on the Azure blogstore and in the Azure HELM repo.
+Upload HELM package on the Azure blogstore and in the Azure HELM repo.
+
+    ./gradlew helm:uploadElassandraDatacenter
+    ./gradelw helm:uploadElassandraOperator
 
 ## Deploy Strapkop
 
