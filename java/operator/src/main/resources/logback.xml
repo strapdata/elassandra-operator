@@ -10,13 +10,14 @@
     </appender>
 
     <logger name="com.strapdata.strapkop" level="DEBUG" />
-    <logger name="com.strapdata.strapkop.k8s" level="DEBUG" />
-    <logger name="com.strapdata.strapkop.source" level="DEBUG" />
-    <logger name="com.strapdata.strapkop.handler" level="DEBUG" />
-    <logger name="com.strapdata.strapkop.pipeline" level="DEBUG" />
+    <logger name="com.strapdata.strapkop.k8s" level="WARN" />
+    <logger name="com.strapdata.strapkop.event" level="WARN" />
+    <logger name="com.strapdata.strapkop.source" level="WARN" />
+    <logger name="com.strapdata.strapkop.handler" level="WARN" />
+    <logger name="com.strapdata.strapkop.pipeline" level="WARN" />
     <logger name="com.strapdata.strapkop.sidecar" level="WARN" />
 
-    <root level="DEBUG">
+    <root level="WARN">
         <appender-ref ref="STDOUT" />
     </root>
 </configuration>
