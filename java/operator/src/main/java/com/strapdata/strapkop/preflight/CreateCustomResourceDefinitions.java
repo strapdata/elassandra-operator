@@ -38,13 +38,11 @@ public class CreateCustomResourceDefinitions implements Preflight<Void> {
              final InputStreamReader resourceReader = new InputStreamReader(resourceStream);) {
 
             final V1beta1CustomResourceDefinition crdDefinition = Yaml.loadAs(resourceReader, V1beta1CustomResourceDefinition.class);
-
             final String crdName = crdDefinition.getMetadata().getName();
-
-            logger.info("Creating Custom Resource Definition {}", crdName);
 
             try {
                 apiExtensionsApi.createCustomResourceDefinition(crdDefinition, null, null, null);
+                logger.info("Custom Resource Definition {} created", crdName);
             } catch (final ApiException e) {
                 if (e.getCode() == 409) { // HTTP 409 CONFLICT
                     logger.info("Custom Resource Definition {} already exists.", crdName);
