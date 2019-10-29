@@ -8,6 +8,7 @@ import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import io.kubernetes.client.ApiException;
 import io.micronaut.context.annotation.Infrastructure;
+import io.reactivex.Completable;
 import io.reactivex.Observable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,7 +33,7 @@ public final class CleanupTaskReconcilier extends TaskReconcilier {
     }
     
     @Override
-    protected void doTask(Task task, DataCenter dc) throws ApiException {
+    protected Completable doTask(Task task, DataCenter dc) throws ApiException {
         
         // if it's the first time, initialize the map of pods status
         if (task.getStatus().getPods() == null) {
@@ -50,8 +51,7 @@ public final class CleanupTaskReconcilier extends TaskReconcilier {
         if (pods.isEmpty()) {
             task.getStatus().setPhase(TaskPhase.SUCCEED);
             k8sResourceUtils.updateTaskStatus(task);
-            ensureUnlockDc(task, dc);
-            return ;
+            return ensureUnlockDc(task, dc);
         }
         
         // do clean up on each pod with 10 sec interval
@@ -62,7 +62,7 @@ public final class CleanupTaskReconcilier extends TaskReconcilier {
                 (pod, timer) -> pod)
                 .doOnNext(pod -> {
                     try {
-                        final Throwable t = sidecarClientFactory.clientForPod(new ElassandraPod(dc, pod)).cleanup().blockingGet();
+                        final Throwable t = sidecarClientFactory.clientForPod(ElassandraPod.fromName(dc, pod)).cleanup().blockingGet();
                         if (t != null) throw t;
                         task.getStatus().getPods().put(pod, TaskPhase.SUCCEED);
                     } catch (Throwable throwable) {
@@ -74,6 +74,6 @@ public final class CleanupTaskReconcilier extends TaskReconcilier {
                 })
                 .toList().blockingGet();
 
-        k8sResourceUtils.updateTaskStatus(task);
+        return k8sResourceUtils.updateTaskStatus(task);
     }
 }

@@ -4,8 +4,8 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
 import com.strapdata.model.k8s.cassandra.*;
-import com.strapdata.strapkop.cql.*;
 import com.strapdata.strapkop.StrapkopException;
+import com.strapdata.strapkop.cql.*;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.k8s.OperatorNames;
@@ -16,9 +16,12 @@ import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.custom.IntOrString;
 import io.kubernetes.client.models.*;
 import io.micronaut.context.ApplicationContext;
+import io.reactivex.Completable;
+import io.reactivex.Single;
 
 import javax.inject.Singleton;
 import java.util.*;
+import java.util.concurrent.Callable;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -77,8 +80,8 @@ public class KibanaPlugin extends AbstractPlugin {
         return "elassandra-" + dataCenter.getSpec().getClusterName() + "-" + space.name();
     }
 
-    public static String kibanaNameDc(DataCenter dataCenter, String space) {
-        return "elassandra-" + dataCenter.getSpec().getClusterName() + "-" + dataCenter.getSpec().getDatacenterName() + "-kibana" + (space.length() > 0 ? "-" : "") + space;
+    public static String kibanaNameDc(DataCenter dataCenter, KibanaSpace space) {
+        return "elassandra-" + dataCenter.getSpec().getClusterName() + "-" + dataCenter.getSpec().getDatacenterName() + "-kibana" + (space.name().length() > 0 ? "-" : "") + space.name();
     }
 
 
@@ -94,35 +97,38 @@ public class KibanaPlugin extends AbstractPlugin {
     }
 
     @Override
-    public void reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
+    public Completable reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
             // remove deleted kibana spaces
             Set<String> deployedKibanaSpaces = dataCenter.getStatus().getKibanaSpaces();
             Map<String, KibanaSpace> kibanaMap = dataCenter.getSpec().getKibanaSpaces().stream().collect(Collectors.toMap(KibanaSpace::getName, Function.identity()));
-            for(String spaceToDelete : Sets.difference(deployedKibanaSpaces, dataCenter.getSpec().getKibanaSpaces().stream().map(KibanaSpace::getName).collect(Collectors.toSet()))) {
-                logger.debug("Deleting kibana space={}", spaceToDelete);
-                delete(dataCenter, kibanaMap.get(spaceToDelete));
-                dataCenter.getStatus().getKibanaSpaces().remove(spaceToDelete);
-            }
+            Completable deleteCompletable = io.reactivex.Observable.fromIterable(Sets.difference(deployedKibanaSpaces, dataCenter.getSpec().getKibanaSpaces().stream().map(KibanaSpace::getName).collect(Collectors.toSet())))
+                    .flatMapCompletable(spaceToDelete -> {
+                        logger.debug("Deleting kibana space={}", spaceToDelete);
+                        dataCenter.getStatus().getKibanaSpaces().remove(spaceToDelete);
+                        return delete(dataCenter, kibanaMap.get(spaceToDelete));
+                    });
 
-            // create or update kibana spaces
-            for(KibanaSpace kibanaSpace : dataCenter.getSpec().getKibanaSpaces()) {
-                createOrReplaceReaperObjects(dataCenter, kibanaSpace);
-                dataCenter.getStatus().getKibanaSpaces().add(kibanaSpace.getName());
-            }
+
+            Completable createCompletable = io.reactivex.Observable.fromIterable(dataCenter.getSpec().getKibanaSpaces())
+                    .flatMapCompletable(kibanaSpace -> {
+                        dataCenter.getStatus().getKibanaSpaces().add(kibanaSpace.getName());
+                        return createOrReplaceReaperObjects(dataCenter, kibanaSpace);
+                    });
+
+            return deleteCompletable.andThen(createCompletable);
     }
 
     @Override
-    public void delete(final DataCenter dataCenter) throws ApiException {
-        for(KibanaSpace kibana : dataCenter.getSpec().getKibanaSpaces()) {
-            delete(dataCenter, kibana);
-        }
+    public Completable delete(final DataCenter dataCenter) throws ApiException {
+        return io.reactivex.Observable.fromIterable(dataCenter.getSpec().getKibanaSpaces())
+                .flatMapCompletable(kibanaSpace -> delete(dataCenter, kibanaSpace));
     }
 
-    public void delete(final DataCenter dataCenter, KibanaSpace space) throws ApiException {
+    public Completable delete(final DataCenter dataCenter, KibanaSpace space) throws ApiException {
         final String kibanaLabelSelector = OperatorLabels.toSelector(kibanaLabels(dataCenter, space));
-        k8sResourceUtils.deleteIngress(dataCenter.getMetadata().getNamespace(), null, kibanaLabelSelector);
-        k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, kibanaLabelSelector).subscribe();
-        k8sResourceUtils.deleteDeployment(kibanaName(dataCenter, space), dataCenter.getMetadata().getNamespace());
+        return k8sResourceUtils.deleteDeployment(dataCenter.getMetadata().getNamespace(), null, kibanaLabelSelector)
+                .andThen(k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, kibanaLabelSelector))
+                .andThen(k8sResourceUtils.deleteIngress(dataCenter.getMetadata().getNamespace(), null, kibanaLabelSelector));
     }
 
 
@@ -133,7 +139,8 @@ public class KibanaPlugin extends AbstractPlugin {
         return (dataCenter.getStatus().getKeyspaceManagerStatus().getKeyspaces().contains(kibanaSpace.keyspace())) ? 1 : 0;
     }
 
-    public void createOrReplaceReaperObjects(final DataCenter dataCenter, KibanaSpace space) throws ApiException, StrapkopException {
+
+    public Completable createOrReplaceReaperObjects(final DataCenter dataCenter, KibanaSpace space) throws ApiException, StrapkopException {
         final V1ObjectMeta dataCenterMetadata = dataCenter.getMetadata();
         final DataCenterSpec dataCenterSpec = dataCenter.getSpec();
         final DataCenterStatus dataCenterStatus = dataCenter.getStatus();
@@ -141,7 +148,7 @@ public class KibanaPlugin extends AbstractPlugin {
         final Map<String, String> labels = kibanaLabels(dataCenter, space);
 
         final V1ObjectMeta meta = new V1ObjectMeta()
-                .name(kibanaName(dataCenter, space))
+                .name(kibanaNameDc(dataCenter, space))
                 .namespace(dataCenterMetadata.getNamespace())
                 .labels(labels)
                 .putAnnotationsItem("datacenter-generation", dataCenter.getMetadata().getGeneration().toString());
@@ -260,93 +267,92 @@ public class KibanaPlugin extends AbstractPlugin {
                     );
         }
 
-        // create kibana service
-        final V1Service service = new V1Service()
-                .metadata(meta)
-                .spec(new V1ServiceSpec()
-                        .type("ClusterIP")
-                        .addPortsItem(new V1ServicePort().name("kibana").port(5601))
-                        .selector(labels)
-                );
-        k8sResourceUtils.createOrReplaceNamespacedService(service).subscribe();
+        return k8sResourceUtils.createOrReplaceNamespacedDeployment(deployment)
+                .flatMap(d -> {
+                    return k8sResourceUtils.createOrReplaceNamespacedService(new V1Service()
+                            .metadata(meta)
+                            .spec(new V1ServiceSpec()
+                                    .type("ClusterIP")
+                                    .addPortsItem(new V1ServicePort().name("kibana").port(5601))
+                                    .selector(labels)
+                            ));
+                })
+                .flatMap(s -> {
+                    String ingressDomain = System.getenv("INGRESS_DOMAIN");
+                    if (!Strings.isNullOrEmpty(ingressDomain)) {
+                        String kibanaHost = space.name() + "-" + dataCenterSpec.getClusterName() + "-" + dataCenterSpec.getDatacenterName() + "." + ingressDomain;
+                        logger.trace("Creating kibana ingress for host={}", kibanaHost);
+                        final V1beta1Ingress ingress = new V1beta1Ingress()
+                                .metadata(meta)
+                                .spec(new V1beta1IngressSpec()
+                                        .addRulesItem(new V1beta1IngressRule()
+                                                .host(kibanaHost)
+                                                .http(new V1beta1HTTPIngressRuleValue()
+                                                        .addPathsItem(new V1beta1HTTPIngressPath()
+                                                                .path("/")
+                                                                .backend(new V1beta1IngressBackend()
+                                                                        .serviceName(meta.getName())
+                                                                        .servicePort(new IntOrString(5601)))
+                                                        )
+                                                )
+                                        )
+                                        .addTlsItem(new V1beta1IngressTLS()
+                                                .addHostsItem(kibanaHost)
+                                        )
+                                );
+                        return k8sResourceUtils.createOrReplaceNamespacedIngress(ingress).map(i -> s);
+                    }
+                    return Single.just(s);
+                })
+                .flatMap(s -> createKibanaSecretIfNotExists(dataCenter, space))
+                .flatMapCompletable(s2 -> Completable.fromCallable(new Callable<V1Deployment>() {
+                    /**
+                     * Computes a result, or throws an exception if unable to do so.
+                     *
+                     * @return computed result
+                     * @throws Exception if unable to compute a result
+                     */
+                    @Override
+                    public V1Deployment call() throws Exception {
+                        // abort deployment replacement if it is already up to date (according to the annotation datacenter-generation and to spec.replicas)
+                        // this is important because otherwise it generate a "larsen" : deployment replace -> k8s event -> reconciliation -> deployment replace...
+                        try {
+                            final V1Deployment existingDeployment = appsApi.readNamespacedDeployment(meta.getName(), meta.getNamespace(), null, null, null);
+                            final String datacenterGeneration = existingDeployment.getMetadata().getAnnotations().get("datacenter-generation");
 
-        // create reaper ingress
-        String ingressDomain = System.getenv("INGRESS_DOMAIN");
-        if (!Strings.isNullOrEmpty(ingressDomain)) {
-            String kibanaHost = space.name() + "-" + dataCenterSpec.getClusterName() + "-" + dataCenterSpec.getDatacenterName() + "." + ingressDomain;
-            logger.trace("Creating kibana ingress for host={}", kibanaHost);
-            final V1beta1Ingress ingress = new V1beta1Ingress()
-                    .metadata(meta)
-                    .spec(new V1beta1IngressSpec()
-                            .addRulesItem(new V1beta1IngressRule()
-                                    .host(kibanaHost)
-                                    .http(new V1beta1HTTPIngressRuleValue()
-                                            .addPathsItem(new V1beta1HTTPIngressPath()
-                                                    .path("/")
-                                                    .backend(new V1beta1IngressBackend()
-                                                            .serviceName(meta.getName())
-                                                            .servicePort(new IntOrString(5601)))
-                                            )
-                                    )
-                            )
-                            .addTlsItem(new V1beta1IngressTLS()
-                                    .addHostsItem(kibanaHost)
-                            )
-                    );
-            k8sResourceUtils.createOrReplaceNamespacedIngress(ingress).subscribe();
-        }
+                            if (datacenterGeneration == null) {
+                                throw new StrapkopException(String.format("kibana deployment %s miss the annotation datacenter-generation", meta.getName()));
+                            }
 
-        // abort deployment replacement if it is already up to date (according to the annotation datacenter-generation and to spec.replicas)
-        // this is important because otherwise it generate a "larsen" : deployment replace -> k8s event -> reconciliation -> deployment replace...
-        try {
-            final V1Deployment existingDeployment = appsApi.readNamespacedDeployment(meta.getName(), meta.getNamespace(), null, null, null);
-            final String datacenterGeneration = existingDeployment.getMetadata().getAnnotations().get("datacenter-generation");
+                            if (Objects.equals(Long.parseLong(datacenterGeneration), dataCenterMetadata.getGeneration()) &&
+                                    Objects.equals(existingDeployment.getSpec().getReplicas(), deployment.getSpec().getReplicas())) {
+                                return existingDeployment;
+                            }
+                        } catch (ApiException e) {
+                            if (e.getCode() != 404) {
+                                throw e;
+                            }
+                        }
 
-            if (datacenterGeneration == null) {
-                throw new StrapkopException(String.format("kibana deployment %s miss the annotation datacenter-generation", meta.getName()));
-            }
-
-            if (Objects.equals(Long.parseLong(datacenterGeneration), dataCenterMetadata.getGeneration()) &&
-                    Objects.equals(existingDeployment.getSpec().getReplicas(), deployment.getSpec().getReplicas())) {
-                return;
-            }
-        } catch (ApiException e) {
-            if (e.getCode() != 404) {
-                throw e;
-            }
-        }
-
-        k8sResourceUtils.createOrReplaceNamespacedDeployment(deployment).subscribe();
+                        return k8sResourceUtils.createOrReplaceNamespacedDeployment(deployment).blockingGet();
+                    }
+                }));
     }
 
-
-    private void createKibanaSecretIfNotExists(DataCenter dataCenter, KibanaSpace kibanaSpace) throws ApiException {
+    private Single<V1Secret> createKibanaSecretIfNotExists(DataCenter dataCenter, KibanaSpace kibanaSpace) throws ApiException {
         String kibanaSecretName = kibanaName(dataCenter, kibanaSpace);
         final V1ObjectMeta secretMetadata = new V1ObjectMeta()
                 .name(kibanaSecretName)
                 .namespace(dataCenter.getMetadata().getNamespace())
                 .labels(OperatorLabels.cluster(dataCenter.getSpec().getClusterName()));
 
-        // check if secret exists
-        V1Secret secret = null;
-        try {
-            secret = coreApi.readNamespacedSecret(secretMetadata.getName(), secretMetadata.getNamespace(), null, null, null);
-        } catch (ApiException e) {
-            if (e.getCode() != 404) {
-                throw e;
-            }
-        }
-
-        if (secret == null) {
+        return this.k8sResourceUtils.getOrCreateNamespacedSecret(secretMetadata, () -> {
             logger.debug("Creating kibana secret name={}", kibanaSecretName);
-            String adminPassword = UUID.randomUUID().toString();
-            secret = new V1Secret()
+            return new V1Secret()
                     .metadata(secretMetadata)
                     // replace the default cassandra password
                     .putStringDataItem("kibana.kibana_password", UUID.randomUUID().toString());
-
-            coreApi.createNamespacedSecret(dataCenter.getMetadata().getNamespace(), secret, null, null, null);
-        }
+        });
     }
 
 }

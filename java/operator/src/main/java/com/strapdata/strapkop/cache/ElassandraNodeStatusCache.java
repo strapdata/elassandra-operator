@@ -15,4 +15,8 @@ public class ElassandraNodeStatusCache extends Cache<ElassandraPod, ElassandraNo
                 Objects.equals(e.getKey().getParent(), dc.getMetadata().getName()) &&
                         Objects.equals(e.getKey().getNamespace(), dc.getMetadata().getNamespace()));
     }
+
+    public boolean isNormal(ElassandraPod pod) {
+        return ElassandraNodeStatus.NORMAL.equals(getOrDefault(pod, ElassandraNodeStatus.UNKNOWN));
+    }
 }

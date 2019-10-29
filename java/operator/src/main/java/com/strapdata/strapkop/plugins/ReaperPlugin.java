@@ -4,8 +4,8 @@ import com.datastax.driver.core.Session;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.strapdata.model.k8s.cassandra.*;
-import com.strapdata.strapkop.cql.*;
 import com.strapdata.strapkop.StrapkopException;
+import com.strapdata.strapkop.cql.*;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.k8s.OperatorNames;
@@ -16,13 +16,13 @@ import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.custom.IntOrString;
 import io.kubernetes.client.models.*;
 import io.micronaut.context.ApplicationContext;
+import io.reactivex.Completable;
+import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
 
 import javax.inject.Singleton;
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
+import java.util.concurrent.Callable;
 
 /**
  * Manage reaper deployment
@@ -50,7 +50,7 @@ public class ReaperPlugin extends AbstractPlugin {
         @Override
         public CqlKeyspace createIfNotExistsKeyspace(DataCenter dataCenter, Session session) {
             CqlKeyspace ks = super.createIfNotExistsKeyspace(dataCenter, session);
-            dataCenter.getStatus().setReaperStatus(ReaperStatus.KEYSPACE_CREATED);
+            dataCenter.getStatus().setReaperPhase(ReaperPhase.KEYSPACE_CREATED);
             return ks;
         }
     };
@@ -73,7 +73,7 @@ public class ReaperPlugin extends AbstractPlugin {
             .withPostCreateHandler(ReaperPlugin::postCreateReaper);
 
     public static void postCreateReaper(DataCenter dataCenter, final Session session) throws Exception {
-        dataCenter.getStatus().setReaperStatus(ReaperStatus.ROLE_CREATED);
+        dataCenter.getStatus().setReaperPhase(ReaperPhase.ROLE_CREATED);
         logger.debug("reaper role created for dc={}, ReaperStatus=ROLE_CREATED", dataCenter.getMetadata().getName());
     }
 
@@ -99,20 +99,16 @@ public class ReaperPlugin extends AbstractPlugin {
     }
 
     @Override
-    public void reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
-        if (dataCenter.getSpec().getReaperEnabled()) {
-            createOrReplaceReaperObjects(dataCenter);
-        } else {
-            delete(dataCenter);
-        }
+    public Completable reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
+        return (dataCenter.getSpec().getReaperEnabled()) ? createOrReplaceReaperObjects(dataCenter) : delete(dataCenter);
     }
 
     @Override
-    public void delete(final DataCenter dataCenter) throws ApiException {
+    public Completable delete(final DataCenter dataCenter) throws ApiException {
         final String reaperLabelSelector = OperatorLabels.toSelector(reaperLabels(dataCenter));
-        k8sResourceUtils.deleteIngress(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector);
-        k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector).subscribe();
-        k8sResourceUtils.deleteDeployment(reaperName(dataCenter), dataCenter.getMetadata().getNamespace());
+        return k8sResourceUtils.deleteDeployment(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector)
+                .andThen(k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector))
+                .andThen(k8sResourceUtils.deleteIngress(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector));
     }
 
 
@@ -120,7 +116,7 @@ public class ReaperPlugin extends AbstractPlugin {
      * @return The number of reaper pods depending on ReaperStatus
      */
     private int reaperReplicas(final DataCenter dataCenter) {
-        switch(dataCenter.getStatus().getReaperStatus()) {
+        switch(dataCenter.getStatus().getReaperPhase()) {
             case NONE:
                 return 0;
             case KEYSPACE_CREATED:
@@ -133,7 +129,7 @@ public class ReaperPlugin extends AbstractPlugin {
     }
 
 
-    public void createOrReplaceReaperObjects(final DataCenter dataCenter) throws ApiException, StrapkopException {
+    public Completable createOrReplaceReaperObjects(final DataCenter dataCenter) throws ApiException, StrapkopException {
         final V1ObjectMeta dataCenterMetadata = dataCenter.getMetadata();
         final DataCenterSpec dataCenterSpec = dataCenter.getSpec();
         final DataCenterStatus dataCenterStatus = dataCenter.getStatus();
@@ -232,7 +228,7 @@ public class ReaperPlugin extends AbstractPlugin {
                         .name("REAPER_AUTH_PASSWORD")
                         .valueFrom(new V1EnvVarSource()
                                 .secretKeyRef(new V1SecretKeySelector()
-                                        .name(OperatorNames.clusterSecret(dataCenter))
+                                        .name(reaperSecretName(dataCenter))
                                         .key("reaper.admin_password")
                                 )
                         )
@@ -335,15 +331,15 @@ public class ReaperPlugin extends AbstractPlugin {
                         .addPortsItem(new V1ServicePort().name(ADMIN_SERVICE_NAME).port(ADMIN_SERVICE_PORT))
                         .selector(labels)
                 );
-        k8sResourceUtils.createOrReplaceNamespacedService(service).subscribe();
 
         // create reaper ingress
         String ingressDomain = System.getenv("INGRESS_DOMAIN");
+        final V1beta1Ingress ingress;
         if (!Strings.isNullOrEmpty(ingressDomain)) {
             String reaperAppHost = "reaper-" + dataCenterSpec.getClusterName() + "-" + dataCenterSpec.getDatacenterName() + "." + ingressDomain;
             String reaperAdminHost = "admin-reaper-" + dataCenterSpec.getClusterName() + "-" + dataCenterSpec.getDatacenterName() + "." + ingressDomain;
             logger.trace("Creating reaper ingress for host={}", reaperAppHost);
-            final V1beta1Ingress ingress = new V1beta1Ingress()
+            ingress = new V1beta1Ingress()
                     .metadata(meta)
                     .spec(new V1beta1IngressSpec()
                             .addRulesItem(new V1beta1IngressRule()
@@ -372,7 +368,8 @@ public class ReaperPlugin extends AbstractPlugin {
                             .addTlsItem(new V1beta1IngressTLS().addHostsItem(reaperAdminHost))
 
                     );
-            k8sResourceUtils.createOrReplaceNamespacedIngress(ingress).subscribe();
+        } else {
+            ingress = null;
         }
 
         // abort deployment replacement if it is already up to date (according to the annotation datacenter-generation and to spec.replicas)
@@ -387,7 +384,7 @@ public class ReaperPlugin extends AbstractPlugin {
 
             if (Objects.equals(Long.parseLong(datacenterGeneration), dataCenterMetadata.getGeneration()) &&
                     Objects.equals(existingDeployment.getSpec().getReplicas(), deployment.getSpec().getReplicas())) {
-                return;
+                return Completable.complete();
             }
         } catch (ApiException e) {
             if (e.getCode() != 404) {
@@ -395,21 +392,52 @@ public class ReaperPlugin extends AbstractPlugin {
             }
         }
 
-        k8sResourceUtils.createOrReplaceNamespacedDeployment(deployment).subscribe();
+        return getOrCreateReaperAdminPassword(dataCenter)
+                .flatMap(s -> k8sResourceUtils.createOrReplaceNamespacedService(service))
+                .flatMap(s -> ingress == null ? Single.just(s) : k8sResourceUtils.createOrReplaceNamespacedIngress(ingress).map(i -> s))
+                .flatMap(s -> k8sResourceUtils.createOrReplaceNamespacedDeployment(deployment))
+                .flatMapCompletable(d -> Completable.fromCallable(new Callable<DataCenter>() {
+                    /**
+                     * Computes a result, or throws an exception if unable to do so.
+                     *
+                     * @return computed result
+                     * @throws Exception if unable to compute a result
+                     */
+                    @Override
+                    public DataCenter call() throws Exception {
+                        return reconcileReaperRegistration(dataCenter);
+                    }
+                }));
+    }
 
-        // reconcile reaper cluster registration
-        reconcileReaperRegistration(dataCenter);
+    private String reaperSecretName(DataCenter dataCenter) {
+        return OperatorNames.dataCenterChildObjectName("%s-reaper", dataCenter);
+    }
+
+
+    private Single<V1Secret> getOrCreateReaperAdminPassword(DataCenter dataCenter) throws ApiException {
+        V1ObjectMeta secretMeta = new V1ObjectMeta()
+                .name(reaperSecretName(dataCenter))
+                .namespace(dataCenter.getMetadata().getNamespace())
+                .addOwnerReferencesItem(OperatorNames.ownerReference(dataCenter))
+                .labels(OperatorLabels.cluster(dataCenter.getSpec().getClusterName()));
+
+        return k8sResourceUtils.getOrCreateNamespacedSecret(secretMeta, () -> {
+            V1Secret secret = new V1Secret().metadata(secretMeta);
+            secret.putStringDataItem("reaper.admin_password", UUID.randomUUID().toString());
+            return secret;
+        });
     }
 
     /**
      * As soon as reaper_db keyspace is created, this function try to ping the reaper api and, if success, register the datacenter.
      * THe registration is done only once. If the datacenter is unregistered by the user, it will not register it again automatically.
      */
-    private void reconcileReaperRegistration(DataCenter dc) throws StrapkopException, ApiException {
+    private DataCenter reconcileReaperRegistration(DataCenter dc) throws StrapkopException, ApiException {
 
-        if (!ReaperStatus.REGISTERED.equals(dc.getStatus().getReaperStatus()) && (
-                (dc.getSpec().getAuthentication().equals(Authentication.NONE) && ReaperStatus.KEYSPACE_CREATED.equals(dc.getStatus().getReaperStatus())) ||
-                        !dc.getSpec().getAuthentication().equals(Authentication.NONE) && ReaperStatus.ROLE_CREATED.equals(dc.getStatus().getReaperStatus())
+        if (!ReaperPhase.REGISTERED.equals(dc.getStatus().getReaperPhase()) && (
+                (dc.getSpec().getAuthentication().equals(Authentication.NONE) && ReaperPhase.KEYSPACE_CREATED.equals(dc.getStatus().getReaperPhase())) ||
+                        !dc.getSpec().getAuthentication().equals(Authentication.NONE) && ReaperPhase.ROLE_CREATED.equals(dc.getStatus().getReaperPhase())
         )) {
 
             if (reaperAdminPassword == null)
@@ -425,7 +453,7 @@ public class ReaperPlugin extends AbstractPlugin {
                             .observeOn(Schedulers.io())
                             .subscribeOn(Schedulers.io())
                             .blockingGet();
-                    dc.getStatus().setReaperStatus(ReaperStatus.REGISTERED);
+                    dc.getStatus().setReaperPhase(ReaperPhase.REGISTERED);
                     logger.info("registered dc={} in cassandra-reaper", dc.getMetadata().getName());
                 }
             }
@@ -434,6 +462,7 @@ public class ReaperPlugin extends AbstractPlugin {
                 logger.error("error while registering dc={} in cassandra-reaper", dc.getMetadata().getName(), e);
             }
         }
+        return dc;
     }
 
     // TODO: cache cluster secret to avoid loading secret again and again

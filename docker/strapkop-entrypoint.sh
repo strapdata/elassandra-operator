@@ -45,12 +45,6 @@ echo "broadcast_rpc_address: $BROADCAST_RPC_ADDRESS" > /etc/cassandra/cassandra.
 
 export JVM_OPTS="$JVM_OPTS $ES_USE_INTERNAL_ADDRESS"
 
-# Load node IPs of local seeds for the strapkop SeedProvider
-if [ -f "/nodeinfo/seeds-ip" ] && [ -s "/nodeinfo/seeds-ip" ]; then
-    export SEEDS_IP=$(cat /nodeinfo/seeds-ip)
-    echo "SEEDS_IP=$SEEDS_IP"
-fi
-
 # Generate /etc/cassandra/jmxremote.password
 if [ -n "$JMX_PASSWORD" ]; then
    echo "cassandra $JMX_PASSWORD" > /etc/cassandra/jmxremote.password

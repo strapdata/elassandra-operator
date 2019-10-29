@@ -27,7 +27,7 @@ public class DataCenterCache extends Cache<Key, DataCenter> {
                                 .map(DataCenterStatus::getElassandraNodeStatuses)
                                 // map each dc to a stream of ElassandraPods
                                 .map(elassandraNodeStatusMap -> elassandraNodeStatusMap.keySet().stream()
-                                        .map(podName -> new ElassandraPod(dataCenter, podName)))
+                                        .map(podName -> ElassandraPod.fromName(dataCenter, podName)))
                                 // filtered dc will got an empty stream instead
                                 .orElseGet(Stream::empty)
                 ).collect(Collectors.toList());

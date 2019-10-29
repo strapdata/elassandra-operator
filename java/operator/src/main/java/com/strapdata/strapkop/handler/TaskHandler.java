@@ -44,7 +44,7 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
     }
     
     @Override
-    public void accept(K8sWatchEvent<Task> event) {
+    public void accept(K8sWatchEvent<Task> event) throws Exception {
         logger.debug("Processing a Task event={}", event);
         
         final ClusterKey key = new ClusterKey(

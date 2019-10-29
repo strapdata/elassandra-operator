@@ -1,10 +1,11 @@
 package com.strapdata.strapkop.plugins;
 
 import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRoleManager;
-import com.strapdata.strapkop.StrapkopException;
 import io.kubernetes.client.ApiException;
+import io.reactivex.Completable;
 
 public interface Plugin {
 
@@ -32,14 +33,14 @@ public interface Plugin {
     /**
      * Call on each reconciliation
      */
-    default void reconcile(final DataCenter dataCenter) throws ApiException, StrapkopException {
-
+    default Completable reconcile(final DataCenter dataCenter) throws ApiException, StrapkopException {
+        return Completable.complete();
     }
 
     /**
      * Call when deleting the elassandra datacenter
      */
-    default void delete(final DataCenter dataCenter) throws ApiException {
-
+    default Completable delete(final DataCenter dataCenter) throws ApiException {
+        return Completable.complete();
     }
 }

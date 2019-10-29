@@ -6,6 +6,7 @@ import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.pipeline.WorkQueue;
 import com.strapdata.strapkop.reconcilier.DataCenterUpdateReconcilier;
+import io.kubernetes.client.ApiException;
 import io.kubernetes.client.models.V1StatefulSet;
 import org.apache.commons.lang3.ObjectUtils;
 import org.slf4j.Logger;
@@ -32,7 +33,7 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
     }
     
     @Override
-    public void accept(K8sWatchEvent<V1StatefulSet> event) {
+    public void accept(K8sWatchEvent<V1StatefulSet> event) throws ApiException {
         if (!acceptedEventTypes.contains(event.getType())) {
             return ;
         }
@@ -56,6 +57,6 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
         
         workQueue.submit(
                 new ClusterKey(clusterName, sts.getMetadata().getNamespace()),
-                dataCenterReconcilier.asCompletable((new Key(dcResourceName, sts.getMetadata().getNamespace()))));
+                dataCenterReconcilier.reconcile((new Key(dcResourceName, sts.getMetadata().getNamespace()))));
     }
 }

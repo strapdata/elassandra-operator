@@ -97,7 +97,12 @@ public class K8sWatchEventSource<ResourceT, ResourceListT> implements EventSourc
                 }.getType());
         return Observable.fromIterable(watch)
                 .observeOn(Schedulers.io()).observeOn(Schedulers.io()) // blocking io seemed to happen on computational thread...
-                .doOnError(t -> logger.warn("error", t))
+                .doOnError(t -> {
+                    if (t.getCause() instanceof java.net.SocketTimeoutException)
+                        // ignore read timeout
+                        return;
+                    logger.warn("error", t);
+                })
                 .map(this::objectJsonToEvent)
                 .doFinally(watch::close);
     }
@@ -113,7 +118,7 @@ public class K8sWatchEventSource<ResourceT, ResourceListT> implements EventSourc
         ResourceT resource = null;
         
         if (type == ERROR) {
-            logger.error("{} list watch failed with {}.", adapter.getName(), response.status);
+            logger.error("{} list watch failed with status={}.", adapter.getName(), response.status);
         } else {
             // TODO: unit test with bad a datacenter CRD causing JsonSyntaxException
             try {
@@ -129,7 +134,7 @@ public class K8sWatchEventSource<ResourceT, ResourceListT> implements EventSourc
         K8sWatchEvent<ResourceT> watchEvent = new K8sWatchEvent<ResourceT>()
                 .setType(type)
                 .setResource(resource);
-        logger.debug("new event={} lastResourceVersion={} type={} resource={}", watchEvent, lastResourceVersion, type, resource);
+        logger.trace("new event={} lastResourceVersion={} type={} resource={}", watchEvent, lastResourceVersion, type, resource);
         return watchEvent;
     }
 }

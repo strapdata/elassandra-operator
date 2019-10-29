@@ -12,10 +12,18 @@ import java.util.*;
 @NoArgsConstructor
 public class DataCenterStatus {
 
+    /**
+     * Current DC phase
+     */
     @SerializedName("phase")
     @Expose
     private DataCenterPhase phase = DataCenterPhase.CREATING;
-    
+
+    @SerializedName("needCleanup")
+    @Expose
+    private Boolean needCleanup = false;
+
+
     @SerializedName("lastErrorMessage")
     @Expose
     private String lastErrorMessage = null;
@@ -57,11 +65,11 @@ public class DataCenterStatus {
      */
     @SerializedName("configMapFingerPrint")
     @Expose
-    private String configMapFingerPrint;
+    private String configMapFingerPrint = null;
 
     @SerializedName("currentTask")
     @Expose
-    private String currentTask;
+    private String currentTask = null;
 
     /**
      * State of cassandra racks.
@@ -80,8 +88,8 @@ public class DataCenterStatus {
     /**
      * Cassandra reaper status
      */
-    @SerializedName("reaperStatus")
-    private ReaperStatus reaperStatus = ReaperStatus.NONE;
+    @SerializedName("reaperPhase")
+    private ReaperPhase reaperPhase = ReaperPhase.NONE;
 
     /**
      * keyspace manager status
