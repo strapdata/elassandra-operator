@@ -185,7 +185,7 @@ public class CqlConnectionManager implements AutoCloseable {
         }
 
         // contact local nodes is boostraped or first DC in the cluster
-        boolean hasSeedBootstrapped = dc.getStatus().getRackStatuses().stream().anyMatch(s -> s.getSeedBootstrapped());
+        boolean hasSeedBootstrapped = dc.getStatus().getRackStatuses().stream().anyMatch(s -> s.getJoinedReplicas() > 0);
         if (hasSeedBootstrapped ||
                 ((dc.getSpec().getRemoteSeeds() == null || dc.getSpec().getRemoteSeeds().isEmpty()) && (dc.getSpec().getRemoteSeeders() == null || dc.getSpec().getRemoteSeeders().isEmpty()))) {
             builder.addContactPoint(OperatorNames.nodesService(dc));

@@ -2,9 +2,9 @@ package com.strapdata.strapkop.reconcilier;
 
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.cql.CqlConnectionManager;
-import com.strapdata.strapkop.plugins.Plugin;
 import com.strapdata.strapkop.plugins.PluginRegistry;
 import io.micronaut.context.ApplicationContext;
+import io.reactivex.Completable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,27 +28,9 @@ public class DataCenterDeleteReconcilier extends Reconcilier<DataCenter> {
     }
     
     @Override
-    void reconcile(final DataCenter dc) {
-        
-        try {
-            logger.debug("processing a dc delete reconciliation for {} in thread {}", dc.getMetadata().getName(), Thread.currentThread().getName());
-
-            // ordering may be important ?
-            for(Plugin plugin : pluginRegistry.plugins()) {
-                try {
-                    if (plugin.isActive(dc))
-                        plugin.delete(dc);
-                } catch(Exception e) {
-                    logger.error("Plugin class="+plugin.getClass().getSimpleName()+" reconcilation failed:", e);
-                }
-            }
-
-            context.createBean(DataCenterDeleteAction.class, dc).deleteDataCenter();
-            
-            cqlConnectionManager.removeConnection(dc);
-        }
-        catch (Exception e) {
-            logger.error("an error occurred while processing DataCenter update reconciliation for {}", dc.getMetadata().getName(), e);
-        }
+    public Completable reconcile(final DataCenter dc) throws Exception {
+        cqlConnectionManager.removeConnection(dc);
+        return Completable.mergeArray(pluginRegistry.deleteAll(dc))
+                .andThen(context.createBean(DataCenterDeleteAction.class, dc).deleteDataCenter());
     }
 }

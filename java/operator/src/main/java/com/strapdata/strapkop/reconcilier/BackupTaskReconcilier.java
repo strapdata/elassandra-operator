@@ -13,6 +13,7 @@ import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CustomObjectsApi;
 import io.micronaut.context.annotation.Infrastructure;
+import io.reactivex.Completable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +37,7 @@ public class BackupTaskReconcilier extends TaskReconcilier {
     
     
     @Override
-    protected void doTask(Task task, DataCenter dc) throws ApiException {
+    protected Completable doTask(Task task, DataCenter dc) throws ApiException {
         // if it's the first time, initialize the map of pods status
         if (task.getStatus().getPods() == null) {
             task.getStatus().setPhase(TaskPhase.STARTED);
@@ -53,8 +54,7 @@ public class BackupTaskReconcilier extends TaskReconcilier {
         if (pods.isEmpty()) {
             task.getStatus().setPhase(TaskPhase.SUCCEED);
             k8sResourceUtils.updateTaskStatus(task);
-            ensureUnlockDc(task, dc);
-            return;
+            return ensureUnlockDc(task, dc);
         }
         
         // TODO: better backup with sstableloader and progress tracking
@@ -68,7 +68,7 @@ public class BackupTaskReconcilier extends TaskReconcilier {
                         OperatorNames.dataCenterResource(task.getSpec().getCluster(), task.getSpec().getDatacenter()),
                         pod);
     
-                final boolean success = sidecarClientFactory.clientForPod(new ElassandraPod(dc, pod))
+                final boolean success = sidecarClientFactory.clientForPod(ElassandraPod.fromName(dc, pod))
                         .backup(backupArguments)
                         .doOnSuccess(backupResponse -> logger.debug("received backup response with status = {}", backupResponse.getStatus()))
                         .map(backupResponse -> backupResponse.getStatus().equalsIgnoreCase("success"))
@@ -91,7 +91,7 @@ public class BackupTaskReconcilier extends TaskReconcilier {
             task.getStatus().setPhase(TaskPhase.FAILED);
         }
         
-        k8sResourceUtils.updateTaskStatus(task);
+        return k8sResourceUtils.updateTaskStatus(task);
     }
     
     

@@ -26,15 +26,15 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
     }
     
     @Override
-    public void accept(K8sWatchEvent<DataCenter> event) {
+    public void accept(K8sWatchEvent<DataCenter> event) throws Exception {
         logger.debug("Processing a DataCenter event={}", event);
         
         Completable completable = null;
         if (event.isUpdate()) {
-            completable = dataCenterUpdateReconcilier.asCompletable(new Key(event.getResource().getMetadata()));
+            completable = dataCenterUpdateReconcilier.reconcile(new Key(event.getResource().getMetadata()));
         }
         else if (event.isDeletion()) {
-            completable = dataCenterDeleteReconcilier.asCompletable(event.getResource());
+            completable = dataCenterDeleteReconcilier.reconcile(event.getResource());
         }
         else {
             return;
