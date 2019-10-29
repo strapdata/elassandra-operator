@@ -125,7 +125,7 @@ public class CqlRole implements Cloneable {
             logger.debug("Creating role={} in cluster={} dc={}", this, dataCenter.getSpec().getClusterName(), dataCenter.getMetadata().getName());
             // create role if not exists, then alter... so this is completely idempotent and can even update password, although it might not be optimized
             session.execute(String.format(Locale.ROOT, "CREATE ROLE IF NOT EXISTS %s with SUPERUSER = %b AND LOGIN = true and PASSWORD = '%s'", username, superUser, password));
-            session.execute(String.format(Locale.ROOT, "ALTER ROLE %s WITH SUPERUSER = %b AND LOGIN = true AND PASSWORD = '%s'", username, superUser, password));
+            session.execute(String.format(Locale.ROOT, "ALTER ROLE %s WITH PASSWORD = '%s'", username, superUser, password));
 
             this.applied = true;     // mark the role as up-to-date
 
