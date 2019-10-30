@@ -49,7 +49,7 @@ rules:
   resources:
   - pods
   - serviceaccounts
-  verbs: ['list']
+  verbs: ['get', 'list']
 - apiGroups: ['']
   resources:
   - services
