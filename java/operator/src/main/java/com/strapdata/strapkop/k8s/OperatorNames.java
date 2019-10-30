@@ -35,7 +35,7 @@ public class OperatorNames {
         return OperatorNames.clusterChildObjectName("%s-rc", dataCenter);
     }
 
-    public static String keystore(final DataCenter dataCenter) {
+    public static String keystoreSecret(final DataCenter dataCenter) {
         return OperatorNames.dataCenterChildObjectName("%s-keystore", dataCenter);
     }
 

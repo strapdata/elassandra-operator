@@ -35,10 +35,9 @@ public class KibanaPlugin extends AbstractPlugin {
     public KibanaPlugin(final ApplicationContext context,
                         K8sResourceUtils k8sResourceUtils,
                         AuthorityManager authorityManager,
-                        CqlConnectionManager cqlConnectionManager,
                         CoreV1Api coreApi,
                         AppsV1Api appsApi) {
-        super(context, k8sResourceUtils, authorityManager, cqlConnectionManager, coreApi, appsApi);
+        super(context, k8sResourceUtils, authorityManager, coreApi, appsApi);
     }
 
     @Override

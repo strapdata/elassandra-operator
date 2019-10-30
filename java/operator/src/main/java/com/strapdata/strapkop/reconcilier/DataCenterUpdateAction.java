@@ -12,13 +12,16 @@ import com.strapdata.model.k8s.task.Task;
 import com.strapdata.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
-import com.strapdata.strapkop.cql.CqlConnectionManager;
+import com.strapdata.strapkop.cql.CqlKeyspaceManager;
+import com.strapdata.strapkop.cql.CqlRoleManager;
+import com.strapdata.strapkop.cql.CqlSessionHandler;
 import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import com.strapdata.strapkop.ssl.AuthorityManager;
+import com.strapdata.strapkop.ssl.utils.X509CertificateAndPrivateKey;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
@@ -32,6 +35,7 @@ import io.reactivex.Flowable;
 import io.reactivex.Single;
 import lombok.Data;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.bouncycastle.operator.OperatorCreationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.DumperOptions;
@@ -39,6 +43,7 @@ import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
 import java.io.StringWriter;
+import java.security.GeneralSecurityException;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
@@ -72,8 +77,10 @@ public class DataCenterUpdateAction {
     private final DataCenterStatus dataCenterStatus;
     private final Map<String, String> dataCenterLabels;
     private final SidecarClientFactory sidecarClientFactory;
-    
-    private final CqlConnectionManager cqlConnectionManager;
+
+    private final CqlRoleManager cqlRoleManager;
+    private final CqlKeyspaceManager cqlKeyspaceManager;
+
     private final ElassandraNodeStatusCache elassandraNodeStatusCache;
     public final Builder builder = new Builder();
 
@@ -83,7 +90,8 @@ public class DataCenterUpdateAction {
                                   final CustomObjectsApi customObjectsApi,
                                   final K8sResourceUtils k8sResourceUtils,
                                   final AuthorityManager authorityManager,
-                                  final CqlConnectionManager cqlConnectionManager,
+                                  final CqlRoleManager cqlRoleManager,
+                                  final CqlKeyspaceManager cqlKeyspaceManager,
                                   final ElassandraNodeStatusCache elassandraNodeStatusCache,
                                   final SidecarClientFactory sidecarClientFactory,
                                   @Parameter("dataCenter") com.strapdata.model.k8s.cassandra.DataCenter dataCenter) {
@@ -98,7 +106,8 @@ public class DataCenterUpdateAction {
         this.dataCenterMetadata = dataCenter.getMetadata();
         this.dataCenterSpec = dataCenter.getSpec();
 
-        this.cqlConnectionManager = cqlConnectionManager;
+        this.cqlRoleManager = cqlRoleManager;
+        this.cqlKeyspaceManager = cqlKeyspaceManager;
         this.elassandraNodeStatusCache = elassandraNodeStatusCache;
         this.sidecarClientFactory = sidecarClientFactory;
         if (dataCenter.getStatus() == null) {
@@ -201,11 +210,21 @@ public class DataCenterUpdateAction {
                             });
                 })
                 .flatMap(passwords -> {
-                    // update elassandra keystores
-                    return (dataCenterSpec.getSsl()) ?
-                            k8sResourceUtils.readOrCreateNamespacedSecret(builder.dataCenterObjectMeta(OperatorNames.keystore(dataCenter)),
-                                    () -> builder.buildSecretKeystore()).map(s2 -> passwords) :
-                            Single.just(passwords);
+                    // reate SSL keystore if not exists
+                    return !dataCenterSpec.getSsl() ?
+                            Single.just(passwords) :
+                            authorityManager.loadFromSecretSingle()
+                                .flatMap(x509CertificateAndPrivateKey -> {
+                                    V1ObjectMeta keystoreMeta = builder.dataCenterObjectMeta(OperatorNames.keystoreSecret(dataCenter));
+                                    return k8sResourceUtils.readOrCreateNamespacedSecret(keystoreMeta,
+                                            () -> {
+                                                try {
+                                                    return builder.buildSecretKeystore(x509CertificateAndPrivateKey);
+                                                } catch (GeneralSecurityException | IOException | OperatorCreationException e) {
+                                                    throw new RuntimeException(e);
+                                                }
+                                            });
+                                }).map(s2 -> passwords);
                 })
                 .flatMap(s4 -> fetchExistingStatefulSetsByZone())
                 .flatMapCompletable(existingStsMap -> {
@@ -224,6 +243,7 @@ public class DataCenterUpdateAction {
                     }
 
                     ElassandraPod failedPod = null;
+
                     if (movingRack != null) {
                         Zone movingZone = zones.zones.get(movingRack.getName());
                         logger.debug("movingRack={} phase={} isReady={} isUpdating={} isScalingUp={} isScalingDown={} firstPodStatus={} lastPodStatus={}",
@@ -292,18 +312,28 @@ public class DataCenterUpdateAction {
                     }
 
                     // check all existing pod are UP and NORMAL before starting a new operation
+                    int totalNormalPod = 0;
                     for (ElassandraPod pod : enumeratePods(existingStsMap)) {
                         ElassandraNodeStatus podStatus = Optional
                                 .ofNullable(elassandraNodeStatusCache.get(pod))
                                 .orElse(ElassandraNodeStatus.UNKNOWN);
                         switch(podStatus) {
                             case NORMAL:
-                            case FAILED:
+                                totalNormalPod++;
                                 break;
                             default:
                                 logger.info("Pod name={} status={}, delaying operation.", pod.getName(), podStatus);
                                 return Completable.complete();
                         }
+                    }
+
+                    Completable todo = Completable.complete();
+                    if (totalNormalPod > 0) {
+                        // before scaling, if at least a pod is NORMAL, update keyspaces and roles if needed
+                        CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
+                        todo = this.cqlKeyspaceManager.reconcileKeyspaces(dataCenter, cqlSessionHandler)
+                                .andThen(this.cqlRoleManager.reconcileRole(dataCenter, cqlSessionHandler))
+                                .andThen(cqlSessionHandler.close());
                     }
 
                     // look up for the next rack to update if needed.
@@ -326,7 +356,8 @@ public class DataCenterUpdateAction {
                                         dataCenterMetadata.getName(), dataCenterMetadata.getNamespace(), dataCenterStatus.getPhase());
                                 rackStatusByName.get(rack).setPhase(RackPhase.UPDATING);
                                 updateDatacenterStatus(DataCenterPhase.UPDATING, zones, rackStatusByName);
-                                return configMapVolumeMounts.createOrReplaceNamespacedConfigMaps()
+                                return todo
+                                        .andThen(configMapVolumeMounts.createOrReplaceNamespacedConfigMaps())
                                         .andThen(updateRack(zones, builder.buildStatefulSetRack(rack, replicas, configMapVolumeMounts), rack, rackStatusByName));
                             }
                         }
@@ -334,7 +365,7 @@ public class DataCenterUpdateAction {
 
                     if (failedPod != null) {
                         logger.info("pod={} FAILED, cannot scale the datacenter now", failedPod);
-                        return Completable.complete();
+                        return todo;
                     }
 
                     if (zones.totalReplicas() < dataCenter.getSpec().getReplicas()) {
@@ -347,13 +378,13 @@ public class DataCenterUpdateAction {
                                 final V1StatefulSet sts = builder.buildStatefulSetRack(zones, zone.getName(), 1);
                                 updateDatacenterStatus(DataCenterPhase.SCALING_UP, zones, rackStatusByName);
                                 logger.debug("SCALE_UP started in rack={} size={}", zone.name, zone.size);
-                                return k8sResourceUtils
-                                        .createOrReplaceNamespacedService(builder.buildServiceSeed(zone.getName()))
+                                return todo.andThen(
+                                        k8sResourceUtils.createOrReplaceNamespacedService(builder.buildServiceSeed(zone.getName()))
                                         .flatMapCompletable(s -> {
                                             ConfigMapVolumeMounts configMapVolumeMounts = new ConfigMapVolumeMounts(zones, zone.name);
                                             return configMapVolumeMounts.createOrReplaceNamespacedConfigMaps();
                                         })
-                                        .andThen(k8sResourceUtils.createNamespacedStatefulSet(sts).ignoreElement());
+                                        .andThen(k8sResourceUtils.createNamespacedStatefulSet(sts).ignoreElement()));
                             }
                             // +1 on sts replicas
                             V1StatefulSet sts = zone.getSts().get();
@@ -362,7 +393,7 @@ public class DataCenterUpdateAction {
                             rackStatusByName.get(zone.name).setPhase(RackPhase.SCALING_UP);
                             updateDatacenterStatus(DataCenterPhase.SCALING_UP, zones, rackStatusByName);
                             logger.debug("SCALE_UP started in rack={} size={}", zone.name, zone.size);
-                            return k8sResourceUtils.replaceNamespacedStatefulSet(sts).ignoreElement();
+                            return todo.andThen(k8sResourceUtils.replaceNamespacedStatefulSet(sts).ignoreElement());
                         }
                         logger.warn("Cannot scale up, no free node in datacenter={} in namespace={}", dataCenterMetadata.getName(), dataCenterMetadata.getNamespace());
                     } else if (zones.totalReplicas() > dataCenter.getSpec().getReplicas()) {
@@ -380,11 +411,12 @@ public class DataCenterUpdateAction {
                                     updateDatacenterStatus(DataCenterPhase.SCALING_DOWN, zones, rackStatusByName);
                                     logger.debug("SCALE_DOWN started in rack={} size={}, decommissioning pod={} status={}",
                                             zone.name, zone.size, elassandraPod, elassandraNodeStatus);
-                                    return sidecarClientFactory.clientForPod(elassandraPod).decommission()
+                                    // decomission node
+                                    return todo.andThen(sidecarClientFactory.clientForPod(elassandraPod).decommission()
                                             .retryWhen(errors -> errors
                                                     .zipWith(Flowable.range(1, 5), (n, i) -> i)
                                                     .flatMap(retryCount -> Flowable.timer(2, TimeUnit.SECONDS))
-                                            );
+                                            ));
                                 case DECOMMISSIONED:
                                 case DRAINED:
                                 case DOWN:
@@ -393,9 +425,10 @@ public class DataCenterUpdateAction {
                                             sts.getMetadata().getName(), sts.getSpec().getReplicas(), elassandraPod);
                                     rackStatusByName.get(zone.name).setPhase(RackPhase.SCALING_DOWN);
                                     updateDatacenterStatus(DataCenterPhase.SCALING_DOWN, zones, rackStatusByName);
+                                    // scale down sts
                                     logger.debug("SCALE_DOWN started in rack={} size={}, removing pod={} status={}",
                                             zone.name, zone.size, elassandraPod, elassandraNodeStatus);
-                                    return k8sResourceUtils.replaceNamespacedStatefulSet(sts).ignoreElement();
+                                    return todo.andThen(k8sResourceUtils.replaceNamespacedStatefulSet(sts).ignoreElement());
                                 default:
                                     logger.info("Waiting a valid status to remove pod={} from sts={} in namspace={}",
                                             elassandraPod,sts.getMetadata().getName(), dataCenterMetadata.getNamespace());
@@ -403,7 +436,7 @@ public class DataCenterUpdateAction {
                         }
                         logger.warn("Cannot scale down, no more replicas in datacenter={} in namespace={}", dataCenterMetadata.getName(), dataCenterMetadata.getNamespace());
                     }
-                    return Completable.complete();
+                    return todo;
                 });
     }
 
@@ -719,8 +752,6 @@ public class DataCenterUpdateAction {
                     seeds.add(new ElassandraPod(dataCenter, rackStatus.getName(), 0).getName());
             }
 
-            logger.debug("seeds={} remoteSeeds={} remoteSeeders={}", seeds, remoteSeeds, remoteSeeders);
-
             Map<String, String> parameters = new HashMap<>();
             if (!seeds.isEmpty())
                 parameters.put("seeds", String.join(", ", seeds));
@@ -1015,8 +1046,8 @@ public class DataCenterUpdateAction {
                     .addFile("cassandra-topology.properties", String.format(Locale.ROOT, "default=%s:%s", dataCenterSpec.getDatacenterName(), rack));
         }
 
-        public V1Secret buildSecretKeystore() throws Exception {
-            final V1ObjectMeta certificatesMetadata = dataCenterObjectMeta(OperatorNames.keystore(dataCenter));
+        public V1Secret buildSecretKeystore(X509CertificateAndPrivateKey x509CertificateAndPrivateKey) throws GeneralSecurityException, IOException, OperatorCreationException {
+            final V1ObjectMeta certificatesMetadata = dataCenterObjectMeta(OperatorNames.keystoreSecret(dataCenter));
 
             // generate statefulset wildcard certificate in a PKCS12 keystore
             final String wildcardStatefulsetName = "*." + OperatorNames.nodesService(dataCenter) + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local";
@@ -1026,6 +1057,7 @@ public class DataCenterUpdateAction {
                     .metadata(certificatesMetadata)
                     .putDataItem("keystore.p12",
                             authorityManager.issueCertificateKeystore(
+                                    x509CertificateAndPrivateKey,
                                     wildcardStatefulsetName,
                                     ImmutableList.of(wildcardStatefulsetName, headlessServiceName, elasticsearchServiceName, "localhost"),
                                     ImmutableList.of(InetAddresses.forString("127.0.0.1")),
@@ -1042,7 +1074,7 @@ public class DataCenterUpdateAction {
          * @param username
          * @param password
          */
-        public V1Secret buildSecretRcFile(String username, String password) throws ApiException {
+        public V1Secret buildSecretRcFile(String username, String password)  {
             String cqlshrc = "";
             String curlrc = "";
 
@@ -1389,7 +1421,7 @@ public class DataCenterUpdateAction {
             if (dataCenterSpec.getSsl()) {
                 cassandraContainer.addVolumeMountsItem(new V1VolumeMount().name("operator-keystore").mountPath(OPERATOR_KEYSTORE_MOUNT_PATH));
                 podSpec.addVolumesItem(new V1Volume().name("operator-keystore")
-                        .secret(new V1SecretVolumeSource().secretName(OperatorNames.keystore(dataCenter))
+                        .secret(new V1SecretVolumeSource().secretName(OperatorNames.keystoreSecret(dataCenter))
                                 .addItemsItem(new V1KeyToPath().key("keystore.p12").path("keystore.p12"))));
 
                 cassandraContainer.addVolumeMountsItem(new V1VolumeMount().name("operator-truststore").mountPath(authorityManager.getPublicCaMountPath()));

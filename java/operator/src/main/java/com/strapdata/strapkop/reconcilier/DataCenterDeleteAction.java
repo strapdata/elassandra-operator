@@ -5,6 +5,7 @@ import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.cache.SidecarConnectionCache;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
+import com.strapdata.strapkop.cql.CqlSessionSupplier;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import io.kubernetes.client.ApiException;
@@ -46,12 +47,12 @@ public class DataCenterDeleteAction {
         this.cqlKeyspaceManager = cqlKeyspaceManager;
     }
     
-    Completable deleteDataCenter() throws Exception {
+    Completable deleteDataCenter(final CqlSessionSupplier cqlSessionSupplier) throws Exception {
         // remove the datacenter from replication maps of managed keyspaces
         return Completable.fromAction(new Action() {
             @Override
             public void run() throws Exception {
-                cqlKeyspaceManager.removeDatacenter(dataCenter);
+                cqlKeyspaceManager.removeDatacenter(dataCenter, cqlSessionSupplier);
 
                 final String labelSelector = OperatorLabels.toSelector(OperatorLabels.datacenter(dataCenter));
 

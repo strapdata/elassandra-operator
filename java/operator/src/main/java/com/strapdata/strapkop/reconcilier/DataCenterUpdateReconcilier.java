@@ -3,9 +3,6 @@ package com.strapdata.strapkop.reconcilier;
 import com.strapdata.model.Key;
 import com.strapdata.model.k8s.cassandra.DataCenterPhase;
 import com.strapdata.model.k8s.cassandra.DataCenterStatus;
-import com.strapdata.strapkop.cql.CqlConnectionManager;
-import com.strapdata.strapkop.cql.CqlKeyspaceManager;
-import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.plugins.PluginRegistry;
 import io.kubernetes.client.ApiException;
@@ -26,23 +23,15 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
     
     private final ApplicationContext context;
     private final K8sResourceUtils k8sResourceUtils;
-    private final CqlRoleManager cqlRoleManager;
-    private final CqlKeyspaceManager cqlKeyspaceManager;
-    private final CqlConnectionManager cqlConnectionManager;
+
     private final PluginRegistry pluginRegistry;
 
     public DataCenterUpdateReconcilier(final ApplicationContext context,
                                        final K8sResourceUtils k8sResourceUtils,
-                                       final CqlRoleManager cqlRoleManager,
-                                       final CqlKeyspaceManager cqlKeyspaceManager,
-                                       final CqlConnectionManager cqlConnectionManager,
                                        final CoreV1Api coreApi,
                                        final PluginRegistry pluginRegistry) {
         this.context = context;
         this.k8sResourceUtils = k8sResourceUtils;
-        this.cqlRoleManager = cqlRoleManager;
-        this.cqlKeyspaceManager = cqlKeyspaceManager;
-        this.cqlConnectionManager = cqlConnectionManager;
         this.pluginRegistry = pluginRegistry;
     }
 
@@ -58,15 +47,6 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
                         return Completable.complete();
                     }
                     try {
-                        // reconcile cql connection
-                        cqlConnectionManager.reconcileConnection(dc);
-
-                        // reconcile keyspaces (when CQL connection is up)
-                        cqlKeyspaceManager.reconcileKeyspaces(dc);
-
-                        // reconcile credentials (after keyspace creation)
-                        cqlRoleManager.reconcileRole(dc);
-
                         // call the statefullset reconciliation  (before scaling up/down to properly stream data according to the adjusted RF)
                         logger.trace("processing a dc reconciliation request for {} in thread {}", dc.getMetadata().getName(), Thread.currentThread().getName());
 
