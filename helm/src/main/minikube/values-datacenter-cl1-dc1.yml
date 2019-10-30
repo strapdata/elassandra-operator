@@ -2,10 +2,11 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 clusterName: Elassandra
-replicas: 2
+replicas: 1
 
 # STRICT or SLACK
 nodeAffinityPolicy: STRICT
+decommissionPolicy: DELETE_PVC
 
 image:
   elassandraRepository: localhost.localdomain:5000/strapdata/strapkop-elassandra-dev
