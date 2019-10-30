@@ -226,7 +226,7 @@ public class DataCenterUpdateAction {
                     ElassandraPod failedPod = null;
                     if (movingRack != null) {
                         Zone movingZone = zones.zones.get(movingRack.getName());
-                        logger.debug("movinRack={} phase={} isReady={} isUpdating={} isScalingUp={} isScalingDown={} firstPodStatus={} lastPodStatus={}",
+                        logger.debug("movingRack={} phase={} isReady={} isUpdating={} isScalingUp={} isScalingDown={} firstPodStatus={} lastPodStatus={}",
                                 movingRack.getName(), movingRack.getPhase(), movingZone.isReady(), movingZone.isScalingUp(), movingZone.isScalingDown(),
                                 elassandraNodeStatusCache.get(movingZone.firstPod(dataCenter)), elassandraNodeStatusCache.get(movingZone.lastPod(dataCenter)));
                         // check is operation is finished ?
