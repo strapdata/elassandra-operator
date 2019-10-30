@@ -23,8 +23,8 @@ import java.util.stream.Collectors;
 /**
  * Provides Cassandra seed addresses, usually one per rack.
  */
-public class SeedProvider implements org.apache.cassandra.locator.SeedProvider {
-    private static final Logger logger = LoggerFactory.getLogger(SeedProvider.class);
+public class ElassandraOperatorSeedProvider implements org.apache.cassandra.locator.SeedProvider {
+    private static final Logger logger = LoggerFactory.getLogger(ElassandraOperatorSeedProvider.class);
 
     /**
      * List of comma separated hostnames or ip address.
@@ -41,7 +41,7 @@ public class SeedProvider implements org.apache.cassandra.locator.SeedProvider {
 
     private Set<InetAddress> nodeInfoSeeds;
 
-    public SeedProvider(final Map<String, String> args) {
+    public ElassandraOperatorSeedProvider(final Map<String, String> args) {
         seeds = getParameter(args, "seeds", "SEEDS");
         remoteSeeds = getParameter(args, "remote_seeds", "REMOTE_SEEDS");
         remoteSeeders = getParameter(args, "remote_seeders", "REMOTE_SEEDERS");
@@ -115,9 +115,9 @@ public class SeedProvider implements org.apache.cassandra.locator.SeedProvider {
         try
         {
             conn.setRequestMethod("GET");
-            conn.setRequestProperty("Metadata-Flavor", "Strapdata");
+            conn.setRequestProperty("Metadata-Flavor", "elassandra-operator");
             if (conn.getResponseCode() != 200)
-                throw new ConfigurationException("StrapkopSeedProvider was unable to execute the API call code="+conn.getResponseCode()+" reason="+conn.getResponseMessage());
+                throw new ConfigurationException("ElassandraOperatorSeedProvider was unable to execute the API call code="+conn.getResponseCode()+" reason="+conn.getResponseMessage());
 
             // Read the information.
             int cl = conn.getContentLength();

@@ -7,6 +7,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.net.InetAddresses;
 import com.google.gson.reflect.TypeToken;
 import com.squareup.okhttp.Call;
+import com.strapdata.cassandra.k8s.ElassandraOperatorSeedProvider;
 import com.strapdata.model.k8s.cassandra.*;
 import com.strapdata.model.k8s.task.Task;
 import com.strapdata.model.sidecar.ElassandraNodeStatus;
@@ -762,7 +763,7 @@ public class DataCenterUpdateAction {
             logger.debug("seed parameters={}", parameters);
             final Map<String, Object> config = new HashMap<>(); // can't use ImmutableMap as some values are null
             config.put("seed_provider", ImmutableList.of(ImmutableMap.of(
-                    "class_name", "com.strapdata.cassandra.k8s.SeedProvider",
+                    "class_name", ElassandraOperatorSeedProvider.class.getName(),
                     "parameters", ImmutableList.of(parameters))
             ));
             return new ConfigMapVolumeMountBuilder(configMap, volumeSource, "operator-config-volume-seeds", "/tmp/operator-config-seeds")

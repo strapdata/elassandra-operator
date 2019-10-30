@@ -9,7 +9,7 @@ import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.policies.DCAwareRoundRobinPolicy;
 import com.datastax.driver.core.policies.TokenAwarePolicy;
 import com.google.common.collect.ImmutableList;
-import com.strapdata.cassandra.k8s.SeedProvider;
+import com.strapdata.cassandra.k8s.ElassandraOperatorSeedProvider;
 import com.strapdata.model.k8s.cassandra.Authentication;
 import com.strapdata.model.k8s.cassandra.CqlStatus;
 import com.strapdata.model.k8s.cassandra.DataCenter;
@@ -242,7 +242,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
         if (dc.getSpec().getRemoteSeeders() != null) {
             for(String remoteSeeder : dc.getSpec().getRemoteSeeders()) {
                 try {
-                    for(InetAddress addr : SeedProvider.seederCall(remoteSeeder)) {
+                    for(InetAddress addr : ElassandraOperatorSeedProvider.seederCall(remoteSeeder)) {
                         logger.debug("Add remote seed={} from seeder={} for datacenter={}",
                                 addr.getHostAddress(), remoteSeeder, dc.getMetadata().getName());
                         builder.addContactPoint(addr.getHostAddress());
