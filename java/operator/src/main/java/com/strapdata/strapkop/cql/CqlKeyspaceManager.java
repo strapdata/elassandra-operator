@@ -15,7 +15,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 import java.util.*;
-import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
 /**
@@ -189,17 +188,14 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
     }
 
     private Single<Session> alterKeyspace(final DataCenter dc, final CqlSessionSupplier sessionSupplier, final String name, Map<String, Integer> rfMap) throws Exception {
-        return sessionSupplier.getSession(dc).flatMap(session -> Single.fromCallable(new Callable<Session>() {
-            @Override
-            public Session call() throws Exception {
-                final String query = String.format(Locale.ROOT,
-                        "ALTER KEYSPACE %s WITH replication = {'class': 'NetworkTopologyStrategy', %s};",
-                        name, stringifyRfMap(rfMap));
-                logger.debug("dc={} execute: {}", dc.getMetadata().getName(), query);
-                session.execute(query);
-                return session;
-            }
-        }));
+        return sessionSupplier.getSession(dc)
+                .flatMap(session -> {
+                    final String query = String.format(Locale.ROOT,
+                            "ALTER KEYSPACE %s WITH replication = {'class': 'NetworkTopologyStrategy', %s};",
+                            name, stringifyRfMap(rfMap));
+                    logger.debug("dc={} execute: {}", dc.getMetadata().getName(), query);
+                    return Single.fromFuture(session.executeAsync(query)).map(x -> session);
+                });
     }
 
     private String stringifyRfMap(final Map<String, Integer> rfMap) {
