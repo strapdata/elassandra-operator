@@ -1,15 +1,18 @@
 package com.strapdata.strapkop.plugins;
 
-import com.datastax.driver.core.Session;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.strapdata.model.k8s.cassandra.*;
 import com.strapdata.strapkop.StrapkopException;
-import com.strapdata.strapkop.cql.*;
+import com.strapdata.strapkop.cql.CqlKeyspace;
+import com.strapdata.strapkop.cql.CqlKeyspaceManager;
+import com.strapdata.strapkop.cql.CqlRole;
+import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.ssl.AuthorityManager;
+import com.strapdata.strapkop.cql.CqlSessionSupplier;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
@@ -40,18 +43,18 @@ public class ReaperPlugin extends AbstractPlugin {
     public ReaperPlugin(final ApplicationContext context,
                         K8sResourceUtils k8sResourceUtils,
                         AuthorityManager authorityManager,
-                        CqlConnectionManager cqlConnectionManager,
                         CoreV1Api coreApi,
                         AppsV1Api appsApi) {
-        super(context, k8sResourceUtils, authorityManager, cqlConnectionManager, coreApi, appsApi);
+        super(context, k8sResourceUtils, authorityManager, coreApi, appsApi);
     }
 
     public static final CqlKeyspace REAPER_KEYSPACE = new CqlKeyspace("reaper_db", 3) {
         @Override
-        public CqlKeyspace createIfNotExistsKeyspace(DataCenter dataCenter, Session session) {
-            CqlKeyspace ks = super.createIfNotExistsKeyspace(dataCenter, session);
-            dataCenter.getStatus().setReaperPhase(ReaperPhase.KEYSPACE_CREATED);
-            return ks;
+        public Single<CqlKeyspace> createIfNotExistsKeyspace(DataCenter dataCenter, CqlSessionSupplier sessionSupplier) throws Exception {
+            return super.createIfNotExistsKeyspace(dataCenter, sessionSupplier).map(ks -> {
+                dataCenter.getStatus().setReaperPhase(ReaperPhase.KEYSPACE_CREATED);
+                return ks;
+            });
         }
     };
 
@@ -72,7 +75,7 @@ public class ReaperPlugin extends AbstractPlugin {
             .withGrantStatements(ImmutableList.of("GRANT ALL PERMISSIONS ON KEYSPACE reaper_db TO reaper"))
             .withPostCreateHandler(ReaperPlugin::postCreateReaper);
 
-    public static void postCreateReaper(DataCenter dataCenter, final Session session) throws Exception {
+    public static void postCreateReaper(DataCenter dataCenter, final CqlSessionSupplier sessionSupplier) throws Exception {
         dataCenter.getStatus().setReaperPhase(ReaperPhase.ROLE_CREATED);
         logger.debug("reaper role created for dc={}, ReaperStatus=ROLE_CREATED", dataCenter.getMetadata().getName());
     }

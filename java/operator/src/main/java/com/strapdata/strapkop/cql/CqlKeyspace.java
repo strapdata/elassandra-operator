@@ -1,7 +1,7 @@
 package com.strapdata.strapkop.cql;
 
-import com.datastax.driver.core.Session;
 import com.strapdata.model.k8s.cassandra.DataCenter;
+import io.reactivex.Single;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -22,15 +22,19 @@ public class CqlKeyspace {
      * create keyspace if not exists.
      *
      * @param dataCenter
-     * @param session
+     * @param sessionSupplier
      * @return
      */
-    public CqlKeyspace createIfNotExistsKeyspace(final DataCenter dataCenter, final Session session) {
-        if (rf > 0) {
-            int targetRf = Math.max(1, Math.min(rf, dataCenter.getStatus().getReplicas()));
-            session.execute(String.format(Locale.ROOT, "CREATE KEYSPACE IF NOT EXISTS \"%s\" WITH replication = {'class': 'NetworkTopologyStrategy', '%s':'%d'}; ",
-                    name, dataCenter.getSpec().getDatacenterName(), targetRf));
-        }
-        return this;
+    public Single<CqlKeyspace> createIfNotExistsKeyspace(final DataCenter dataCenter, final CqlSessionSupplier sessionSupplier) throws Exception {
+        return (rf <= 0) ?
+                Single.just(this) :
+                sessionSupplier.getSession(dataCenter)
+                    .flatMap(session -> {
+                        int targetRf = Math.max(1, Math.min(rf, dataCenter.getStatus().getReplicas()));
+                        return Single.fromFuture(session.executeAsync(
+                                String.format(Locale.ROOT, "CREATE KEYSPACE IF NOT EXISTS \"%s\" WITH replication = {'class': 'NetworkTopologyStrategy', '%s':'%d'}; ",
+                                name, dataCenter.getSpec().getDatacenterName(), targetRf)));
+                    })
+                    .map(x -> this);
     }
 }

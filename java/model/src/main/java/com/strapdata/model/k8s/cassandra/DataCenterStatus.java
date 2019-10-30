@@ -35,9 +35,9 @@ public class DataCenterStatus {
     @Expose
     private CqlStatus cqlStatus = CqlStatus.NOT_STARTED;
     
-    @SerializedName("cqlErrorMessage")
+    @SerializedName("cqlStatusMessage")
     @Expose
-    private String cqlErrorMessage = null;
+    private String cqlStatusMessage = null;
 
     /**
      * Number of nodes in the datacenter

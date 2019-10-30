@@ -9,6 +9,7 @@ import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.models.V1ObjectMeta;
 import io.kubernetes.client.models.V1Secret;
+import io.reactivex.Single;
 import io.vavr.control.Option;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.slf4j.Logger;
@@ -24,6 +25,7 @@ import java.security.SignatureException;
 import java.security.cert.CertificateException;
 import java.text.MessageFormat;
 import java.util.List;
+import java.util.concurrent.Callable;
 
 /**
  * Read/Write the operator CA in a k8s secret.
@@ -132,6 +134,15 @@ public class AuthorityManager {
     
         return new X509CertificateAndPrivateKey(certs, key);
     }
+
+    public Single<X509CertificateAndPrivateKey> loadFromSecretSingle() {
+        return Single.fromCallable(new Callable<X509CertificateAndPrivateKey>() {
+            @Override
+            public X509CertificateAndPrivateKey call() throws Exception {
+                return loadFromSecret();
+            }
+        });
+    }
     
     public String loadPrivateCaFromSecret() throws StrapkopException, ApiException {
         return loadItemFromSecret(getPrivateCaSecretName(), SECRET_CA_KEY);
@@ -168,13 +179,14 @@ public class AuthorityManager {
      * @return
      * @throws Exception
      */
-    public byte[] issueCertificateKeystore(String cn,
+    public byte[] issueCertificateKeystore(X509CertificateAndPrivateKey x509CertificateAndPrivateKey,
+                                           String cn,
                                            List<String> dnsNames,
                                            List<InetAddress> ipAddresses,
                                            String alias,
-                                           String password) throws Exception {
+                                           String password) throws GeneralSecurityException, IOException, OperatorCreationException {
         return certManager.generateClientKeystoreBytes(
-            loadFromSecret(),
+                x509CertificateAndPrivateKey,
             Option.of(getCaKeyPass()),
             cn,
             dnsNames,

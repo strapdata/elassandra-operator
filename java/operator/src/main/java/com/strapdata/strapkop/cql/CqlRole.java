@@ -1,11 +1,12 @@
 package com.strapdata.strapkop.cql;
 
 import com.datastax.driver.core.Session;
-import com.datastax.driver.core.exceptions.DriverException;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.StrapkopException;
+import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
-import io.kubernetes.client.models.V1Secret;
+import io.reactivex.Completable;
+import io.reactivex.Single;
 import lombok.*;
 import lombok.experimental.Wither;
 import org.slf4j.Logger;
@@ -34,7 +35,7 @@ public class CqlRole implements Cloneable {
     public static final CqlRole CASSANDRA_ROLE = new CqlRole()
             .withUsername("cassandra")
             .withSecretKey("cassandra.cassandra_password")
-            .withSuperUser(false)
+            .withSuperUser(true)
             .withApplied(false);
 
     public static final CqlRole ADMIN_ROLE = new CqlRole()
@@ -77,7 +78,7 @@ public class CqlRole implements Cloneable {
     boolean applied;
 
     /**
-     * Grant statement applied after the role is created
+     * Grant statements applied after the role is created
      */
     List<String> grantStatements;
 
@@ -90,69 +91,80 @@ public class CqlRole implements Cloneable {
         return this.toBuilder().applied(false).password(null).build();
     }
 
-    /**
-     * Load password from k8s secret
-     *
-     * @param secret
-     * @return this
-     * @throws StrapkopException
-     */
-    CqlRole loadPassword(V1Secret secret) throws StrapkopException {
-        if (this.password != null)
-            return this;
+    public String secret(DataCenter dc) {
+        return (secretKey == null) ? null : secretNameProvider.apply(dc) + "/" + secretKey;
+    }
 
-        byte[] passBytes = secret.getData().get(secretKey);
-        if (passBytes == null) {
-            logger.error("secret={} does not contain password for role={}", secret.getMetadata().getName(), this);
-            throw new StrapkopException("secret=" + secret.getMetadata().getName() + " does not contain password for role=" + username);
-        }
-        this.password = new String(passBytes);
-        if (this.password.matches(".*[\"\'].*")) {
-            throw new StrapkopException(String.format("invalid character in cassandra password for username %s", username));
-        }
-        return this;
+    Single<CqlRole> loadPassword(DataCenter dataCenter, K8sResourceUtils k8sResourceUtils) {
+        if (this.password != null)
+            return Single.just(this);
+
+        return k8sResourceUtils.readNamespacedSecret(dataCenter.getMetadata().getNamespace(), this.secretNameProvider.apply(dataCenter))
+                .map(secret -> {
+                    byte[] passBytes = secret.getData().get(secretKey);
+                    if (passBytes == null) {
+                        logger.error("secret={} does not contain password for role={}", secret.getMetadata().getName(), this);
+                        throw new StrapkopException("secret=" + secret.getMetadata().getName() + " does not contain password for role=" + username);
+                    }
+                    this.password = new String(passBytes);
+                    if (this.password.matches(".*[\"\'].*")) {
+                        throw new StrapkopException(String.format("invalid character in cassandra password for username %s", username));
+                    }
+                    return this;
+                });
     }
 
     /**
      * Create or update a cassandra role, grant permissions and execute postCreate handler.
      *
-     * @param session
+     * @param sessionSupplier
      * @return this
      * @throws StrapkopException
      */
-    CqlRole createOrUpdateRole(DataCenter dataCenter, final Session session) throws Exception {
+    Single<CqlRole> createOrUpdateRole(DataCenter dataCenter, K8sResourceUtils k8sResourceUtils, final CqlSessionSupplier sessionSupplier) throws Exception {
         if (!applied) {
-            logger.debug("Creating role={} in cluster={} dc={}", this, dataCenter.getSpec().getClusterName(), dataCenter.getMetadata().getName());
             // create role if not exists, then alter... so this is completely idempotent and can even update password, although it might not be optimized
-            session.execute(String.format(Locale.ROOT, "CREATE ROLE IF NOT EXISTS %s with SUPERUSER = %b AND LOGIN = true and PASSWORD = '%s'", username, superUser, password));
-            session.execute(String.format(Locale.ROOT, "ALTER ROLE %s WITH PASSWORD = '%s'", username, superUser, password));
-
-            this.applied = true;     // mark the role as up-to-date
-
-            if (this.grantStatements != null) {
-                for (String grant : grantStatements) {
-                    try {
-                        session.execute(grant);
-                    } catch (DriverException ex) {
-                        logger.error("Failed to execute: " + grant, ex);
-                    }
-                }
-            }
-            if (this.postCreateHandler != null) {
-                try {
-                    this.postCreateHandler.postCreate(dataCenter, session);
-                } catch (Exception e) {
-                    logger.error("Failed to execute posteCreate for role=" + this.username, e);
-                }
-            }
+            return loadPassword(dataCenter, k8sResourceUtils)
+                    .flatMap(cqlRole -> {
+                        logger.debug("Creating role={} in cluster={} dc={}", this, dataCenter.getSpec().getClusterName(), dataCenter.getMetadata().getName());
+                        return sessionSupplier.getSession(dataCenter);
+                    })
+                    .flatMap(session -> {
+                        String q = String.format(Locale.ROOT, "CREATE ROLE IF NOT EXISTS %s with SUPERUSER = %b AND LOGIN = true and PASSWORD = '%s'", username, superUser, password);
+                        logger.debug(q);
+                        return Single.fromFuture(session.executeAsync(q)).map(rs -> session);
+                    })
+                    .flatMap(session -> {
+                        String q = String.format(Locale.ROOT, "ALTER ROLE %s WITH PASSWORD = '%s'", username, password);
+                        logger.debug(q);
+                        return Single.fromFuture(session.executeAsync(q)).map(rs -> session);
+                    })
+                    .flatMap(session -> {
+                        return (this.grantStatements != null && this.grantStatements.size() > 0) ?
+                                Completable.mergeArray(this.grantStatements.stream().map(
+                                        stmt -> Completable.fromFuture(session.executeAsync(stmt))).toArray(Completable[]::new))
+                                        .toSingleDefault(session) :
+                                Single.just(session);
+                    })
+                    .map(session -> {
+                        if (this.postCreateHandler != null) {
+                            try {
+                                this.postCreateHandler.postCreate(dataCenter, sessionSupplier);
+                            } catch (Exception e) {
+                                logger.error("Failed to execute posteCreate for role=" + this.username, e);
+                            }
+                        }
+                        this.applied = true;     // mark the role as up-to-date
+                        return this;
+                    });
         }
-        return this;
+        return Single.just(this);
     }
 
-    CqlRole deleteRole(final Session session) throws Exception {
+    Single<CqlRole> deleteRole(final Session session) throws Exception {
         logger.debug("Droping role={}", this);
-        session.execute(String.format(Locale.ROOT, "DROP ROLE %s", username));
-        return this;
+        return Single.fromFuture(session.executeAsync(String.format(Locale.ROOT, "DROP ROLE %s", username)))
+                .map(rs -> this);
     }
 
     /**
@@ -161,9 +173,9 @@ public class CqlRole implements Cloneable {
      * @param session
      * @return this
      */
-    CqlRole updatePassword(Session session) {
+    Single<CqlRole> updatePassword(Session session) {
         logger.debug("Updating password for role={}", this);
-        session.execute(String.format(Locale.ROOT, "ALTER ROLE %s WITH PASSWORD = '%s'", username, password));
-        return this;
+        return Single.fromFuture(session.executeAsync(String.format(Locale.ROOT, "ALTER ROLE %s WITH PASSWORD = '%s'", username, password)))
+                .map(rs -> this);
     }
 }

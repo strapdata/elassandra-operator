@@ -12,7 +12,6 @@ import com.strapdata.model.k8s.task.Task;
 import com.strapdata.model.k8s.task.TaskList;
 import com.strapdata.model.k8s.task.TaskPhase;
 import com.strapdata.model.k8s.task.TaskSpec;
-import com.strapdata.strapkop.utils.ThrowingSupplier;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.ApiResponse;
 import io.kubernetes.client.apis.AppsV1Api;
@@ -36,6 +35,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 @Singleton
 public class K8sResourceUtils {
@@ -283,7 +283,7 @@ public class K8sResourceUtils {
         );
     }
 
-    public Single<V1Secret> readOrCreateNamespacedSecret(V1ObjectMeta secretObjectMeta, final ThrowingSupplier<V1Secret> secretSupplier) throws ApiException {
+    public Single<V1Secret> readOrCreateNamespacedSecret(V1ObjectMeta secretObjectMeta, final Supplier<V1Secret> secretSupplier) throws ApiException {
         return readOrCreateResource(
                 () -> {
                         V1Secret secret2 = coreApi.readNamespacedSecret(secretObjectMeta.getName(), secretObjectMeta.getNamespace(), null, null, null);

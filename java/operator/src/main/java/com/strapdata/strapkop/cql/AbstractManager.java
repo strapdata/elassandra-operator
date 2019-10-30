@@ -12,12 +12,9 @@ import java.util.function.Supplier;
  */
 public abstract class AbstractManager<T> {
 
-    protected final CqlConnectionManager cqlConnectionManager;
-
     private final Map<String, Map<String, T>> ressources = new HashMap<>(); // per datacenter resources
 
-    public AbstractManager(CqlConnectionManager cqlConnectionManager) {
-        this.cqlConnectionManager = cqlConnectionManager;
+    public AbstractManager() {
     }
 
     public Map<String, T> get(final DataCenter dataCenter) {
