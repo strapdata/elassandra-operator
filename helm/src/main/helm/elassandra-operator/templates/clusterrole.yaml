@@ -56,7 +56,12 @@ rules:
   - endpoints
   - persistentvolumeclaims
   - persistentvolumes
-  - ingresses
+  verbs: ['get', 'create', 'update', 'delete', 'list']
+- apiGroups:
+  - extensions
+  resources:
+    - ingress
+    - ingresses
   verbs: ['get', 'create', 'update', 'delete', 'list']
 - nonResourceURLs: ["/version", "/version/*"]
   verbs: ['get']
