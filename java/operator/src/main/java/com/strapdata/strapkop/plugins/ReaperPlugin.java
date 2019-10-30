@@ -467,7 +467,7 @@ public class ReaperPlugin extends AbstractPlugin {
 
     // TODO: cache cluster secret to avoid loading secret again and again
     private String loadReaperAdminPassword(DataCenter dc) throws ApiException, StrapkopException {
-        final String secretName = OperatorNames.clusterSecret(dc);
+        final String secretName = reaperSecretName(dc);
         final V1Secret secret = coreApi.readNamespacedSecret(secretName,
                 dc.getMetadata().getNamespace(),
                 null,
