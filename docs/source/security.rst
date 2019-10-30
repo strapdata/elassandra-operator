@@ -76,6 +76,7 @@ cluster role ``strapkop-elassandra-operator`` with the following restricted oper
       - endpoints
       - persistentvolumeclaims
       - persistentvolumes
+      - ingresses
       verbs:
       - get
       - create
@@ -101,6 +102,31 @@ cluster role ``strapkop-elassandra-operator`` with the following restricted oper
       verbs:
       - list
 
+In order to access Kubernetes nodes information about server type, storage type and optional public IP address,
+the Elassandra operator create a dedicated ServiceAccount suffixed by ``nodeinfo`` associated to the ClusterRole
+``node-reader``. When starting Elassandra pods, this allows an init container to retrieve usefull information.
+
+The node-reader has the following permissions:
+
+.. code::
+
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRole
+    metadata:
+      labels:
+        app: {{ template "elassandra-operator.name" . }}
+        chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+        heritage: {{ .Release.Service }}
+        release: {{ .Release.Name }}
+      name: {{ template "elassandra-operator.fullname" . }}-node-reader
+    rules:
+      - apiGroups: [""]
+        resources: ["nodes"]
+        verbs: ["get", "list", "watch"]
+      - apiGroups: [""]
+        resources: ["pods"]
+        verbs: ["get", "list", "watch"]
+
 SSL/TLS Certificates
 ....................
 
@@ -118,7 +144,8 @@ This TLS certificates and keys are used to secure:
 When your cluster have multiple datacenters located in several Kubernetes clusters, these datacenter must share the same root CA
 certificate secret. Thus, all nodes trust the same root CA.
 
-Authentication and Access Control
-.................................
+Authentication
+..............
+
 
 Strapkop can automatically create Cassandra roles with a password defined as a Kubernetes secret, and set Cassandra permission and Elasticsearch privileges.
