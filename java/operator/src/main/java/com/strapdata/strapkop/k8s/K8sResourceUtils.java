@@ -705,13 +705,13 @@ public class K8sResourceUtils {
     }
 
 
-    public Iterable<ExtensionsV1beta1Deployment> listNamespacedDeployment(final String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) throws ApiException {
-        class V1DeploymentPage implements ResourceListIterable.Page<ExtensionsV1beta1Deployment> {
-            private final ExtensionsV1beta1DeploymentList deploymentList;
+    public Iterable<V1Deployment> listNamespacedDeployment(final String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) throws ApiException {
+        class V1DeploymentPage implements ResourceListIterable.Page<V1Deployment> {
+            private final V1DeploymentList deploymentList;
 
             private V1DeploymentPage(final String continueToken) throws ApiException {
                 try {
-                    deploymentList = extensionsV1beta1Api.listNamespacedDeployment(namespace, null, null, continueToken, fieldSelector, labelSelector, null, null, null, null);
+                    deploymentList = appsApi.listNamespacedDeployment(namespace, null, null, continueToken, fieldSelector, labelSelector, null, null, null, null);
                 } catch(ApiException e) {
                     logger.warn("Failed to list deployments in namespace="+namespace+" labelSelector="+labelSelector, e);
                     throw e;
@@ -719,12 +719,12 @@ public class K8sResourceUtils {
             }
 
             @Override
-            public Collection<ExtensionsV1beta1Deployment> items() {
+            public Collection<V1Deployment> items() {
                 return deploymentList.getItems();
             }
 
             @Override
-            public ResourceListIterable.Page<ExtensionsV1beta1Deployment> nextPage() throws ApiException {
+            public ResourceListIterable.Page<V1Deployment> nextPage() throws ApiException {
                 final String continueToken = deploymentList.getMetadata().getContinue();
 
                 if (Strings.isNullOrEmpty(continueToken))
