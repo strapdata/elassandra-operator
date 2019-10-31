@@ -66,6 +66,9 @@ public class DataCenterUpdateAction {
     public static final String OPERATOR_KEYSTORE = "keystore.p12";
     public static final String OPERATOR_KEYPASS = "changeit";
 
+    public static final long CASSANDRA_USER_ID = 999L;
+    public static final long CASSANDRA_GROUP_ID = 999L;
+
     private final ApplicationContext context;
     private final CoreV1Api coreApi;
     private final AppsV1Api appsApi;
@@ -1132,102 +1135,9 @@ public class DataCenterUpdateAction {
         public V1StatefulSet buildStatefulSetRack(final String rack, final int replicas, ConfigMapVolumeMounts configMapVolumeMounts) throws ApiException, StrapkopException {
             final V1ObjectMeta statefulSetMetadata = rackObjectMeta(rack, OperatorNames.stsName(dataCenter, rack));
 
-            final V1Container cassandraContainer = new V1Container()
-                    .name("elassandra")
-                    .image(dataCenterSpec.getElassandraImage())
-                    .imagePullPolicy(dataCenterSpec.getImagePullPolicy())
-                    .terminationMessagePolicy("FallbackToLogsOnError")
-                    .resources(dataCenterSpec.getResources())
-                    .securityContext(new V1SecurityContext()
-                            .runAsUser(999L)
-                            .capabilities(new V1Capabilities().add(ImmutableList.of(
-                                    "IPC_LOCK",
-                                    "SYS_RESOURCE"
-                            ))))
-                    .readinessProbe(new V1Probe()
-                            .exec(new V1ExecAction()
-                                    .addCommandItem("/ready-probe.sh")
-                                    .addCommandItem(dataCenterSpec.getNativePort().toString())
-                                    .addCommandItem("9200")
-                            )
-                            .initialDelaySeconds(15)
-                            .timeoutSeconds(5)
-                    )
-                    .addVolumeMountsItem(new V1VolumeMount()
-                            .name("data-volume")
-                            .mountPath("/var/lib/cassandra")
-                    )
-                    .addVolumeMountsItem(new V1VolumeMount()
-                            .name("nodeinfo")
-                            .mountPath("/nodeinfo")
-                    )
-                    .addVolumeMountsItem(new V1VolumeMount()
-                            .name("pod-info")
-                            .mountPath("/etc/podinfo")
-                    )
-                    .addVolumeMountsItem(new V1VolumeMount()
-                            .name("sidecar-config-volume")
-                            .mountPath("/tmp/sidecar-config-volume")
-                    )
-                    .addVolumeMountsItem(new V1VolumeMount()
-                            .name("cassandra-log-volume")
-                            .mountPath("/var/log/cassandra")
-                    )
-                    .addVolumeMountsItem(new V1VolumeMount()
-                            .name("cqlshrc-volume")
-                            .mountPath("/home/cassandra/.cassandra/cqlshrc")
-                            .subPath("cqlshrc")
-                    )
-                    .addVolumeMountsItem(new V1VolumeMount()
-                            .name("curlrc-volume")
-                            .mountPath("/home/cassandra/.curlrc")
-                            .subPath(".curlrc")
-                    )
-                    .addArgsItem("/tmp/sidecar-config-volume")
-                    .addEnvItem(new V1EnvVar().name("JMX_PORT").value(Integer.toString(dataCenterSpec.getJmxPort())))
-                    .addEnvItem(new V1EnvVar().name("CQLS_OPTS").value( dataCenterSpec.getSsl() ? "--ssl" : ""))
-                    .addEnvItem(new V1EnvVar().name("NODETOOL_OPTS").value(
-                            dataCenterSpec.getJmxmpEnabled() ?
-                                    " -Dcassandra.jmxmp" :
-                                    ((dataCenterSpec.getSsl() ? " --ssl" : "") + " -u cassandra -pwf /etc/cassandra/jmxremote.password" )))
-                    .addEnvItem(new V1EnvVar().name("ES_SCHEME").value( dataCenterSpec.getSsl() ? "https" : "http"))
-                    .addEnvItem(new V1EnvVar().name("HOST_NETWORK").value( Boolean.toString(dataCenterSpec.getHostNetworkEnabled())))
-                    .addEnvItem(new V1EnvVar().name("NAMESPACE").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.namespace"))))
-                    .addEnvItem(new V1EnvVar().name("POD_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.name"))))
-                    .addEnvItem(new V1EnvVar().name("POD_IP").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("status.podIP"))))
-                    .addEnvItem(new V1EnvVar().name("NODE_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("spec.nodeName"))))
-                    .addEnvItem(new V1EnvVar().name("NODE_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("spec.nodeName"))))
-                    ;
-
-            if (dataCenterSpec.getSsl()) {
-                cassandraContainer.addVolumeMountsItem(new V1VolumeMount()
-                        .name("nodetool-ssl-volume")
-                        .mountPath("/home/cassandra/.cassandra/nodetool-ssl.properties")
-                        .subPath("nodetool-ssl.properties")
-                );
-            }
-            addPortsItem(cassandraContainer, dataCenterSpec.getStoragePort(), "internode", dataCenterSpec.getHostPortEnabled());
-            addPortsItem(cassandraContainer, dataCenterSpec.getSslStoragePort(), "internode-ssl", dataCenterSpec.getHostPortEnabled());
-            addPortsItem(cassandraContainer, dataCenterSpec.getNativePort(), "cql", dataCenterSpec.getHostPortEnabled());
-            addPortsItem(cassandraContainer, dataCenterSpec.getJmxPort(), "jmx", false);
-            addPortsItem(cassandraContainer, dataCenterSpec.getJdbPort(), "jdb", false);
-
-            if (dataCenterSpec.getElasticsearchEnabled()) {
-                cassandraContainer.addPortsItem(new V1ContainerPort().name("elasticsearch").containerPort(9200));
-                cassandraContainer.addPortsItem(new V1ContainerPort().name("transport").containerPort(9300));
-                cassandraContainer.addEnvItem(new V1EnvVar().name("CASSANDRA_DAEMON").value("org.apache.cassandra.service.ElassandraDaemon"));
-
-                // if enterprise JMX is enabled, stop search with a pre-stop hook
-                if (dataCenterSpec.getEnterprise().getJmx()) {
-                    cassandraContainer.lifecycle(new V1Lifecycle().preStop(new V1Handler().exec(new V1ExecAction()
-                            .addCommandItem("curl")
-                            .addCommandItem("-X")
-                            .addCommandItem("POST")
-                            .addCommandItem("http://localhost:8080/enterprise/search/disable"))));
-                }
-            } else {
-                cassandraContainer.addEnvItem(new V1EnvVar().name("CASSANDRA_DAEMON").value("org.apache.cassandra.service.CassandraDaemon"));
-            }
+            // create Elassandra container and the associated initContainer to replay commitlogs
+            final V1Container cassandraContainer = buildElassandraContainer();
+            final V1Container commitlogInitContainer = buildInitContainerCommitlogReplayer();
 
             if (dataCenterSpec.getPrometheusEnabled()) {
                 cassandraContainer.addPortsItem(new V1ContainerPort().name("prometheus").containerPort(9500));
@@ -1250,7 +1160,7 @@ public class DataCenterUpdateAction {
                     )
                     .image(dataCenterSpec.getSidecarImage())
                     .imagePullPolicy(dataCenterSpec.getImagePullPolicy())
-                    .securityContext(new V1SecurityContext().runAsUser(999L).runAsGroup(999L))
+                    .securityContext(new V1SecurityContext().runAsUser(CASSANDRA_USER_ID).runAsGroup(CASSANDRA_GROUP_ID))
                     .addPortsItem(new V1ContainerPort().name("http").containerPort(8080))
                     .addVolumeMountsItem(new V1VolumeMount()
                             .name("data-volume")
@@ -1279,7 +1189,7 @@ public class DataCenterUpdateAction {
                 sidecarContainer.addEnvItem(new V1EnvVar().name("JAVA_TOOL_OPTIONS").value(javaToolOptions));
 
             final V1PodSpec podSpec = new V1PodSpec()
-                    .securityContext(new V1PodSecurityContext().fsGroup(999L))
+                    .securityContext(new V1PodSecurityContext().fsGroup(CASSANDRA_GROUP_ID))
                     .hostNetwork(dataCenterSpec.getHostNetworkEnabled())
                     .addInitContainersItem(buildInitContainerVmMaxMapCount())
                     .addContainersItem(cassandraContainer)
@@ -1398,6 +1308,10 @@ public class DataCenterUpdateAction {
                 // the Cassandra container entrypoint overlays configmap volumes
                 cassandraContainer.addArgsItem(configMapVolumeMountBuilder.mountPath);
 
+                // commitlogInitContainer must have same volumes as the elassandra one
+                commitlogInitContainer.addVolumeMountsItem(configMapVolumeMountBuilder.buildV1VolumeMount());
+                commitlogInitContainer.addArgsItem(configMapVolumeMountBuilder.mountPath);
+
                 // provide access to config map volumes in the sidecar, these reside in /tmp though and are not overlayed into /etc/cassandra
                 sidecarContainer.addVolumeMountsItem(configMapVolumeMountBuilder.buildV1VolumeMount());
 
@@ -1408,9 +1322,11 @@ public class DataCenterUpdateAction {
             }
 
             if (dataCenterSpec.getUserSecretVolumeSource() != null) {
-                cassandraContainer.addVolumeMountsItem(new V1VolumeMount()
+                V1VolumeMount userSecretVolMount = new V1VolumeMount()
                         .name("user-secret-volume")
-                        .mountPath("/tmp/user-secret-config"));
+                        .mountPath("/tmp/user-secret-config");
+                cassandraContainer.addVolumeMountsItem(userSecretVolMount);
+                commitlogInitContainer.addVolumeMountsItem(userSecretVolMount);
 
                 podSpec.addVolumesItem(new V1Volume()
                         .name("user-secret-volume")
@@ -1425,17 +1341,22 @@ public class DataCenterUpdateAction {
                             .name(OperatorNames.clusterSecret(dataCenter))
                             .key("cassandra.jmx_password")));
             cassandraContainer.addEnvItem(jmxPasswordEnvVar);
+            commitlogInitContainer.addEnvItem(jmxPasswordEnvVar);
             sidecarContainer.addEnvItem(jmxPasswordEnvVar);
 
             // mount SSL keystores
             if (dataCenterSpec.getSsl()) {
-                cassandraContainer.addVolumeMountsItem(new V1VolumeMount().name("operator-keystore").mountPath(OPERATOR_KEYSTORE_MOUNT_PATH));
+                V1VolumeMount opKeystoreVolMount = new V1VolumeMount().name("operator-keystore").mountPath(OPERATOR_KEYSTORE_MOUNT_PATH);
+                cassandraContainer.addVolumeMountsItem(opKeystoreVolMount);
+                commitlogInitContainer.addVolumeMountsItem(opKeystoreVolMount);
                 podSpec.addVolumesItem(new V1Volume().name("operator-keystore")
                         .secret(new V1SecretVolumeSource().secretName(OperatorNames.keystoreSecret(dataCenter))
                                 .addItemsItem(new V1KeyToPath().key("keystore.p12").path("keystore.p12"))));
 
-                cassandraContainer.addVolumeMountsItem(new V1VolumeMount().name("operator-truststore").mountPath(authorityManager.getPublicCaMountPath()));
-                sidecarContainer.addVolumeMountsItem(new V1VolumeMount().name("operator-truststore").mountPath(authorityManager.getPublicCaMountPath()));
+                V1VolumeMount opTruststoreVolMount = new V1VolumeMount().name("operator-truststore").mountPath(authorityManager.getPublicCaMountPath());
+                cassandraContainer.addVolumeMountsItem(opTruststoreVolMount);
+                commitlogInitContainer.addVolumeMountsItem(opTruststoreVolMount);
+                sidecarContainer.addVolumeMountsItem(opTruststoreVolMount);
                 podSpec.addVolumesItem(new V1Volume().name("operator-truststore")
                         .secret(new V1SecretVolumeSource()
                                 .secretName(authorityManager.getPublicCaSecretName())
@@ -1445,11 +1366,18 @@ public class DataCenterUpdateAction {
 
             // Cluster secret mounted as config file (e.g AAA shared secret)
             if (dataCenterSpec.getEnterprise() != null && dataCenterSpec.getEnterprise().getAaa() != null && dataCenterSpec.getEnterprise().getAaa().getEnabled()) {
-                cassandraContainer.addVolumeMountsItem(new V1VolumeMount().name("operator-cluster-secret").mountPath("/tmp/operator-cluster-secret"));
+                final String opClusterSecretPath = "/tmp/operator-cluster-secret";
+                V1VolumeMount opClusterSecretVolMount = new V1VolumeMount().name("operator-cluster-secret").mountPath(opClusterSecretPath);
+
+                cassandraContainer.addVolumeMountsItem(opClusterSecretVolMount);
+                commitlogInitContainer.addVolumeMountsItem(opClusterSecretVolMount);
+
                 podSpec.addVolumesItem(new V1Volume().name("operator-cluster-secret")
                         .secret(new V1SecretVolumeSource().secretName(OperatorNames.clusterSecret(dataCenter))
                                 .addItemsItem(new V1KeyToPath().key("shared-secret.yaml").path("elasticsearch.yml.d/003-shared-secret.yaml"))));
-                cassandraContainer.addArgsItem("/tmp/operator-cluster-secret");
+
+                cassandraContainer.addArgsItem(opClusterSecretPath);
+                commitlogInitContainer.addArgsItem(opClusterSecretPath);
             }
 
 
@@ -1473,7 +1401,7 @@ public class DataCenterUpdateAction {
                         .env(dataCenterSpec.getEnv())
                         .image(dataCenterSpec.getSidecarImage())
                         .imagePullPolicy(dataCenterSpec.getImagePullPolicy())
-                        .securityContext(new V1SecurityContext().runAsUser(999L).runAsGroup(999L))
+                        .securityContext(new V1SecurityContext().runAsUser(CASSANDRA_USER_ID).runAsGroup(CASSANDRA_GROUP_ID))
                         .command(ImmutableList.of(
                                 "java", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseCGroupMemoryLimitForHeap", "-XX:MaxRAMFraction=2",
                                 "-cp", "/app/resources:/app/classes:/app/libs/*",
@@ -1513,6 +1441,9 @@ public class DataCenterUpdateAction {
                     templateMetadata.putAnnotationsItem(annotations[i], annotations[i + 1]);
             }
 
+            // add commitlog replayer
+            podSpec.addInitContainersItem(commitlogInitContainer);
+
             return new V1StatefulSet()
                     .metadata(statefulSetMetadata)
                     .spec(new V1StatefulSetSpec()
@@ -1530,6 +1461,115 @@ public class DataCenterUpdateAction {
                                     .spec(dataCenterSpec.getDataVolumeClaim())
                             )
                     );
+        }
+
+        private V1Container buildElassandraContainer() {
+            final V1Container cassandraContainer = buildElassandraBaseContainer("elassandra")
+                    .readinessProbe(new V1Probe()
+                            .exec(new V1ExecAction()
+                                    .addCommandItem("/ready-probe.sh")
+                                    .addCommandItem(dataCenterSpec.getNativePort().toString())
+                                    .addCommandItem("9200")
+                            )
+                            .initialDelaySeconds(15)
+                            .timeoutSeconds(5)
+                    );
+            if (dataCenterSpec.getElasticsearchEnabled() &&  dataCenterSpec.getEnterprise().getJmx()) {
+                    cassandraContainer.lifecycle(new V1Lifecycle().preStop(new V1Handler().exec(new V1ExecAction()
+                            .addCommandItem("curl")
+                            .addCommandItem("-X")
+                            .addCommandItem("POST")
+                            .addCommandItem("http://localhost:8080/enterprise/search/disable"))));
+            }
+            return cassandraContainer;
+        }
+
+        private V1Container buildInitContainerCommitlogReplayer() {
+            return  buildElassandraBaseContainer("commitlog-replayer")
+                    .addEnvItem(new V1EnvVar()
+                            .name("STOP_AFTER_COMMILOG_REPLAY")
+                            .value("true"));
+        }
+
+        private V1Container buildElassandraBaseContainer(String containerName) {
+            final V1Container cassandraContainer = new V1Container()
+                    .name(containerName)
+                    .image(dataCenterSpec.getElassandraImage())
+                    .imagePullPolicy(dataCenterSpec.getImagePullPolicy())
+                    .terminationMessagePolicy("FallbackToLogsOnError")
+                    .securityContext(new V1SecurityContext()
+                            .runAsUser(CASSANDRA_USER_ID)
+                            .capabilities(new V1Capabilities().add(ImmutableList.of(
+                                    "IPC_LOCK",
+                                    "SYS_RESOURCE"
+                            ))))
+                    .resources(dataCenterSpec.getResources())
+                    .addVolumeMountsItem(new V1VolumeMount()
+                            .name("data-volume")
+                            .mountPath("/var/lib/cassandra")
+                    )
+                    .addVolumeMountsItem(new V1VolumeMount()
+                            .name("nodeinfo")
+                            .mountPath("/nodeinfo")
+                    )
+                    .addVolumeMountsItem(new V1VolumeMount()
+                            .name("pod-info")
+                            .mountPath("/etc/podinfo")
+                    )
+                    .addVolumeMountsItem(new V1VolumeMount()
+                            .name("sidecar-config-volume")
+                            .mountPath("/tmp/sidecar-config-volume")
+                    )
+                    .addVolumeMountsItem(new V1VolumeMount()
+                            .name("cassandra-log-volume")
+                            .mountPath("/var/log/cassandra")
+                    )
+                    .addVolumeMountsItem(new V1VolumeMount()
+                            .name("cqlshrc-volume")
+                            .mountPath("/home/cassandra/.cassandra/cqlshrc")
+                            .subPath("cqlshrc")
+                    )
+                    .addVolumeMountsItem(new V1VolumeMount()
+                            .name("curlrc-volume")
+                            .mountPath("/home/cassandra/.curlrc")
+                            .subPath(".curlrc")
+                    )
+                    .addArgsItem("/tmp/sidecar-config-volume")
+                    .addEnvItem(new V1EnvVar().name("JMX_PORT").value(Integer.toString(dataCenterSpec.getJmxPort())))
+                    .addEnvItem(new V1EnvVar().name("CQLS_OPTS").value( dataCenterSpec.getSsl() ? "--ssl" : ""))
+                    .addEnvItem(new V1EnvVar().name("NODETOOL_OPTS").value(
+                            dataCenterSpec.getJmxmpEnabled() ?
+                                    " -Dcassandra.jmxmp" :
+                                    ((dataCenterSpec.getSsl() ? " --ssl" : "") + " -u cassandra -pwf /etc/cassandra/jmxremote.password" )))
+                    .addEnvItem(new V1EnvVar().name("ES_SCHEME").value( dataCenterSpec.getSsl() ? "https" : "http"))
+                    .addEnvItem(new V1EnvVar().name("HOST_NETWORK").value( Boolean.toString(dataCenterSpec.getHostNetworkEnabled())))
+                    .addEnvItem(new V1EnvVar().name("NAMESPACE").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.namespace"))))
+                    .addEnvItem(new V1EnvVar().name("POD_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.name"))))
+                    .addEnvItem(new V1EnvVar().name("POD_IP").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("status.podIP"))))
+                    .addEnvItem(new V1EnvVar().name("NODE_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("spec.nodeName"))));
+
+            if (dataCenterSpec.getSsl()) {
+                cassandraContainer.addVolumeMountsItem(new V1VolumeMount()
+                        .name("nodetool-ssl-volume")
+                        .mountPath("/home/cassandra/.cassandra/nodetool-ssl.properties")
+                        .subPath("nodetool-ssl.properties")
+                );
+            }
+            addPortsItem(cassandraContainer, dataCenterSpec.getStoragePort(), "internode", dataCenterSpec.getHostPortEnabled());
+            addPortsItem(cassandraContainer, dataCenterSpec.getSslStoragePort(), "internode-ssl", dataCenterSpec.getHostPortEnabled());
+            addPortsItem(cassandraContainer, dataCenterSpec.getNativePort(), "cql", dataCenterSpec.getHostPortEnabled());
+            addPortsItem(cassandraContainer, dataCenterSpec.getJmxPort(), "jmx", false);
+            addPortsItem(cassandraContainer, dataCenterSpec.getJdbPort(), "jdb", false);
+
+            if (dataCenterSpec.getElasticsearchEnabled()) {
+                cassandraContainer.addPortsItem(new V1ContainerPort().name("elasticsearch").containerPort(9200));
+                cassandraContainer.addPortsItem(new V1ContainerPort().name("transport").containerPort(9300));
+                cassandraContainer.addEnvItem(new V1EnvVar().name("CASSANDRA_DAEMON").value("org.apache.cassandra.service.ElassandraDaemon"));
+            } else {
+                cassandraContainer.addEnvItem(new V1EnvVar().name("CASSANDRA_DAEMON").value("org.apache.cassandra.service.CassandraDaemon"));
+            }
+
+            return cassandraContainer;
         }
 
         private V1Container buildInitContainerVmMaxMapCount() {
