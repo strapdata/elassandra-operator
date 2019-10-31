@@ -5,7 +5,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
 import com.strapdata.model.k8s.cassandra.*;
 import com.strapdata.strapkop.StrapkopException;
-import com.strapdata.strapkop.cql.*;
+import com.strapdata.strapkop.cql.CqlKeyspace;
+import com.strapdata.strapkop.cql.CqlKeyspaceManager;
+import com.strapdata.strapkop.cql.CqlRole;
+import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.k8s.OperatorNames;
@@ -119,15 +122,18 @@ public class KibanaPlugin extends AbstractPlugin {
 
     @Override
     public Completable delete(final DataCenter dataCenter) throws ApiException {
-        return io.reactivex.Observable.fromIterable(dataCenter.getSpec().getKibanaSpaces())
-                .flatMapCompletable(kibanaSpace -> delete(dataCenter, kibanaSpace));
+        return Completable.mergeArray(dataCenter.getSpec().getKibanaSpaces().stream()
+                .map(kibanaSpace -> delete(dataCenter, kibanaSpace))
+                .toArray(Completable[]::new));
     }
 
-    public Completable delete(final DataCenter dataCenter, KibanaSpace space) throws ApiException {
+    public Completable delete(final DataCenter dataCenter, KibanaSpace space) {
         final String kibanaLabelSelector = OperatorLabels.toSelector(kibanaLabels(dataCenter, space));
-        return k8sResourceUtils.deleteDeployment(dataCenter.getMetadata().getNamespace(), null, kibanaLabelSelector)
-                .andThen(k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, kibanaLabelSelector))
-                .andThen(k8sResourceUtils.deleteIngress(dataCenter.getMetadata().getNamespace(), null, kibanaLabelSelector));
+        return Completable.mergeArray(new Completable[]{
+                k8sResourceUtils.deleteDeployment(dataCenter.getMetadata().getNamespace(), null, kibanaLabelSelector),
+                k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, kibanaLabelSelector),
+                k8sResourceUtils.deleteIngress(dataCenter.getMetadata().getNamespace(), null, kibanaLabelSelector)
+        });
     }
 
 

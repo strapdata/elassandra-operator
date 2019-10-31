@@ -123,15 +123,15 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
 
         // adjust RF for system keyspaces
         for(String keyspace : SYSTEM_KEYSPACES) {
-            updateKeyspaceReplcationMap(dataCenter, keyspace, 0, sessionSupplier);
+            updateKeyspaceReplcationMap(dataCenter, keyspace, 0, sessionSupplier).blockingGet();
         }
 
         // monitor elastic_admin keyspace to reduce RF when scaling down the DC.
-        updateKeyspaceReplcationMap(dataCenter, elasticAdminKeyspaceName(dataCenter), 0, sessionSupplier);
+        updateKeyspaceReplcationMap(dataCenter, elasticAdminKeyspaceName(dataCenter), 0, sessionSupplier).blockingGet();
 
         // adjust user keyspace RF
         for(CqlKeyspace keyspace : get(dataCenter).values()) {
-            updateKeyspaceReplcationMap(dataCenter, keyspace.name, 0, sessionSupplier);
+            updateKeyspaceReplcationMap(dataCenter, keyspace.name, 0, sessionSupplier).blockingGet();
         }
 
         remove(dataCenter);

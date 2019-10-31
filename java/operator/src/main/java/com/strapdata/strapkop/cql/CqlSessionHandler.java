@@ -4,9 +4,7 @@ import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.Session;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import io.micronaut.context.annotation.Prototype;
-import io.reactivex.Completable;
 import io.reactivex.Single;
-import io.reactivex.functions.Action;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,16 +36,10 @@ public class CqlSessionHandler implements CqlSessionSupplier {
                 });
     }
 
-    public Completable close() throws Exception {
-        return (cluster == null) ?
-                Completable.complete() :
-                Completable.fromAction(new Action() {
-                    @Override
-                    public void run() throws Exception {
-                        logger.debug("Closing connections to cluster={}", cluster.getClusterName());
-                        cluster.close();
-
-                    }
-                });
+    public void close() throws Exception {
+        if (cluster != null) {
+            logger.debug("Closing cluster={}", cluster.getClusterName());
+            cluster.close();
+        }
     }
 }

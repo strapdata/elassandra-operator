@@ -28,7 +28,6 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.Collection;
 import java.util.Iterator;
@@ -94,7 +93,7 @@ public class K8sResourceUtils {
         });
     }
 
-    public static Completable deleteResource(final Callable<V1Status> deleteResourceRunnable) throws ApiException {
+    public static Completable deleteResource(final Callable<V1Status> deleteResourceRunnable) {
         return Completable.fromCallable(deleteResourceRunnable);
     }
 
@@ -298,64 +297,51 @@ public class K8sResourceUtils {
         );
     }
 
-    public Completable deleteService(String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) throws ApiException {
-
-        return Completable.fromAction(new Action() {
-               @Override
-               public void run() throws Exception {
-                   listNamespacedServices(namespace, null, labelSelector).forEach(service -> {
-                       try {
-                           deleteService(service);
-                           logger.debug("Deleted Service namespace={} name={}", service.getMetadata().getNamespace(), service.getMetadata().getName());
-                       } catch (final JsonSyntaxException e) {
-                           logger.debug("Caught JSON exception while deleting Service. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
-                       } catch (final ApiException | IOException e) {
-                           logger.error("Failed to delete Service.", e);
-                       }
-                   });
-               }
-           });
-    }
-
-    public Single<V1Service> deleteService(final V1Service service) throws ApiException, IOException {
-        final V1ObjectMeta metadata = service.getMetadata();
-        return Single.fromCallable(() -> {
-            coreApi.deleteNamespacedServiceAsync(metadata.getName(), metadata.getNamespace(), new V1DeleteOptions(), null, null, null, null, null, null)
-                    .execute();
-            return service;
-        });
-    }
-
-    public Completable deleteIngress(String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) throws ApiException {
+    public Completable deleteService(String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) {
         return Completable.fromAction(new Action() {
             @Override
             public void run() throws Exception {
-                listNamespacedIngress(namespace, null, labelSelector).forEach(ingress -> {
+                for (V1Service service : listNamespacedServices(namespace, null, labelSelector)) {
                     try {
-                        deleteIngress(ingress);
-                        logger.debug("Deleted Ingress namespace={} name={}", ingress.getMetadata().getNamespace(), ingress.getMetadata().getName());
+                        deleteService(service);
+                        logger.debug("Deleted Service namespace={} name={}", service.getMetadata().getNamespace(), service.getMetadata().getName());
                     } catch (final JsonSyntaxException e) {
-                        logger.debug("Caught JSON exception while deleting Ingress. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
-                    } catch (final ApiException e) {
-                        logger.error("Failed to delete Ingress.", e);
+                        logger.debug("Caught JSON exception while deleting Service. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
                     }
-                });
+                }
             }
         });
     }
 
-    public Completable deleteIngress(final V1beta1Ingress ingress) throws ApiException {
-        return deleteResource(() -> {
-            final V1ObjectMeta metadata = ingress.getMetadata();
-            return extensionsV1beta1Api.deleteNamespacedIngress(metadata.getName(), metadata.getNamespace(), new V1DeleteOptions(), null, null, null, null, null);
+    public V1Status deleteService(final V1Service service) throws ApiException {
+        final V1ObjectMeta metadata = service.getMetadata();
+        return coreApi.deleteNamespacedService(metadata.getName(), metadata.getNamespace(), new V1DeleteOptions(), null, null, null, null, null);
+    }
+
+    public Completable deleteIngress(String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) {
+        return Completable.fromAction(new Action() {
+            @Override
+            public void run() throws Exception {
+                for(V1beta1Ingress ingress : listNamespacedIngress(namespace, null, labelSelector)) {
+                    try {
+                        deleteIngress(ingress);
+                        logger.debug("Deleted Ingress namespace={} name={}", ingress.getMetadata().getNamespace(), ingress.getMetadata().getName());
+                    } catch (final JsonSyntaxException e) {
+                        logger.debug("Caught JSON exception while deleting Service. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
+                    }
+                }
+            }
         });
     }
 
-    public Completable deleteConfigMap(final V1ConfigMap configMap) throws ApiException {
-        return deleteResource(() -> {
+    public V1Status deleteIngress(final V1beta1Ingress ingress) throws ApiException {
+            final V1ObjectMeta metadata = ingress.getMetadata();
+            return extensionsV1beta1Api.deleteNamespacedIngress(metadata.getName(), metadata.getNamespace(), new V1DeleteOptions(), null, null, null, null, null);
+    }
+
+    public V1Status deleteConfigMap(final V1ConfigMap configMap) throws ApiException {
             final V1ObjectMeta configMapMetadata = configMap.getMetadata();
             return coreApi.deleteNamespacedConfigMap(configMapMetadata.getName(), configMapMetadata.getNamespace(), new V1DeleteOptions(), null, null, null, null, null);
-        });
     }
 
     public Completable deleteStatefulSet(final V1StatefulSet statefulSet) throws ApiException {
@@ -377,40 +363,37 @@ public class K8sResourceUtils {
 //
 //        logger.debug("done with scaling to 0");
 
-            final V1ObjectMeta statefulSetMetadata = statefulSet.getMetadata();
-            return appsApi.deleteNamespacedStatefulSet(statefulSetMetadata.getName(), statefulSetMetadata.getNamespace(), deleteOptions, null, null, null, false, "Foreground");
+            V1Status v1Status = null;
+            try {
+                final V1ObjectMeta statefulSetMetadata = statefulSet.getMetadata();
+                v1Status = appsApi.deleteNamespacedStatefulSet(statefulSetMetadata.getName(), statefulSetMetadata.getNamespace(), deleteOptions, null, null, null, false, "Foreground");
+            } catch (final JsonSyntaxException e) {
+                logger.debug("Caught JSON exception while deleting Service. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
+            }
+            return v1Status;
         });
     }
 
-    public Completable deleteDeployment(String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) throws ApiException {
+    public Completable deleteDeployment(String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) {
         return deleteResource(() -> {
-            listNamespacedDeployment(namespace, null, labelSelector).forEach(deployment -> {
+            for (V1Deployment deployment : listNamespacedDeployment(namespace, null, labelSelector)) {
                 try {
                     deleteDeployment(deployment.getMetadata());
-                    logger.debug("Deleted Ingress namespace={} name={}", deployment.getMetadata().getNamespace(), deployment.getMetadata().getName());
+                    logger.debug("Deleted Deployment namespace={} name={}", deployment.getMetadata().getNamespace(), deployment.getMetadata().getName());
                 } catch (final JsonSyntaxException e) {
-                    logger.debug("Caught JSON exception while deleting Ingress. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
-                } catch (final ApiException e) {
-                    logger.error("Failed to delete Ingress.", e);
+                    logger.debug("Caught JSON exception while deleting Service. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
                 }
-            });
-            return (V1Status)null;
+            }
+            return (V1Status) null;
         });
     }
 
-    public Completable deleteDeployment(final V1ObjectMeta metadata) throws ApiException {
-        return deleteResource(() -> {
-            V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
-            return extensionsV1beta1Api.deleteNamespacedDeployment(metadata.getName(), metadata.getNamespace(), deleteOptions, null, null, null, null, "Foreground");
-        });
+    // see https://github.com/kubernetes-client/java/issues/86
+    public V1Status deleteDeployment(final V1ObjectMeta metadata) throws ApiException {
+        logger.debug("Deleting Deployment namespace={} name={}", metadata.getNamespace(), metadata.getName());
+        V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
+        return appsApi.deleteNamespacedDeployment(metadata.getName(), metadata.getNamespace(), deleteOptions, null, null, null, null, "Foreground");
      }
-
-    public Completable deleteDeployment(final String name, final String namespace) throws ApiException {
-        return deleteResource(() -> {
-            V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
-            return appsApi.deleteNamespacedDeployment(name, namespace, deleteOptions, null, null, null, false, "Foreground");
-        });
-    }
     
     public Completable deleteService(final String name, final String namespace) throws ApiException {
         return deleteResource(() -> {
@@ -427,8 +410,14 @@ public class K8sResourceUtils {
             final String pvcName = pod.getSpec().getVolumes().get(0).getPersistentVolumeClaim().getClaimName();
             final V1PersistentVolumeClaim pvc = coreApi.readNamespacedPersistentVolumeClaim(pvcName, pod.getMetadata().getNamespace(), null, null, null);
 
-            logger.debug("Deleting PVC name={}", pvcName);
-            return coreApi.deleteNamespacedPersistentVolumeClaim(pvcName, pod.getMetadata().getNamespace(), deleteOptions, null, null, null, null, "Foreground");
+            V1Status v1Status = null;
+            try {
+                logger.debug("Deleting PVC name={}", pvcName);
+                v1Status = coreApi.deleteNamespacedPersistentVolumeClaim(pvcName, pod.getMetadata().getNamespace(), deleteOptions, null, null, null, null, "Foreground");
+            } catch (final JsonSyntaxException e) {
+                logger.debug("Caught JSON exception while deleting Service. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
+            }
+            return v1Status;
         });
     }
 

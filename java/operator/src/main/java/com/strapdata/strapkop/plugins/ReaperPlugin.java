@@ -4,15 +4,11 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.strapdata.model.k8s.cassandra.*;
 import com.strapdata.strapkop.StrapkopException;
-import com.strapdata.strapkop.cql.CqlKeyspace;
-import com.strapdata.strapkop.cql.CqlKeyspaceManager;
-import com.strapdata.strapkop.cql.CqlRole;
-import com.strapdata.strapkop.cql.CqlRoleManager;
+import com.strapdata.strapkop.cql.*;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.ssl.AuthorityManager;
-import com.strapdata.strapkop.cql.CqlSessionSupplier;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
@@ -109,9 +105,11 @@ public class ReaperPlugin extends AbstractPlugin {
     @Override
     public Completable delete(final DataCenter dataCenter) throws ApiException {
         final String reaperLabelSelector = OperatorLabels.toSelector(reaperLabels(dataCenter));
-        return k8sResourceUtils.deleteDeployment(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector)
-                .andThen(k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector))
-                .andThen(k8sResourceUtils.deleteIngress(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector));
+        return Completable.mergeArray(new Completable[] {
+                k8sResourceUtils.deleteDeployment(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector),
+                k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector),
+                k8sResourceUtils.deleteIngress(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector)
+        });
     }
 
 
