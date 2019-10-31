@@ -28,7 +28,7 @@ public class PluginRegistry {
         return this.plugins;
     }
 
-    public Completable[] deleteAll(DataCenter dc) {
+    public Completable deleteAll(DataCenter dc) {
         List<Completable> pluginCompletables = new ArrayList<>();
         for(Plugin plugin : plugins) {
             try {
@@ -37,7 +37,7 @@ public class PluginRegistry {
                 logger.error("Plugin class="+plugin.getClass().getSimpleName()+" reconcilation failed:", e);
             }
         }
-        return pluginCompletables.toArray(new Completable[pluginCompletables.size()]);
+        return Completable.mergeArray(pluginCompletables.toArray(new Completable[pluginCompletables.size()]));
     }
 
     public Completable[] reconcileAll(DataCenter dc) {

@@ -8,6 +8,7 @@ import com.google.common.net.InetAddresses;
 import com.google.gson.reflect.TypeToken;
 import com.squareup.okhttp.Call;
 import com.strapdata.cassandra.k8s.ElassandraOperatorSeedProvider;
+import com.strapdata.cassandra.k8s.ElassandraOperatorSeedProviderAndNotifier;
 import com.strapdata.model.k8s.cassandra.*;
 import com.strapdata.model.k8s.task.Task;
 import com.strapdata.model.sidecar.ElassandraNodeStatus;
@@ -34,6 +35,7 @@ import io.micronaut.context.annotation.Prototype;
 import io.reactivex.Completable;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
+import io.reactivex.functions.Action;
 import lombok.Data;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.bouncycastle.operator.OperatorCreationException;
@@ -331,10 +333,15 @@ public class DataCenterUpdateAction {
                     Completable todo = Completable.complete();
                     if (totalNormalPod > 0) {
                         // before scaling, if at least a pod is NORMAL, update keyspaces and roles if needed
-                        CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
+                        final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
                         todo = this.cqlKeyspaceManager.reconcileKeyspaces(dataCenter, cqlSessionHandler)
                                 .andThen(this.cqlRoleManager.reconcileRole(dataCenter, cqlSessionHandler))
-                                .andThen(cqlSessionHandler.close());
+                                .doFinally(new Action() {
+                                    @Override
+                                    public void run() throws Exception {
+                                        cqlSessionHandler.close();
+                                    }
+                                });
                     }
 
                     // look up for the next rack to update if needed.
@@ -1010,7 +1017,9 @@ public class DataCenterUpdateAction {
                 esConfig.put("cbs", ImmutableMap.of("enabled", enterprise.getCbs()));
                 configMapVolumeMountBuilder.addFile("elasticsearch.yml.d/002-enterprise.yaml", toYamlString(esConfig));
                 configMapVolumeMountBuilder.addFile( "cassandra-env.sh.d/002-enterprise.sh",
-                        "JVM_OPTS=\"$JVM_OPTS -Dcassandra.custom_query_handler_class=org.elassandra.index.EnterpriseElasticQueryHandler\"");
+                        "JVM_OPTS=\"$JVM_OPTS -Dcassandra.custom_query_handler_class=org.elassandra.index.EnterpriseElasticQueryHandler" +
+                                " -D"+ElassandraOperatorSeedProviderAndNotifier.STATUS_NOTIFIER_URL+"=http://strapkop-elassandra-operator:8080/node/"+dataCenterMetadata.getNamespace()
+                                +"\"");
                 // TODO: override com exporter in cassandra-env.sh.d/001-cassandra-exporter.sh
             }
 
@@ -1187,6 +1196,7 @@ public class DataCenterUpdateAction {
                     .addEnvItem(new V1EnvVar().name("NAMESPACE").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.namespace"))))
                     .addEnvItem(new V1EnvVar().name("POD_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.name"))))
                     .addEnvItem(new V1EnvVar().name("POD_IP").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("status.podIP"))))
+                    .addEnvItem(new V1EnvVar().name("NODE_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("spec.nodeName"))))
                     .addEnvItem(new V1EnvVar().name("NODE_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("spec.nodeName"))))
                     ;
 

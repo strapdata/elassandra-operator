@@ -33,14 +33,10 @@ public interface Plugin {
     /**
      * Call on each reconciliation
      */
-    default Completable reconcile(final DataCenter dataCenter) throws ApiException, StrapkopException {
-        return Completable.complete();
-    }
+    Completable reconcile(final DataCenter dataCenter) throws ApiException, StrapkopException;
 
     /**
      * Call when deleting the elassandra datacenter
      */
-    default Completable delete(final DataCenter dataCenter) throws ApiException {
-        return Completable.complete();
-    }
+    Completable delete(final DataCenter dataCenter) throws ApiException;
 }
