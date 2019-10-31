@@ -52,7 +52,7 @@ public class ElassandraOperatorSeedProvider implements org.apache.cassandra.loca
         System.setProperty("javax.net.ssl.trustStorePassword", DatabaseDescriptor.getClientEncryptionOptions().keystore_password);
     }
 
-    private String[] getParameter(final Map<String, String> args, String paramName, String envVarName) {
+    public String[] getParameter(final Map<String, String> args, String paramName, String envVarName) {
         if (args.get(paramName) != null) {
             return args.get(paramName).trim().split(", ");
         }
@@ -115,7 +115,7 @@ public class ElassandraOperatorSeedProvider implements org.apache.cassandra.loca
         try
         {
             conn.setRequestMethod("GET");
-            conn.setRequestProperty("Metadata-Flavor", "elassandra-operator");
+            conn.setRequestProperty("Metadata-Flavor", "elassandra-operator-seed-provider");
             if (conn.getResponseCode() != 200)
                 throw new ConfigurationException("ElassandraOperatorSeedProvider was unable to execute the API call code="+conn.getResponseCode()+" reason="+conn.getResponseMessage());
 
