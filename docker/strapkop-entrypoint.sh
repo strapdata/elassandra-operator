@@ -43,6 +43,11 @@ fi
 echo "broadcast_address: $BROADCAST_ADDRESS" > /etc/cassandra/cassandra.yaml.d/002-broadcast_address.yaml
 echo "broadcast_rpc_address: $BROADCAST_RPC_ADDRESS" > /etc/cassandra/cassandra.yaml.d/002-broadcast_rpc_address.yaml
 
+if [ "x${STOP_AFTER_COMMILOG_REPLAY}" != "x" ]; then
+  echo "REQUEST FOR cassandra.stop_after_commitlog_replayed : CassandraDeamon will stop after all commitlog will be replayed"
+  export JVM_OPTS="$JVM_OPTS -Dcassandra.stop_after_commitlog_replayed=${STOP_AFTER_COMMILOG_REPLAY} "
+fi
+
 export JVM_OPTS="$JVM_OPTS $ES_USE_INTERNAL_ADDRESS"
 
 # Generate /etc/cassandra/jmxremote.password
