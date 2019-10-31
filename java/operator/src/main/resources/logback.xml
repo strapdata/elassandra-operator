@@ -10,6 +10,7 @@
     </appender>
 
     <logger name="com.strapdata.strapkop" level="DEBUG" />
+    <logger name="com.strapdata.strapkop.controllers" level="DEBUG" />
     <logger name="com.strapdata.strapkop.k8s" level="WARN" />
     <logger name="com.strapdata.strapkop.event" level="WARN" />
     <logger name="com.strapdata.strapkop.source" level="WARN" />

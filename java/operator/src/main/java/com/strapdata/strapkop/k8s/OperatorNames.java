@@ -15,6 +15,10 @@ public class OperatorNames {
         return "elassandra-" + clusterName + "-" + datacenterName;
     }
 
+    public static String rackResource(final String clusterName, final String datacenterName, final String rack) {
+        return "elassandra-" + clusterName + "-" + datacenterName + "-" +rack;
+    }
+
     public static String dataCenterChildObjectName(final String nameFormat, final DataCenter dataCenter) {
         return String.format(nameFormat,
                 dataCenterResource(dataCenter.getSpec().getClusterName(), dataCenter.getSpec().getDatacenterName()));
@@ -78,6 +82,11 @@ public class OperatorNames {
     public static String podFqdn(final DataCenter dc, final String podName) {
         return String.format("%s.%s.%s.svc.cluster.local", podName,
                 OperatorNames.nodesService(dc), dc.getMetadata().getNamespace());
+    }
+
+    public static String podFqdn(final String namespace, final String clusterName, String dcName, final String podName) {
+        return String.format("%s.%s.%s.svc.cluster.local", podName,
+                dataCenterResource(clusterName, dcName), namespace);
     }
 
     
