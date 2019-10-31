@@ -68,7 +68,14 @@ Upload HELM package on the Azure blogstore and in the Azure HELM repo.
 
 * install [minikube](https://kubernetes.io/docs/tasks/tools/install-minikube/) and create an instance with enough resources to run elassandra (the profile is optional)
 ```bash
+# start minikube without internal registry 
 minikube start --cpus 4 --memory 4096 --kubernetes-version v1.15.3 --profile strapdata-operator
+
+# start minikube with internal registry (useful if you want to push locally build images)
+minikube addons enable registry 
+minikube start --cpus 4 --memory 4096 --kubernetes-version v1.15.3 --profile strapdata-operator --insecure-registry "10.0.0.0/24"
+# to push an image to the minikube registry
+# docker push $(minikube ip --profile strapdata-operator):5000/<my-image-name>
 ```
 
 * add a label to the minikube node:
