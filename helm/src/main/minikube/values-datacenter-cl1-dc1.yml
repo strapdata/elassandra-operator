@@ -8,6 +8,8 @@ replicas: 1
 nodeAffinityPolicy: STRICT
 decommissionPolicy: DELETE_PVC
 
+workload: "READ"
+
 image:
   elassandraRepository: localhost.localdomain:5000/strapdata/strapkop-elassandra-dev
   sidecarRepository: localhost.localdomain:5000/strapdata/strapkop-sidecar-dev
@@ -17,6 +19,7 @@ image:
 imagePullPolicy: Always
 imagePullSecret: ""
 
+kibanaImage: localhost.localdomain:5000/kibana/kibana-oss:6.2.3
 # TODO: we do not support unprivileged setup yet
 privilegedSupported: true
 
@@ -93,12 +96,14 @@ enterprise:
 #restoreFromBackup: backup-hostname
 
 # Cassandra reaper
-reaperSupport: true
+reaperEnabled: true
+reaper:
+  image: localhost.localdomain:5000/strapdata/cassandra-reaper
 
 # Elassandra datacenter group
 # datacenterGroup:
 
-prometheusEnabled: true
+prometheusEnabled: false
 elasticsearchEnabled: true
 ssl: true
 authentication: CASSANDRA
@@ -110,7 +115,7 @@ sslStoragePort: 37001
 nativePort: 39042
 jmxPort: 7199
 jdbPort: 4242
-
+#jmxmpEnabled: false
 remoteSeeds: []
 
 kibanaSpaces:
