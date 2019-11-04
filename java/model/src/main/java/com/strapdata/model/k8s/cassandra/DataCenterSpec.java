@@ -21,7 +21,10 @@ public class DataCenterSpec {
     @SerializedName("datacenterName")
     @Expose
     private String datacenterName;
-    
+
+    @SerializedName("workload")
+    @Expose
+    private ElassandraWorkload workload = ElassandraWorkload.WRITE;
     /**
      * Number of Cassandra nodes in this data center.
      * 

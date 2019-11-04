@@ -14,6 +14,7 @@ metadata:
 spec:
   clusterName: {{ template "elassandra.clusterName" . }}
   datacenterName: {{ template "elassandra.datacenterName" . }}
+  workload: {{ .Values.workload }}
   replicas: {{ .Values.replicas }}
   elassandraImage: "{{ .Values.image.elassandraRepository }}:{{ .Values.image.elassandraTag }}"
   sidecarImage: "{{ .Values.image.sidecarRepository }}:{{ .Values.image.sidecarTag }}"
@@ -47,6 +48,11 @@ spec:
 {{- end }}
   prometheusEnabled: {{ default "false" .Values.prometheusEnabled }}
   reaperEnabled: {{ default "false" .Values.reaperEnabled }}
+  {{- if .Values.reaper.image }}
+  reaper:
+    image:  {{ .Values.reaper.image }}
+  {{- end }}
+
   privilegedSupported: {{ default "false" .Values.privilegedSupported }}
   hostPortEnabled: {{ default "false" .Values.hostPortEnabled }}
   nativePort : {{ default "9042" .Values.nativePort | quote }}
