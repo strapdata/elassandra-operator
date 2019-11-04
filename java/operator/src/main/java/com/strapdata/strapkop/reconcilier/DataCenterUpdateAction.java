@@ -275,7 +275,6 @@ public class DataCenterUpdateAction {
                                 break;
                             case SCALING_UP:
                                 // scale up done and last node NORMAL
-                                ElassandraPod lastNode = movingZone.lastPod(dataCenter);
                                 if (!movingZone.isScalingUp() && elassandraNodeStatusCache.isNormal(movingZone.lastPod(dataCenter))) {
                                     movingRack.setJoinedReplicas(movingZone.size);
                                     movingRack.setPhase(RackPhase.RUNNING);
