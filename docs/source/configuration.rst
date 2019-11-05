@@ -93,3 +93,44 @@ You can adjust CPU and Memory needs of your Elassandra nodes by updating the CRD
 .. code::
 
     kubectl patch elassandradatacenter elassandra-cl1-dc1 --type merge --patch '{"spec":{"resources":{"limits":{"memory":"4Gi"}}}}'
+
+Resources entry may receive "limits" and/or "requests" quantity description as describe in the [k8s documentation](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/).
+
+.. code::
+
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+
+
+Pod affinity
+.......................
+
+You can define the the [NodeAffinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#node-affinity) for the elassandra pods using the "nodeAffinityPolicy" attribute of the DatacenterSpec.
+
+.. code::
+
+    kubectl patch elassandradatacenter elassandra-cl1-dc1 --type merge --patch '{"spec":{"nodeAffinityPolicy": "STRICT"}}'
+
+Possible values are :
+* STRICT : schedule elassandra pods only on nodes in the matching the failure-domain.beta.kubernetes.io/zone label (default value)
+* SLACK : schedule elassandra pods preferably on nodes in the matching the failure-domain.beta.kubernetes.io/zone label
+
+Data Volume Claim
+........................
+
+To specify the persistence characteristics for each Elassandra node, you can describe a [PersistentVolumeClaimSpec](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.12/#persistentvolumeclaimspec-v1-core) as "dataVolumeClaim" value.
+
+.. code::
+
+    dataVolumeClaim:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 500Mi
+
