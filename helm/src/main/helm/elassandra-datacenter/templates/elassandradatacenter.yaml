@@ -48,10 +48,12 @@ spec:
 {{- end }}
   prometheusEnabled: {{ default "false" .Values.prometheusEnabled }}
   reaperEnabled: {{ default "false" .Values.reaperEnabled }}
-  {{- if .Values.reaper.image }}
+{{- if .Values.reaper }}
   reaper:
+{{- if .Values.reaper.image }}
     image:  {{ .Values.reaper.image }}
-  {{- end }}
+{{- end }}
+{{- end }}
 
   privilegedSupported: {{ default "false" .Values.privilegedSupported }}
   hostPortEnabled: {{ default "false" .Values.hostPortEnabled }}
