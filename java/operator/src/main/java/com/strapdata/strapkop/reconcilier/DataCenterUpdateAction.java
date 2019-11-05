@@ -804,13 +804,6 @@ public class DataCenterUpdateAction {
                 config.put("ssl_storage_port", dataCenterSpec.getSslStoragePort());
                 config.put("native_transport_port", dataCenterSpec.getNativePort());
 
-                // reader recommendation is based on the number of disk (nbDisk * 16)
-                // so leave the default value...
-                final int concurrentReader = 32;
-                config.put("concurrent_reads", concurrentReader);
-                // counter use the same as reader because counter read the value before increment & write value
-                config.put("concurrent_counter_writes", concurrentReader);
-
                 // compute the number os CPU to adapt the ConcurrentWriter settings (force a min to 1 to avoid the a ThreadPool of 0)
                 final int cpu = Math.max(1, Runtime.getRuntime().availableProcessors());
                 // writer recommendation is 8 * CPUs
@@ -818,33 +811,46 @@ public class DataCenterUpdateAction {
                 config.put("concurrent_writes", concurrentWriter);
                 config.put("concurrent_materialized_view_writes", concurrentWriter);
 
-                // values used by : https://blog.deimos.fr/2018/06/24/running-cassandra-on-kubernetes/
-                config.put("hinted_handoff_throttle_in_kb", 4096);
-                config.put("memtable_allocation_type", "offheap_objects");
+                // reader recommendation is based on the number of disk (nbDisk * 16)
+                // so leave the default value or set to nb of writer if writers are more than 32...
+                final int concurrentReader = Math.max(32, concurrentWriter);
+                config.put("concurrent_reads", concurrentReader);
+                // counter use the same as reader because counter read the value before increment & write value
+                config.put("concurrent_counter_writes", concurrentReader);
 
-                switch (dataCenterSpec.getWorkload()) {
-                    case READ:
-                        // because we are in a read heavy workload, we set the cache to 100MB
-                        // (the max value of the auto setting -  (min(5% of Heap (in MB), 100MB)) )
-                        config.put("key_cache_size_in_mb", 100);
-                        break;
-                    case WRITE:
-                        // configure memtable_flush_writer has an influence on the memtable_cleanup_threshold (1/(nb_flush_w + 1))
-                        // so we set a little bit higher value for memtable_cleanup_threshold in case of Write Heavy Workload
-                        // default is 1/(memtable_flush_writer +1) ==> 1/3
-                        // reduce a little this value to reduce the number of memtable flush
-                        config.put("memtable_flush_writer", 4);
-                        // The faster you insert data, the faster you need to compact in order to keep the sstable count down,
-                        // but in general, setting this to 16 to 32 times the rate you are inserting data is more than sufficient.
-                        config.put("compaction_throughput_mb_per_sec", 24); // default is 16 - set to 24 to increase the compaction speed
-                        break;
-                    case READ_WRITE:
-                        // leave the memtable_cleanup_threshold to the default to compact more often (compaction is important for read)
-                        config.put("key_cache_size_in_mb", 100);
-                        // The faster you insert data, the faster you need to compact in order to keep the sstable count down,
-                        // but in general, setting this to 16 to 32 times the rate you are inserting data is more than sufficient.
-                        config.put("compaction_throughput_mb_per_sec", 20); // default is 16 - increase the compaction speed (not so much to preserve reads)
-                        break;
+                // value used by : https://blog.deimos.fr/2018/06/24/running-cassandra-on-kubernetes/
+                config.put("hinted_handoff_throttle_in_kb", 4096);
+
+                if (dataCenterSpec.getWorkload().equals(ElassandraWorkload.READ)
+                        || dataCenterSpec.getWorkload().equals(ElassandraWorkload.READ_WRITE)) {
+                    // because we are in a read heavy workload, we set the cache to 100MB
+                    // (the max value of the auto setting -  (min(5% of Heap (in MB), 100MB)) )
+                    config.put("key_cache_size_in_mb", 100);
+                }
+
+                if (dataCenterSpec.getWorkload().equals(ElassandraWorkload.WRITE)
+                        || dataCenterSpec.getWorkload().equals(ElassandraWorkload.READ_WRITE)) {
+                    // configure memtable_flush_writer has an influence on the memtable_cleanup_threshold (1/(nb_flush_w + 1))
+                    // so we set a little bit higher value for Write Heavy Workload
+                    // default is 1/(memtable_flush_writer +1) ==> 1/3
+                    // increase the number of memtable flush, increase the frequncy of memtable flush
+                    // cpu = 1 ==> 1
+                    // cpu = 2 ==> 2
+                    // cpu = 4 ==> 2
+                    // cpu = 8 ==> 4
+                    // cpu = 16 ==> 8
+                    final int flusher = Math.min(cpu, Math.max(2, cpu / 2));
+                    config.put("memtable_flush_writer", flusher);
+
+                    // https://tobert.github.io/pages/als-cassandra-21-tuning-guide.html
+                    // Offheap memtables can improve write-heavy workloads by reducing the amount of data stored on the Java heap
+                    config.put( "memtable_allocation_type", "offheap_objects");
+                }
+
+                if (dataCenterSpec.getWorkload().equals(ElassandraWorkload.READ_WRITE)) {
+                    // The faster you insert data, the faster you need to compact in order to keep the sstable count down,
+                    // but in general, setting this to 16 to 32 times the rate you are inserting data is more than sufficient.
+                    config.put("compaction_throughput_mb_per_sec", 24); // default is 16 - set to 24 to increase the compaction speed
                 }
 
                 configMapVolumeMountBuilder.addFile("cassandra.yaml.d/001-spec.yaml", toYamlString(config));
