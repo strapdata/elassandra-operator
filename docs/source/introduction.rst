@@ -1,10 +1,10 @@
-Strapkop
-========
+Elassandra Operator
+===================
 
-Strapkop is a Kubernetes operator for Elassandra.
+Elassandra Operator is a Kubernetes operator for Elassandra.
 
-Strapkop features
------------------
+Elassandra Operator features
+----------------------------
 
 * Manage a Kuberentes statefulset of Elassandra nodes per cloud-provider zone to ensure high availability.
 * Manage Cassandra seeds when datacenters are deployed on several Kuberenetes clusters.
@@ -30,21 +30,39 @@ High Availibility
 Elassandra high availibilty across cloud-provider zones is achieve by using one StatfulSet per Cassandra rack.
 
 
-Getting started
----------------
+Getting started with helm
+-------------------------
 
-Deploy a strapkop POD in your kubrenetes cluster.
+The Elassandra Operator is available under two helm charts, the first one install the operator and underlying resources (CRD, ServiceAccounts, Services...).
+The second one is used to define the configuration of your Elassandra Datacenter thanks to a CustomResourceDefinition.
 
-Deploy an elassandra-datacenter CRD
+Firstly, deploy an operator POD in your kubrenetes cluster.
+
+.. code-block:: bash
+
+    helm install --namespace default --name myproject -f custom-values.yaml elassandra-operator
+
+Check the pod is up and running.
+
+.. code-block:: bash
+
+      kubectl --namespace default get pods -l "app=elassandra-operator,release=myproject"
+
+Finally, deploy the elassandra-datacenter CRD definition.
+
+.. code-block:: bash
+
+    helm install --namespace default --name mycluster-mydatacenter -f custom-values.yaml elassandra-datacenter
+
+After a short period, you should have some elassandra running pods. You can list them using "elassandra" as value for the "app" label.
+
+.. code-block:: bash
+
+    kubectl --namespace default get pods -l "app=elassandra"
 
 
-
-
-
-
-
-Getting started
----------------
+Getting started with StrapCloud
+-------------------------------
 
 .. note:: Strapcloud only supports Google Chrome browser.
 
