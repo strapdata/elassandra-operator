@@ -201,6 +201,13 @@ public class DataCenterSpec {
     private Boolean jmxmpEnabled = true;
 
     /**
+     * Enable SSL with JMXMP.
+     */
+    @SerializedName("jmxmpOverSSL")
+    @Expose
+    private Boolean jmxmpOverSSL = true;
+
+    /**
      * Java debugger port (also hostPort)
      */
     @SerializedName("jdbPort")

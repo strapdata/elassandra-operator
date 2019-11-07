@@ -150,6 +150,9 @@ public class ReaperPlugin extends AbstractPlugin {
         StringBuilder javaOptsBuilder = new StringBuilder(200);
         if (dataCenterSpec.getJmxmpEnabled()) {
             javaOptsBuilder.append(" -Ddw.jmxmp.enabled=true ");
+            if (dataCenterSpec.getSsl() && (!dataCenterSpec.getJmxmpEnabled() || (dataCenterSpec.getJmxmpEnabled() && dataCenterSpec.getJmxmpOverSSL()))) {
+                javaOptsBuilder.append(" -Ddw.jmxmp.ssl=true ");
+            }
         }
 
         final V1PodSpec podSpec = new V1PodSpec()
@@ -297,8 +300,11 @@ public class ReaperPlugin extends AbstractPlugin {
                     .name("truststore")
                     .secret(new V1SecretVolumeSource()
                             .secretName(authorityManager.getPublicCaSecretName())
+                            .addItemsItem(new V1KeyToPath().key(AuthorityManager.SECRET_CACERT_PEM).path(AuthorityManager.SECRET_CACERT_PEM))
+                            .addItemsItem(new V1KeyToPath().key(AuthorityManager.SECRET_TRUSTSTORE_P12).path(AuthorityManager.SECRET_TRUSTSTORE_P12))
                     )
             );
+
             container
                     .addEnvItem(new V1EnvVar()
                             .name("REAPER_CASS_NATIVE_PROTOCOL_SSL_ENCRYPTION_ENABLED")
