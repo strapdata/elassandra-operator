@@ -20,15 +20,15 @@ The Elassandra operator use a custom Cassandra seed provider using the following
 
 .. cssclass:: table-bordered
 
-+----------------+----------------+-------------------------------------------------------------------------+
-| Parameter      | Env variable   | Description                                                             |
-+================+================+=========================================================================+
-| seeds          | SEEDS          | Local seed addresses or DNS hostname.                                   |
-+----------------+------------------------------------------------------------------------------------------+
-| remote_seeds   | REMOTE_SEEDS   | Remote datacenters seed addresses or DNS names.                         |
-+----------------+------------------------------------------------------------------------------------------+
++----------------+----------------+-----------------------------------------------------------------------------+
+| Parameter      | Env variable   | Description                                                                 |
++================+================+=============================================================================+
+| seeds          | SEEDS          | Local seed addresses or DNS hostname.                                       |
++----------------+----------------------------------------------------------------------------------------------+
+| remote_seeds   | REMOTE_SEEDS   | Remote datacenters seed addresses or DNS names.                             |
++----------------+----------------------------------------------------------------------------------------------+
 | remote_seeders | REMOTE_SEEDERS | Remote elassandra operator web service URL providing remote seed addresses. |
-+----------------+----------------+-------------------------------------------------------------------------+
++----------------+----------------+-----------------------------------------------------------------------------+
 
 Empty parameters are replaced by the associated env variable if available.
 
