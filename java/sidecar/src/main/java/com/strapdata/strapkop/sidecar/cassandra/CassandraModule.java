@@ -77,7 +77,7 @@ public class CassandraModule {
 
         public UserPasswordCallbackHandler(String user, String password) {
             this.username = user;
-            this.password = password.toCharArray();
+            this.password = password == null ? null : password.toCharArray();
         }
 
         public void handle(javax.security.auth.callback.Callback[] callbacks)

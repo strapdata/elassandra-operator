@@ -56,15 +56,16 @@ if [ -n "$JMX_PASSWORD" ]; then
    chmod 400 /etc/cassandra/jmxremote.password
 fi
 
+
 # handle kubernetes SIGTERM and gracefully stop elassandra
 _term() {
   echo "entry-point: received SIGTERM"
-  current_mode=$(nodetool netstats | head -n 1 | sed 's/^Mode: \(.*\)$/\1/g')
+  current_mode=$(nodetool ${NODETOOL_OPTS} netstats | head -n 1 | sed 's/^Mode: \(.*\)$/\1/g')
   echo "current mode is ${current_mode}"
   case "$current_mode" in
   NORMAL)
     echo "draining node..."
-    nodetool drain
+    nodetool ${NODETOOL_OPTS} drain
     echo "drained"
     ;;
   *)
