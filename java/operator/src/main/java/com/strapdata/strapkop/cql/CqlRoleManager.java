@@ -102,7 +102,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                 for(CqlRole role : get(dataCenter).values()) {
                     if (!role.isApplied()) {
                         try {
-                            role.createOrUpdateRole(dataCenter, k8sResourceUtils, sessionSupplier);
+                            role.createOrUpdateRole(dataCenter, k8sResourceUtils, sessionSupplier).blockingGet();
                         } catch (Exception ex) {
                             logger.error("Cannot load password or apply for role=" + role.getUsername() + " in dc=" + dataCenter.getMetadata().getName() + ":" + ex.getMessage());
                         }
