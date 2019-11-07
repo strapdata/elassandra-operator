@@ -25,13 +25,13 @@ metadata:
     chart: {{ .Chart.Name }}-{{ .Chart.Version }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
-  name: {{ template "elassandra-operator.fullname" . }}-nodeinfo
+  name: {{ template "elassandra-operator.fullname" . }}nodeinfo
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: {{ template "elassandra-operator.fullname" . }}-node-reader
 subjects:
   - kind: ServiceAccount
-    name: {{ template "elassandra-operator.fullname" . }}-nodeinfo
+    name: {{ template "elassandra-operator.fullname" . }}nodeinfo
     namespace: {{ .Release.Namespace }}
 {{- end }}
