@@ -1582,10 +1582,6 @@ public class DataCenterUpdateAction {
                     .addArgsItem("/tmp/sidecar-config-volume")
                     .addEnvItem(new V1EnvVar().name("JMX_PORT").value(Integer.toString(dataCenterSpec.getJmxPort())))
                     .addEnvItem(new V1EnvVar().name("CQLS_OPTS").value( dataCenterSpec.getSsl() ? "--ssl" : ""))
-                    .addEnvItem(new V1EnvVar().name("NODETOOL_OPTS").value(
-                            dataCenterSpec.getJmxmpEnabled() ?
-                                    " -Dcassandra.jmxmp" :
-                                    ((useJmxOverSSL() ? " --ssl" : "") + " -u cassandra -pwf /etc/cassandra/jmxremote.password" )))
                     .addEnvItem(new V1EnvVar().name("ES_SCHEME").value( dataCenterSpec.getSsl() ? "https" : "http"))
                     .addEnvItem(new V1EnvVar().name("HOST_NETWORK").value( Boolean.toString(dataCenterSpec.getHostNetworkEnabled())))
                     .addEnvItem(new V1EnvVar().name("NAMESPACE").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.namespace"))))
@@ -1593,6 +1589,11 @@ public class DataCenterUpdateAction {
                     .addEnvItem(new V1EnvVar().name("POD_IP").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("status.podIP"))))
                     .addEnvItem(new V1EnvVar().name("NODE_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("spec.nodeName"))));
 
+            String nodetoolOpts = " -u cassandra -pwf /etc/cassandra/jmxremote.password ";
+            nodetoolOpts += dataCenterSpec.getJmxmpEnabled() ? " --jmxmp " : "";
+            nodetoolOpts += useJmxOverSSL() ? " --ssl " : "";
+            cassandraContainer.addEnvItem(new V1EnvVar().name("NODETOOL_OPTS").value(nodetoolOpts));
+            
             if (dataCenterSpec.getSsl()) {
                 cassandraContainer.addVolumeMountsItem(new V1VolumeMount()
                         .name("nodetool-ssl-volume")
