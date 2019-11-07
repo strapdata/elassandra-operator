@@ -870,41 +870,38 @@ public class DataCenterUpdateAction {
                         "JVM_OPTS=\"${JVM_OPTS} -javaagent:${CASSANDRA_HOME}/agents/jmx_prometheus_javaagent.jar=9500:${CASSANDRA_CONF}/jmx_prometheus_exporter.yml\"");
             }
 
+            StringBuilder jvmOptionsD = new StringBuilder(500);
+            jvmOptionsD.append("-Dcassandra.jmx.remote.port=" + dataCenterSpec.getJmxPort()+"\n");
+
             // Add JMX configuration
             if (dataCenterSpec.getJmxmpEnabled()) {
                 // JMXMP is fine, but visualVM cannot use jmxmp+tls+auth
-                configMapVolumeMountBuilder.addFile("jvm.options.d/001-jmx.options",
-                        "-Dcassandra.jmx.remote.port=" + dataCenterSpec.getJmxPort() + "\n" +
-                                "-Dcassandra.jmxmp=true\n"
-                );
-            } else {
-                // Remote JMX require SSL, otherwise this is local clear JMX
-                if (dataCenterSpec.getSsl()) {
-                    configMapVolumeMountBuilder.addFile("jvm.options.d/001-jmx-ssl.options",
-                            "-Dcassandra.jmx.remote.port=" + dataCenterSpec.getJmxPort() + "\n" +
-                                    "-Dcom.sun.management.jmxremote.rmi.port=" + dataCenterSpec.getJmxPort() + "\n" +
-                                    "-Dcom.sun.management.jmxremote.authenticate=true\n" +
-                                    "-Dcom.sun.management.jmxremote.password.file=/etc/cassandra/jmxremote.password\n" +
-                                    //"-Dcom.sun.management.jmxremote.access.file=/etc/cassandra/jmxremote.access\n" + \
-                                    "-Dcom.sun.management.jmxremote.ssl=true\n" +
-                                    "-Dcom.sun.management.jmxremote.registry.ssl=true\n" +
-                                    "-Djavax.net.ssl.keyStore=" + OPERATOR_KEYSTORE_MOUNT_PATH + "/" + OPERATOR_KEYSTORE + "\n" +
-                                    "-Djavax.net.ssl.keyStorePassword=" + OPERATOR_KEYPASS + "\n" +
-                                    "-Djavax.net.ssl.keyStoreType=PKCS12\n" +
-                                    "-Djavax.net.ssl.trustStore=" + authorityManager.getPublicCaMountPath() + "/" + AuthorityManager.SECRET_TRUSTSTORE_P12 + "\n" +
-                                    "-Djavax.net.ssl.trustStorePassword=" + authorityManager.getCaTrustPass() + "\n" +
-                                    "-Djavax.net.ssl.trustStoreType=PKCS12");
-                } else {
-                    // local JMX, clear + no auth
-                    configMapVolumeMountBuilder.addFile("jvm.options.d/001-jmx.options",
-                            "-Dcassandra.jmx.remote.port=" + dataCenterSpec.getJmxPort() + "\n" +
-                                    "-Dcom.sun.management.jmxremote.rmi.port=" + dataCenterSpec.getJmxPort() + "\n" +
-                                    "-Dcom.sun.management.jmxremote.authenticate=true\n" +
-                                    "-Dcom.sun.management.jmxremote.password.file=/etc/cassandra/jmxremote.password\n" +
-                                    "-Djava.rmi.server.hostname=127.0.0.1\n" +
-                                    "-XX:+DisableAttachMechanism");
-                }
+                jvmOptionsD.append("-Dcassandra.jmxmp=true\n");
             }
+
+            // Remote JMX require SSL, otherwise this is local clear JMX
+            if (useJmxOverSSL()) {
+                jvmOptionsD.append("-Dcom.sun.management.jmxremote.rmi.port=" + dataCenterSpec.getJmxPort() + "\n");
+                jvmOptionsD.append("-Dcom.sun.management.jmxremote.authenticate=true\n");
+                jvmOptionsD.append("-Dcom.sun.management.jmxremote.password.file=/etc/cassandra/jmxremote.password\n");
+                                //"-Dcom.sun.management.jmxremote.access.file=/etc/cassandra/jmxremote.access\n" + \
+                jvmOptionsD.append("-Dcom.sun.management.jmxremote.ssl=true\n");
+                jvmOptionsD.append("-Dcom.sun.management.jmxremote.registry.ssl=true\n");
+                jvmOptionsD.append("-Djavax.net.ssl.keyStore=" + OPERATOR_KEYSTORE_MOUNT_PATH + "/" + OPERATOR_KEYSTORE + "\n");
+                jvmOptionsD.append("-Djavax.net.ssl.keyStorePassword=" + OPERATOR_KEYPASS + "\n");
+                jvmOptionsD.append("-Djavax.net.ssl.keyStoreType=PKCS12\n");
+                jvmOptionsD.append("-Djavax.net.ssl.trustStore=" + authorityManager.getPublicCaMountPath() + "/" + AuthorityManager.SECRET_TRUSTSTORE_P12 + "\n");
+                jvmOptionsD.append("-Djavax.net.ssl.trustStorePassword=" + authorityManager.getCaTrustPass() + "\n");
+                jvmOptionsD.append("-Djavax.net.ssl.trustStoreType=PKCS12");
+            } else {
+                // local JMX, clear + no auth
+                jvmOptionsD.append("-Dcom.sun.management.jmxremote.rmi.port=" + dataCenterSpec.getJmxPort() + "\n");
+                jvmOptionsD.append("-Dcom.sun.management.jmxremote.authenticate=true\n");
+                jvmOptionsD.append("-Dcom.sun.management.jmxremote.password.file=/etc/cassandra/jmxremote.password\n");
+                jvmOptionsD.append("-Djava.rmi.server.hostname=127.0.0.1\n");
+                jvmOptionsD.append("-XX:+DisableAttachMechanism");
+            }
+            configMapVolumeMountBuilder.addFile("jvm.options.d/001-jmx.options", jvmOptionsD.toString());
 
             // Add jdb transport socket
             if (dataCenterSpec.getJdbPort() > 0) {
@@ -1230,11 +1227,11 @@ public class DataCenterUpdateAction {
 
             String javaToolOptions = "";
             // WARN: Cannot enable SSL on JMXMP because VisualVM does not support it => JMXMP in clear with no auth
-            javaToolOptions += dataCenterSpec.getJmxmpEnabled() ?
-                    " -Dcassandra.jmxmp " :
-                    (dataCenterSpec.getSsl() ? " -Dssl.enable=true " + nodetoolSsl() : "");
-            if (javaToolOptions.length() > 0)
+            javaToolOptions += dataCenterSpec.getJmxmpEnabled() ? " -Dcassandra.jmxmp " : "";
+            javaToolOptions += (useJmxOverSSL() ? " -Dssl.enable=true " + nodetoolSsl() : "");
+            if (javaToolOptions.length() > 0) {
                 sidecarContainer.addEnvItem(new V1EnvVar().name("JAVA_TOOL_OPTIONS").value(javaToolOptions));
+            }
 
             final V1PodSpec podSpec = new V1PodSpec()
                     .securityContext(new V1PodSecurityContext().fsGroup(CASSANDRA_GROUP_ID))
@@ -1588,7 +1585,7 @@ public class DataCenterUpdateAction {
                     .addEnvItem(new V1EnvVar().name("NODETOOL_OPTS").value(
                             dataCenterSpec.getJmxmpEnabled() ?
                                     " -Dcassandra.jmxmp" :
-                                    ((dataCenterSpec.getSsl() ? " --ssl" : "") + " -u cassandra -pwf /etc/cassandra/jmxremote.password" )))
+                                    ((useJmxOverSSL() ? " --ssl" : "") + " -u cassandra -pwf /etc/cassandra/jmxremote.password" )))
                     .addEnvItem(new V1EnvVar().name("ES_SCHEME").value( dataCenterSpec.getSsl() ? "https" : "http"))
                     .addEnvItem(new V1EnvVar().name("HOST_NETWORK").value( Boolean.toString(dataCenterSpec.getHostNetworkEnabled())))
                     .addEnvItem(new V1EnvVar().name("NAMESPACE").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.namespace"))))
@@ -1654,6 +1651,10 @@ public class DataCenterUpdateAction {
                     .addEnvItem(new V1EnvVar().name("NODEINFO_TOKEN").valueFrom(new V1EnvVarSource().secretKeyRef(new V1SecretKeySelector().name(nodeInfoSecretName).key("token"))));
         }
 
+    }
+
+    private boolean useJmxOverSSL() {
+        return dataCenterSpec.getSsl() && (!dataCenterSpec.getJmxmpEnabled() || (dataCenterSpec.getJmxmpEnabled() && dataCenterSpec.getJmxmpOverSSL()));
     }
 
     /**
