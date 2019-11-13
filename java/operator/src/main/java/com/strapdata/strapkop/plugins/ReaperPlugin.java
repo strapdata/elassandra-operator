@@ -15,9 +15,11 @@ import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.custom.IntOrString;
 import io.kubernetes.client.models.*;
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.runtime.event.annotation.EventListener;
 import io.reactivex.Completable;
 import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
+import org.apache.cassandra.utils.Hex;
 
 import javax.inject.Singleton;
 import java.util.*;
@@ -391,7 +393,22 @@ public class ReaperPlugin extends AbstractPlugin {
 
             if (Objects.equals(Long.parseLong(datacenterGeneration), dataCenterMetadata.getGeneration()) &&
                     Objects.equals(existingDeployment.getSpec().getReplicas(), deployment.getSpec().getReplicas())) {
-                return Completable.complete();
+                if (dataCenter.getStatus().getReaperPhase().equals(ReaperPhase.REGISTERED)) {
+                    return Completable.complete();
+                } else {
+                    return Completable.fromCallable(new Callable<DataCenter>() {
+                        /**
+                         * Computes a result, or throws an exception if unable to do so.
+                         *
+                         * @return computed result
+                         * @throws Exception if unable to compute a result
+                         */
+                        @Override
+                        public DataCenter call() throws Exception {
+                            return reconcileReaperRegistration(dataCenter);
+                        }
+                    });
+                }
             }
         } catch (ApiException e) {
             if (e.getCode() != 404) {
@@ -486,4 +503,5 @@ public class ReaperPlugin extends AbstractPlugin {
         }
         return new String(password);
     }
+
 }
