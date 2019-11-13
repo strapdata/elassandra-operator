@@ -34,13 +34,15 @@ public class ReaperClient implements Closeable {
 
     private final Logger logger = LoggerFactory.getLogger(ReaperClient.class);
     
+    private final RxHttpClient adminHttpClient; // to request the "/ping" endpoint
     private final RxHttpClient httpClient;
     private final DataCenter dataCenter;
     private final String username;
     private final String password;
     
     public ReaperClient(DataCenter dc, String username, String password) throws MalformedURLException {
-        httpClient = RxHttpClient.create(new URL("http", ReaperPlugin.reaperName(dc), ReaperPlugin.ADMIN_SERVICE_PORT, "/"));
+        httpClient = RxHttpClient.create(new URL("http", ReaperPlugin.reaperName(dc), ReaperPlugin.APP_SERVICE_PORT, "/"));
+        adminHttpClient = RxHttpClient.create(new URL("http", ReaperPlugin.reaperName(dc), ReaperPlugin.ADMIN_SERVICE_PORT, "/"));
         this.dataCenter = dc;
         this.username = username;
         this.password = password;
@@ -50,7 +52,7 @@ public class ReaperClient implements Closeable {
      * Check for the availability of reaper
      */
     public Single<Boolean> ping() {
-        return httpClient.exchange(GET("/ping"))
+        return adminHttpClient.exchange(GET("/ping"))
                 .observeOn(Schedulers.io())
                 .map(res -> res.code() == 200)
                 .onErrorReturnItem(false)
@@ -119,11 +121,11 @@ public class ReaperClient implements Closeable {
      */
     private Single<String> getJwt(String cookie) {
         return httpClient.exchange(GET("/jwt").header("Cookie", cookie))
-                .observeOn(Schedulers.io())
                 .doOnNext(httpResponse -> {
                     logger.debug("reaper jwt response status={}", httpResponse.getStatus().getCode());
                 })
-                .map(httpResponse -> Objects.requireNonNull(httpResponse.body()).toString(StandardCharsets.UTF_8))
+                .map(httpResponse -> Objects.requireNonNull(httpResponse.body()).toString(httpResponse.getCharacterEncoding()))
+                .subscribeOn(Schedulers.io()) // force the execution of body extraction in same thread as Request execution
                 .singleOrError();
     }
     
@@ -140,12 +142,13 @@ public class ReaperClient implements Closeable {
         if (!m.find()) {
             return null;
         }
-    
+
         return m.group(1);
     }
     
     @Override
     public void close() throws IOException {
         httpClient.close();
+        adminHttpClient.close();
     }
 }
