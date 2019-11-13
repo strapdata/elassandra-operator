@@ -160,6 +160,8 @@ to the desired number of replica and the number of available nodes.
 Cassandra cleanup
 .................
 
+// TODO revoir cette section, en expliquant quand un clean up est triggé (à la fin d'un scaleup)
+
 To execute a *nodetool cleanup* on each nodes, you have to create a **CleanUp task**.
 
 .. code-block:: bash
@@ -204,11 +206,65 @@ To check the status of the task :
       pods:
         elassandra-mycluster-mydatacenter-local-0: SUCCEED
 
+Update a password
+.................
 
+The Elassandra Operator defines a set of cassandra role when the DC
+
+// list here the list of pwd and specify which one can be updated
+
+To update a password used to interact with the Elassandra Cluster through CQL or JMX, you can update the values stored in the elassandra-*cluster_name* secret.
+
+.. code-block:: bash
+
+    $ kubectl get secret elassandra-mycluster -o json
+    {
+        "apiVersion": "v1",
+        "data": {
+            "cassandra.admin_password": "M2Q4NjRlNjktNGNkZi00NjVmLThhOTgtNjk0YjFiZThkYjQ3",
+            "cassandra.cassandra_password": "YjA2OGY4OGEtMTdiOS00MjYxLTlmNjgtNTMxNzMyYjZjMTgz",
+            "cassandra.jmx_password": "OTUwNjQ5MjYtYjNiOC00MTE4LTgzZTEtNjFhNzc0YzkwOGE4",
+            "cassandra.reaper_password": "YTU5YWZhMjAtYzUyMi00ODIwLWI2YzQtNmFmMWUwMDEwZDU2",
+            "cassandra.strapkop_password": "NzllYzVkN2UtOWY1OS00YjAwLWIxMTctZDlhOTQ2NmJjOGFh",
+            "shared-secret.yaml": "YWFhLnNoYXJlZF9zZWNyZXQ6IGQ2ZDliNGM5LTFkOGEtNDdhZi05ZDNkLTFhZDJiZmIwMzFkNQ=="
+        },
+        "kind": "Secret",
+        "metadata": {
+            "creationTimestamp": "2019-11-07T14:18:45Z",
+            "labels": {
+                "app": "elassandra",
+                "app.kubernetes.io/managed-by": "elassandra-operator",
+                "cluster": "mycluster"
+            },
+            "name": "elassandra-mycluster",
+            "namespace": "default",
+            "ownerReferences": [
+                {
+                    "apiVersion": "stable.strapdata.com/v1",
+                    "blockOwnerDeletion": true,
+                    "controller": true,
+                    "kind": "ElassandraDataCenter",
+                    "name": "elassandra-mycluster-mydatacenter",
+                    "uid": "7e059ca9-1288-4643-be1d-2d25f99fb9ac"
+                }
+            ],
+            "resourceVersion": "280541",
+            "selfLink": "/api/v1/namespaces/default/secrets/elassandra-mycluster",
+            "uid": "d16c480e-97eb-414b-87b0-23a6c3f6ba23"
+        },
+        "type": "Opaque"
+    }
+
+Once you have identified the password to update, you can run this command:
+
+.. code-block:: bash
+
+    kubectl get secret elassandra-mycluster -o json | jq --arg newpassword "$(echo -n pass1234 | base64)" '.data["cassandra.admin_password"]=$newpassword' | kubectl apply -f -
 
 
 Enable/Disable search
 .....................
+
 
 Upgrade Elassandra
 ..................
