@@ -113,6 +113,10 @@ dependencies {
 
     compile "com.datastax.cassandra:cassandra-driver-core:3.7.1"
 
+    compile("com.strapdata.elasticsearch.plugin.enterprise:strapdata-license:$version") {
+        exclude group: 'com.strapdata.elasticsearch', module: 'elasticsearch'
+    }
+
     compile project(':java:model')
     compile project(':java:backup')
     compile project(':java:k8s-addons')

@@ -14,6 +14,7 @@ import com.strapdata.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
+import com.strapdata.strapkop.cql.CqlLicenseManager;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.cql.CqlSessionHandler;
 import com.strapdata.strapkop.event.ElassandraPod;
@@ -84,6 +85,7 @@ public class DataCenterUpdateAction {
     private final SidecarClientFactory sidecarClientFactory;
 
     private final CqlRoleManager cqlRoleManager;
+    private final CqlLicenseManager cqlLicenseManager;
     private final CqlKeyspaceManager cqlKeyspaceManager;
 
     private final ElassandraNodeStatusCache elassandraNodeStatusCache;
@@ -99,7 +101,8 @@ public class DataCenterUpdateAction {
                                   final CqlKeyspaceManager cqlKeyspaceManager,
                                   final ElassandraNodeStatusCache elassandraNodeStatusCache,
                                   final SidecarClientFactory sidecarClientFactory,
-                                  @Parameter("dataCenter") com.strapdata.model.k8s.cassandra.DataCenter dataCenter) {
+                                  @Parameter("dataCenter") com.strapdata.model.k8s.cassandra.DataCenter dataCenter,
+                                  final CqlLicenseManager cqlLicenseManager) {
         this.context = context;
         this.coreApi = coreApi;
         this.appsApi = appsApi;
@@ -112,6 +115,7 @@ public class DataCenterUpdateAction {
         this.dataCenterSpec = dataCenter.getSpec();
 
         this.cqlRoleManager = cqlRoleManager;
+        this.cqlLicenseManager = cqlLicenseManager;
         this.cqlKeyspaceManager = cqlKeyspaceManager;
         this.elassandraNodeStatusCache = elassandraNodeStatusCache;
         this.sidecarClientFactory = sidecarClientFactory;
@@ -337,6 +341,7 @@ public class DataCenterUpdateAction {
                         final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
                         todo = this.cqlKeyspaceManager.reconcileKeyspaces(dataCenter, cqlSessionHandler)
                                 .andThen(this.cqlRoleManager.reconcileRole(dataCenter, cqlSessionHandler))
+                                .andThen(this.cqlLicenseManager.verifyLicense(dataCenter, cqlSessionHandler))
                                 .doFinally(new Action() {
                                     @Override
                                     public void run() throws Exception {
