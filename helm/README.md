@@ -169,3 +169,75 @@ If you want to delete the chart :
 strapkop$ ./gradlew helmDeleteInstallDatacenter 
 strapkop$ ./gradlew helmDeleteOperator 
 ```
+
+## Install Microk8s on Ubuntu
+
+* install microk8s using snap  (https://microk8s.io/docs/)
+
+```bash
+sudo snap install microk8s --classic --channel=1.15/stable
+```
+
+* add user to microk8s group 
+
+```bash
+sudo usermod -a -G microk8s <user>
+```
+
+* check install works properly
+
+```bash
+microk8s.status --wait-ready
+microk8s.kubectl create deployment kubernetes-bootcamp --image=gcr.io/google-samples/kubernetes-bootcamp:v1
+```
+
+if the "bootcamp" img is running, create a kubeconfig file and export it to avoid using microk8s prefix on each command
+
+```bash
+microk8s.kubectl config view --raw > ~/.kube/microk8s.config 
+export KUBECONFIG=~/.kube/microk8s.config
+# create an alias kconf-microk8s to switch easily on this config
+```
+
+* Enable the DNS add-on
+
+```bash
+microk8s.enable dns
+```
+
+* Enable the Registry add-on
+
+```bash
+microk8s.enable registry
+```
+
+Add microk8s registry (localhost:32000) in docker config (/etc/docker/daemon.json)
+
+* Install helm on microk8s cluster
+
+```bash
+kubectl apply -f helm/src/main/resources/rbac-tiller.yml
+helm init --history-max 200 --service-account tiller
+```
+
+* Add the "zone" label on the node
+ 
+```bash
+kubectl label nodes $NODENAME failure-domain.beta.kubernetes.io/zone=local
+```
+
+* Authorize privileged container and change the insecure http port in kube-apiserver config 
+
+Add **--allow-privileged** and **--insecure-port=16480** in the configuration file _/var/snap/microk8s/current/args/kube-apiserver_
+
+Check there are no more references on 8080 in microk8s config files:
+```bash
+sudo sed -i s/:8080/:16480/ /var/snap/microk8s/current/args/cni-network /var/snap/microk8s/current/args/containerd /var/snap/microk8s/current/args/containerd-env /var/snap/microk8s/current/args/containerd-template.toml /var/snap/microk8s/current/args/containerd.toml /var/snap/microk8s/current/args/ctr /var/snap/microk8s/current/args/etcd /var/snap/microk8s/current/args/kube-apiserver /var/snap/microk8s/current/args/kube-controller-manager /var/snap/microk8s/current/args/kubectl /var/snap/microk8s/current/args/kubelet /var/snap/microk8s/current/args/kube-proxy /var/snap/microk8s/current/args/kube-scheduler
+```
+
+* Retsart microk8s 
+
+```bash
+microk8s.stop
+microk8s.start
+```
