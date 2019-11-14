@@ -111,9 +111,11 @@ public class ReaperPlugin extends AbstractPlugin {
                 k8sResourceUtils.deleteDeployment(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector),
                 k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector),
                 k8sResourceUtils.deleteIngress(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector)
-        });
+        }).andThen(Completable.fromAction(() -> {
+            DataCenterStatus status = dataCenter.getStatus();
+            status.setReaperPhase(ReaperPhase.ROLE_CREATED); // step back the phase to be in consistent state next time Reaper will be enabled
+        }));
     }
-
 
     /**
      * @return The number of reaper pods depending on ReaperStatus
