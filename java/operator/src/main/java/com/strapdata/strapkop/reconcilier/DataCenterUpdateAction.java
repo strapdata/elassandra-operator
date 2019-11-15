@@ -186,7 +186,7 @@ public class DataCenterUpdateAction {
             throw new StrapkopException(String.format("dc=%s has an invalid number of replicas", dataCenterMetadata.getName()));
         }
 
-        return Single.zip(
+            return Single.zip(
                 k8sResourceUtils.createOrReplaceNamespacedService(builder.buildServiceNodes()),
                 k8sResourceUtils.createOrReplaceNamespacedService(builder.buildServiceElasticsearch()),
                 k8sResourceUtils.createOrReplaceNamespacedService(builder.buildServiceExternalNodes()),
@@ -279,7 +279,11 @@ public class DataCenterUpdateAction {
                                 break;
                             case SCALING_UP:
                                 // scale up done and last node NORMAL
-                                if (!movingZone.isScalingUp() && elassandraNodeStatusCache.isNormal(movingZone.lastPod(dataCenter))) {
+
+                                Integer expectedReplicas = movingZone.sts.get().getSpec().getReplicas();
+                                boolean replicasRunning = (expectedReplicas == elassandraNodeStatusCache.countNodesInStateForRack(movingZone.name, ElassandraNodeStatus.NORMAL));
+
+                                if (!movingZone.isScalingUp() && replicasRunning) {
                                     movingRack.setJoinedReplicas(movingZone.size);
                                     movingRack.setPhase(RackPhase.RUNNING);
                                     updateDatacenterStatus(DataCenterPhase.RUNNING, zones, rackStatusByName);

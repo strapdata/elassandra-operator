@@ -30,7 +30,8 @@ public class ElassandraPod {
                 .setCluster(dc.getSpec().getClusterName())
                 .setDataCenter(dc.getSpec().getDatacenterName())
                 .setParent(dc.getMetadata().getName())
-                .setNamespace(dc.getMetadata().getNamespace());
+                .setNamespace(dc.getMetadata().getNamespace())
+                .setRack(rack);
     }
 
     public ElassandraPod(final String namespace, final String clusterName, String dcName, String podName) {

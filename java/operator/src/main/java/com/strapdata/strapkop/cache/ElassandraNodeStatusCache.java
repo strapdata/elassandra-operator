@@ -19,4 +19,14 @@ public class ElassandraNodeStatusCache extends Cache<ElassandraPod, ElassandraNo
     public boolean isNormal(ElassandraPod pod) {
         return ElassandraNodeStatus.NORMAL.equals(getOrDefault(pod, ElassandraNodeStatus.UNKNOWN));
     }
+
+    public long countNodesInStateForRack(String rack, ElassandraNodeStatus status) {
+        Objects.requireNonNull(rack, "rack paramter is null");
+        Objects.requireNonNull(status, "status paramter is null");
+        long result =  this.entrySet().stream()
+                .filter(e -> rack.equals(e.getKey().getRack()))
+                .filter(e -> status.equals(e.getValue()))
+                .count();
+        return result;
+    }
 }
