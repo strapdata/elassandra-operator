@@ -99,11 +99,11 @@ public class K8sWatchEventSource<ResourceT, ResourceListT> implements EventSourc
                 .observeOn(Schedulers.io()).observeOn(Schedulers.io()) // blocking io seemed to happen on computational thread...
                 .doOnError(t -> {
                     if (t.getCause() instanceof java.net.SocketTimeoutException) {
-                        logger.debug("Watcher for adapter '{}' receive socket timeout", adapter.getClass().getName(), t);
+                        logger.debug("Watcher for adapter '{}' receive a socket timeout", adapter.getClass().getName(), t);
                         // ignore read timeout
                         return;
                     }
-                    logger.warn("error", t);
+                    logger.warn("Watcher for adapter '{}' receive an error", t);
                 })
                 .map(this::objectJsonToEvent)
                 .doFinally(watch::close);
