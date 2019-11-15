@@ -411,7 +411,10 @@ public class DataCenterUpdateAction {
                             rackStatusByName.get(zone.name).setPhase(RackPhase.SCALING_UP);
                             updateDatacenterStatus(DataCenterPhase.SCALING_UP, zones, rackStatusByName);
                             logger.debug("SCALE_UP started in rack={} size={}", zone.name, zone.size);
-                            return todo.andThen(k8sResourceUtils.replaceNamespacedStatefulSet(sts).ignoreElement());
+                            ConfigMapVolumeMounts configMapVolumeMounts = new ConfigMapVolumeMounts(zones, zone.name);
+                            return todo
+                                    .andThen(configMapVolumeMounts.createOrReplaceNamespacedConfigMaps()) // call ConfigMapVolumeMount here to update seeds in case of single rack with multi-nodes
+                                    .andThen(k8sResourceUtils.replaceNamespacedStatefulSet(sts).ignoreElement());
                         }
                         logger.warn("Cannot scale up, no free node in datacenter={} in namespace={}", dataCenterMetadata.getName(), dataCenterMetadata.getNamespace());
                     } else if (zones.totalReplicas() > dataCenter.getSpec().getReplicas()) {
