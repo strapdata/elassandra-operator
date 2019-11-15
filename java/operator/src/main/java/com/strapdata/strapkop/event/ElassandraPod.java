@@ -22,7 +22,7 @@ public class ElassandraPod {
     private String parent;
     private String rack;
 
-    final static Pattern podNamePattern = Pattern.compile("elassandra-([\\w]+)-([\\w]+)-([\\w]+)-([\\d]+)");
+    final static Pattern podNamePattern = Pattern.compile("elassandra-([\\w]+)-([\\w]+)-([\\w-]+)-([\\d]+)");
 
     public ElassandraPod(final DataCenter dc, final String rack, final int index) {
         this.setName(OperatorNames.podName(dc, rack, index))
