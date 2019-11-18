@@ -12,8 +12,8 @@ metadata:
 {{ toYaml .Values.labels | indent 4 }}
 {{- end }}
 spec:
-  clusterName: {{ template "elassandra.clusterName" . }}
-  datacenterName: {{ template "elassandra.datacenterName" . }}
+  clusterName: {{ include "elassandra.clusterName" . | required "Invalid clusterName : Release name has to be clustername-dcname (in lowercase), clustername must match ([0-9a-z]+)" }}
+  datacenterName: {{ include "elassandra.datacenterName" . | required "Invalid datacenterName : Release name has to be clustername-dcname (in lowercase), datacenterName must match ([0-9a-z]+)" }}
   workload: {{ .Values.workload }}
   replicas: {{ .Values.replicas }}
   elassandraImage: "{{ .Values.image.elassandraRepository }}:{{ .Values.image.elassandraTag }}"

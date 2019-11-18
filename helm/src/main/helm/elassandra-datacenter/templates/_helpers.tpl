@@ -32,11 +32,17 @@ Create chart name and version as used by the chart label.
 {{- end -}}
 
 {{- define "elassandra.datacenterName" -}}
-{{- (split "-" .Release.Name)._1 | required "Release name has to be clustername-dcname (in lowercase)" -}}
+{{ $length := len (split "-" .Release.Name) }}
+{{- if le $length 2 -}}
+{{ (split "-" .Release.Name)._1 | lower }}
+{{- end -}}
 {{- end -}}
 
 {{- define "elassandra.clusterName" -}}
-{{- (split "-" .Release.Name)._0 | required "Release name has to be clustername-dcname (in lowercase)" -}}
+{{ $length := len (split "-" .Release.Name) }}
+{{- if le $length 2 -}}
+{{ (split "-" .Release.Name)._0 | lower }}
+{{- end -}}
 {{- end -}}
 
 {{- define "elassandra.resourceName" -}}
