@@ -9,14 +9,14 @@
         </encoder>
     </appender>
 
-    <logger name="com.strapdata.strapkop" level="DEBUG" />
-    <logger name="com.strapdata.strapkop.controllers" level="DEBUG" />
-    <logger name="com.strapdata.strapkop.k8s" level="WARN" />
-    <logger name="com.strapdata.strapkop.event" level="WARN" />
-    <logger name="com.strapdata.strapkop.source" level="WARN" />
-    <logger name="com.strapdata.strapkop.handler" level="WARN" />
-    <logger name="com.strapdata.strapkop.pipeline" level="WARN" />
-    <logger name="com.strapdata.strapkop.sidecar" level="WARN" />
+    <logger name="com.strapdata.strapkop" level="${LOGBACK_com_strapdata_strapkop:-DEBUG}" />
+    <logger name="com.strapdata.strapkop.controllers" level="${LOGBACK_com_strapdata_strapkop_controllers:-DEBUG}" />
+    <logger name="com.strapdata.strapkop.k8s" level="${LOGBACK_com_strapdata_strapkop_k8s:-WARN}" />
+    <logger name="com.strapdata.strapkop.event" level="${LOGBACK_com_strapdata_strapkop_event:-WARN}" />
+    <logger name="com.strapdata.strapkop.source" level="${LOGBACK_com_strapdata_strapkop_source:-WARN}" />
+    <logger name="com.strapdata.strapkop.handler" level="${LOGBACK_com_strapdata_strapkop_handler:-WARN}" />
+    <logger name="com.strapdata.strapkop.pipeline" level="${LOGBACK_com_strapdata_strapkop_pipeline:-WARN}" />
+    <logger name="com.strapdata.strapkop.sidecar" level="${LOGBACK_com_strapdata_strapkop_sidecar:-WARN}" />
 
     <root level="WARN">
         <appender-ref ref="STDOUT" />
