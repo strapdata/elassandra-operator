@@ -13,4 +13,4 @@ jackson:
     module-scan: false
 
 operator:
-    namespace: default
+    namespace: ${OPERATOR_NAMESPACE:default}

@@ -8,6 +8,7 @@ import com.strapdata.strapkop.cql.*;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.k8s.OperatorNames;
+import com.strapdata.strapkop.reconcilier.DataCenterUpdateAction;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
@@ -67,7 +68,7 @@ public class ReaperPlugin extends AbstractPlugin {
 
     public static final CqlRole REAPER_ROLE = new CqlRole()
             .withUsername("reaper")
-            .withSecretKey("cassandra.reaper_password")
+            .withSecretKey(DataCenterUpdateAction.KEY_REAPER_PASSWORD)
             .withSuperUser(false)
             .withApplied(false)
             .withGrantStatements(ImmutableList.of("GRANT ALL PERMISSIONS ON KEYSPACE reaper_db TO reaper"))
@@ -220,7 +221,7 @@ public class ReaperPlugin extends AbstractPlugin {
                         .valueFrom(new V1EnvVarSource()
                                 .secretKeyRef(new V1SecretKeySelector()
                                         .name(OperatorNames.clusterSecret(dataCenter))
-                                        .key("cassandra.jmx_password")
+                                        .key(DataCenterUpdateAction.KEY_JMX_PASSWORD)
                                 )
                         )
                 )
@@ -287,7 +288,7 @@ public class ReaperPlugin extends AbstractPlugin {
                             .valueFrom(new V1EnvVarSource()
                                     .secretKeyRef(new V1SecretKeySelector()
                                             .name(OperatorNames.clusterSecret(dataCenter))
-                                            .key("cassandra.reaper_password")
+                                            .key(DataCenterUpdateAction.KEY_REAPER_PASSWORD)
                                     )
                             )
                     );

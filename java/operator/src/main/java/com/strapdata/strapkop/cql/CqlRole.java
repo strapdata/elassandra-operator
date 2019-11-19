@@ -26,6 +26,10 @@ import java.util.function.Function;
 public class CqlRole implements Cloneable {
     private static final Logger logger = LoggerFactory.getLogger(CqlRole.class);
 
+    public static final String KEY_CASSANDRA_PASSWORD = "cassandra.cassandra_password";
+    public static final String KEY_ELASSANDRA_OPERATOR_PASSWORD = "cassandra.elassandra_operator_password";
+    public static final String KEY_ADMIN_PASSWORD = "cassandra.admin_password";
+
     public static final CqlRole DEFAULT_CASSANDRA_ROLE = new CqlRole()
             .withUsername("cassandra")
             .withPassword("cassandra")
@@ -34,19 +38,19 @@ public class CqlRole implements Cloneable {
 
     public static final CqlRole CASSANDRA_ROLE = new CqlRole()
             .withUsername("cassandra")
-            .withSecretKey("cassandra.cassandra_password")
+            .withSecretKey(KEY_CASSANDRA_PASSWORD)
             .withSuperUser(true)
             .withApplied(false);
 
     public static final CqlRole ADMIN_ROLE = new CqlRole()
             .withUsername("admin")
-            .withSecretKey("cassandra.admin_password")
+            .withSecretKey(KEY_ADMIN_PASSWORD)
             .withSuperUser(true)
             .withApplied(false);
 
     public static final CqlRole STRAPKOP_ROLE = new CqlRole()
-            .withUsername("strapkop")
-            .withSecretKey("cassandra.strapkop_password")
+            .withUsername("elassandra_operator")
+            .withSecretKey(KEY_ELASSANDRA_OPERATOR_PASSWORD)
             .withSuperUser(true)
             .withApplied(false);
 
