@@ -13,10 +13,7 @@ import com.strapdata.model.k8s.task.Task;
 import com.strapdata.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
-import com.strapdata.strapkop.cql.CqlKeyspaceManager;
-import com.strapdata.strapkop.cql.CqlLicenseManager;
-import com.strapdata.strapkop.cql.CqlRoleManager;
-import com.strapdata.strapkop.cql.CqlSessionHandler;
+import com.strapdata.strapkop.cql.*;
 import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
@@ -66,6 +63,11 @@ public class DataCenterUpdateAction {
     public static final String OPERATOR_KEYSTORE_MOUNT_PATH = "/tmp/operator-keystore";
     public static final String OPERATOR_KEYSTORE = "keystore.p12";
     public static final String OPERATOR_KEYPASS = "changeit";
+
+
+    public static final String KEY_JMX_PASSWORD = "cassandra.jmx_password";
+    public static final String KEY_SHARED_SECRET = "shared-secret.yaml";
+    public static final String KEY_REAPER_PASSWORD = "cassandra.reaper_password";
 
     public static final long CASSANDRA_USER_ID = 999L;
     public static final long CASSANDRA_GROUP_ID = 999L;
@@ -195,12 +197,12 @@ public class DataCenterUpdateAction {
                 .flatMap(clusterSecret -> {
                     // create cluster secret if not exists
                     Map<String, String> passwords = new HashMap<>();
-                    passwords.put("cassandra.cassandra_password", UUID.randomUUID().toString());
-                    passwords.put("cassandra.strapkop_password", UUID.randomUUID().toString());
-                    passwords.put("cassandra.admin_password", UUID.randomUUID().toString());
-                    passwords.put("cassandra.jmx_password", UUID.randomUUID().toString());
-                    passwords.put("shared-secret.yaml", "aaa.shared_secret: " + UUID.randomUUID().toString());
-                    passwords.put("cassandra.reaper_password", UUID.randomUUID().toString());
+                    passwords.put(CqlRole.KEY_CASSANDRA_PASSWORD, UUID.randomUUID().toString());
+                    passwords.put(CqlRole.KEY_ELASSANDRA_OPERATOR_PASSWORD, UUID.randomUUID().toString());
+                    passwords.put(CqlRole.KEY_ADMIN_PASSWORD, UUID.randomUUID().toString());
+                    passwords.put(KEY_JMX_PASSWORD, UUID.randomUUID().toString());
+                    passwords.put(KEY_SHARED_SECRET, "aaa.shared_secret: " + UUID.randomUUID().toString());
+                    passwords.put(KEY_REAPER_PASSWORD, UUID.randomUUID().toString());
                     return k8sResourceUtils.readOrCreateNamespacedSecret(clusterSecret, () -> {
                                 V1Secret secret = new V1Secret().metadata(clusterSecret);
                                 for(Map.Entry<String,String> entry : passwords.entrySet())
@@ -212,7 +214,7 @@ public class DataCenterUpdateAction {
                 .flatMap(passwords -> {
                     // create rc file
                     return k8sResourceUtils.readOrCreateNamespacedSecret(builder.clusterObjectMeta(OperatorNames.clusterRcFilesSecret(dataCenter)),
-                            () -> builder.buildSecretRcFile("admin", passwords.get("cassandra.admin_password")))
+                            () -> builder.buildSecretRcFile("admin", passwords.get(CqlRole.KEY_ADMIN_PASSWORD)))
                             .map(s -> {
                                 passwords.clear();
                                 return passwords;
@@ -770,7 +772,7 @@ public class DataCenterUpdateAction {
             Set<String> seeds = new HashSet<>();
             for(RackStatus rackStatus : dataCenterStatus.getRackStatuses()) {
                 if (rackStatus.getJoinedReplicas() > 0)
-                    seeds.add(new ElassandraPod(dataCenter, rackStatus.getName(), 0).getName());
+                    seeds.add(new ElassandraPod(dataCenter, rackStatus.getName(), 0).getFqdn());
             }
 
             Map<String, String> parameters = new HashMap<>();
@@ -1213,7 +1215,7 @@ public class DataCenterUpdateAction {
                             .valueFrom(new V1EnvVarSource()
                                     .secretKeyRef(new V1SecretKeySelector()
                                             .name(OperatorNames.clusterSecret(dataCenter))
-                                            .key("cassandra.strapkop_password")))
+                                            .key(CqlRole.KEY_ELASSANDRA_OPERATOR_PASSWORD )))
                     )
                     .image(dataCenterSpec.getSidecarImage())
                     .imagePullPolicy(dataCenterSpec.getImagePullPolicy())
@@ -1396,7 +1398,7 @@ public class DataCenterUpdateAction {
                     .name("JMX_PASSWORD")
                     .valueFrom(new V1EnvVarSource().secretKeyRef(new V1SecretKeySelector()
                             .name(OperatorNames.clusterSecret(dataCenter))
-                            .key("cassandra.jmx_password")));
+                            .key(KEY_JMX_PASSWORD)));
             cassandraContainer.addEnvItem(jmxPasswordEnvVar);
             commitlogInitContainer.addEnvItem(jmxPasswordEnvVar);
             sidecarContainer.addEnvItem(jmxPasswordEnvVar);
@@ -1431,7 +1433,7 @@ public class DataCenterUpdateAction {
 
                 podSpec.addVolumesItem(new V1Volume().name("operator-cluster-secret")
                         .secret(new V1SecretVolumeSource().secretName(OperatorNames.clusterSecret(dataCenter))
-                                .addItemsItem(new V1KeyToPath().key("shared-secret.yaml").path("elasticsearch.yml.d/003-shared-secret.yaml"))));
+                                .addItemsItem(new V1KeyToPath().key(KEY_SHARED_SECRET).path("elasticsearch.yml.d/003-shared-secret.yaml"))));
 
                 cassandraContainer.addArgsItem(opClusterSecretPath);
                 commitlogInitContainer.addArgsItem(opClusterSecretPath);
@@ -1444,7 +1446,7 @@ public class DataCenterUpdateAction {
                 // custom objects api doesn't give us a nice way to pass in the type we want so we do it manually
                 final Task backup;
                 {
-                    final Call call = customObjectsApi.getNamespacedCustomObjectCall("stable.strapdata.com", "v1", "default", "elassandratasks", dataCenterSpec.getRestoreFromBackup(), null, null);
+                    final Call call = customObjectsApi.getNamespacedCustomObjectCall("stable.strapdata.com", "v1", dataCenterMetadata.getNamespace(), "elassandratasks", dataCenterSpec.getRestoreFromBackup(), null, null);
                     backup = customObjectsApi.getApiClient().<Task>execute(call, new TypeToken<Task>() {
                     }.getType()).getData();
                     if (backup.getSpec().getBackup() == null) {

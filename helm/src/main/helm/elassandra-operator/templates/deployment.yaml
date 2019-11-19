@@ -52,6 +52,8 @@ spec:
           env:
           - name: ELASSANDRA_OPERATOR_NAME
             value: {{ template "elassandra-operator.fullname" . }}
+          - name: OPERATOR_NAMESPACE
+            value: {{ .Release.Namespace }}
           {{- if .Values.env }}
           {{- range $key, $val := .Values.env }}
           - name: {{ $key }}

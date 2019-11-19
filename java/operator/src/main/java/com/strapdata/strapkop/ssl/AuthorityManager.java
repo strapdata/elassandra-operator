@@ -1,6 +1,7 @@
 package com.strapdata.strapkop.ssl;
 
 
+import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.ssl.utils.CertManager;
@@ -41,7 +42,6 @@ public class AuthorityManager {
     public static final String DEFAULT_PUBLIC_CA_MOUNT_PATH = "/tmp/operator-truststore"; // public CA certificate mount path
 
     public static final String DEFAULT_PRIVATE_CA_SECRET_NAME = "ca-key"; // secret for issuing certificates, only for some privileged pods
-    public static final String DEFAULT_CA_SECRET_NAMESPACE = "default";
 
     // secret keys
     public static final String SECRET_CA_KEY = "ca.key";
@@ -56,6 +56,9 @@ public class AuthorityManager {
 
     @Inject
     private CoreV1Api coreApi;
+
+    @Inject
+    private OperatorConfig config;
 
     /**
      * CA secret with public certificate, mounted by all pods
@@ -106,21 +109,21 @@ public class AuthorityManager {
         final V1Secret publicSecret = new V1Secret()
                 .metadata(new V1ObjectMeta()
                         .name(getPublicCaSecretName())
-                        .namespace(DEFAULT_CA_SECRET_NAMESPACE)
+                        .namespace(config.getNamespace())
                         .labels(OperatorLabels.MANAGED))
                 .putStringDataItem(SECRET_CACERT_PEM, ca.getCertificateChainAsString())
                 .putDataItem(SECRET_TRUSTSTORE_P12, certManager.generateTruststoreBytes(ca, getCaTrustPass()));
-        logger.info("Storing public CA in secret {} in namespace {} secret={}", getPublicCaSecretName(), DEFAULT_CA_SECRET_NAMESPACE, publicSecret);
-        coreApi.createNamespacedSecret(DEFAULT_CA_SECRET_NAMESPACE, publicSecret, null, null, null);
+        logger.info("Storing public CA in secret {} in namespace {} secret={}", getPublicCaSecretName(), config.getNamespace(), publicSecret);
+        coreApi.createNamespacedSecret(config.getNamespace(), publicSecret, null, null, null);
 
         final V1Secret privateSecret = new V1Secret()
                 .metadata(new V1ObjectMeta()
                         .name(getPrivateCaSecretName())
-                        .namespace(DEFAULT_CA_SECRET_NAMESPACE)
+                        .namespace(config.getNamespace())
                         .labels(OperatorLabels.MANAGED))
                 .putStringDataItem(SECRET_CA_KEY, ca.getPrivateKeyAsString());
-        logger.info("Storing private CA in secret {} in namespace {}", getPrivateCaSecretName(), DEFAULT_CA_SECRET_NAMESPACE);
-        coreApi.createNamespacedSecret(DEFAULT_CA_SECRET_NAMESPACE, privateSecret, null, null, null);
+        logger.info("Storing private CA in secret {} in namespace {}", getPrivateCaSecretName(), config.getNamespace());
+        coreApi.createNamespacedSecret(config.getNamespace(), privateSecret, null, null, null);
     }
 
     /**
@@ -153,10 +156,10 @@ public class AuthorityManager {
     }
     
     private String loadItemFromSecret(String publicCaSecretName, String secretCacertPem) throws StrapkopException, ApiException {
-        V1Secret publicSecret = coreApi.readNamespacedSecret(publicCaSecretName, DEFAULT_CA_SECRET_NAMESPACE, null, null, null);
+        V1Secret publicSecret = coreApi.readNamespacedSecret(publicCaSecretName, config.getNamespace(), null, null, null);
         final byte[] certsBytes = publicSecret.getData().get(secretCacertPem);
         if (certsBytes == null) {
-            throw new StrapkopException(MessageFormat.format("missing file {} from secret {} in namespace {}", secretCacertPem, publicCaSecretName, DEFAULT_CA_SECRET_NAMESPACE));
+            throw new StrapkopException(MessageFormat.format("missing file {} from secret {} in namespace {}", secretCacertPem, publicCaSecretName, config.getNamespace()));
         }
         return new String(certsBytes);
     }
