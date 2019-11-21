@@ -7,7 +7,7 @@ replicaCount: 1
 apiVersion: stable.strapdata.com/v1
 
 image:
-  repository: strapdata.azurecr.io/strapdata/strapkop-operator-dev
+  repository: strapdata.azurecr.io/strapdata/elassandra-operator-dev
   tag: latest
 
 imagePullPolicy: Always

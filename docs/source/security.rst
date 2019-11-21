@@ -4,8 +4,8 @@ Security
 Kuberenetes RBAC
 ................
 
-The elassandra operator runs with a dedicated Kubernetes serviceaccount ``strapkop-elassandra-operator`` and a
-cluster role ``strapkop-elassandra-operator`` with the following restricted operations:
+The elassandra operator runs with a dedicated Kubernetes serviceaccount ``elassandra-operator`` and a
+cluster role ``elassandra-operator`` with the following restricted operations:
 
 .. code::
 
@@ -18,9 +18,9 @@ cluster role ``strapkop-elassandra-operator`` with the following restricted oper
         chart: elassandra-operator-0.1.0
         heritage: Tiller
         release: strapkop
-      name: strapkop-elassandra-operator
+      name: elassandra-operator
       resourceVersion: "5345657"
-      selfLink: /apis/rbac.authorization.k8s.io/v1/clusterroles/strapkop-elassandra-operator
+      selfLink: /apis/rbac.authorization.k8s.io/v1/clusterroles/elassandra-operator
       uid: 311e5250-f131-11e9-a4ec-82615f3d8479
     rules:
     - apiGroups:
@@ -133,7 +133,7 @@ SSL/TLS Certificates
 The Elassandra operator can generate TLS keystores for Elassandra nodes
 * On startup, the operator generates a self-signed root CA certificate stored in ca-pub and ca-key Kubernetes secrets if these does not exists.
 * When a datacenter is deployed, a TLS keystore is generated from the root CA certificate if it does not exists in the secret
-`èlassandra-[cluster]-[dc]-keystore``. This certificate has a wildcard certificate subjectAltName extension matching all Elassandra datacenter pods.
+``elassandra-[cluster]-[dc]-keystore``. This certificate has a wildcard certificate subjectAltName extension matching all Elassandra datacenter pods.
 It also have the localhost and 127.0.0.1 extensions to allow local connections.
 
 This TLS certificates and keys are used to secure:
@@ -148,4 +148,4 @@ Authentication
 ..............
 
 
-Strapkop can automatically create Cassandra roles with a password defined as a Kubernetes secret, and set Cassandra permission and Elasticsearch privileges.
+Elassandra operator can automatically create Cassandra roles with a password defined as a Kubernetes secret, and set Cassandra permission and Elasticsearch privileges.

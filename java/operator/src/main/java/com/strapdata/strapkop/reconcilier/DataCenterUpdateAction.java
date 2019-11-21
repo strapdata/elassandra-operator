@@ -1208,7 +1208,7 @@ public class DataCenterUpdateAction {
                     .env(new ArrayList<>(dataCenterSpec.getEnv()))
                     .addEnvItem(new V1EnvVar()
                             .name("ELASSANDRA_USERNAME")
-                            .value("strapkop")
+                            .value("elassandra_operator")
                     )
                     .addEnvItem(new V1EnvVar()
                             .name("ELASSANDRA_PASSWORD")

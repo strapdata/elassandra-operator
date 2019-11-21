@@ -202,7 +202,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                         try {
                             return connect(dc, Optional.of(strakopRole));
                         } catch(Exception e) {
-                            logger.error("Failed to reconnect with the strapkop role="+strakopRole+" :"+e.getMessage(), e);
+                            logger.error("Failed to reconnect with the operator role="+strakopRole+" :"+e.getMessage(), e);
                         }
                     }
                     return tuple;

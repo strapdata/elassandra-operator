@@ -7,8 +7,8 @@ replicas: 1
 nodeAffinityPolicy: STRICT
 
 image:
-  elassandraRepository: strapdata.azurecr.io/strapdata/strapkop-elassandra-dev
-  sidecarRepository: strapdata.azurecr.io/strapdata/strapkop-sidecar-dev
+  elassandraRepository: strapdata.azurecr.io/strapdata/elassandra-node-dev
+  sidecarRepository: strapdata.azurecr.io/strapdata/elassandra-sidecar-dev
   elassandraTag: latest
   sidecarTag: latest
 

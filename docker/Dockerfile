@@ -43,6 +43,6 @@ RUN chown -R cassandra:cassandra /etc/cassandra /usr/share/cassandra
 VOLUME /etc/cassandra
 
 # wrap the entrtpoint
-COPY strapkop-entrypoint.sh /usr/local/bin/strapkop-entrypoint.sh
-RUN ln -s usr/local/bin/strapkop-entrypoint.sh /strapkop-entrypoint.sh # backwards compat
-ENTRYPOINT ["strapkop-entrypoint.sh"]
+COPY elassandra-node-entrypoint.sh /usr/local/bin/elassandra-node-entrypoint.sh
+RUN ln -s usr/local/bin/elassandra-node-entrypoint.sh /elassandra-node-entrypoint.sh # backwards compat
+ENTRYPOINT ["elassandra-node-entrypoint.sh"]

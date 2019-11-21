@@ -225,7 +225,7 @@ To update a password used to interact with the Elassandra Cluster through CQL or
             "cassandra.cassandra_password": "YjA2OGY4OGEtMTdiOS00MjYxLTlmNjgtNTMxNzMyYjZjMTgz",
             "cassandra.jmx_password": "OTUwNjQ5MjYtYjNiOC00MTE4LTgzZTEtNjFhNzc0YzkwOGE4",
             "cassandra.reaper_password": "YTU5YWZhMjAtYzUyMi00ODIwLWI2YzQtNmFmMWUwMDEwZDU2",
-            "cassandra.strapkop_password": "NzllYzVkN2UtOWY1OS00YjAwLWIxMTctZDlhOTQ2NmJjOGFh",
+            "cassandra.elassandra_operator_password": "NzllYzVkN2UtOWY1OS00YjAwLWIxMTctZDlhOTQ2NmJjOGFh",
             "shared-secret.yaml": "YWFhLnNoYXJlZF9zZWNyZXQ6IGQ2ZDliNGM5LTFkOGEtNDdhZi05ZDNkLTFhZDJiZmIwMzFkNQ=="
         },
         "kind": "Secret",
