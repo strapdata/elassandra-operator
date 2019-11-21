@@ -23,14 +23,14 @@ export AKS_SP_PASSWORD=${AKS_SP_PASSWORD:-}
 export AKS_K8S_VERSION=${AKS_K8S_VERSION:-1.13.7}
 
 export PULL_SECRET=${PULL_SECRET:-""}
-export IMAGE_PREFIX=${IMAGE_PREFIX:-"strapdata/strapkop-"}
+export IMAGE_PREFIX=${IMAGE_PREFIX:-"strapdata/elassandra-"}
 export IMAGE_SUFFIX=${IMAGE_SUFFIX:-"-dev"}
 export ELASSANDRA=${ELASSANDRA:-elassandra}
 # used for pull-secret registry
 export REGISTRY=${REGISTRY:-docker.repo.strapdata.com}
 export REGISTRY_USER=${REGISTRY_USER:-""}
 export REGISTRY_PASSWORD=${REGISTRY_PASSWORD:-""}
-export ELASSANDRA_IMAGE=${IMAGE_PREFIX}elassandra${IMAGE_SUFFIX}
+export ELASSANDRA_IMAGE=${IMAGE_PREFIX}node${IMAGE_SUFFIX}
 export OPERATOR_IMAGE=${IMAGE_PREFIX}operator${IMAGE_SUFFIX}
 export SIDECAR_IMAGE=${IMAGE_PREFIX}sidecar${IMAGE_SUFFIX}
 

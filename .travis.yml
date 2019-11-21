@@ -49,10 +49,10 @@ deploy:
   skip_cleanup: true
   script:
   - ./gradlew dockerPush -PregistryUsername=$NEXUS_USERNAME -PregistryPassword=$NEXUS_PASSWORD
-    -Dorg.gradle.project.dockerImagePrefix="docker.repo.strapdata.com/strapdata/strapkop-"
+    -Dorg.gradle.project.dockerImagePrefix="docker.repo.strapdata.com/strapdata/elassandra-"
     -Dorg.gradle.project.dockerImageSuffix="-dev"
     -Dorg.gradle.project.elassandraParentImage="strapdata/elassandra-enterprise"
-#      - ./gradlew dockerPush -PregistryUsername=$AZ_USERNAME -PregistryPassword=$AZ_PASSWORD -Dorg.gradle.project.dockerImagePrefix="strapdata.azurecr.io/strapdata/strapkop-" -Dorg.gradle.project.dockerImageSuffix="-dev"
+#      - ./gradlew dockerPush -PregistryUsername=$AZ_USERNAME -PregistryPassword=$AZ_PASSWORD -Dorg.gradle.project.dockerImagePrefix="strapdata.azurecr.io/strapdata/elassandra-" -Dorg.gradle.project.dockerImageSuffix="-dev"
   on:
     tags: false
     branch:
@@ -61,15 +61,15 @@ deploy:
   skip_cleanup: true
   script:
   - ./gradlew dockerPush -PregistryUsername=$NEXUS_USERNAME -PregistryPassword=$NEXUS_PASSWORD
-    -Dorg.gradle.project.dockerImagePrefix="docker.repo.strapdata.com/strapdata/strapkop-"
+    -Dorg.gradle.project.dockerImagePrefix="docker.repo.strapdata.com/strapdata/elassandra-"
     -Dorg.gradle.project.dockerImageSuffix=""
     -Dorg.gradle.project.elassandraParentImage="strapdata/elassandra-enterprise"
-#      - ./gradlew dockerPush -PregistryUsername=$AZ_USERNAME -PregistryPassword=$AZ_PASSWORD -Dorg.gradle.project.dockerImagePrefix="strapdata.azurecr.io/strapdata/strapkop-" -Dorg.gradle.project.dockerImageSuffix=""
-  - docker tag docker.repo.strapdata.com/strapdata/strapkop-elassandra:${TRAVIS_TAG} gcr.io/strapdata-gcp-partnership/strapkop-elassandra:${TRAVIS_TAG}
-  - docker tag docker.repo.strapdata.com/strapdata/strapkop-sidecar:${TRAVIS_TAG} gcr.io/strapdata-gcp-partnership/strapkop-sidecar:${TRAVIS_TAG}
-  - docker tag docker.repo.strapdata.com/strapdata/strapkop-operator:${TRAVIS_TAG} gcr.io/strapdata-gcp-partnership/strapkop-operator:${TRAVIS_TAG}
-  - docker push gcr.io/strapdata-gcp-partnership/strapkop-elassandra:${TRAVIS_TAG}
-  - docker push gcr.io/strapdata-gcp-partnership/strapkop-sidecar:${TRAVIS_TAG}
-  - docker push gcr.io/strapdata-gcp-partnership/strapkop-operator:${TRAVIS_TAG}
+#      - ./gradlew dockerPush -PregistryUsername=$AZ_USERNAME -PregistryPassword=$AZ_PASSWORD -Dorg.gradle.project.dockerImagePrefix="strapdata.azurecr.io/strapdata/elassandra-" -Dorg.gradle.project.dockerImageSuffix=""
+  - docker tag docker.repo.strapdata.com/strapdata/elassandra-node:${TRAVIS_TAG} gcr.io/strapdata-gcp-partnership/elassandra-node:${TRAVIS_TAG}
+  - docker tag docker.repo.strapdata.com/strapdata/elassandra-sidecar:${TRAVIS_TAG} gcr.io/strapdata-gcp-partnership/elassandra-sidecar:${TRAVIS_TAG}
+  - docker tag docker.repo.strapdata.com/strapdata/elassandra-operator:${TRAVIS_TAG} gcr.io/strapdata-gcp-partnership/elassandra-operator:${TRAVIS_TAG}
+  - docker push gcr.io/strapdata-gcp-partnership/elassandra-node:${TRAVIS_TAG}
+  - docker push gcr.io/strapdata-gcp-partnership/elassandra-sidecar:${TRAVIS_TAG}
+  - docker push gcr.io/strapdata-gcp-partnership/elassandra-operator:${TRAVIS_TAG}
   on:
     tags: true

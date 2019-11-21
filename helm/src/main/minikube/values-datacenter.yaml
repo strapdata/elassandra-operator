@@ -7,8 +7,8 @@ replicas: 1
 nodeAffinityPolicy: STRICT
 
 image:
-  elassandraRepository: docker.repo.strapdata.com/strapdata/strapkop-elassandra-dev
-  sidecarRepository: docker.repo.strapdata.com/strapdata/strapkop-sidecar-dev
+  elassandraRepository: docker.repo.strapdata.com/strapdata/elassandra-node-dev
+  sidecarRepository: docker.repo.strapdata.com/strapdata/elassandra-sidecar-dev
   elassandraTag: latest
   sidecarTag: latest
 

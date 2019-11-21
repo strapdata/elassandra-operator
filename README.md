@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.com/strapdata/strapkop.svg?token=PzEdBQpdXSgcm2zGdxUn&branch=ele-gke-develop-vr2)](https://travis-ci.com/strapdata/strapkop)
 
-# Strapkop
+# Elassandra Operator
 
 Elassandra Kubernetes Operator
 

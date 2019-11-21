@@ -7,13 +7,13 @@ High Availibility
 Elassandra high availibilty across cloud-provider zones is achieve by using one StatfulSet per Cassandra rack.
 
 
-Strapkop sidecar
+Elassandra sidecar
 ................
 
 Getting started
 ---------------
 
-Deploy a strapkop POD in your kubrenetes cluster.
+Deploy a Elassandra operator POD in your kubrenetes cluster.
 
 Deploy an elassandra-datacenter CRD
 

@@ -1,4 +1,4 @@
-# Strapkop HELM
+# Elassandra Operator HELM
 
 ## Package HELM charts
 
@@ -54,7 +54,7 @@ Upload HELM package on the Azure blogstore and in the Azure HELM repo.
     ./gradlew helm:uploadElassandraDatacenter
     ./gradelw helm:uploadElassandraOperator
 
-## Deploy Strapkop
+## Deploy Elassandra Operator
 
     helm install --name kop --namespace default elassandra-operator
 
@@ -62,7 +62,7 @@ Upload HELM package on the Azure blogstore and in the Azure HELM repo.
 
     helm install --name cl1-dc1 --namespace default elassandra-datacenter
     
-## deploy Strapkop with Minikube
+## deploy Elassandra Operator with Minikube
 
 ### Prerequisites 
 
@@ -136,7 +136,7 @@ kubectl create -f rbac.yml
 helm init --history-max 200 --service-account tiller
 ```
 
-### deploy strapkop
+### deploy Elassandra Operator
 
 * create [docker credentials](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/) as secret to download images from docker.repo.strapdata.com
 ```bash
