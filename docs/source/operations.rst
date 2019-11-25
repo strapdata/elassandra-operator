@@ -109,11 +109,11 @@ Here is the possible values :
 | ERROR          | An action encountered an error                            |
 +----------------+-----------------------------------------------------------+
 
-If the phase is set to *ERROR*, you can check the last error message with the **lastErrorMessage** entry in the CRD status.
+If the phase is set to *ERROR*, you can check the last error message with the **lastMessage** entry in the CRD status.
 
 .. code-block:: bash
 
-    kubectl get elassandradatacenters elassandra-mycluster-mydatacenter -o jsonpath="{$.status.lastErrorMessage}"
+    kubectl get elassandradatacenters elassandra-mycluster-mydatacenter -o jsonpath="{$.status.lastMessage}"
 
 
 Get the node status

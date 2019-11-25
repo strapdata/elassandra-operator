@@ -10,12 +10,13 @@ import java.util.Map;
 public final class OperatorLabels {
     public static final String POD = "statefulset.kubernetes.io/pod-name";
     public static final String ZONE = "failure-domain.beta.kubernetes.io/zone";
+    public static final String APP = "app";
 
-    
+
     // public static final String labelPrefix = "elassandra-operator.strapdata.com/";
     // no prefix for compatibility with vroyer's grafana dashboard
     public static final String labelPrefix = "";
-    
+
     
     public static final String PARENT = labelPrefix + "parent"; // parent datacenter resource name
     public static final String CLUSTER = labelPrefix + "cluster";
@@ -41,7 +42,7 @@ public final class OperatorLabels {
         return ImmutableMap.<String, String>builder()
                 .put(CLUSTER, clusterName)
                 .putAll(MANAGED)
-                .put("app", "elassandra") // for grafana
+                .put(APP, "elassandra") // for grafana
                 .build();
     }
     

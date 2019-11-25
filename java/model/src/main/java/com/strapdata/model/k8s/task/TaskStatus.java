@@ -16,9 +16,9 @@ public class TaskStatus {
     @Expose
     private TaskPhase phase = null;
     
-    @SerializedName("lastErrorMessage")
+    @SerializedName("lastMessage")
     @Expose
-    private String lastErrorMessage = null;
+    private String lastMessage = null;
     
     @SerializedName("pods")
     @Expose

@@ -14,3 +14,6 @@ jackson:
 
 operator:
     namespace: ${OPERATOR_NAMESPACE:default}
+    test:
+        enabled: ${TESTSUITE_ENABLE:false}
+        platform: ${TESTSUITE_PLATFORM:LOCAL}

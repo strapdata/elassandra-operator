@@ -1,6 +1,8 @@
 package com.strapdata.strapkop;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Property;
 import lombok.Getter;
 
 import javax.validation.constraints.NotBlank;
@@ -14,4 +16,22 @@ public class OperatorConfig {
     
     @NotBlank
     String namespace;
+
+    TestSuiteConfig test = new TestSuiteConfig();
+
+    @Getter
+    @ConfigurationProperties("test")
+    public static class TestSuiteConfig {
+
+        boolean enabled = false;
+
+        Platform platform = Platform.LOCAL;
+
+        public static enum Platform {
+            LOCAL,
+            GKE,
+            AZURE
+            // TODO OVH, AWS
+        }
+    }
 }

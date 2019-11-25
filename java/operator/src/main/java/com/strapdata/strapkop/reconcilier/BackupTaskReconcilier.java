@@ -74,7 +74,7 @@ public class BackupTaskReconcilier extends TaskReconcilier {
                         .map(backupResponse -> backupResponse.getStatus().equalsIgnoreCase("success"))
                         .onErrorReturn(throwable -> {
                             logger.warn("error occurred from sidecar backup", throwable);
-                            task.getStatus().setLastErrorMessage(throwable.getMessage());
+                            task.getStatus().setLastMessage(throwable.getMessage());
                             return true;
                         }).blockingGet();
         
@@ -87,7 +87,7 @@ public class BackupTaskReconcilier extends TaskReconcilier {
             }
         }
         catch (Throwable throwable) {
-            task.getStatus().setLastErrorMessage(throwable.getMessage());
+            task.getStatus().setLastMessage(throwable.getMessage());
             task.getStatus().setPhase(TaskPhase.FAILED);
         }
         

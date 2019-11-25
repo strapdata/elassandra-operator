@@ -61,7 +61,7 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
                                 dc.setStatus(new DataCenterStatus());
                             }
                             dc.getStatus().setPhase(DataCenterPhase.ERROR);
-                            dc.getStatus().setLastErrorMessage(e.getMessage());
+                            dc.getStatus().setLastMessage(e.getMessage());
                             k8sResourceUtils.updateDataCenterStatus(dc);
                         }
                         throw e;

@@ -68,7 +68,7 @@ public final class CleanupTaskReconcilier extends TaskReconcilier {
                     } catch (Throwable throwable) {
                         logger.error("error while executing cleanup on {}", pod, throwable);
                         task.getStatus().getPods().put(pod, TaskPhase.FAILED);
-                        task.getStatus().setLastErrorMessage(throwable.getMessage());
+                        task.getStatus().setLastMessage(throwable.getMessage());
                         task.getStatus().setPhase(TaskPhase.FAILED);
                     }
                 })
