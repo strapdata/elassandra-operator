@@ -41,16 +41,16 @@ public class K8sResourceUtils {
     private static final Logger logger = LoggerFactory.getLogger(K8sResourceUtils.class);
     
     @Inject
-    private CoreV1Api coreApi;
+    protected CoreV1Api coreApi;
     
     @Inject
-    private AppsV1Api appsApi;
+    protected AppsV1Api appsApi;
     
     @Inject
-    private CustomObjectsApi customObjectsApi;
+    protected CustomObjectsApi customObjectsApi;
     
     @Inject
-    private ExtensionsV1beta1Api extensionsV1beta1Api;
+    protected ExtensionsV1beta1Api extensionsV1beta1Api;
 
     @FunctionalInterface
     public interface ApiCallable {

@@ -16,11 +16,9 @@ import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.custom.IntOrString;
 import io.kubernetes.client.models.*;
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.runtime.event.annotation.EventListener;
 import io.reactivex.Completable;
 import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
-import org.apache.cassandra.utils.Hex;
 
 import javax.inject.Singleton;
 import java.util.*;
@@ -485,7 +483,7 @@ public class ReaperPlugin extends AbstractPlugin {
                 }
             }
             catch (Exception e) {
-                dc.getStatus().setLastErrorMessage(e.getMessage());
+                dc.getStatus().setLastMessage(e.getMessage());
                 logger.error("error while registering dc={} in cassandra-reaper", dc.getMetadata().getName(), e);
             }
         }

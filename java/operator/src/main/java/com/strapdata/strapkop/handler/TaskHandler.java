@@ -9,6 +9,7 @@ import com.strapdata.strapkop.pipeline.WorkQueue;
 import com.strapdata.strapkop.reconcilier.BackupTaskReconcilier;
 import com.strapdata.strapkop.reconcilier.CleanupTaskReconcilier;
 import com.strapdata.strapkop.reconcilier.TaskReconcilier;
+import com.strapdata.strapkop.reconcilier.TestTaskReconcilier;
 import io.vavr.Tuple;
 import io.vavr.Tuple2;
 import org.slf4j.Logger;
@@ -33,13 +34,17 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
     
     private final List<Tuple2<TaskReconcilier, Function<TaskSpec, Object>>> taskFamily;
     
-    public TaskHandler(WorkQueue workQueue, BackupTaskReconcilier backupTaskReconcilier, CleanupTaskReconcilier cleanupTaskReconcilier) {
+    public TaskHandler(WorkQueue workQueue,
+                       BackupTaskReconcilier backupTaskReconcilier,
+                       CleanupTaskReconcilier cleanupTaskReconcilier,
+                       TestTaskReconcilier testTaskReconcilier) {
      
         this.workQueue = workQueue;
     
         taskFamily = ImmutableList.of(
                 Tuple.of(backupTaskReconcilier, TaskSpec::getBackup),
-                Tuple.of(cleanupTaskReconcilier, TaskSpec::getCleanup)
+                Tuple.of(cleanupTaskReconcilier, TaskSpec::getCleanup),
+                Tuple.of(testTaskReconcilier, TaskSpec::getTest)
         );
     }
     

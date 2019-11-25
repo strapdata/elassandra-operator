@@ -7,6 +7,7 @@ import com.strapdata.model.k8s.cassandra.DataCenterPhase;
 import com.strapdata.model.k8s.task.Task;
 import com.strapdata.model.k8s.task.TaskPhase;
 import com.strapdata.model.k8s.task.TaskStatus;
+import com.strapdata.model.k8s.task.TestTaskSpec;
 import com.strapdata.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
@@ -14,6 +15,7 @@ import io.kubernetes.client.ApiException;
 import io.reactivex.Completable;
 import io.reactivex.Single;
 import io.vavr.Tuple2;
+import org.bouncycastle.util.test.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,6 +37,10 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
     }
     
     protected abstract Completable doTask(Task task, DataCenter dc) throws Exception;
+
+    protected Completable validTask(Task task, DataCenter dc) throws Exception {
+        return Completable.complete();
+    }
 
     @Override
     public Completable reconcile(final Tuple2<Action, Task> item) throws Exception {
@@ -73,7 +79,7 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
         // fetch corresponding dc
         return fetchDataCenter(task)
                 .flatMap(dc -> {
-                    if (task.getStatus().getPhase() != null && task.getStatus().getPhase().isTerminated()) {
+                    if (task.getStatus().getPhase() != null && isTerminated(task)) {
                         logger.debug("task {} was terminated", task.getMetadata().getName());
                         return ensureUnlockDc(task, dc).toSingleDefault(dc);
                     } else {
@@ -81,7 +87,9 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
                     }
                 })
                 .flatMapCompletable(dc -> {
-                    if (!ensureDcIsReady(task, dc)) {
+
+
+                    if (!ensureDcIsReady(task, dc) && task.getSpec().isExclusive()) {
                         if (task.getStatus().getPhase() == null) {
                             logger.info("dc {} is not ready for {} operation, delaying.", dc.getMetadata().getName(), taskType);
                             task.getStatus().setPhase(TaskPhase.WAITING);
@@ -92,15 +100,33 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
                             return ensureUnlockDc(task, dc);
                         }
                     }
-                    logger.debug("dc {} is ready to process {} {}", dc.getMetadata().getName(), taskType, task.getMetadata().getName());
-                    // lock the dc if not already done
-                    return ensureLockDc(task, dc)
-                            .andThen(k8sResourceUtils.updateTaskStatus(task, TaskPhase.STARTED))
-                            .andThen(doTask(task, dc));
+
+                    if (!task.getSpec().isExclusive() && task.getStatus().getPhase() != null) {
+                        // STARTED non exclusive task execute this to avoid passing in STARTED State another time.
+                        // TestRunner use this second call to start the first step of the test suite
+                        if (task.getStatus().getPhase().equals(TaskPhase.STARTED)) {
+                            return validTask(task, dc);
+                        } else {
+                            return Completable.complete();
+                        }
+                    } else {
+                        logger.debug("dc {} is ready to process {} {}", dc.getMetadata().getName(), taskType, task.getMetadata().getName());
+                        // lock the dc if not already done
+                        return ensureLockDc(task, dc)
+                                .andThen(k8sResourceUtils.updateTaskStatus(task, TaskPhase.STARTED))
+                                .andThen(doTask(task, dc));
+                    }
+
                 });
     }
-    
-    
+
+    private boolean isTerminated(Task task) {
+        return task.getStatus() != null &&
+                task.getStatus().getPhase() != null &&
+                task.getStatus().getPhase().isTerminated();
+    }
+
+
     Single<DataCenter> fetchDataCenter(Task task) throws ApiException {
         final Key dcKey =  new Key(
                 OperatorNames.dataCenterResource(task.getSpec().getCluster(), task.getSpec().getDatacenter()),
@@ -132,7 +158,7 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
     
     private Completable ensureLockDc(Task task, DataCenter dc) throws ApiException {
         
-        if (Objects.equals(dc.getStatus().getCurrentTask(), task.getMetadata().getName())) {
+        if (!task.getSpec().isExclusive() || Objects.equals(dc.getStatus().getCurrentTask(), task.getMetadata().getName())) {
             return Completable.complete();
         }
         
@@ -154,8 +180,7 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
 
     Completable ensureUnlockDc(Task task, DataCenter dc) throws ApiException {
         // TODO: not sure if we need an intermediate phase like "TASK_EXECUTED_PLEASE_CHECK_EVERYTHING_IS_RUNNING..."
-        
-        if (Objects.equals(task.getMetadata().getName(), dc.getStatus().getCurrentTask())) {
+        if (task.getSpec().isExclusive() && Objects.equals(task.getMetadata().getName(), dc.getStatus().getCurrentTask())) {
             logger.debug("unlocking dc {} after task {} {} terminated", dc.getMetadata().getName(), taskType, task.getMetadata().getName());
             dc.getStatus().setPhase(DataCenterPhase.RUNNING);
             dc.getStatus().setCurrentTask("");

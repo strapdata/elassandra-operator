@@ -7,11 +7,13 @@ import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
-public class BackupTaskSpec  {
-    @SerializedName("type")
+public class TestTaskSpec {
+
+    @SerializedName("timeOut")
     @Expose
-    private String type;
-    @SerializedName("target")
+    private int timeOut;
+
+    @SerializedName("testSuite")
     @Expose
-    private String target;
+    private String testSuite;
 }

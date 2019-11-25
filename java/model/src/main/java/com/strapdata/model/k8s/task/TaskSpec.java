@@ -18,7 +18,12 @@ public class TaskSpec {
     @SerializedName("datacenter")
     @Expose
     private String datacenter;
-    
+
+    // Do we have to lock the execution of other task/reconciliation ?
+    @SerializedName("exclusive")
+    @Expose
+    private boolean exclusive = true;
+
     @SerializedName("cleanup")
     @Expose
     private CleanupTaskSpec cleanup;
@@ -26,4 +31,8 @@ public class TaskSpec {
     @SerializedName("backup")
     @Expose
     private BackupTaskSpec backup;
+
+    @SerializedName("test")
+    @Expose
+    private TestTaskSpec test;
 }

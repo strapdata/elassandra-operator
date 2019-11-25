@@ -24,9 +24,9 @@ public class DataCenterStatus {
     private Boolean needCleanup = false;
 
 
-    @SerializedName("lastErrorMessage")
+    @SerializedName("lastMessage")
     @Expose
-    private String lastErrorMessage = null;
+    private String lastMessage = null;
 
     /**
      * CQL connection status
