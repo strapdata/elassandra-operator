@@ -1,9 +1,6 @@
 package com.strapdata.strapkop.plugins.test;
 
-import com.strapdata.model.k8s.cassandra.CqlStatus;
-import com.strapdata.model.k8s.cassandra.DataCenter;
-import com.strapdata.model.k8s.cassandra.DataCenterStatus;
-import com.strapdata.model.k8s.cassandra.RackPhase;
+import com.strapdata.model.k8s.cassandra.*;
 import com.strapdata.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.plugins.test.step.OnSuccessAction;
@@ -27,13 +24,8 @@ public class SingleNodeTestSuite extends TestSuiteExecutor {
     protected Step createReplicas(DataCenter dc) {
         if (dc.getSpec().getReplicas() <= 0) {
             dc.getSpec().setReplicas(1);
-            try {
-                LOGGER.info("[TEST] Trigger the creation of the elassandra node .");
-                k8sResourceUtils.updateDataCenter(dc).subscribe();
-            } catch (ApiException e) {
-                LOGGER.error("[TEST] unable to update the DC replicas [code : {} | body : {}]", e.getCode(), e.getResponseBody());
-                failed(e.getMessage());
-            }
+            LOGGER.info("[TEST] Trigger the creation of the elassandra node .");
+            updateDataCenterOrFail(dc);
             return this::waitRunningDcPhase;
         } else {
             LOGGER.info("[TEST] Replicas already configured, execute nextStep");
@@ -53,7 +45,8 @@ public class SingleNodeTestSuite extends TestSuiteExecutor {
                     break;
                 case RUNNING:
                     LOGGER.info("[TEST] DataCenter is now Running ...");
-                    nextStep = checkNodeAvailability(dc,1, enableReaper());
+                    // check Node availability, if OK enableReaper, otherwise wait using this step
+                    nextStep = checkNodeAvailability(dc,1, enableReaper(), this::waitRunningDcPhase);
                     break;
                 case CREATING:
                 case SCALING_UP:
@@ -70,7 +63,7 @@ public class SingleNodeTestSuite extends TestSuiteExecutor {
     }
 
     // TODO move to super class ??
-    protected Step checkNodeAvailability(final DataCenter dc, final int expectedReplicas, final OnSuccessAction onSuccess) {
+    protected Step checkNodeAvailability(final DataCenter dc, final int expectedReplicas, final OnSuccessAction onSuccess, final Step waitingStep) {
         final DataCenterStatus status = dc.getStatus();
         // filter on NORMAL nodes
         List<String> nodeNames = status.getElassandraNodeStatuses().entrySet().stream()
@@ -79,7 +72,7 @@ public class SingleNodeTestSuite extends TestSuiteExecutor {
 
         if (nodeNames.size() != expectedReplicas) {
             LOGGER.info("[TEST] {}/{} nodes in NORMAL state, waiting... ", nodeNames.size(), expectedReplicas);
-            return this::waitRunningDcPhase; // go back to previous state // TODO pass this in parameters
+            return this::waitRunningDcPhase;
         } else {
             LOGGER.info("[TEST] {}/{} nodes in NORMAL state, other values... ", nodeNames.size(), expectedReplicas);
 
@@ -106,14 +99,10 @@ public class SingleNodeTestSuite extends TestSuiteExecutor {
         return (dc) -> {
             Step nextStep = this::waitReaperRegistered;
             if (!dc.getSpec().getReaperEnabled()) {
-                try {
-                    dc.getSpec().setReaperEnabled(true);
-                    k8sResourceUtils.updateDataCenter(dc).subscribe();
-                    LOGGER.debug("[TEST] Reaper enabled");
-                } catch (ApiException e) {
-                    LOGGER.error("[TEST] unable to activate reaper [code : {} | body : {}]", e.getCode(), e.getResponseBody());
-                    failed(e.getMessage());
-                }
+                LOGGER.debug("[TEST] Update DC to enable Reaper");
+                dc.getSpec().setReaperEnabled(true);
+                updateDataCenterOrFail(dc);
+                LOGGER.debug("[TEST] Reaper enabled");
             } else {
                 LOGGER.debug("[TEST] Reaper already enabled, exec next step");
                 // reaper already enabled, execute next step to avoid timeout
@@ -135,10 +124,69 @@ public class SingleNodeTestSuite extends TestSuiteExecutor {
             case REGISTERED:
                 LOGGER.info("[TEST] Reaper registered");
                 assertTrue("Reaper pod exist", podExists(dc, OperatorLabels.APP, "reaper"));
-                nextStep = shutdownTest(dc);// FINAL STEP for now
+                nextStep = updateSpecConfigMap(dc); // execute updateSpecConfig
                 break;
         }
         return nextStep;
+    }
+
+    protected Step updateSpecConfigMap(DataCenter dc) {
+        // update a DC value to trigger a new finger print
+        ElassandraWorkload current = dc.getSpec().getWorkload();
+        switch (current){
+            case WRITE:
+                dc.getSpec().setWorkload(ElassandraWorkload.READ);
+                break;
+            case READ:
+            case READ_WRITE:
+                dc.getSpec().setWorkload(ElassandraWorkload.WRITE);
+                break;
+        }
+        LOGGER.info("[TEST] Update the DC workload from '{}' to '{}'", current, dc.getSpec().getWorkload());
+        updateDataCenterOrFail(dc);
+        return waitClusterUpdated(false);
+    }
+
+    protected Step waitClusterUpdated(boolean phaseHasBeenUpdating) {
+        return (dc) -> {
+            Step nextStep = null;
+            switch (dc.getStatus().getPhase()) {
+                case UPDATING:
+                    LOGGER.info("[TEST] DC is updating the configuration, waiting...");
+                    nextStep = waitClusterUpdated(true);
+                    break;
+                case ERROR:
+                    LOGGER.info("[TEST] DC update failed");
+                    failed("DC update failed with DataCenterPhase set to ERROR");
+                    break;
+
+                case CREATING:
+                case EXECUTING_TASK:
+                    LOGGER.info("[TEST] Unexpected DC Phase");
+                    failed("Unexpected DC Phase during config map update ('" + dc.getStatus().getPhase() + "')");
+                    break;
+
+                case RUNNING:
+                    if (phaseHasBeenUpdating) {
+                        LOGGER.info("[TEST] DC Phase is now in Phase RUNNING after UPDATING one");
+                        // check Node availability, if OK test will finish, otherwise wait using this step
+                        return checkNodeAvailability(dc, 1, this::shutdownTest, waitClusterUpdated(true));
+                    } else {
+                        failed("Unexpected DC Phase RUNNING without UPDATING one");
+                    }
+                    break;
+            }
+            return nextStep;
+        };
+    }
+
+    private void updateDataCenterOrFail(DataCenter dc) {
+        try {
+            k8sResourceUtils.updateDataCenter(dc).subscribe();
+        } catch (ApiException e) {
+            LOGGER.error("[TEST] unable to update DataCenter [code : {} | body : {}]", e.getCode(), e.getResponseBody());
+            failed(e.getMessage());
+        }
     }
 
 }
