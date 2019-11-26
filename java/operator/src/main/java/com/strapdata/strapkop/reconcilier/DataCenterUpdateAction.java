@@ -1737,7 +1737,7 @@ public class DataCenterUpdateAction {
             V1StatefulSetStatus status = sts.get().getStatus();
             return (status.getUpdateRevision() != null &&
                     status.getUpdateRevision() != status.getCurrentRevision() &&
-                    status.getUpdatedReplicas() < status.getReplicas());
+                    Optional.ofNullable(status.getUpdatedReplicas()).orElse(0) < status.getReplicas());
         }
 
         public boolean isScalingUp() {
