@@ -552,34 +552,44 @@ public class DataCenterUpdateAction {
             this.specConfig = builder.buildConfigMapSpec();
             this.rackConfig = builder.buildConfigMapRack(rack);
             this.seedConfig = builder.buildConfigMapSeed(zones);
+            if (dataCenterSpec.getUserConfigMapVolumeSource() != null) {
+                // load and make user config unique here to mount the files
+                this.userConfig = buildConfigMapUserConfig();
+            }
+        }
+
+        private ConfigMapVolumeMountBuilder buildConfigMapUserConfig() {
+            return k8sResourceUtils.readNamespacedConfigMap(dataCenterMetadata.getNamespace(), dataCenterSpec.getUserConfigMapVolumeSource().getName())
+                    .map(configMap -> {
+                        V1ObjectMeta meta = new V1ObjectMeta()
+                                .name(configMap.getMetadata().getName())
+                                .namespace(configMap.getMetadata().getNamespace())
+                                .annotations(configMap.getMetadata().getAnnotations())
+                                .labels(configMap.getMetadata().getLabels())
+                                .addOwnerReferencesItem(OperatorNames.ownerReference(dataCenter));
+                        V1ConfigMap configMap1 = new V1ConfigMap()
+                                .metadata(meta)
+                                .data(configMap.getData())
+                                .binaryData(configMap.getBinaryData());
+                        return new ConfigMapVolumeMountBuilder(configMap1, dataCenterSpec.getUserConfigMapVolumeSource(), "user-config-volume", "/tmp/user-config");
+                    }).blockingGet();
         }
 
         public String fingerPrint() {
-            return this.specConfig.fingerPrint();
+            return Optional.ofNullable(this.userConfig)
+                    .map((uConfig -> this.specConfig.fingerPrint() + "-" +  uConfig.fingerPrint()))
+                    .orElse(this.specConfig.fingerPrint()) ;
         }
 
         public Completable createOrReplaceNamespacedConfigMaps() throws ApiException {
             return specConfig.createOrReplaceNamespacedConfigMap().ignoreElement()
                     .andThen(rackConfig.createOrReplaceNamespacedConfigMap().ignoreElement())
                     .andThen(seedConfig.createOrReplaceNamespacedConfigMap().ignoreElement())
-                    // load and make unique user configmap
-                    .andThen((dataCenterSpec.getUserConfigMapVolumeSource() == null) ?
+                    // use user configmap
+                    .andThen((userConfig == null) ?
                             Completable.complete() :
-                            k8sResourceUtils.readNamespacedConfigMap(dataCenterMetadata.getNamespace(), dataCenterSpec.getUserConfigMapVolumeSource().getName())
-                                    .flatMapCompletable(configMap -> {
-                                        V1ObjectMeta meta = new V1ObjectMeta()
-                                                .name(configMap.getMetadata().getName())
-                                                .namespace(configMap.getMetadata().getNamespace())
-                                                .annotations(configMap.getMetadata().getAnnotations())
-                                                .labels(configMap.getMetadata().getLabels())
-                                                .addOwnerReferencesItem(OperatorNames.ownerReference(dataCenter));
-                                        V1ConfigMap configMap1 = new V1ConfigMap()
-                                                .metadata(meta)
-                                                .data(configMap.getData())
-                                                .binaryData(configMap.getBinaryData());
-                                        ConfigMapVolumeMountBuilder configMapVolumeMountBuilder = new ConfigMapVolumeMountBuilder(configMap1, dataCenterSpec.getUserConfigMapVolumeSource(), "user-config-volume", "/tmp/user-config");
-                                        return configMapVolumeMountBuilder.makeUnique().createOrReplaceNamespacedConfigMap().ignoreElement();
-                                    }));
+                            userConfig.makeUnique().createOrReplaceNamespacedConfigMap().ignoreElement()
+                                    );
         }
 
         /**
@@ -797,7 +807,7 @@ public class DataCenterUpdateAction {
          * @return
          * @throws IOException
          */
-        public ConfigMapVolumeMountBuilder buildConfigMapSpec() throws IOException {
+        public ConfigMapVolumeMountBuilder  buildConfigMapSpec() throws IOException {
             final V1ConfigMap configMap = new V1ConfigMap().metadata(dataCenterObjectMeta(OperatorNames.specConfig(dataCenter)));
             final V1ConfigMapVolumeSource volumeSource = new V1ConfigMapVolumeSource().name(configMap.getMetadata().getName());
             final ConfigMapVolumeMountBuilder configMapVolumeMountBuilder =
