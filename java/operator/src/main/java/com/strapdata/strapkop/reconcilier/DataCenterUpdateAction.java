@@ -413,10 +413,16 @@ public class DataCenterUpdateAction {
                             rackStatusByName.get(zone.name).setPhase(RackPhase.SCALING_UP);
                             updateDatacenterStatus(DataCenterPhase.SCALING_UP, zones, rackStatusByName);
                             logger.debug("SCALE_UP started in rack={} size={}", zone.name, zone.size);
-                            ConfigMapVolumeMounts configMapVolumeMounts = new ConfigMapVolumeMounts(zones, zone.name);
-                            return todo
-                                    .andThen(configMapVolumeMounts.createOrReplaceNamespacedConfigMaps()) // call ConfigMapVolumeMount here to update seeds in case of single rack with multi-nodes
-                                    .andThen(k8sResourceUtils.replaceNamespacedStatefulSet(sts).ignoreElement());
+                            if (sts.getSpec().getReplicas() > 1) {
+                                // call ConfigMapVolumeMount here to update seeds in case of single rack with multi-nodes
+                                ConfigMapVolumeMounts configMapVolumeMounts = new ConfigMapVolumeMounts(zones, zone.name);
+                                return todo
+                                        .andThen(sts.getSpec().getReplicas() > 1 ? configMapVolumeMounts.createOrReplaceNamespacedConfigMaps() : Completable.complete())
+                                        .andThen(k8sResourceUtils.replaceNamespacedStatefulSet(sts).ignoreElement());
+                            } else {
+                                return todo
+                                        .andThen(k8sResourceUtils.replaceNamespacedStatefulSet(sts).ignoreElement());
+                            }
                         }
                         logger.warn("Cannot scale up, no free node in datacenter={} in namespace={}", dataCenterMetadata.getName(), dataCenterMetadata.getNamespace());
                     } else if (zones.totalReplicas() > dataCenter.getSpec().getReplicas()) {
@@ -781,7 +787,7 @@ public class DataCenterUpdateAction {
 
             Set<String> seeds = new HashSet<>();
             for(RackStatus rackStatus : dataCenterStatus.getRackStatuses()) {
-                if (rackStatus.getJoinedReplicas() > 0)
+                if (rackStatus.getJoinedReplicas() > 0 && dataCenterSpec.getReplicas() > 1) // also test the nb of expected replicas to avoid crashloopbackup in a single node configuration update
                     seeds.add(new ElassandraPod(dataCenter, rackStatus.getName(), 0).getFqdn());
             }
 
