@@ -83,7 +83,7 @@ Here is an example to customize Cassandra settings from the cassandra.yaml file:
 
 .. CAUTION::
 
-    If you patch the CRD with a wrong schema, the elassandra operator won't be able to parse and process it until you fix it.klog
+    If you patch the CRD with a wrong schema, the elassandra operator won't be able to parse and process it until you fix it.
 
 Resources configuration
 .......................
