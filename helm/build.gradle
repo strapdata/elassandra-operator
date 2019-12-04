@@ -10,12 +10,12 @@ helm {
   charts {
     elassandraDatacenter {
       chartName = 'elassandra-datacenter'
-      chartVersion = '0.1.0'
+      chartVersion = '0.2.0'
       sourceDir = file('src/main/helm/elassandra-datacenter')
     }
     elassandraOperator {
       chartName = 'elassandra-operator'
-      chartVersion = '0.1.0'
+      chartVersion = '0.2.0'
       sourceDir = file('src/main/helm/elassandra-operator')
     }
   }
@@ -49,7 +49,7 @@ task uploadElassandraDatacenter(type: com.strapdata.AzureStorageDeployTask) {
   dependsOn 'helmPackageElassandraDatacenterChart'
   connectionString ***REMOVED***
   container 'charts'
-  fileToDeploy "${project.buildDir}/helm/charts/elassandra-datacenter-0.1.0.tgz"
+  fileToDeploy "${project.buildDir}/helm/charts/elassandra-datacenter-0.2.0.tgz"
   mimeType 'application/x-tar'
 }
 
@@ -57,6 +57,6 @@ task uploadElassandraOperator(type: com.strapdata.AzureStorageDeployTask) {
   dependsOn 'helmPackageElassandraOperatorChart'
   connectionString ***REMOVED***
   container 'charts'
-  fileToDeploy "${project.buildDir}/helm/charts/elassandra-operator-0.1.0.tgz"
+  fileToDeploy "${project.buildDir}/helm/charts/elassandra-operator-0.2.0.tgz"
   mimeType 'application/x-tar'
 }
