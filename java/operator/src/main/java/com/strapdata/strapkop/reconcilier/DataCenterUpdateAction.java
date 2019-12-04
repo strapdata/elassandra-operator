@@ -363,7 +363,14 @@ public class DataCenterUpdateAction {
                         String rack = v1StatefulSet.getSpec().getTemplate().getMetadata().getLabels().get("rack");
                         ConfigMapVolumeMounts configMapVolumeMounts = new ConfigMapVolumeMounts(zones, rack);
                         String configFingerprint = configMapVolumeMounts.fingerPrint();
-                        if (!configFingerprint.equals(stsFingerprint)) {
+
+                        // extract DC generation from STS metadata or return 0 if the entry is missing
+                        final long stsDcGeneration = Optional.ofNullable(v1StatefulSet.getMetadata().getAnnotations())
+                                .map(annotations -> Optional.ofNullable(annotations.get(OperatorLabels.DATACENTER_GENERATION)).orElse("0"))
+                                .map(g -> Long.parseLong(g)).orElse(0L);
+
+                        // Trigger an update if ConfigMap fingerprint or DC generation are different
+                        if (!configFingerprint.equals(stsFingerprint) || dataCenter.getMetadata().getGeneration() > stsDcGeneration) {
                             if (failedPod != null && !failedPod.getRack().equals(rack)) {
                                 logger.warn("pod={} FAILED, cannot update other rack={} now, please fix the rack={} before.",
                                         failedPod, failedPod.getRack(), rack);

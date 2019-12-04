@@ -6,8 +6,11 @@ import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.plugins.test.step.OnSuccessAction;
 import com.strapdata.strapkop.plugins.test.step.Step;
 import io.kubernetes.client.ApiException;
+import io.kubernetes.client.custom.Quantity;
+import io.kubernetes.client.models.V1ResourceRequirements;
 import io.micronaut.context.annotation.Prototype;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -16,6 +19,9 @@ import static com.strapdata.strapkop.plugins.test.step.StepFailedException.faile
 
 @Prototype
 public class SingleNodeTestSuite extends TestSuiteExecutor {
+
+    public static final Quantity UPDATED_CPU_QUANTITY = Quantity.fromString("2500m");
+
     @Override
     protected Step initialStep() {
         return this::createReplicas;
@@ -144,16 +150,23 @@ public class SingleNodeTestSuite extends TestSuiteExecutor {
         }
         LOGGER.info("[TEST] Update the DC workload from '{}' to '{}'", current, dc.getSpec().getWorkload());
         updateDataCenterOrFail(dc);
-        return waitClusterUpdated(false);
+        // wait before cluster update, on success process updateDataCenterCPUResources
+        return waitClusterUpdated(this::updateDataCenterCPUResources, false);
     }
 
-    protected Step waitClusterUpdated(boolean phaseHasBeenUpdating) {
+    /**
+     *
+     * @param onNodeAvailable action returning a Step to call if waitClusterUpdated succeeded
+     * @param phaseHasBeenUpdating flag to keep track of DC Phase changes (true if UPDATING phase has been checked)
+     * @return
+     */
+    protected Step waitClusterUpdated(OnSuccessAction onNodeAvailable, boolean phaseHasBeenUpdating) {
         return (dc) -> {
             Step nextStep = null;
             switch (dc.getStatus().getPhase()) {
                 case UPDATING:
                     LOGGER.info("[TEST] DC is updating the configuration, waiting...");
-                    nextStep = waitClusterUpdated(true);
+                    nextStep = waitClusterUpdated(onNodeAvailable, true);
                     break;
                 case ERROR:
                     LOGGER.info("[TEST] DC update failed");
@@ -170,7 +183,7 @@ public class SingleNodeTestSuite extends TestSuiteExecutor {
                     if (phaseHasBeenUpdating) {
                         LOGGER.info("[TEST] DC Phase is now in Phase RUNNING after UPDATING one");
                         // check Node availability, if OK test will finish, otherwise wait using this step
-                        return checkNodeAvailability(dc, 1, this::shutdownTest, waitClusterUpdated(true));
+                        return checkNodeAvailability(dc, 1, onNodeAvailable, waitClusterUpdated(onNodeAvailable,true));
                     } else {
                         failed("Unexpected DC Phase RUNNING without UPDATING one");
                     }
@@ -178,6 +191,40 @@ public class SingleNodeTestSuite extends TestSuiteExecutor {
             }
             return nextStep;
         };
+    }
+
+    protected Step updateDataCenterCPUResources(DataCenter dc) {
+        // update a DC Spec to trigger a new DC Generation without ConfigMap fingerprint change
+        V1ResourceRequirements current = dc.getSpec().getResources();
+        if (current == null) {
+            current = new V1ResourceRequirements();
+            dc.getSpec().setResources(current);
+        }
+
+        if (current.getLimits() == null) {
+            current.limits(new HashMap<>());
+        }
+
+        if (current.getRequests() == null) {
+            current.requests(new HashMap<>());
+        }
+
+        Quantity qtCPU = current.getLimits().get("cpu");
+        if (qtCPU == null || !qtCPU.equals(UPDATED_CPU_QUANTITY)) {
+            LOGGER.info("[TEST] Update the DC CPU Limit from '{}' to '{}'", qtCPU, UPDATED_CPU_QUANTITY);
+            current.getLimits().put("cpu", UPDATED_CPU_QUANTITY);
+
+            // set Request to Limit value to avoid Request > Limit that hang STS
+            // TODO better to implement a check before applying STS changes and reject the DC update but how to do that... ?
+            LOGGER.info("[TEST] Update the DC CPU Request from '{}' to '{}'", current.getRequests().get("cpu"), UPDATED_CPU_QUANTITY);
+            current.getRequests().put("cpu", UPDATED_CPU_QUANTITY);
+
+            updateDataCenterOrFail(dc);
+            return waitClusterUpdated(this::shutdownTest, false);
+        } else {
+            LOGGER.info("[TEST] DC CPU Limit already set to '{}'", UPDATED_CPU_QUANTITY);
+            return shutdownTest(dc); // call end of test
+        }
     }
 
     private void updateDataCenterOrFail(DataCenter dc) {
@@ -188,5 +235,4 @@ public class SingleNodeTestSuite extends TestSuiteExecutor {
             failed(e.getMessage());
         }
     }
-
 }
