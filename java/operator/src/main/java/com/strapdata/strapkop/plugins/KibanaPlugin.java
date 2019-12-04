@@ -156,7 +156,7 @@ public class KibanaPlugin extends AbstractPlugin {
                 .name(kibanaNameDc(dataCenter, space))
                 .namespace(dataCenterMetadata.getNamespace())
                 .labels(labels)
-                .putAnnotationsItem("datacenter-generation", dataCenter.getMetadata().getGeneration().toString());
+                .putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, dataCenter.getMetadata().getGeneration().toString());
 
         final V1Container container = new V1Container();
 
@@ -323,7 +323,7 @@ public class KibanaPlugin extends AbstractPlugin {
                         // this is important because otherwise it generate a "larsen" : deployment replace -> k8s event -> reconciliation -> deployment replace...
                         try {
                             final V1Deployment existingDeployment = appsApi.readNamespacedDeployment(meta.getName(), meta.getNamespace(), null, null, null);
-                            final String datacenterGeneration = existingDeployment.getMetadata().getAnnotations().get("datacenter-generation");
+                            final String datacenterGeneration = existingDeployment.getMetadata().getAnnotations().get(OperatorLabels.DATACENTER_GENERATION);
 
                             if (datacenterGeneration == null) {
                                 throw new StrapkopException(String.format("kibana deployment %s miss the annotation datacenter-generation", meta.getName()));
