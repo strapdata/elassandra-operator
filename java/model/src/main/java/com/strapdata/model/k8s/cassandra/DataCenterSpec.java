@@ -27,11 +27,20 @@ public class DataCenterSpec {
     private ElassandraWorkload workload = ElassandraWorkload.WRITE;
     /**
      * Number of Cassandra nodes in this data center.
-     * 
      */
     @SerializedName("replicas")
     @Expose
     private int replicas;
+
+    /**
+     * How the operator decide to spawn a new E* node
+     * MANUAL : based on the rplicas value
+     * N - 1 : based on the Number of nodes minus one (with min to 1)
+     * N : based on the Number of nodes
+     */
+    @SerializedName("replicasMode")
+    @Expose
+    private ReplicationMode replicasMode = ReplicationMode.MANUAL;
     
     @SerializedName("nodeAffinityPolicy")
     @Expose
