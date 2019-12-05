@@ -3,9 +3,11 @@ plugins {
     id 'application'
     id 'com.google.cloud.tools.jib'
     id 'org.hidetake.swagger.generator' version '2.18.1'
+    id "de.undercouch.download" version "4.0.2"
 }
 
 mainClassName = 'com.strapdata.strapkop.Application'
+
 
 jar {
     manifest {
@@ -62,11 +64,23 @@ jib {
 tasks.jibDockerBuild.dependsOn project(':java:backup').jar
 tasks.jibDockerBuild.dependsOn project(':java:model').jar
 
+task downloadFile {
+    doLast {
+        download {
+            src 'https://pki.goog/roots.pem'
+            dest 'src/main/resources/cacert/cacert.pem'
+            overwrite true
+        }
+    }
+}
+
 compileJava {
+
     sourceCompatibility = 1.8
     targetCompatibility = 1.8
     options.encoding = 'UTF-8'
     options.compilerArgs = [ '-parameters', '-Xlint:all', '-Xlint:-processing', '-Xlint:-serial', '-Werror']
+    dependsOn(  downloadFile )
 }
 
 compileTestJava {
