@@ -3,7 +3,10 @@ Backup & Restore
 
 The Elassandra operator supports taking backups a cluster managed by the operator and restoring those backups into a new cluster. This document outlines how to configure and manage backups.
 
-## Configuring backups for your cluster
+
+Configuring backups for your cluster
+------------------------------------
+
 Depending on your environment and kubernetes distribution, these steps may be different.
 The backup agent used by the operator leverages the Instaclustr [backup util](https://github.com/instaclustr/cassandra-backup).
 The backup target location (where your backups will be stored) will determine how you configure your cluster.
