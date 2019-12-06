@@ -3,41 +3,163 @@ Backup & Restore
 
 The Elassandra operator supports taking backups a cluster managed by the operator and restoring those backups into a new cluster. This document outlines how to configure and manage backups.
 
-
 Configuring backups for your cluster
 ------------------------------------
 
 Depending on your environment and kubernetes distribution, these steps may be different.
-The backup agent used by the operator leverages the Instaclustr [backup util](https://github.com/instaclustr/cassandra-backup).
 The backup target location (where your backups will be stored) will determine how you configure your cluster.
 Each supported cloud based, backup location (Google Cloud Storage, AWS S3 and Azure Blobstore) utilises the standard Java clients from those cloud providers
 and those clients default credentials chains.
 
-This means you can generally pass in credentials via environment variables, default credential paths or let
-the library discover credentials via mechanisms such as instance roles. Either way you will need to ensure that the backup agent can access credentials for the target location.
-This example will cover using environment variables provided by a [kubernetes secret](https://kubernetes.io/docs/concepts/configuration/secret/).
+Credentials information must be provided through a kubernetes secret using the following naming convention *elassandra-[clusterName]-backup-[provider]* where
 
-## Configuring AWS S3 via environment variables
-First create a secret in kubernetes to hold an IAM users access and secret keys (assuming they are stored in files named access and secret respectively).
+* *clusterName* must match the value in your Datacenter CRD
+* *provider* must be one of the following values:
+  * **gcp** : for a GCP blob storage
+  * **aws** : for a AWS S3 bucket
+  * **azure** : for an Azure blob storage
 
-`kubectl create secret generic awsbackuptest --from-file=./access --from-file=./secret`
+The entries of those secrets depend of the provider, see the following section for details.
 
-You can inspect the secret created via `kubectl describe secrets/awsbackuptest`
+.. note:: The secret should be defined before the first deployment of the Datacenter CRD.
 
-Create a `CassandraDataCenter` CRD that injects the secret as environment variables that matches the AWS client libraries expected env variables:
 
-```yaml
-  env:
-    - name: AWS_ACCESS_KEY_ID
-      valueFrom:
-        secretKeyRef:
-          key: access
-          name: awsbackuptest
-    - name: AWS_SECRET_ACCESS_KEY
-      valueFrom:
-        secretKeyRef:
-          key: secret
-          name: awsbackuptest
-    - name: AWS_REGION
-      value: us-west-2
-```
+Configuring AWS S3
+...................
+
+For talking to AWS S3, you have to provide the *access key*, the *secret key* and the *region* in the secret using this manifest
+
+.. note:: Remember to change the name
+
+.. code-block:: yaml
+
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: elassandra-cl1-backup-aws
+    type: Opaque
+    stringData:
+      region: __enter__
+      access-key: __enter__
+      secret-key: __enter__
+
+Once you have update the manifest with your credentials, create the secret.
+
+.. code-block:: bash
+
+   kubectl create secret generic elassandra-cl1-backup-aws --from-file=./aws-secrets.yaml
+
+
+Configuring GCP BLOB
+....................
+
+.. note:: The bucket has to manage ACL. (see `Access Control<https://cloud.google.com/storage/docs/access-control/lists>`_ )
+
+For talking to GCP, you need a file created as a secret which will be mounted to container transparently and picked up by GCP initialisation mechanism.
+The mount process will be managed by the Elassandra operator.
+
+The file (a json file) must be named **gcp.json** and must contain the GCP service account information, you can find how to create this json following the `GCP documentation<https://cloud.google.com/iam/docs/creating-managing-service-account-keys>`_
+
+.. code-block:: bash
+
+   kubectl create secret generic elassandra-cl1-backup-gcp --from-file=/path/to/gcp.json
+
+
+Configuring AZURE BLOB
+......................
+
+For talking to AZURE BLOB, you have to provide the *Storage access name* and the *Storage access key* in the secret using this manifest
+
+.. note:: Remember to change the name
+
+.. code-block:: yaml
+
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: elassandra-cl1-backup-azure
+    type: Opaque
+    stringData:
+      storage-account: __enter__
+      storage-key: __enter__
+
+Once you have update the manifest with your credentials, create the secret.
+
+.. code-block:: bash
+
+   kubectl create secret generic elassandra-cl1-backup-azure --from-file=./azure-secrets.yaml
+
+
+.. _ref-backup:
+Backups your cluster
+--------------------
+
+The Elassandra Operator allows you to trigger a backup of your cluster by creating a backup task though the Task CRD.
+
+To create a task, you have to provide:
+
+* a backup name
+* the cluster and datacenter name
+* the type of your cloud provider (AZURE_BLOB, GCP_BLOB, AWS_S3)
+* the bucket name where the backup files will be uploaded
+
+Here is an example of Task manifest.
+
+.. code-block:: yaml
+
+    apiVersion: stable.strapdata.com/v1
+    kind: ElassandraTask
+    metadata:
+      name: "backup001"
+    spec:
+      cluster: "cl1"
+      datacenter: "dc1"
+      backup:
+        type: AZURE_BLOB
+        target: storage-bucket-name
+
+
+Once the task applied, the Operator will send a backup request to each Sidecar container to perform a snaphost and then upload all relevant files on the specified cloud storage location.
+
+// TODO how to check upload fully finished
+
+.. note:: Take care to backup the kubernetes secrets containing the Cassandra credentials in order to avoid connection issue during the restore phase. For a cluster name 'cl1', secrets to backup is 'elassandra-cl1'
+
+.. code-block:: bash
+
+   kubectl get secrets elassandra-cl1 -o yaml > elassandra-cl1-credentials.yaml
+   # store this file in a safe place to apply it before a restore
+
+
+
+Restore your cluster
+--------------------
+
+Follow theses steps to restore an elassandra datacenter on a new Kubernetes cluster with the same number of nodes as the previous one.
+* Deploy the Elassandra Operator
+
+.. code-block:: bash
+   helm install --name myoperator -f operator-values.yaml elassandra-operator-0.2.0.tgz
+
+* Apply the elassandra-cl1-credentials.yaml (see :ref:`ref-backup`) and check if the creation succeeds
+
+.. code-block:: bash
+   kubectl apply -f elassandra-cl1-credentials.yaml
+   kubectal get elassandra-cl1
+
+
+* Apply the same backup task manifest you used to create the backup (see :ref:`ref-backup`) and check if the creation succeeds
+
+.. code-block:: bash
+   kubectl apply -f backup-task.yaml
+   kubectal get elassandratasks backup001
+
+* Apply the DataCenter CRD with the 'restoreFromBackup' entry containing the name of the backup task
+
+.. code-block:: bash
+   # edit  datacenter-values.yaml
+   # cat "restoreFromBackup: backup001" >> datacenter-values.yaml
+   helm install --name cl1-dc1 -f datacenter-values.yaml elassandra-datacenter-0.2.0.tgz
+
+
+.. note:: Once the elassandra cluster up and running, you can remove the task CRD and update the Datacenter CRD to remove the "restoreFromBackup" entry.
