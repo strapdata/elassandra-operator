@@ -35,6 +35,18 @@ public class OperatorNames {
         return OperatorNames.clusterChildObjectName("%s", dataCenter);
     }
 
+    public static String blobStoreSecretGCP(final DataCenter dataCenter) {
+        return OperatorNames.clusterChildObjectName("%s-backup-gcp", dataCenter);
+    }
+
+    public static String blobStoreSecretAZURE(final DataCenter dataCenter) {
+        return OperatorNames.clusterChildObjectName("%s-backup-azure", dataCenter);
+    }
+
+    public static String blobStoreSecretAWS(final DataCenter dataCenter) {
+        return OperatorNames.clusterChildObjectName("%s-backup-aws", dataCenter);
+    }
+
     public static String clusterRcFilesSecret(final DataCenter dataCenter) {
         return OperatorNames.clusterChildObjectName("%s-rc", dataCenter);
     }

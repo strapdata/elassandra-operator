@@ -1329,6 +1329,8 @@ public class DataCenterUpdateAction {
                     )
                     ;
 
+            initializeBlobCredentialsForBackup(podSpec, sidecarContainer);
+
             if (dataCenterSpec.getSsl()) {
                 podSpec.addVolumesItem(new V1Volume()
                         .name("nodetool-ssl-volume")
@@ -1477,7 +1479,7 @@ public class DataCenterUpdateAction {
                     }
                 }
 
-                podSpec.addInitContainersItem(new V1Container()
+                V1Container restoreInitContainer = new V1Container()
                         .name("sidecar-restore")
                         .terminationMessagePolicy("FallbackToLogsOnError")
                         .env(dataCenterSpec.getEnv())
@@ -1506,8 +1508,9 @@ public class DataCenterUpdateAction {
                         ).addVolumeMountsItem(new V1VolumeMount()
                                 .name("data-volume")
                                 .mountPath("/var/lib/cassandra")
-                        )
-                );
+                        );
+                initializeBlobCredentialsForBackup(podSpec, restoreInitContainer);
+                podSpec.addInitContainersItem(restoreInitContainer);
             }
 
             final Map<String, String> rackLabels = OperatorLabels.rack(dataCenter, rack);
@@ -1543,6 +1546,97 @@ public class DataCenterUpdateAction {
                                     .spec(dataCenterSpec.getDataVolumeClaim())
                             )
                     );
+        }
+
+        private void initializeBlobCredentialsForBackup(V1PodSpec podSpec, V1Container sidecarContainer) {
+            boolean credentialsInitialized = initAWSBlobCredentialsForBackup(sidecarContainer);
+            credentialsInitialized = initAzureBlobCredentiaksForBackup(sidecarContainer) || credentialsInitialized;
+            credentialsInitialized = initGCPBlobCredentialsForBackup(podSpec, sidecarContainer) || credentialsInitialized;
+            if (!credentialsInitialized) {
+                logger.warn("No credentials found for CloudStorage, backups will fail");
+            }
+        }
+
+        private boolean initAzureBlobCredentiaksForBackup(V1Container sidecarContainer) {
+            String azureSecretName = OperatorNames.blobStoreSecretAZURE(dataCenter);
+            boolean result = false;
+            try {
+                V1Secret azureSecret = k8sResourceUtils.readNamespacedSecret(dataCenterMetadata.getNamespace(), azureSecretName).blockingGet();
+                if (azureSecret.getData().containsKey("storage-account") && azureSecret.getData().containsKey("storage-key")) {
+                    sidecarContainer.addEnvItem(buildBlobStoreEnvVar("AZURE_STORAGE_ACCOUNT", "storage-account", azureSecretName))
+                            .addEnvItem(buildBlobStoreEnvVar("AZURE_STORAGE_KEY", "storage-key", azureSecretName));
+                    result = true;
+                    logger.info("Azure blob secret configured for backup");
+                } else {
+                    logger.warn("Azure blob secret configured but one of values is missing (storage-key, storage-account)");
+                }
+            } catch (Exception e) {
+                logger.info("Azure blob secret '{}' is unreachable", azureSecretName);
+            }
+            return result;
+        }
+
+        private boolean initAWSBlobCredentialsForBackup(V1Container sidecarContainer) {
+            final String awsSecretName = OperatorNames.blobStoreSecretAWS(dataCenter);
+            boolean result = false;
+            try {
+                V1Secret awsSecret = k8sResourceUtils.readNamespacedSecret(dataCenterMetadata.getNamespace(), awsSecretName).blockingGet();
+                if(awsSecret.getData().containsKey("region") && awsSecret.getData().containsKey("access-key") &&awsSecret.getData().containsKey("secret-key") ) {
+                    sidecarContainer.addEnvItem(buildBlobStoreEnvVar("AWS_REGION", "region", awsSecretName))
+                            .addEnvItem(buildBlobStoreEnvVar("AWS_ACCESS_KEY_ID", "access-key", awsSecretName))
+                            .addEnvItem(buildBlobStoreEnvVar("AWS_SECRET_ACCESS_KEY", "secret-key", awsSecretName));
+                    result = true;
+                    logger.info("AWS blob secret configured for backup");
+                } else {
+                    logger.warn("AWS blob secret configured but one of values is missing (region, access-key, secret-key)");
+                }
+            } catch (Exception e) {
+                logger.info("AWS blob secret '{}' is unreachable", awsSecretName);
+            }
+            return result;
+
+        }
+
+        private boolean initGCPBlobCredentialsForBackup(V1PodSpec podSpec, V1Container sidecarContainer) {
+            String gcpSecretName = OperatorNames.blobStoreSecretGCP(dataCenter);
+            boolean result = false;
+            try {
+                V1Secret gcpSecret = k8sResourceUtils.readNamespacedSecret(dataCenterMetadata.getNamespace(), gcpSecretName).blockingGet();
+                if (gcpSecret.getData().containsKey("gcp.json")) {
+                    final String volumeName = sidecarContainer.getName() + "gcp-secret-volume";
+                    podSpec.addVolumesItem(new V1Volume()
+                            .name(volumeName)
+                            .secret(new V1SecretVolumeSource()
+                                    .secretName(gcpSecretName)
+                                    .addItemsItem(new V1KeyToPath()
+                                            .key("gcp.json").path("gcp.json").mode(256)
+                                    )
+                            ));
+                    sidecarContainer
+                            .addVolumeMountsItem(new V1VolumeMount()
+                                    .readOnly(true)
+                                    .name(volumeName)
+                                    .mountPath("/tmp/" + sidecarContainer.getName() + "/"))
+                            .addEnvItem(new V1EnvVar()
+                                    .name("GOOGLE_APPLICATION_CREDENTIALS")
+                                    .value("/tmp/" + sidecarContainer.getName() + "/gcp.json"));
+                    result = true;
+                    logger.info("GCP blob secret configured for backup");
+                } else {
+                    logger.warn("GCP blob secret configured but gcp.json is missing");
+                }
+            } catch (Exception e) {
+                logger.info("GCP blob secret '{}' is unreachable", gcpSecretName);
+            }
+            return result;
+        }
+
+        private V1EnvVar buildBlobStoreEnvVar(String varName, String secretEntry, String k8sSecret) {
+            return new V1EnvVar()
+                    .name(varName)
+                    .valueFrom(new V1EnvVarSource().secretKeyRef(new V1SecretKeySelector()
+                            .name(k8sSecret)
+                            .key(secretEntry)));
         }
 
         private V1Container buildElassandraContainer() {
