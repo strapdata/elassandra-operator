@@ -23,3 +23,8 @@ dependencies {
 
     compile project(':java:model')
 }
+
+test {
+    useTestNG()
+
+}
