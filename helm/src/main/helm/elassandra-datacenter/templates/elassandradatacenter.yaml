@@ -60,6 +60,7 @@ spec:
 
   privilegedSupported: {{ default "false" .Values.privilegedSupported }}
   hostPortEnabled: {{ default "false" .Values.hostPortEnabled }}
+  hostNetworkEnabled: {{ default "false" .Values.hostNetworkEnabled }}
   nativePort : {{ default "9042" .Values.nativePort | quote }}
   storagePort : {{ default "7000" .Values.storagePort | quote }}
   sslStoragePort : {{ default "7001" .Values.sslStoragePort | quote }}
