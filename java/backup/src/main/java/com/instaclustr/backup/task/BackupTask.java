@@ -44,7 +44,7 @@ import java.util.zip.Adler32;
 
 import static java.lang.Math.toIntExact;
 
-public class BackupTask implements Callable<Void> {
+public class BackupTask {
     private static final Logger logger = LoggerFactory.getLogger(BackupTask.class);
     
     // Ver. 2.0 = com-recovery_codes-jb-1-Data.db
@@ -72,6 +72,8 @@ public class BackupTask implements Callable<Void> {
     private final BackupArguments arguments;
     
     private final StorageServiceMBean storageServiceMBean;
+
+    private Thread snapshotCleaner = null;
     
     static class KeyspaceColumnFamilySnapshot {
         final String keyspace, columnFamily;
@@ -106,14 +108,6 @@ public class BackupTask implements Callable<Void> {
         
         this.filesUploader = new FilesUploader(arguments);
         this.arguments = arguments;
-    }
-    
-    @Override
-    public Void call() throws Exception {
-        if (globalLock.getLock(arguments.waitForLock))
-            tryBackup();
-        
-        return null;
     }
     
     @VisibleForTesting
@@ -174,7 +168,7 @@ public class BackupTask implements Callable<Void> {
         
     }
     
-    private void doUpload(List<String> tokens) throws Exception {
+    public final void doUpload(List<String> tokens) throws Exception {
         Collection<ManifestEntry> manifest = generateManifest(arguments.keyspaces, arguments.snapshotTag, cassandraDataDirectory);
         
         Iterables.addAll(manifest, saveTokenList(tokens));
@@ -183,10 +177,23 @@ public class BackupTask implements Callable<Void> {
         filesUploader.uploadOrFreshenFiles(manifest);
     }
     
-    private void tryBackup() throws Exception {
-        List<String> tokens = new ArrayList<>();
+    public final void performBackup() throws Exception {
         if (arguments.offlineSnapshot) {
+            List<String> tokens = new ArrayList<>();
             doUpload(tokens);
+        } else {
+            try {
+                doUpload(storageServiceMBean.getTokens());
+            } finally {
+                this.snapshotCleaner.run();
+            }
+        }
+    }
+
+    public final boolean performSnapshot() {
+        boolean result = true;
+        if (arguments.offlineSnapshot) {
+            logger.debug("Offline Snapshot, skip snapshot processing");
         } else {
             HashMap<String, String[]> environment = null; //we can pass nulls to the jmxconnectorFactory
             if (arguments.jmxPassword != null && arguments.jmxUser != null) {
@@ -194,40 +201,22 @@ public class BackupTask implements Callable<Void> {
                 String[] credentials = new String[]{arguments.jmxUser, arguments.jmxPassword};
                 environment.put(JMXConnector.CREDENTIALS, credentials);
             }
-            
-            final Runnable clearSnapshotRunnable = new Runnable() {
-                private boolean hasRun = false;
-                
-                @Override
-                public void run() {
-                    if (hasRun)
-                        return;
-                    
-                    hasRun = true;
-                    
-                    try {
-                        storageServiceMBean.clearSnapshot(arguments.snapshotTag);
-                        logger.info("Cleared snapshot \"{}\".", arguments.snapshotTag);
-                        
-                    } catch (final IOException e) {
-                        logger.error("Failed to cleanup snapshot {}.", arguments.snapshotTag, e);
-                    }
-                }
-            };
-            
-            Runtime.getRuntime().addShutdownHook(new Thread(clearSnapshotRunnable));
-            
+
+            // create a ShutdownHook to clean snapshot if something go wrong during the nominal process
+            // TODO do we have to also clean Offline Snapshot ???
+            this.snapshotCleaner = new ClearSnapshotRunnable(arguments.snapshotTag, this.storageServiceMBean);
+            Runtime.getRuntime().addShutdownHook(this.snapshotCleaner);
+
             try {
-                // take snapshot
                 takeCassandraSnapshot(arguments.keyspaces, arguments.snapshotTag, arguments.columnFamily, arguments.drain);
-                doUpload(storageServiceMBean.getTokens());
-                
-            } finally {
-                clearSnapshotRunnable.run();
+            } catch (IOException | ExecutionException | InterruptedException ex) {
+                logger.error("Snapshot '{}' failed on keyspaces/tables '{}/{}'", arguments.snapshotTag, arguments.keyspaces, arguments.columnFamily, ex);
+                result = false;
             }
         }
+        return result;
     }
-    
+
     @VisibleForTesting
     public static Map<String, List<Path>> listSSTables(Path table) throws IOException {
         return Files.list(table)
@@ -239,14 +228,14 @@ public class BackupTask implements Callable<Void> {
                     return matcher.group(SSTABLE_GENERATION_IDX);
                 }));
     }
-    
+
     @VisibleForTesting
     public static String calculateChecksum(final Path filePath) throws IOException {
         try (final FileChannel fileChannel = FileChannel.open(filePath)) {
-            
+
             int bytesStart;
             int bytesPerChecksum = 10 * 1024 * 1024;
-            
+
             // Get last 10 megabytes of file to use for checksum
             if (fileChannel.size() >= bytesPerChecksum) {
                 bytesStart = toIntExact(fileChannel.size()) - bytesPerChecksum;
@@ -254,39 +243,39 @@ public class BackupTask implements Callable<Void> {
                 bytesStart = 0;
                 bytesPerChecksum = (int) fileChannel.size();
             }
-            
+
             fileChannel.position(bytesStart);
             final ByteBuffer bytesToChecksum = ByteBuffer.allocate(bytesPerChecksum);
             int bytesRead = fileChannel.read(bytesToChecksum, bytesStart);
-            
+
             assert (bytesRead == bytesPerChecksum);
-            
+
             // Adler32 because it's faster than SHA / MD5 and Cassandra uses it - https://issues.apache.org/jira/browse/CASSANDRA-5862
             final Adler32 adler32 = new Adler32();
             adler32.update(bytesToChecksum.array());
-            
+
             return String.valueOf(adler32.getValue());
         }
     }
-    
+
     public static String sstableHash(Path path) throws IOException {
         final Matcher matcher = SSTABLE_RE.matcher(path.getFileName().toString());
         if (!matcher.matches()) {
             throw new BackupException("Can't compute SSTable hash for " + path + ": doesn't taste like sstable");
         }
-        
+
         for (String digest : DIGESTS) {
             final Path digestPath = path.resolveSibling(matcher.group(SSTABLE_PREFIX_IDX) + "-Digest." + digest);
             if (!Files.exists(digestPath)) {
                 continue;
             }
-            
+
             final Matcher matcherChecksum = CHECKSUM_RE.matcher(new String(Files.readAllBytes(digestPath), StandardCharsets.UTF_8));
             if (matcherChecksum.matches()) {
                 return matcher.group(SSTABLE_GENERATION_IDX) + "-" + matcherChecksum.group(1);
             }
         }
-        
+
         // Ver. 2.0 doesn't create hash file, so do it ourselves
         try {
             final Path dataFilePath = path.resolveSibling(matcher.group(SSTABLE_PREFIX_IDX) + "-Data.db");
@@ -296,14 +285,14 @@ public class BackupTask implements Callable<Void> {
             throw new BackupException("Couldn't generate checksum for " + path.toString());
         }
     }
-    
+
     public static Collection<ManifestEntry> ssTableManifest(Path tablePath, Path tableBackupPath) throws IOException {
         final Map<String, List<Path>> sstables = listSSTables(tablePath);
-        
+
         final LinkedList<ManifestEntry> manifest = new LinkedList<>();
         for (Map.Entry<String, List<Path>> entry : sstables.entrySet()) {
             final String hash = sstableHash(entry.getValue().get(0));
-            
+
             for (Path path : entry.getValue()) {
                 final Path tableRelative = tablePath.relativize(path);
                 final Path backupPath = tableBackupPath.resolve(hash).resolve(tableRelative);
@@ -312,48 +301,76 @@ public class BackupTask implements Callable<Void> {
         }
         return manifest;
     }
-    
+
     private Iterable<ManifestEntry> saveManifest(final Iterable<ManifestEntry> manifest, Path snapshotManifestDirectory, String tag) throws IOException {
         final Path manifestFilePath = Files.createFile(snapshotManifestDirectory.resolve(tag));
-        
+
         try (final Writer writer = Files.newBufferedWriter(manifestFilePath)) {
             for (final ManifestEntry manifestEntry : manifest) {
                 writer.write(Joiner.on(' ').join(manifestEntry.size, manifestEntry.objectKey));
                 writer.write('\n');
             }
         }
-        
+
         manifestFilePath.toFile().deleteOnExit();
-        
+
         return ImmutableList.of(new ManifestEntry(backupManifestsRootKey.resolve(manifestFilePath.getFileName()), manifestFilePath, ManifestEntry.Type.MANIFEST_FILE));
     }
-    
+
     public void stopBackupTask() {
         filesUploader.executorService.shutdownNow();
     }
-    
+
     private Iterable<ManifestEntry> saveTokenList(List<String> tokens) throws IOException {
         final Path tokensFilePath = snapshotTokensDirectory.resolve(String.format("%s-tokens.yaml", arguments.snapshotTag));
-        
+
         try (final OutputStream stream = Files.newOutputStream(tokensFilePath); final PrintStream writer = new PrintStream(stream)) {
             writer.println("# automatically generated by cassandra-com.com.backup.");
             writer.println("# add the following to cassandra.yaml when restoring to a new cluster.");
             writer.printf("initial_token: %s%n", Joiner.on(',').join(tokens));
         }
-        
+
         tokensFilePath.toFile().deleteOnExit();
-        
+
         return ImmutableList.of(new ManifestEntry(backupTokensRootKey.resolve(tokensFilePath.getFileName()), tokensFilePath, ManifestEntry.Type.FILE));
     }
-    
+
     private static Map<String, ? extends Iterable<KeyspaceColumnFamilySnapshot>> findKeyspaceColumnFamilySnapshots(final Path cassandraDataDirectory) throws IOException {
         // /var/lib/cassandra /data /<keyspace> /<column family> /snapshots /<snapshot>
         return Files.find(cassandraDataDirectory, 4, (path, basicFileAttributes) -> path.getParent().endsWith("snapshots"))
                 .map((KeyspaceColumnFamilySnapshot::new))
                 .collect(Collectors.groupingBy(k -> k.snapshotDirectory.getFileName().toString()));
     }
-    
+
     public BackupArguments getArguments() {
         return arguments;
+    }
+
+    private static class ClearSnapshotRunnable extends Thread {
+        private final String snapshotTag;
+        private final StorageServiceMBean storageServiceMBean;
+
+        private boolean hasRun = false;
+
+        public ClearSnapshotRunnable(String snapshotTag, StorageServiceMBean storageServiceMBean) {
+            this.snapshotTag = snapshotTag;
+            this.storageServiceMBean = storageServiceMBean;
+        }
+
+        @Override
+        public void run() {
+            if (hasRun)
+                return;
+
+            hasRun = true;
+            try {
+                storageServiceMBean.clearSnapshot(snapshotTag);
+                logger.info("Cleared snapshot \"{}\".", snapshotTag);
+                // remove ShutdownHook for this snapshot to avoid resource leak
+                Runtime.getRuntime().removeShutdownHook(this);
+            } catch (final IOException e) {
+                logger.error("Failed to cleanup snapshot {}.", snapshotTag, e);
+            }
+        }
     }
 }

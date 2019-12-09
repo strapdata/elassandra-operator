@@ -14,7 +14,6 @@ public class GlobalLock {
 
     public GlobalLock(final String sharedContainerRoot) throws IOException {
         this.snapshotLocksDirectory = Paths.get(sharedContainerRoot).resolve(Paths.get("var/lock/node-agent"));
-
         Files.createDirectories(snapshotLocksDirectory);
     }
 
