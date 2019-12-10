@@ -29,6 +29,7 @@ RUN dagi  cpio libcap2-bin sysstat net-tools iotop dstat htop strace linux-perf 
 
 COPY cassandra /usr/sbin/cassandra
 COPY cassandra.in.sh /usr/share/cassandra/
+COPY nodetool /usr/bin/
 
 # this file is sourced from the entrypoint.sh
 COPY systune.sh /
