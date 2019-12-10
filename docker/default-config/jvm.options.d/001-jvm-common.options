@@ -1,0 +1,16 @@
+# Set Elassandra & Nodetool specific JVM options when run by strapkop
+
+# sigar support
+-Djava.library.path=/usr/share/cassandra/lib/sigar-bin
+-Dcassandra.libjemalloc=/usr/lib64/libjemalloc.so.1
+
+# elasticsearch requires -Dcassandra.storagedir to start properly
+-Dcassandra.storagedir=/var/lib/cassandra
+
+# Conf loader
+-Dcassandra.config.loader=com.strapdata.cassandra.k8s.ConcatenatedYamlConfigurationLoader
+-Dcassandra.config=/usr/share/cassandra/cassandra.yaml:/etc/cassandra/cassandra.yaml:/etc/cassandra/cassandra.yaml.d
+
+# add the jamm agent
+-javaagent:/usr/share/cassandra/lib/jamm-0.3.0.jar
+
