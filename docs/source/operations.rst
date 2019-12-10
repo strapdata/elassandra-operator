@@ -40,6 +40,7 @@ root CA certificate:
     cacert.pem:      1204 bytes
     truststore.p12:  1258 bytes
 
+.. warning:: Before deploying the operator, if you want to use backup/restore feature you have to create secrets according to the cloud storage you will use, see `Backup & Restore`_ for more details.
 
 Kubernetes deployment
 _____________________
