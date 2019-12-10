@@ -135,7 +135,12 @@ Once the task applied, the Operator will send a backup request to each Sidecar c
 Restore your cluster
 --------------------
 
+Restore with the same cluster configuration
+...........................................
+
 Follow theses steps to restore an elassandra datacenter on a new Kubernetes cluster with the same number of nodes as the previous one.
+.. note:: The region used to create you cluster must be the same as the previous instance in order to match the node names.
+
 * Deploy the Elassandra Operator
 
 .. code-block:: bash
@@ -147,19 +152,23 @@ Follow theses steps to restore an elassandra datacenter on a new Kubernetes clus
    kubectl apply -f elassandra-cl1-credentials.yaml
    kubectal get elassandra-cl1
 
-
 * Apply the same backup task manifest you used to create the backup (see :ref:`ref-backup`) and check if the creation succeeds
 
 .. code-block:: bash
    kubectl apply -f backup-task.yaml
    kubectal get elassandratasks backup001
 
-* Apply the DataCenter CRD with the 'restoreFromBackup' entry containing the name of the backup task
+* Apply the DataCenter CRD you want to restore with the 'restoreFromBackup' entry containing the name of the backup task
 
 .. code-block:: bash
    # edit  datacenter-values.yaml
    # cat "restoreFromBackup: backup001" >> datacenter-values.yaml
    helm install --name cl1-dc1 -f datacenter-values.yaml elassandra-datacenter-0.2.0.tgz
 
-
 .. note:: Once the elassandra cluster up and running, you can remove the task CRD and update the Datacenter CRD to remove the "restoreFromBackup" entry.
+
+
+Restore with different cluster configuration
+.............................................
+
+// TODO
