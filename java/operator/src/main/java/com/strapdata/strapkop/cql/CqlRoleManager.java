@@ -189,12 +189,16 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                                 get(dc, CqlRole.CASSANDRA_ROLE.username),
                                 get(dc, CqlRole.STRAPKOP_ROLE.username)
                         )) {
-                            role.createOrUpdateRole(dc, k8sResourceUtils, new CqlSessionSupplier() {
-                                @Override
-                                public Single<Session> getSession(DataCenter dc) throws Exception {
-                                    return Single.just(currentSesssion);
-                                }
-                            }).blockingGet();
+                            try {
+                                role.createOrUpdateRole(dc, k8sResourceUtils, new CqlSessionSupplier() {
+                                    @Override
+                                    public Single<Session> getSession(DataCenter dc) throws Exception {
+                                        return Single.just(currentSesssion);
+                                    }
+                                }).blockingGet();
+                            } catch (Exception e) {
+                                logger.error("Cannot CreateOrUpdate role '{}'", role, e);
+                            }
                         }
 
                         // reconnect with strapkop
