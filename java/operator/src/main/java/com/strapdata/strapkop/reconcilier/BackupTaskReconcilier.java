@@ -60,11 +60,12 @@ public class BackupTaskReconcilier extends TaskReconcilier {
         // TODO: better backup with sstableloader and progress tracking
         // right now it just call the backup api on every nodes sidecar
         try {
+
             for (String pod : pods) {
                 final BackupArguments backupArguments = generateBackupArguments(
                         task.getMetadata().getName(),
-                        StorageProvider.valueOf(task.getSpec().getBackup().getType()),
-                        task.getSpec().getBackup().getTarget(),
+                        task.getSpec().getBackup().getProvider(),
+                        task.getSpec().getBackup().getBucket(),
                         OperatorNames.dataCenterResource(task.getSpec().getCluster(), task.getSpec().getDatacenter()),
                         pod);
     

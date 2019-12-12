@@ -4,13 +4,18 @@ package com.strapdata.strapkop.sidecar;
 import com.instaclustr.backup.task.RestoreTask;
 import com.instaclustr.backup.util.GlobalLock;
 import com.strapdata.model.backup.RestoreArguments;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.Callable;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -21,7 +26,9 @@ import java.util.regex.Pattern;
 )
 public class SidecarRestore implements Callable<Void> {
     private static final Logger logger = LoggerFactory.getLogger(SidecarRestore.class);
-    
+
+    private final static String RESTORE_PROOF_PREFIX = "/var/lib/cassandra/restored";
+
     @CommandLine.Unmatched
     private String[] args = new String[0];
     
@@ -44,27 +51,33 @@ public class SidecarRestore implements Callable<Void> {
         m.find();
         String ordinal = m.group();
         
-        
         logger.info("detected ordinal is {}", ordinal);
         
         try {
-            GlobalLock globalLock = new GlobalLock("/tmp");
-            arguments.sourceNodeID = arguments.sourceNodeID  + "-"  + ordinal; //make getting the ordinal more robust
-            new RestoreTask(
-                    globalLock,
-                    arguments
-            ).call();
-            
-            logger.info("Restore completed successfully.");
-            
+            File restoredProof = Paths.get(RESTORE_PROOF_PREFIX+"-"+DigestUtils.sha1Hex(arguments.snapshotTag)).toFile();
+            if (restoredProof.exists()) {
+                logger.info("Restore already done.");
+            } else {
+                GlobalLock globalLock = new GlobalLock("/tmp");
+                arguments.sourceNodeID = arguments.sourceNodeID + "-" + ordinal; //make getting the ordinal more robust
+                boolean done = new RestoreTask(
+                        globalLock,
+                        arguments
+                ).call();
+
+                if (done) {
+                    logger.info("Restore completed successfully.");
+                    logger.info("Proof file created to avoid cleanup & restore on pod restart : {}", restoredProof.createNewFile());
+                } else {
+                    logger.warn("RestoreTask not executed...");
+                }
+            }
+
             System.exit(0);
-            
         } catch (final Exception e) {
             logger.error("Failed to complete restore.", e);
-            
             System.exit(1);
         }
-        
         return null;
     }
 }
