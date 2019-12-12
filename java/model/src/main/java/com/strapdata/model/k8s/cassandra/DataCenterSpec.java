@@ -88,7 +88,7 @@ public class DataCenterSpec {
      */
     @SerializedName("restoreFromBackup")
     @Expose
-    private java.lang.String restoreFromBackup = null;
+    private Restore restoreFromBackup = new Restore();
 
     /**
      * Name of an optional config map that contains cassandra configuration in the form of yaml fragments

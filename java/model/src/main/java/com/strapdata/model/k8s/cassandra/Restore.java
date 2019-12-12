@@ -1,4 +1,4 @@
-package com.strapdata.model.k8s.task;
+package com.strapdata.model.k8s.cassandra;
 
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
@@ -8,10 +8,16 @@ import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
-public class BackupTaskSpec  {
+public class Restore {
+
+    @SerializedName("tag")
+    @Expose
+    private String snapshotTag;
+
     @SerializedName("provider")
     @Expose
     private StorageProvider provider;
+
     @SerializedName("bucket")
     @Expose
     private String bucket;

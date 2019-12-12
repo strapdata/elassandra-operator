@@ -34,7 +34,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public class RestoreTask implements Callable<Void> {
+public class RestoreTask implements Callable<Boolean> {
     private static final Logger logger = LoggerFactory.getLogger(RestoreTask.class);
 
     private final Downloader downloaderProvider;
@@ -51,10 +51,6 @@ public class RestoreTask implements Callable<Void> {
     public RestoreTask(final GlobalLock globalLock,
                        final RestoreArguments arguments
     ) throws StorageException, ConfigurationException, URISyntaxException, InvalidKeyException {
-
-
-
-
 
         this.downloaderProvider = CloudDownloadUploadFactory.getDownloader(arguments);
         this.globalLock = globalLock;
@@ -84,22 +80,22 @@ public class RestoreTask implements Callable<Void> {
     }
 
     @Override
-    public Void call() throws Exception {
+    public Boolean call() throws Exception {
+        boolean success = false;
         if (globalLock.getLock(arguments.waitForLock)) {
            logger.info("Restoring backup {}", restoreParameters(arguments));
             try {
-                call0();
+                success = call0();
                 logger.info("Completed restoring backup {}", restoreParameters(arguments));
-
             } catch (Exception e) {
                 logger.info("Failed restoring backup {} with {}", restoreParameters(arguments), e);
                 throw e;
             }
         }
-        return null;
+        return success;
     }
 
-    private void call0() throws Exception {
+    private Boolean call0() throws Exception {
         // 1. TODO: Check cassandra still running. Halt if running? Make this restore task a pre-start container for the pod to avoid this check
 
         // 2. Determine if just restoring a subset of tables
@@ -112,8 +108,13 @@ public class RestoreTask implements Callable<Void> {
 
         final Downloader downloader = downloaderProvider;
         final RemoteObjectReference manifestRemoteObjectReference = downloader.objectKeyToRemoteReference(sourceManifest);
-        downloader.downloadFile(localManifest, manifestRemoteObjectReference);
 
+        try {// TODO do not commit this try/catch prefer updating the DC status instead to ignore the restoreFromBackup entry for new nodes
+            downloader.downloadFile(localManifest, manifestRemoteObjectReference);
+        } catch (Exception e) {
+            logger.warn("Download of '{}' manifest failed", sourceManifest, e);
+            return false;
+        }
         // 4. Clean out old data
         FileUtils.cleanDirectory(fullCommitLogRestoreDirectory.toFile());
         FileUtils.cleanDirectory(cassandraDataDirectory.resolve("hints").toFile());
@@ -226,9 +227,8 @@ public class RestoreTask implements Callable<Void> {
             }
         }
 
-
-
         writeConfigOptions(downloader, isTableSubsetOnly);
+        return true;
     }
 
     private void downloadCommitLogs(final Downloader downloader, final long timestampStart, final long timestampEnd) throws Exception {

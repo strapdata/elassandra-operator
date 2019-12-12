@@ -5,11 +5,8 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.net.InetAddresses;
-import com.google.gson.reflect.TypeToken;
-import com.squareup.okhttp.Call;
 import com.strapdata.cassandra.k8s.ElassandraOperatorSeedProviderAndNotifier;
 import com.strapdata.model.k8s.cassandra.*;
-import com.strapdata.model.k8s.task.Task;
 import com.strapdata.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
@@ -29,6 +26,7 @@ import io.kubernetes.client.models.*;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
+import io.micronaut.core.util.StringUtils;
 import io.reactivex.Completable;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
@@ -78,7 +76,7 @@ public class DataCenterUpdateAction {
     private final CustomObjectsApi customObjectsApi;
     private final K8sResourceUtils k8sResourceUtils;
     private final AuthorityManager authorityManager;
-    
+
     private final com.strapdata.model.k8s.cassandra.DataCenter dataCenter;
     private final V1ObjectMeta dataCenterMetadata;
     private final DataCenterSpec dataCenterSpec;
@@ -111,7 +109,7 @@ public class DataCenterUpdateAction {
         this.customObjectsApi = customObjectsApi;
         this.k8sResourceUtils = k8sResourceUtils;
         this.authorityManager = authorityManager;
-        
+
         this.dataCenter = dataCenter;
         this.dataCenterMetadata = dataCenter.getMetadata();
         this.dataCenterSpec = dataCenter.getSpec();
@@ -125,14 +123,14 @@ public class DataCenterUpdateAction {
             dataCenter.setStatus(new DataCenterStatus());
         }
         this.dataCenterStatus = this.dataCenter.getStatus();
-        
+
         // normalize Enterprise object
         if (this.dataCenterSpec.getEnterprise() == null) {
             this.dataCenterSpec.setEnterprise(new Enterprise());
         } else if (!this.dataCenterSpec.getEnterprise().getEnabled()) {
             this.dataCenterSpec.setEnterprise(new Enterprise());
         }
-        
+
         this.dataCenterLabels = OperatorLabels.datacenter(dataCenter);
     }
 
@@ -188,12 +186,12 @@ public class DataCenterUpdateAction {
             throw new StrapkopException(String.format("dc=%s has an invalid number of replicas", dataCenterMetadata.getName()));
         }
 
-            return Single.zip(
+        return Single.zip(
                 k8sResourceUtils.createOrReplaceNamespacedService(builder.buildServiceNodes()),
                 k8sResourceUtils.createOrReplaceNamespacedService(builder.buildServiceElasticsearch()),
                 k8sResourceUtils.createOrReplaceNamespacedService(builder.buildServiceExternalNodes()),
                 (s1, s2, s3) -> builder.clusterObjectMeta(OperatorNames.clusterSecret(dataCenter))
-                )
+        )
                 .flatMap(clusterSecret -> {
                     // create cluster secret if not exists
                     Map<String, String> passwords = new HashMap<>();
@@ -225,17 +223,17 @@ public class DataCenterUpdateAction {
                     return !dataCenterSpec.getSsl() ?
                             Single.just(passwords) :
                             authorityManager.loadFromSecretSingle()
-                                .flatMap(x509CertificateAndPrivateKey -> {
-                                    V1ObjectMeta keystoreMeta = builder.dataCenterObjectMeta(OperatorNames.keystoreSecret(dataCenter));
-                                    return k8sResourceUtils.readOrCreateNamespacedSecret(keystoreMeta,
-                                            () -> {
-                                                try {
-                                                    return builder.buildSecretKeystore(x509CertificateAndPrivateKey);
-                                                } catch (GeneralSecurityException | IOException | OperatorCreationException e) {
-                                                    throw new RuntimeException(e);
-                                                }
-                                            });
-                                }).map(s2 -> passwords);
+                                    .flatMap(x509CertificateAndPrivateKey -> {
+                                        V1ObjectMeta keystoreMeta = builder.dataCenterObjectMeta(OperatorNames.keystoreSecret(dataCenter));
+                                        return k8sResourceUtils.readOrCreateNamespacedSecret(keystoreMeta,
+                                                () -> {
+                                                    try {
+                                                        return builder.buildSecretKeystore(x509CertificateAndPrivateKey);
+                                                    } catch (GeneralSecurityException | IOException | OperatorCreationException e) {
+                                                        throw new RuntimeException(e);
+                                                    }
+                                                });
+                                    }).map(s2 -> passwords);
                 })
                 .flatMap(s4 -> fetchExistingStatefulSetsByZone())
                 .flatMapCompletable(existingStsMap -> {
@@ -407,11 +405,11 @@ public class DataCenterUpdateAction {
                                 logger.debug("SCALE_UP started in rack={} size={}", zone.name, zone.size);
                                 return todo.andThen(
                                         k8sResourceUtils.createOrReplaceNamespacedService(builder.buildServiceSeed(zone.getName()))
-                                        .flatMapCompletable(s -> {
-                                            ConfigMapVolumeMounts configMapVolumeMounts = new ConfigMapVolumeMounts(zones, zone.name);
-                                            return configMapVolumeMounts.createOrReplaceNamespacedConfigMaps();
-                                        })
-                                        .andThen(k8sResourceUtils.createNamespacedStatefulSet(sts).ignoreElement()));
+                                                .flatMapCompletable(s -> {
+                                                    ConfigMapVolumeMounts configMapVolumeMounts = new ConfigMapVolumeMounts(zones, zone.name);
+                                                    return configMapVolumeMounts.createOrReplaceNamespacedConfigMaps();
+                                                })
+                                                .andThen(k8sResourceUtils.createNamespacedStatefulSet(sts).ignoreElement()));
                             }
                             // +1 on sts replicas
                             V1StatefulSet sts = zone.getSts().get();
@@ -602,7 +600,7 @@ public class DataCenterUpdateAction {
                     .andThen((userConfig == null) ?
                             Completable.complete() :
                             userConfig.makeUnique().createOrReplaceNamespacedConfigMap().ignoreElement()
-                                    );
+                    );
         }
 
         /**
@@ -921,7 +919,7 @@ public class DataCenterUpdateAction {
                 jvmOptionsD.append("-Dcom.sun.management.jmxremote.rmi.port=" + dataCenterSpec.getJmxPort() + "\n");
                 jvmOptionsD.append("-Dcom.sun.management.jmxremote.authenticate=true\n");
                 jvmOptionsD.append("-Dcom.sun.management.jmxremote.password.file=/etc/cassandra/jmxremote.password\n");
-                                //"-Dcom.sun.management.jmxremote.access.file=/etc/cassandra/jmxremote.access\n" + \
+                //"-Dcom.sun.management.jmxremote.access.file=/etc/cassandra/jmxremote.access\n" + \
                 jvmOptionsD.append("-Dcom.sun.management.jmxremote.ssl=true\n");
                 jvmOptionsD.append("-Dcom.sun.management.jmxremote.registry.ssl=true\n");
                 jvmOptionsD.append("-Djavax.net.ssl.keyStore=" + OPERATOR_KEYSTORE_MOUNT_PATH + "/" + OPERATOR_KEYSTORE + "\n");
@@ -1464,21 +1462,9 @@ public class DataCenterUpdateAction {
                 commitlogInitContainer.addArgsItem(opClusterSecretPath);
             }
 
-
-            if (dataCenterSpec.getRestoreFromBackup() != null) {
+            final Restore restoreFromBackup = dataCenterSpec.getRestoreFromBackup();
+            if (restoreFromBackup != null && StringUtils.isNotEmpty(restoreFromBackup.getSnapshotTag())) {
                 logger.debug("Restore requested.");
-
-                // custom objects api doesn't give us a nice way to pass in the type we want so we do it manually
-                final Task backup;
-                {
-                    final Call call = customObjectsApi.getNamespacedCustomObjectCall("stable.strapdata.com", "v1", dataCenterMetadata.getNamespace(), "elassandratasks", dataCenterSpec.getRestoreFromBackup(), null, null);
-                    backup = customObjectsApi.getApiClient().<Task>execute(call, new TypeToken<Task>() {
-                    }.getType()).getData();
-                    if (backup.getSpec().getBackup() == null) {
-                        throw new StrapkopException(String.format("task %s is not a backup", backup.getMetadata().getName()));
-                    }
-                }
-
                 V1Container restoreInitContainer = new V1Container()
                         .name("sidecar-restore")
                         .terminationMessagePolicy("FallbackToLogsOnError")
@@ -1490,11 +1476,11 @@ public class DataCenterUpdateAction {
                                 "java", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseCGroupMemoryLimitForHeap", "-XX:MaxRAMFraction=2",
                                 "-cp", "/app/resources:/app/classes:/app/libs/*",
                                 "com.strapdata.strapkop.sidecar.SidecarRestore",
-                                "-bb", backup.getSpec().getBackup().getTarget(), // bucket name
+                                "-bb", restoreFromBackup.getBucket(), // bucket name
                                 "-c", dataCenterMetadata.getName(), // clusterID == DcName. Backup dc and restore dc must have the same name
                                 "-bi", OperatorNames.stsName(dataCenter, rack), // pod name prefix
-                                "-s", backup.getMetadata().getName(), // backup tag used to find the manifest file
-                                "--bs", backup.getSpec().getBackup().getType(),
+                                "-s",  restoreFromBackup.getSnapshotTag(), // backup tag used to find the manifest file
+                                "--bs", restoreFromBackup.getProvider().name(),
                                 "-rs",
                                 "--shared-path", "/tmp", // elassandra can't run as root,
                                 "--cd", "/tmp/sidecar-config-volume" // location where the restore task can write config fragments
@@ -1651,11 +1637,11 @@ public class DataCenterUpdateAction {
                             .timeoutSeconds(5)
                     );
             if (dataCenterSpec.getElasticsearchEnabled() &&  dataCenterSpec.getEnterprise().getJmx()) {
-                    cassandraContainer.lifecycle(new V1Lifecycle().preStop(new V1Handler().exec(new V1ExecAction()
-                            .addCommandItem("curl")
-                            .addCommandItem("-X")
-                            .addCommandItem("POST")
-                            .addCommandItem("http://localhost:8080/enterprise/search/disable"))));
+                cassandraContainer.lifecycle(new V1Lifecycle().preStop(new V1Handler().exec(new V1ExecAction()
+                        .addCommandItem("curl")
+                        .addCommandItem("-X")
+                        .addCommandItem("POST")
+                        .addCommandItem("http://localhost:8080/enterprise/search/disable"))));
             }
             return cassandraContainer;
         }
@@ -1724,7 +1710,7 @@ public class DataCenterUpdateAction {
             nodetoolOpts += dataCenterSpec.getJmxmpEnabled() ? " --jmxmp " : "";
             nodetoolOpts += useJmxOverSSL() ? " --ssl " : "";
             cassandraContainer.addEnvItem(new V1EnvVar().name("NODETOOL_OPTS").value(nodetoolOpts));
-            
+
             if (dataCenterSpec.getSsl()) {
                 cassandraContainer.addVolumeMountsItem(new V1VolumeMount()
                         .name("nodetool-ssl-volume")
@@ -1831,7 +1817,7 @@ public class DataCenterUpdateAction {
             return  status != null &&
                     sts.get().getSpec().getReplicas() == status.getReadyReplicas() &&
                     ( Strings.isNullOrEmpty(status.getUpdateRevision()) ||
-                      Objects.equals(status.getUpdateRevision(), status.getCurrentRevision()));
+                            Objects.equals(status.getUpdateRevision(), status.getCurrentRevision()));
         }
 
         public boolean isUpdating() {

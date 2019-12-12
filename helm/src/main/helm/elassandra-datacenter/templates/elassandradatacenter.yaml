@@ -33,7 +33,8 @@ spec:
 {{ toYaml .Values.env | indent 4 }}
 {{- end }}
 {{- if .Values.restoreFromBackup }}
-  restoreFromBackup: {{ .Values.restoreFromBackup }}
+  restoreFromBackup:
+{{ toYaml .Values.restoreFromBackup | indent 4 }}
 {{- end }}
   userConfigMapVolumeSource:
     name: {{ template "elassandra.resourceName" . }}

@@ -8,7 +8,7 @@ Configuring backups for your cluster
 
 Depending on your environment and kubernetes distribution, these steps may be different.
 The backup target location (where your backups will be stored) will determine how you configure your cluster.
-Each supported cloud based, backup location (Google Cloud Storage, AWS S3 and Azure Blobstore) utilises the standard Java clients from those cloud providers
+Each supported cloud based backup location (Google Cloud Storage, AWS S3 and Azure Blobstore) uses the standard Java clients from those cloud providers
 and those clients default credentials chains.
 
 Credentials information must be provided through a kubernetes secret using the following naming convention *elassandra-[clusterName]-backup-[provider]* where
@@ -28,8 +28,9 @@ Configuring AWS S3
 ...................
 
 For talking to AWS S3, you have to provide the *access key*, the *secret key* and the *region* in the secret using this manifest
+Here after there is an example of secret for the *clusterName* "cl1".
 
-.. note:: Remember to change the name
+.. note:: Remember to change the name into the metadata section
 
 .. code-block:: yaml
 
@@ -60,6 +61,8 @@ The mount process will be managed by the Elassandra operator.
 
 The file (a json file) must be named **gcp.json** and must contain the GCP service account information, you can find how to create this json following the `GCP documentation<https://cloud.google.com/iam/docs/creating-managing-service-account-keys>`_
 
+Here after there is an example of secret for the *clusterName* "cl1".
+
 .. code-block:: bash
 
    kubectl create secret generic elassandra-cl1-backup-gcp --from-file=/path/to/gcp.json
@@ -69,8 +72,9 @@ Configuring AZURE BLOB
 ......................
 
 For talking to AZURE BLOB, you have to provide the *Storage access name* and the *Storage access key* in the secret using this manifest
+Here after there is an example of secret for the *clusterName* "cl1".
 
-.. note:: Remember to change the name
+.. note:: Remember to change the name into the metadata section
 
 .. code-block:: yaml
 
@@ -95,13 +99,16 @@ Backups your cluster
 --------------------
 
 The Elassandra Operator allows you to trigger a backup of your cluster by creating a backup task though the Task CRD.
+Currently, the Elassandra operator manage a single backup mode by preserving the SSTable of the Elassandra nodes after a Snapshot.
 
 To create a task, you have to provide:
 
 * a backup name
-* the cluster and datacenter name
+* the cluster and data-center name
 * the type of your cloud provider (AZURE_BLOB, GCP_BLOB, AWS_S3)
 * the bucket name where the backup files will be uploaded
+
+The backup name is set using the task name, this name will be used as *tag* for the SSTable snapshots.
 
 Here is an example of Task manifest.
 
@@ -115,13 +122,10 @@ Here is an example of Task manifest.
       cluster: "cl1"
       datacenter: "dc1"
       backup:
-        type: AZURE_BLOB
-        target: storage-bucket-name
-
+        provider: AZURE_BLOB
+        bucket: storage-bucket-name
 
 Once the task applied, the Operator will send a backup request to each Sidecar container to perform a snaphost and then upload all relevant files on the specified cloud storage location.
-
-// TODO how to check upload fully finished
 
 .. note:: Take care to backup the kubernetes secrets containing the Cassandra credentials in order to avoid connection issue during the restore phase. For a cluster name 'cl1', secrets to backup is 'elassandra-cl1'
 
@@ -131,7 +135,6 @@ Once the task applied, the Operator will send a backup request to each Sidecar c
    # store this file in a safe place to apply it before a restore
 
 
-
 Restore your cluster
 --------------------
 
@@ -139,36 +142,39 @@ Restore with the same cluster configuration
 ...........................................
 
 Follow theses steps to restore an elassandra datacenter on a new Kubernetes cluster with the same number of nodes as the previous one.
-.. note:: The region used to create you cluster must be the same as the previous instance in order to match the node names.
+
+.. note::
+   The region used to create you cluster must be the same as the previous instance in order to match the node names.
+   The number of nodes in each availability zone must be the same as the previous instance.
 
 * Deploy the Elassandra Operator
 
 .. code-block:: bash
    helm install --name myoperator -f operator-values.yaml elassandra-operator-0.2.0.tgz
 
-* Apply the elassandra-cl1-credentials.yaml (see :ref:`ref-backup`) and check if the creation succeeds
+* Apply the elassandra-cl1-credentials.yaml (see :ref:`ref-backup`) and check if the creation succeeds.
+  This step is important in order to restore the Cassandra credentials at the operator level.
+  If you miss this step, the operator will generate news secrets that will mismatch the ones preserved into the system_auth keyspace and restored from the cloud storage.
 
 .. code-block:: bash
    kubectl apply -f elassandra-cl1-credentials.yaml
    kubectal get elassandra-cl1
 
-* Apply the same backup task manifest you used to create the backup (see :ref:`ref-backup`) and check if the creation succeeds
+* Apply the DataCenter CRD you want to restore with the 'restoreFromBackup' entry containing the name of the snapshot tag, the cloud provider and the bucket.
 
 .. code-block:: bash
-   kubectl apply -f backup-task.yaml
-   kubectal get elassandratasks backup001
+   # edit datacenter-values.yaml to add the restoration information
+   # ex:
+   cat << EOF >> datacenter-values.yaml
 
-* Apply the DataCenter CRD you want to restore with the 'restoreFromBackup' entry containing the name of the backup task
+   restoreFromBackup:
+     tag: "backup001"
+     provider: "AZURE_BLOB"
+     bucket: "storage-bucket-name"
 
-.. code-block:: bash
-   # edit  datacenter-values.yaml
-   # cat "restoreFromBackup: backup001" >> datacenter-values.yaml
+   EOF
    helm install --name cl1-dc1 -f datacenter-values.yaml elassandra-datacenter-0.2.0.tgz
 
-.. note:: Once the elassandra cluster up and running, you can remove the task CRD and update the Datacenter CRD to remove the "restoreFromBackup" entry.
-
-
-Restore with different cluster configuration
-.............................................
-
-// TODO
+.. Restore with different cluster configuration
+.. .............................................
+.. TODO
