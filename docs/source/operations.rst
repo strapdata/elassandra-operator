@@ -40,7 +40,7 @@ root CA certificate:
     cacert.pem:      1204 bytes
     truststore.p12:  1258 bytes
 
-.. warning:: Before deploying the operator, if you want to use backup/restore feature you have to create secrets according to the cloud storage you will use, see `Backup & Restore`_ for more details.
+.. warning:: Before deploying the operator, if you want to use backup/restore feature you have to create secrets according to the cloud storage you will use, see `Backup & Restore <backup-restore.html#restore-your-cluster>`_ for more details.
 
 Kubernetes deployment
 _____________________
@@ -48,6 +48,8 @@ _____________________
 Create a YAML file including a Kubernetes deployment, and a service:
 
 .. code::
+
+   todo
 
 Deploy into your Kubernetes cluster:
 
@@ -64,6 +66,8 @@ _______________
 
 Deploy a Datacenter
 ...................
+
+.. note:: Before deploying the DataCenter, make sure that you have created cloud storage secrets to receive your backups (see `Backup & Restore <backup-restore.html#restore-your-cluster>`_)
 
 To deploy an Elassandra datacenter you have to install the **elassandra-datacenter** helm chart with a *values* file adapted to your needs.
 The release name of your chart must respect a naming convention in order to quickly identify a DC in your kubernetes environment. The name
@@ -109,6 +113,8 @@ Here is the possible values :
 +----------------+-----------------------------------------------------------+
 | ERROR          | An action encountered an error                            |
 +----------------+-----------------------------------------------------------+
+
+.. note:: ScalingDown a cluster isn't yet managed by the operator
 
 If the phase is set to *ERROR*, you can check the last error message with the **lastMessage** entry in the CRD status.
 
@@ -158,12 +164,26 @@ Adjust Keyspace RF
 For managed keyspaces registered in the operator, the Cassandra Replication Factor can be automatically adjust according
 to the desired number of replica and the number of available nodes.
 
+Scale Up a data center
+......................
+
+The Elassandra operator manages the addition of new Elassandra instances to match the requirement defined into the DataCenter CRD.
+Once you added new nodes into the kubernetes cluster, you can patch the DataCenter CRD with the following command.
+
+.. code-block:: bash
+
+   kubectl patch -n default elassandradatacenters elassandra-mycluster-mydatacenter --type merge --patch '{ "spec" : { "replicas" : 6 }}'
+
+Until the number of replicas is reach the DataCenter phase will have the *SCALING_UP* value to end with *RUNNING* once all new nodes are up and running.
+
 Cassandra cleanup
 .................
 
-// TODO revoir cette section, en expliquant quand un clean up est triggé (à la fin d'un scaleup)
+When a cassandra cluster scale up, you have to cleans up keyspaces and partition keys no longer belonging to a node.
+On on-premises instances, a *nodetool cleanup* on each nodes is required. The Elassandra Operator will trigger this clean up for you
+once the number of replicas specify in the DataCenterSpec is reached.
 
-To execute a *nodetool cleanup* on each nodes, you have to create a **CleanUp task**.
+If you want execute a cleanup by yourself,  you have to create a **CleanUp task**.
 
 .. code-block:: bash
 
@@ -207,61 +227,15 @@ To check the status of the task :
       pods:
         elassandra-mycluster-mydatacenter-local-0: SUCCEED
 
+Scale Down a data center
+........................
+
+This feature isn't yet managed
+
 Update a password
 .................
 
-The Elassandra Operator defines a set of cassandra role when the DC
-
-// list here the list of pwd and specify which one can be updated
-
-To update a password used to interact with the Elassandra Cluster through CQL or JMX, you can update the values stored in the elassandra-*cluster_name* secret.
-
-.. code-block:: bash
-
-    $ kubectl get secret elassandra-mycluster -o json
-    {
-        "apiVersion": "v1",
-        "data": {
-            "cassandra.admin_password": "M2Q4NjRlNjktNGNkZi00NjVmLThhOTgtNjk0YjFiZThkYjQ3",
-            "cassandra.cassandra_password": "YjA2OGY4OGEtMTdiOS00MjYxLTlmNjgtNTMxNzMyYjZjMTgz",
-            "cassandra.jmx_password": "OTUwNjQ5MjYtYjNiOC00MTE4LTgzZTEtNjFhNzc0YzkwOGE4",
-            "cassandra.reaper_password": "YTU5YWZhMjAtYzUyMi00ODIwLWI2YzQtNmFmMWUwMDEwZDU2",
-            "cassandra.elassandra_operator_password": "NzllYzVkN2UtOWY1OS00YjAwLWIxMTctZDlhOTQ2NmJjOGFh",
-            "shared-secret.yaml": "YWFhLnNoYXJlZF9zZWNyZXQ6IGQ2ZDliNGM5LTFkOGEtNDdhZi05ZDNkLTFhZDJiZmIwMzFkNQ=="
-        },
-        "kind": "Secret",
-        "metadata": {
-            "creationTimestamp": "2019-11-07T14:18:45Z",
-            "labels": {
-                "app": "elassandra",
-                "app.kubernetes.io/managed-by": "elassandra-operator",
-                "cluster": "mycluster"
-            },
-            "name": "elassandra-mycluster",
-            "namespace": "default",
-            "ownerReferences": [
-                {
-                    "apiVersion": "stable.strapdata.com/v1",
-                    "blockOwnerDeletion": true,
-                    "controller": true,
-                    "kind": "ElassandraDataCenter",
-                    "name": "elassandra-mycluster-mydatacenter",
-                    "uid": "7e059ca9-1288-4643-be1d-2d25f99fb9ac"
-                }
-            ],
-            "resourceVersion": "280541",
-            "selfLink": "/api/v1/namespaces/default/secrets/elassandra-mycluster",
-            "uid": "d16c480e-97eb-414b-87b0-23a6c3f6ba23"
-        },
-        "type": "Opaque"
-    }
-
-Once you have identified the password to update, you can run this command:
-
-.. code-block:: bash
-
-    kubectl get secret elassandra-mycluster -o json | jq --arg newpassword "$(echo -n pass1234 | base64)" '.data["cassandra.admin_password"]=$newpassword' | kubectl apply -f -
-
+This feature isn't yet managed
 
 Enable/Disable search
 .....................

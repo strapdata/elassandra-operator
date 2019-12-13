@@ -54,12 +54,12 @@ Once you have update the manifest with your credentials, create the secret.
 Configuring GCP BLOB
 ....................
 
-.. note:: The bucket has to manage ACL. (see `Access Control<https://cloud.google.com/storage/docs/access-control/lists>`_ )
+.. note:: The bucket has to manage ACL. (see `Access Control <https://cloud.google.com/storage/docs/access-control/lists>`_ )
 
 For talking to GCP, you need a file created as a secret which will be mounted to container transparently and picked up by GCP initialisation mechanism.
 The mount process will be managed by the Elassandra operator.
 
-The file (a json file) must be named **gcp.json** and must contain the GCP service account information, you can find how to create this json following the `GCP documentation<https://cloud.google.com/iam/docs/creating-managing-service-account-keys>`_
+The file (a json file) must be named **gcp.json** and must contain the GCP service account information, you can find how to create this json following the `GCP documentation <https://cloud.google.com/iam/docs/creating-managing-service-account-keys>`_
 In addition of the json file, you will have to register your GCP **project_id**.
 
 Here after there is an example of secret for the *clusterName* "cl1".
@@ -93,8 +93,6 @@ Once you have update the manifest with your credentials, create the secret.
 
    kubectl create secret generic elassandra-cl1-backup-azure --from-file=./azure-secrets.yaml
 
-
-.. _ref-backup:
 Backups your cluster
 --------------------
 
@@ -134,7 +132,6 @@ Once the task applied, the Operator will send a backup request to each Sidecar c
    kubectl get secrets elassandra-cl1 -o yaml > elassandra-cl1-credentials.yaml
    # store this file in a safe place to apply it before a restore
 
-
 Restore your cluster
 --------------------
 
@@ -150,19 +147,22 @@ Follow theses steps to restore an elassandra datacenter on a new Kubernetes clus
 * Deploy the Elassandra Operator
 
 .. code-block:: bash
+
    helm install --name myoperator -f operator-values.yaml elassandra-operator-0.2.0.tgz
 
-* Apply the elassandra-cl1-credentials.yaml (see :ref:`ref-backup`) and check if the creation succeeds.
+* Apply the elassandra-cl1-credentials.yaml (see `Restore your cluster <#restore-your-cluster>`_) and check if the creation succeeds.
   This step is important in order to restore the Cassandra credentials at the operator level.
   If you miss this step, the operator will generate news secrets that will mismatch the ones preserved into the system_auth keyspace and restored from the cloud storage.
 
 .. code-block:: bash
+
    kubectl apply -f elassandra-cl1-credentials.yaml
    kubectal get elassandra-cl1
 
 * Apply the DataCenter CRD you want to restore with the 'restoreFromBackup' entry containing the name of the snapshot tag, the cloud provider and the bucket.
 
 .. code-block:: bash
+
    # edit datacenter-values.yaml to add the restoration information
    # ex:
    cat << EOF >> datacenter-values.yaml
