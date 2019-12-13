@@ -5,6 +5,8 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.net.InetAddresses;
+import com.strapdata.backup.manifest.GlobalManifest;
+import com.strapdata.backup.manifest.ManifestReader;
 import com.strapdata.cassandra.k8s.ElassandraOperatorSeedProviderAndNotifier;
 import com.strapdata.model.k8s.cassandra.*;
 import com.strapdata.model.sidecar.ElassandraNodeStatus;
@@ -18,6 +20,7 @@ import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import com.strapdata.strapkop.ssl.utils.X509CertificateAndPrivateKey;
+import com.strapdata.strapkop.utils.ManifestReaderFactory;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
@@ -46,6 +49,7 @@ import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * The NodePort service has a DNS name and redirect to STS seed pods
@@ -88,6 +92,8 @@ public class DataCenterUpdateAction {
     private final CqlLicenseManager cqlLicenseManager;
     private final CqlKeyspaceManager cqlKeyspaceManager;
 
+    private final ManifestReaderFactory manifestReaderFactory;
+
     private final ElassandraNodeStatusCache elassandraNodeStatusCache;
     public final Builder builder = new Builder();
 
@@ -102,7 +108,8 @@ public class DataCenterUpdateAction {
                                   final ElassandraNodeStatusCache elassandraNodeStatusCache,
                                   final SidecarClientFactory sidecarClientFactory,
                                   @Parameter("dataCenter") com.strapdata.model.k8s.cassandra.DataCenter dataCenter,
-                                  final CqlLicenseManager cqlLicenseManager) {
+                                  final CqlLicenseManager cqlLicenseManager,
+                                  final ManifestReaderFactory factory) {
         this.context = context;
         this.coreApi = coreApi;
         this.appsApi = appsApi;
@@ -132,6 +139,8 @@ public class DataCenterUpdateAction {
         }
 
         this.dataCenterLabels = OperatorLabels.datacenter(dataCenter);
+
+        this.manifestReaderFactory = factory;
     }
 
     /**
@@ -393,6 +402,35 @@ public class DataCenterUpdateAction {
                         return todo;
                     }
 
+                    Restore restoreFromBackup = dataCenterSpec.getRestoreFromBackup();
+                    if (restoreRequired(zones, restoreFromBackup)) {
+                        // restore is required, check that all saved nodes will have a new host
+                        final String dcName = OperatorNames.dataCenterResource(dataCenterSpec.getClusterName(), dataCenterSpec.getDatacenterName());
+                        ManifestReader reader = manifestReaderFactory.getManifestReader(restoreFromBackup.getProvider(), restoreFromBackup.getBucket(), dataCenter);
+                        GlobalManifest manifests = reader.aggregateManifest(restoreFromBackup.getSnapshotTag());
+
+                        Set<String> nodesToRestore = manifests.getNodes();
+                        Set<String> availableNodes = zones.zones.values().stream().flatMap(zone -> {
+                            String stsName = OperatorNames.stsName(dataCenter, zone.name);
+                            return IntStream.range(0, zone.size).mapToObj(Integer::toString).map(index -> stsName+"-"+index);
+                        }).collect(Collectors.toSet());
+
+                        logger.debug("Restore : '{}' node to restore with '{}' available nodes", nodesToRestore.size(), availableNodes.size());
+                        if (availableNodes.size() < nodesToRestore.size()) {
+                            logger.error("Not enough nodes to restore the snapshot '{}', expected '{}' but '{}' are available", restoreFromBackup.getSnapshotTag(), nodesToRestore.size(), availableNodes.size());
+                            throw new StrapkopException("Not enough nodes to restore the snapshot ["+availableNodes.size()+"/"+nodesToRestore.size()+"]");
+                        }
+
+                        if (!availableNodes.containsAll(nodesToRestore)) {
+                            if (logger.isTraceEnabled()) {
+                                logger.trace("Nodes to restore : {}", nodesToRestore);
+                                logger.trace("Available nodes  : {}", availableNodes);
+                            }
+                            logger.error("Nodes topology doesn't match the previous one, restoration can't be processed");
+                            throw new StrapkopException("Nodes topology is invalid");
+                        }
+                    }
+
                     if (zones.totalReplicas() < dataCenter.getSpec().getReplicas()) {
                         Optional<Zone> scaleUpZone = zones.nextToScalueUp();
                         if (scaleUpZone.isPresent()) {
@@ -474,6 +512,9 @@ public class DataCenterUpdateAction {
                 });
     }
 
+    private boolean restoreRequired(Zones zones, Restore restoreFromBackup) {
+        return zones.totalReplicas() == 0 && restoreFromBackup != null && StringUtils.isNotEmpty(restoreFromBackup.getSnapshotTag());
+    }
 
 
     /**
@@ -893,7 +934,6 @@ public class DataCenterUpdateAction {
 
             // prometheus support (see prometheus annotations)
             if (dataCenterSpec.getPrometheusEnabled()) {
-                // instaclustr jmx agent
             /*
             configMapVolumeAddFile(configMap, volumeSource, "cassandra-env.sh.d/001-cassandra-exporter.sh",
                 "JVM_OPTS=\"${JVM_OPTS} -javaagent:${CASSANDRA_HOME}/agents/cassandra-exporter-agent.jar=@${CASSANDRA_CONF}/cassandra-exporter.conf\"");
@@ -1588,7 +1628,7 @@ public class DataCenterUpdateAction {
             boolean result = false;
             try {
                 V1Secret gcpSecret = k8sResourceUtils.readNamespacedSecret(dataCenterMetadata.getNamespace(), gcpSecretName).blockingGet();
-                if (gcpSecret.getData().containsKey("gcp.json")) {
+                if (gcpSecret.getData().containsKey("gcp.json") && gcpSecret.getData().containsKey("project_id")) {
                     final String volumeName = sidecarContainer.getName() + "gcp-secret-volume";
                     podSpec.addVolumesItem(new V1Volume()
                             .name(volumeName)
@@ -1605,11 +1645,12 @@ public class DataCenterUpdateAction {
                                     .mountPath("/tmp/" + sidecarContainer.getName() + "/"))
                             .addEnvItem(new V1EnvVar()
                                     .name("GOOGLE_APPLICATION_CREDENTIALS")
-                                    .value("/tmp/" + sidecarContainer.getName() + "/gcp.json"));
+                                    .value("/tmp/" + sidecarContainer.getName() + "/gcp.json"))
+                            .addEnvItem(buildBlobStoreEnvVar("GOOGLE_CLOUD_PROJECT", "project_id", gcpSecretName));
                     result = true;
                     logger.info("GCP blob secret configured for backup");
                 } else {
-                    logger.warn("GCP blob secret configured but gcp.json is missing");
+                    logger.warn("GCP blob secret configured but gcp.json or project_id is missing");
                 }
             } catch (Exception e) {
                 logger.info("GCP blob secret '{}' is unreachable", gcpSecretName);
