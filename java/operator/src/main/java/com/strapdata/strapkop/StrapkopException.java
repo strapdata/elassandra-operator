@@ -1,6 +1,6 @@
 package com.strapdata.strapkop;
 
-public class StrapkopException extends Exception {
+public class StrapkopException extends RuntimeException {
     public StrapkopException() {
         super();
     }

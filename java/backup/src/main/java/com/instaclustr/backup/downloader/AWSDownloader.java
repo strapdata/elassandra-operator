@@ -8,6 +8,7 @@ import com.amazonaws.services.s3.model.ObjectListing;
 import com.amazonaws.services.s3.transfer.PersistableTransfer;
 import com.amazonaws.services.s3.transfer.TransferManager;
 import com.amazonaws.services.s3.transfer.internal.S3ProgressListener;
+import com.instaclustr.backup.common.AWSRemoteObjectReference;
 import com.strapdata.model.backup.RestoreArguments;
 import com.instaclustr.backup.common.RemoteObjectReference;
 import org.slf4j.Logger;
@@ -29,17 +30,6 @@ public class AWSDownloader extends Downloader {
         super(arguments);
         this.amazonS3 = transferManager.getAmazonS3Client();
         this.transferManager = transferManager;
-    }
-
-    static class AWSRemoteObjectReference extends RemoteObjectReference {
-        public AWSRemoteObjectReference(Path objectKey, String canonicalPath) {
-            super(objectKey, canonicalPath);
-        }
-
-        @Override
-        public Path getObjectKey() {
-            return objectKey;
-        }
     }
 
     @Override

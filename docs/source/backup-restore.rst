@@ -60,13 +60,13 @@ For talking to GCP, you need a file created as a secret which will be mounted to
 The mount process will be managed by the Elassandra operator.
 
 The file (a json file) must be named **gcp.json** and must contain the GCP service account information, you can find how to create this json following the `GCP documentation<https://cloud.google.com/iam/docs/creating-managing-service-account-keys>`_
+In addition of the json file, you will have to register your GCP **project_id**.
 
 Here after there is an example of secret for the *clusterName* "cl1".
 
 .. code-block:: bash
 
-   kubectl create secret generic elassandra-cl1-backup-gcp --from-file=/path/to/gcp.json
-
+   kubectl create secret generic elassandra-cl1-backup-gcp --from-file=/path/to/gcp.json --from-literal=project_id=your_gcp_project_id
 
 Configuring AZURE BLOB
 ......................

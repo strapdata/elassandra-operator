@@ -4,6 +4,10 @@ import com.amazonaws.services.s3.transfer.TransferManager;
 import com.amazonaws.services.s3.transfer.TransferManagerBuilder;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
+import com.instaclustr.backup.manifest.AWSManifestReader;
+import com.instaclustr.backup.manifest.AzureManifestReader;
+import com.instaclustr.backup.manifest.GCPManifestReader;
+import com.instaclustr.backup.manifest.ManifestReader;
 import com.strapdata.model.backup.BackupArguments;
 import com.strapdata.model.backup.RestoreArguments;
 import com.instaclustr.backup.downloader.*;
@@ -11,6 +15,7 @@ import com.instaclustr.backup.uploader.*;
 import com.microsoft.azure.storage.CloudStorageAccount;
 import com.microsoft.azure.storage.StorageException;
 import com.microsoft.azure.storage.blob.CloudBlobClient;
+import com.strapdata.model.backup.StorageProvider;
 
 import javax.naming.ConfigurationException;
 import java.net.URISyntaxException;
@@ -63,7 +68,21 @@ public class CloudDownloadUploadFactory {
         return StorageOptions.getDefaultInstance().getService();
     }
 
-
+    public static ManifestReader getManifestReader(StorageProvider provider, String bucket, String clusterName) throws URISyntaxException, StorageException, ConfigurationException, InvalidKeyException {
+        switch (provider) {
+            case AWS_S3:
+                //TODO: support encrypted backups via KMS
+                //AWS client set to auto detect credentials
+                return new AWSManifestReader(getTransferManager(), clusterName, bucket);
+            case AZURE_BLOB:
+                //TODO: use SAS token?
+                return new AzureManifestReader(getCloudBlobClient(), clusterName, bucket);
+            case GCP_BLOB:
+                return new GCPManifestReader(getGCPStorageClient(), clusterName, bucket);
+            default:
+        }
+        throw new ConfigurationException("Could not create Manifest Reader");
+    }
 
     public static SnapshotUploader getUploader(final BackupArguments arguments) throws URISyntaxException, StorageException, ConfigurationException, InvalidKeyException {
         //final String backupID, final String clusterID, final String backupBucket,
