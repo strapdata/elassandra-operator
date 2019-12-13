@@ -147,5 +147,4 @@ certificate secret. Thus, all nodes trust the same root CA.
 Authentication
 ..............
 
-
 Elassandra operator can automatically create Cassandra roles with a password defined as a Kubernetes secret, and set Cassandra permission and Elasticsearch privileges.
