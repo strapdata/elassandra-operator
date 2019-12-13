@@ -1,7 +1,7 @@
 package com.strapdata.strapkop.sidecar.services;
 
-import com.instaclustr.backup.task.BackupTask;
-import com.instaclustr.backup.util.GlobalLock;
+import com.strapdata.backup.task.BackupTask;
+import com.strapdata.backup.util.GlobalLock;
 import com.microsoft.azure.storage.StorageException;
 import com.strapdata.model.backup.BackupArguments;
 import io.micronaut.context.annotation.Context;

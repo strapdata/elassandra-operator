@@ -1,8 +1,8 @@
 package com.strapdata.strapkop.sidecar;
 
 
-import com.instaclustr.backup.task.RestoreTask;
-import com.instaclustr.backup.util.GlobalLock;
+import com.strapdata.backup.task.RestoreTask;
+import com.strapdata.backup.util.GlobalLock;
 import com.strapdata.model.backup.RestoreArguments;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.slf4j.Logger;
@@ -12,10 +12,7 @@ import picocli.CommandLine;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.Callable;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
