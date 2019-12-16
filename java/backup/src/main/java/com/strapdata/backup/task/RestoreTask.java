@@ -50,7 +50,7 @@ public class RestoreTask implements Callable<Boolean> {
 
     public RestoreTask(final GlobalLock globalLock,
                        final RestoreArguments arguments
-    ) throws StorageException, ConfigurationException, URISyntaxException, InvalidKeyException {
+    ) throws IOException, StorageException, ConfigurationException, URISyntaxException, InvalidKeyException {
 
         this.downloaderProvider = CloudDownloadUploadFactory.getDownloader(arguments);
         this.globalLock = globalLock;

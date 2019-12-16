@@ -4,15 +4,12 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.RateLimiter;
-import com.strapdata.model.backup.BackupArguments;
-import com.strapdata.model.backup.CommonBackupArguments;
-import com.strapdata.model.backup.DataRate;
-import com.strapdata.model.backup.DataSize;
+import com.microsoft.azure.storage.StorageException;
 import com.strapdata.backup.common.CloudDownloadUploadFactory;
 import com.strapdata.backup.common.RemoteObjectReference;
 import com.strapdata.backup.task.ManifestEntry;
 import com.strapdata.backup.util.SeekableByteChannelInputStream;
-import com.microsoft.azure.storage.StorageException;
+import com.strapdata.model.backup.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,7 +70,8 @@ public class FilesUploader {
         }
     }
 
-    public FilesUploader(final BackupArguments arguments) throws StorageException, ConfigurationException, URISyntaxException, InvalidKeyException {
+    public FilesUploader(final BackupArguments arguments)
+            throws IOException, StorageException, ConfigurationException, URISyntaxException, InvalidKeyException {
         this.snapshotUploaderProvider = CloudDownloadUploadFactory.getUploader(arguments);
         this.arguments = arguments;
         this.executorService = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(arguments.concurrentConnections));

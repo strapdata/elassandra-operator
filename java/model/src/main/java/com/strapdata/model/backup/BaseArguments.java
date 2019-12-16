@@ -17,6 +17,7 @@ public abstract class BaseArguments {
     CmdLineParser parser;
     public String account;
     public String secret;
+    public CloudStorageSecret cloudCredentials;
 
     BaseArguments(final String appName, final PrintStream stream) {
         this.appName = appName;
@@ -90,6 +91,10 @@ public abstract class BaseArguments {
 
     public void setSecret(String secret) {
         this.secret = secret;
+    }
+
+    public void setCloudCredentials(CloudStorageSecret cloudCredentials) {
+        this.cloudCredentials = cloudCredentials;
     }
 
     public void setConcurrentConnections(Integer concurrentConnections) {
