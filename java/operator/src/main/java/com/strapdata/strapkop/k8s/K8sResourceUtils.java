@@ -233,6 +233,23 @@ public class K8sResourceUtils {
         );
     }
 
+    public Single<V1StatefulSet> readNamespacedStatefulSet(final String namespace, final String name) throws ApiException {
+        return Single.fromCallable(() -> {
+                    try {
+                        V1StatefulSet statefulSet2 = appsApi.readNamespacedStatefulSet(name, namespace, null, null, null);
+                        logger.debug("Read namespaced Statefulset '{}' in namespace='{}'", name, namespace);
+                        return statefulSet2;
+                    } catch(ApiException e) {
+                        if (e.getCode() == 404) {
+                            logger.warn("statefulset namespace={} name={} not found", namespace, name);
+                        }
+                        throw e;
+                    }
+
+                }
+        );
+    }
+
     public Single<V1Secret> readNamespacedSecret(final String namespace, final String name) {
         return Single.fromCallable(new Callable<V1Secret>() {
             @Override
