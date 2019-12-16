@@ -15,4 +15,7 @@ public class BackupTaskSpec  {
     @SerializedName("bucket")
     @Expose
     private String bucket;
+    @SerializedName("secretRef")
+    @Expose
+    private String secretRef;
 }

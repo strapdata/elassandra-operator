@@ -40,13 +40,6 @@ Check the pod is up and running.
 
       kubectl --namespace default get pods -l "app=elassandra-operator,release=myproject"
 
-Create CloudStorage secrets in order to receive the backup. (see `Backup & Restore <backup-restore.html>`_)
-Here is an example for GCP cloud storage:
-
-.. code-block:: bash
-
-   kubectl create secret generic elassandra-mycluster-backup-gcp --from-file=/path/to/gcp.json --from-literal=project_id=your_gcp_project_id
-
 Finally, deploy the elassandra-datacenter CRD definition.
 
 .. code-block:: bash
