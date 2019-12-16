@@ -280,7 +280,7 @@ public class DataCenterUpdateAction {
                                 break;
                             case UPDATING:
                                 // rolling update done and first node NORMAL
-                                if (!movingZone.isUpdating() && elassandraNodeStatusCache.isNormal(movingZone.firstPod(dataCenter))) {
+                                if (!movingZone.isUpdating() && elassandraNodeStatusCache.isNormal(movingZone.firstPod(dataCenter))) {// TODO use same condition as SCALING_UP ??
                                     movingRack.setPhase(RackPhase.RUNNING);
                                     updateDatacenterStatus(DataCenterPhase.RUNNING, zones, rackStatusByName);
                                     logger.debug("First node NORMAL after rolling UPDATE in rack={} size={}", movingZone.name, movingZone.size);
@@ -515,7 +515,6 @@ public class DataCenterUpdateAction {
     private boolean restoreRequired(Zones zones, Restore restoreFromBackup) {
         return zones.totalReplicas() == 0 && restoreFromBackup != null && StringUtils.isNotEmpty(restoreFromBackup.getSnapshotTag());
     }
-
 
     /**
      * Currently, only one node is used as a seed. It must be the first node.
@@ -1555,23 +1554,46 @@ public class DataCenterUpdateAction {
             // add commitlog replayer
             podSpec.addInitContainersItem(commitlogInitContainer);
 
+            final V1StatefulSetSpec statefulSetSpec = new V1StatefulSetSpec()
+                    // if the serviceName references a headless service, kubeDNS to create an A record for
+                    // each pod : $(podName).$(serviceName).$(namespace).svc.cluster.local
+                    .serviceName(OperatorNames.nodesService(dataCenter))
+                    .replicas(replicas)
+                    .selector(new V1LabelSelector().matchLabels(rackLabels))
+                    .template(new V1PodTemplateSpec()
+                            .metadata(templateMetadata)
+                            .spec(podSpec)
+                    );
+            statefulSetSpec.setVolumeClaimTemplates(getPersistentVolumeClaims(statefulSetMetadata));
             return new V1StatefulSet()
                     .metadata(statefulSetMetadata)
-                    .spec(new V1StatefulSetSpec()
-                            // if the serviceName references a headless service, kubeDNS to create an A record for
-                            // each pod : $(podName).$(serviceName).$(namespace).svc.cluster.local
-                            .serviceName(OperatorNames.nodesService(dataCenter))
-                            .replicas(replicas)
-                            .selector(new V1LabelSelector().matchLabels(rackLabels))
-                            .template(new V1PodTemplateSpec()
-                                    .metadata(templateMetadata)
-                                    .spec(podSpec)
-                            )
-                            .addVolumeClaimTemplatesItem(new V1PersistentVolumeClaim()
-                                    .metadata(new V1ObjectMeta().name("data-volume"))
-                                    .spec(dataCenterSpec.getDataVolumeClaim())
-                            )
-                    );
+                    .spec(statefulSetSpec);
+        }
+
+        /**
+         * Create the list of PersistenceVolumeClaims according to the DataCenterSpec if the StatefulSet doesn't exists, otherwise
+         * the PersistenceVolumeClaims of the StatefulSet are preserved to avoid data lost.
+         *
+         * @param statefulSetMetadata
+         * @return
+         * @throws ApiException
+         */
+        private List<V1PersistentVolumeClaim> getPersistentVolumeClaims(V1ObjectMeta statefulSetMetadata) throws ApiException {
+            // if the Statefulset already exists, do not override the VolumeClaims
+            try {
+                final V1StatefulSet statefulSet = k8sResourceUtils.readNamespacedStatefulSet(dataCenterMetadata.getNamespace(), statefulSetMetadata.getName()).blockingGet();
+                logger.info("StatefulSet '{}' already exists in namespace '{}', do not modify the VolumeClaims",statefulSetMetadata.getName(), dataCenterMetadata.getNamespace());
+                return statefulSet.getSpec().getVolumeClaimTemplates();
+            } catch (RuntimeException e) {
+                if (!(e.getCause() instanceof ApiException) && ((ApiException)e.getCause()).getCode() != 404) {
+                    // rethrow the RuntimeException
+                    throw e;
+                }
+                logger.trace("StatefulSet '{}' doesn't exists in namespace '{}', use the volume claims defined in the DatacenterSpec",statefulSetMetadata.getName(), dataCenterMetadata.getNamespace());
+                return Arrays.asList(new V1PersistentVolumeClaim()
+                        .metadata(new V1ObjectMeta().name("data-volume"))
+                        .spec(dataCenterSpec.getDataVolumeClaim()));
+            }
         }
 
         private void initializeBlobCredentialsForBackup(V1PodSpec podSpec, V1Container sidecarContainer) {
