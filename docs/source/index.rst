@@ -16,13 +16,14 @@ Contents:
    :maxdepth: 3
 
    introduction
-   architecture
+   requirements
+   security
+   deployment
    configuration
    operations
    monitoring
    backup-restore
    services
-   security
 
 Indices and tables
 ==================
