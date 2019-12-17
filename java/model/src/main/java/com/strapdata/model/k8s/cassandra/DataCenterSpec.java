@@ -170,7 +170,7 @@ public class DataCenterSpec {
      */
     @SerializedName("hostNetworkEnabled")
     @Expose
-    private Boolean hostNetworkEnabled = true;
+    private Boolean hostNetworkEnabled = false;
 
 
 
