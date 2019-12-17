@@ -38,9 +38,9 @@ public class DataCenterSpec {
      * N - 1 : based on the Number of nodes minus one (with min to 1)
      * N : based on the Number of nodes
      */
-    @SerializedName("replicasMode")
+    @SerializedName("autoScaleMode")
     @Expose
-    private ReplicationMode replicasMode = ReplicationMode.MANUAL;
+    private AutoScaleMode autoScaleMode = AutoScaleMode.MANUAL;
     
     @SerializedName("nodeAffinityPolicy")
     @Expose
