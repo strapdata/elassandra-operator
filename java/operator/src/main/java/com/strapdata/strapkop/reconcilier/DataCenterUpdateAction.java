@@ -1071,9 +1071,9 @@ public class DataCenterUpdateAction {
                 final Map<String, Object> cassandraConfig = new HashMap<>();
                 cassandraConfig.put("server_encryption_options", ImmutableMap.builder()
                         .put("internode_encryption", "all")
-                        .put("keystore", OPERATOR_KEYSTORE_MOUNT_PATH + "/keystore.p12")
-                        .put("keystore_password", "changeit")
-                        .put("truststore", authorityManager.getPublicCaMountPath() + "/truststore.p12")
+                        .put("keystore", OPERATOR_KEYSTORE_MOUNT_PATH + "/" + OPERATOR_KEYSTORE)
+                        .put("keystore_password", OPERATOR_KEYPASS)
+                        .put("truststore",  authorityManager.getPublicCaMountPath() + "/" + AuthorityManager.SECRET_TRUSTSTORE_P12 )
                         .put("truststore_password", authorityManager.getCaTrustPass())
                         .put("protocol", "TLSv1.2")
                         .put("algorithm", "SunX509")
@@ -1084,10 +1084,10 @@ public class DataCenterUpdateAction {
                 );
                 cassandraConfig.put("client_encryption_options", ImmutableMap.builder()
                         .put("enabled", true)
-                        .put("keystore", "/tmp/operator-keystore/keystore.p12")
-                        .put("keystore_password", "changeit")
-                        .put("truststore", authorityManager.getPublicCaMountPath() + "/truststore.p12")
-                        .put("truststore_password", "changeit")
+                        .put("keystore", OPERATOR_KEYSTORE_MOUNT_PATH + "/" + OPERATOR_KEYSTORE)
+                        .put("keystore_password", OPERATOR_KEYPASS)
+                        .put("truststore",  authorityManager.getPublicCaMountPath() + "/" + AuthorityManager.SECRET_TRUSTSTORE_P12 )
+                        .put("truststore_password", authorityManager.getCaTrustPass())
                         .put("protocol", "TLSv1.2")
                         .put("store_type", "PKCS12")
                         .put("algorithm", "SunX509")
@@ -1300,7 +1300,19 @@ public class DataCenterUpdateAction {
                     .addEnvItem(new V1EnvVar().name("POD_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.name"))))
                     .addEnvItem(new V1EnvVar().name("POD_IP").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("status.podIP"))))
                     .addEnvItem(new V1EnvVar().name("NODE_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("spec.nodeName"))))
-                    .addEnvItem(new V1EnvVar().name("JMX_PORT").value(Integer.toString(dataCenterSpec.getJmxPort())));
+                    .addEnvItem(new V1EnvVar().name("JMX_PORT").value(Integer.toString(dataCenterSpec.getJmxPort())))
+                    .addEnvItem(new V1EnvVar().name("SIDECAR_SSL_ENABLE").value(dataCenterSpec.getSsl().toString()));
+
+            if (dataCenterSpec.getSsl()) {
+                sidecarContainer
+                        .addPortsItem(new V1ContainerPort().name("https").containerPort(8443))
+                        .addEnvItem(new V1EnvVar()
+                                .name("SIDECAR_SSL_KEYSTORE_SECRET")
+                                .value(OPERATOR_KEYPASS))// TODO [ELE] how to set pwd when keystore define by customer...?
+                        .addEnvItem(new V1EnvVar()
+                                .name("SIDECAR_SSL_KEYSTORE_PATH")
+                                .value("file:"+OPERATOR_KEYSTORE_MOUNT_PATH + "/" + OPERATOR_KEYSTORE));
+            }
 
             String javaToolOptions = "";
             // WARN: Cannot enable SSL on JMXMP because VisualVM does not support it => JMXMP in clear with no auth
@@ -1471,9 +1483,11 @@ public class DataCenterUpdateAction {
                 V1VolumeMount opKeystoreVolMount = new V1VolumeMount().name("operator-keystore").mountPath(OPERATOR_KEYSTORE_MOUNT_PATH);
                 cassandraContainer.addVolumeMountsItem(opKeystoreVolMount);
                 commitlogInitContainer.addVolumeMountsItem(opKeystoreVolMount);
+                sidecarContainer.addVolumeMountsItem(opKeystoreVolMount);
+
                 podSpec.addVolumesItem(new V1Volume().name("operator-keystore")
                         .secret(new V1SecretVolumeSource().secretName(OperatorNames.keystoreSecret(dataCenter))
-                                .addItemsItem(new V1KeyToPath().key("keystore.p12").path("keystore.p12"))));
+                                .addItemsItem(new V1KeyToPath().key("keystore.p12").path(OPERATOR_KEYSTORE))));
 
                 V1VolumeMount opTruststoreVolMount = new V1VolumeMount().name("operator-truststore").mountPath(authorityManager.getPublicCaMountPath());
                 cassandraContainer.addVolumeMountsItem(opTruststoreVolMount);
@@ -1612,19 +1626,19 @@ public class DataCenterUpdateAction {
             }
         }
 
-        private void initAzureBlobCredentiaksForBackup(V1Container sidecarContainer, String secretName) {
-            sidecarContainer.addEnvItem(buildBlobStoreEnvVar("AZURE_STORAGE_ACCOUNT", CloudStorageSecretsKeys.AZURE_STORAGE_ACCOUNT_NAME, secretName))
-                    .addEnvItem(buildBlobStoreEnvVar("AZURE_STORAGE_KEY",  CloudStorageSecretsKeys.AZURE_STORAGE_ACCOUNT_KEY, secretName));
+        private void initAzureBlobCredentiaksForBackup(V1Container container, String secretName) {
+            container.addEnvItem(buildEnvVarFromSecret("AZURE_STORAGE_ACCOUNT", CloudStorageSecretsKeys.AZURE_STORAGE_ACCOUNT_NAME, secretName))
+                    .addEnvItem(buildEnvVarFromSecret("AZURE_STORAGE_KEY",  CloudStorageSecretsKeys.AZURE_STORAGE_ACCOUNT_KEY, secretName));
         }
 
-        private void initAWSBlobCredentialsForBackup(V1Container sidecarContainer, String secretName) {
-            sidecarContainer.addEnvItem(buildBlobStoreEnvVar("AWS_REGION", CloudStorageSecretsKeys.AWS_ACCESS_KEY_REGION, secretName))
-                    .addEnvItem(buildBlobStoreEnvVar("AWS_ACCESS_KEY_ID",  CloudStorageSecretsKeys.AWS_ACCESS_KEY_ID, secretName))
-                    .addEnvItem(buildBlobStoreEnvVar("AWS_SECRET_ACCESS_KEY", CloudStorageSecretsKeys.AWS_ACCESS_KEY_SECRET, secretName));
+        private void initAWSBlobCredentialsForBackup(V1Container container, String secretName) {
+            container.addEnvItem(buildEnvVarFromSecret("AWS_REGION", CloudStorageSecretsKeys.AWS_ACCESS_KEY_REGION, secretName))
+                    .addEnvItem(buildEnvVarFromSecret("AWS_ACCESS_KEY_ID",  CloudStorageSecretsKeys.AWS_ACCESS_KEY_ID, secretName))
+                    .addEnvItem(buildEnvVarFromSecret("AWS_SECRET_ACCESS_KEY", CloudStorageSecretsKeys.AWS_ACCESS_KEY_SECRET, secretName));
         }
 
-        private void initGCPBlobCredentialsForBackup(V1PodSpec podSpec, V1Container sidecarContainer, String secretName) {
-            final String volumeName = sidecarContainer.getName() + "gcp-secret-volume";
+        private void initGCPBlobCredentialsForBackup(V1PodSpec podSpec, V1Container container, String secretName) {
+            final String volumeName = container.getName() + "gcp-secret-volume";
             podSpec.addVolumesItem(new V1Volume()
                     .name(volumeName)
                     .secret(new V1SecretVolumeSource()
@@ -1633,22 +1647,22 @@ public class DataCenterUpdateAction {
                                     .key( CloudStorageSecretsKeys.GCP_JSON).path("gcp.json").mode(256)
                             )
                     ));
-            sidecarContainer
+            container
                     .addVolumeMountsItem(new V1VolumeMount()
                             .readOnly(true)
                             .name(volumeName)
-                            .mountPath("/tmp/" + sidecarContainer.getName() + "/"))
+                            .mountPath("/tmp/" + container.getName() + "/"))
                     .addEnvItem(new V1EnvVar()
                             .name("GOOGLE_APPLICATION_CREDENTIALS")
-                            .value("/tmp/" + sidecarContainer.getName() + "/gcp.json"))
-                    .addEnvItem(buildBlobStoreEnvVar("GOOGLE_CLOUD_PROJECT",  CloudStorageSecretsKeys.GCP_PROJECT_ID, secretName));
+                            .value("/tmp/" + container.getName() + "/gcp.json"))
+                    .addEnvItem(buildEnvVarFromSecret("GOOGLE_CLOUD_PROJECT",  CloudStorageSecretsKeys.GCP_PROJECT_ID, secretName));
         }
 
-        private V1EnvVar buildBlobStoreEnvVar(String varName, String secretEntry, String k8sSecret) {
+        private V1EnvVar buildEnvVarFromSecret(String varName, String secretEntry, String k8sSecretReference) {
             return new V1EnvVar()
                     .name(varName)
                     .valueFrom(new V1EnvVarSource().secretKeyRef(new V1SecretKeySelector()
-                            .name(k8sSecret)
+                            .name(k8sSecretReference)
                             .key(secretEntry)));
         }
 

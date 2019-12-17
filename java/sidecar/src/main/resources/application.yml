@@ -1,4 +1,10 @@
 micronaut:
+    ssl:
+        enabled: ${SIDECAR_SSL_ENABLE:false}
+        keyStore:
+            path:  ${SIDECAR_SSL_KEYSTORE_PATH}
+            password: ${SIDECAR_SSL_KEYSTORE_SECRET}
+            type: PKCS12
     application:
         name: sidecar
     router:
