@@ -11,17 +11,7 @@ The backup target location (where your backups will be stored) will determine ho
 Each supported cloud based backup location (Google Cloud Storage, AWS S3 and Azure Blobstore) uses the standard Java clients from those cloud providers
 and those clients default credentials chains.
 
-Credentials information must be provided through a kubernetes secret using the following naming convention *elassandra-[clusterName]-backup-[provider]* where
-
-* *clusterName* must match the value in your Datacenter CRD
-* *provider* must be one of the following values:
-  * **gcp** : for a GCP blob storage
-  * **aws** : for a AWS S3 bucket
-  * **azure** : for an Azure blob storage
-
-The entries of those secrets depend of the provider, see the following section for details.
-
-.. note:: The secret should be defined before the first deployment of the Datacenter CRD.
+Credentials information must be provided through a kubernetes secret. The entries of those secrets depend of the provider, see the following section for details.
 
 
 Configuring AWS S3
@@ -29,8 +19,6 @@ Configuring AWS S3
 
 For talking to AWS S3, you have to provide the *access key*, the *secret key* and the *region* in the secret using this manifest
 Here after there is an example of secret for the *clusterName* "cl1".
-
-.. note:: Remember to change the name into the metadata section
 
 .. code-block:: yaml
 
@@ -62,7 +50,7 @@ The mount process will be managed by the Elassandra operator.
 The file (a json file) must be named **gcp.json** and must contain the GCP service account information, you can find how to create this json following the `GCP documentation <https://cloud.google.com/iam/docs/creating-managing-service-account-keys>`_
 In addition of the json file, you will have to register your GCP **project_id**.
 
-Here after there is an example of secret for the *clusterName* "cl1".
+Here after there is an example of a command to create a GCP secret .
 
 .. code-block:: bash
 
@@ -73,8 +61,6 @@ Configuring AZURE BLOB
 
 For talking to AZURE BLOB, you have to provide the *Storage access name* and the *Storage access key* in the secret using this manifest
 Here after there is an example of secret for the *clusterName* "cl1".
-
-.. note:: Remember to change the name into the metadata section
 
 .. code-block:: yaml
 
@@ -105,6 +91,7 @@ To create a task, you have to provide:
 * the cluster and data-center name
 * the type of your cloud provider (AZURE_BLOB, GCP_BLOB, AWS_S3)
 * the bucket name where the backup files will be uploaded
+* the secret containing cloud storage credentials
 
 The backup name is set using the task name, this name will be used as *tag* for the SSTable snapshots.
 
@@ -122,6 +109,7 @@ Here is an example of Task manifest.
       backup:
         provider: AZURE_BLOB
         bucket: storage-bucket-name
+        secretRef: elassandra-cl1-backup-azure
 
 Once the task applied, the Operator will send a backup request to each Sidecar container to perform a snaphost and then upload all relevant files on the specified cloud storage location.
 
@@ -150,6 +138,12 @@ Follow theses steps to restore an elassandra datacenter on a new Kubernetes clus
 
    helm install --name myoperator -f operator-values.yaml elassandra-operator-0.2.0.tgz
 
+* Deploy the kubernetets secret containing the CloudStorage credentials
+
+.. code-block:: bash
+
+   kubectl create secret generic elassandra-cl1-backup-azure --from-file=./azure-secrets.yaml
+
 * Apply the elassandra-cl1-credentials.yaml (see `Restore your cluster <#restore-your-cluster>`_) and check if the creation succeeds.
   This step is important in order to restore the Cassandra credentials at the operator level.
   If you miss this step, the operator will generate news secrets that will mismatch the ones preserved into the system_auth keyspace and restored from the cloud storage.
@@ -171,6 +165,7 @@ Follow theses steps to restore an elassandra datacenter on a new Kubernetes clus
      tag: "backup001"
      provider: "AZURE_BLOB"
      bucket: "storage-bucket-name"
+     secretRef: "elassandra-cl1-backup-azure"
 
    EOF
    helm install --name cl1-dc1 -f datacenter-values.yaml elassandra-datacenter-0.2.0.tgz

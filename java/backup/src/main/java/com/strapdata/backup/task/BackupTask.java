@@ -4,12 +4,13 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.microsoft.azure.storage.StorageException;
 import com.strapdata.backup.BackupException;
 import com.strapdata.backup.uploader.FilesUploader;
 import com.strapdata.backup.util.Directories;
 import com.strapdata.backup.util.GlobalLock;
 import com.strapdata.model.backup.BackupArguments;
-import com.microsoft.azure.storage.StorageException;
+import com.strapdata.model.backup.CloudStorageSecret;
 import jmx.org.apache.cassandra.service.StorageServiceMBean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,7 +87,8 @@ public class BackupTask {
     }
     
     public BackupTask(final BackupArguments arguments,
-                      final GlobalLock globalLock, StorageServiceMBean storageServiceMBean) throws IOException, StorageException, ConfigurationException, URISyntaxException, InvalidKeyException {
+                      final GlobalLock globalLock, StorageServiceMBean storageServiceMBean)
+            throws IOException, StorageException, ConfigurationException, URISyntaxException, InvalidKeyException {
         this.cassandraJMXServiceURL = arguments.jmxServiceURL;
         this.snapshotManifestDirectory = arguments.sharedContainerPath.resolve(Paths.get("cassandra-operator/manifests"));
         this.snapshotTokensDirectory = arguments.sharedContainerPath.resolve(Paths.get("cassandra-operator/tokens"));

@@ -2,7 +2,6 @@ package com.strapdata.strapkop.sidecar.services;
 
 import com.strapdata.backup.task.BackupTask;
 import com.strapdata.backup.util.GlobalLock;
-import com.microsoft.azure.storage.StorageException;
 import com.strapdata.model.backup.BackupArguments;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Infrastructure;
@@ -13,11 +12,6 @@ import jmx.org.apache.cassandra.service.StorageServiceMBean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.naming.ConfigurationException;
-import java.io.IOException;
-import java.net.URISyntaxException;
-import java.security.InvalidKeyException;
-
 @Context
 @Infrastructure
 public class BackupService {
@@ -25,10 +19,10 @@ public class BackupService {
     private static final Logger logger = LoggerFactory.getLogger(BackupService.class);
     
     private final StorageServiceMBean storageServiceMBean;
-    
+
     private BehaviorSubject<BackupTask> subject = BehaviorSubject.create();
     private Disposable disposable;
-    
+
     public BackupService(StorageServiceMBean storageServiceMBean) {
         this.storageServiceMBean = storageServiceMBean;
         logger.info("Initializing BackupService");
@@ -59,7 +53,7 @@ public class BackupService {
             globalLock = new GlobalLock("/tmp");
             task = new BackupTask(arguments, globalLock, this.storageServiceMBean);
             globalLock.getLock(arguments.waitForLock);
-        } catch (IOException|StorageException|ConfigurationException|URISyntaxException|InvalidKeyException e) {
+        } catch (Exception e) {
             logger.error("Unable to create BackupTask : {} ", e.getMessage(), e);
             return;
         }
@@ -70,6 +64,5 @@ public class BackupService {
             subject.onNext(task);
         }
     }
-
     // TODO: bind stop event to gracefully shutdown backups
 }
