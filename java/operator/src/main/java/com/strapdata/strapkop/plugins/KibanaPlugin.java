@@ -175,6 +175,13 @@ public class KibanaPlugin extends AbstractPlugin {
                         )
                 );
 
+        if (dataCenterSpec.getImagePullSecrets() != null) {
+            for(String secretName : dataCenterSpec.getImagePullSecrets()) {
+                final V1LocalObjectReference pullSecret = new V1LocalObjectReference().name(secretName);
+                podSpec.addImagePullSecretsItem(pullSecret);
+            }
+        }
+
         container
                 .name("kibana")
                 .image(dataCenter.getSpec().getKibanaImage())

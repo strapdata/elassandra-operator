@@ -22,8 +22,8 @@ spec:
         operator: elassandra
         release: {{ .Release.Name }}
     spec:
-      {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
+      {{- with .Values.imagePullSecrets }}
         - name: {{ . }}
       {{- end }}
       containers:

@@ -58,9 +58,9 @@ public class DataCenterSpec {
     @Expose
     private java.lang.String imagePullPolicy;
 
-    @SerializedName("imagePullSecret")
+    @SerializedName("imagePullSecrets")
     @Expose
-    private java.lang.String imagePullSecret;
+    private List<java.lang.String> imagePullSecrets;
     
     /**
      * List of environment variables to inject in the Cassandra & Sidecar container.
@@ -143,6 +143,7 @@ public class DataCenterSpec {
     @SerializedName("kibanaImage")
     @Expose
     private String kibanaImage = "docker.elastic.co/kibana/kibana-oss:6.2.3";
+    
     /**
      * Attempt to run privileged configuration options for better performance
      * 

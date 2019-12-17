@@ -20,8 +20,10 @@ spec:
   elassandraImage: "{{ .Values.image.elassandraRepository }}:{{ .Values.image.elassandraTag }}"
   sidecarImage: "{{ .Values.image.sidecarRepository }}:{{ .Values.image.sidecarTag }}"
   imagePullPolicy: {{ .Values.imagePullPolicy }}
-  elasticsearchEnabled: {{ .Values.elasticsearchEnabled }}
-  imagePullSecret: {{ default "" .Values.imagePullSecret }}
+  imagePullSecrets:
+  {{- with .Values.imagePullSecrets }}
+    - {{ . }}
+  {{- end }}
   resources:
 {{ toYaml .Values.resources | indent 4 }}
   dataVolumeClaim:
@@ -48,6 +50,7 @@ spec:
   userSecretVolumeSource:
 {{ toYaml .Values.userSecretVolumeSource | indent 4 }}
 {{- end }}
+  elasticsearchEnabled: {{ .Values.elasticsearchEnabled }}
   prometheusEnabled: {{ default "false" .Values.prometheusEnabled }}
   reaperEnabled: {{ default "false" .Values.reaperEnabled }}
 {{- if .Values.reaper }}

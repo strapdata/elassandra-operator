@@ -1411,10 +1411,11 @@ public class DataCenterUpdateAction {
             }
 
             {
-                final String secret = dataCenterSpec.getImagePullSecret();
-                if (!Strings.isNullOrEmpty(secret)) {
-                    final V1LocalObjectReference pullSecret = new V1LocalObjectReference().name(secret);
-                    podSpec.addImagePullSecretsItem(pullSecret);
+                if (dataCenterSpec.getImagePullSecrets() != null) {
+                    for(String secretName : dataCenterSpec.getImagePullSecrets()) {
+                        final V1LocalObjectReference pullSecret = new V1LocalObjectReference().name(secretName);
+                        podSpec.addImagePullSecretsItem(pullSecret);
+                    }
                 }
             }
 

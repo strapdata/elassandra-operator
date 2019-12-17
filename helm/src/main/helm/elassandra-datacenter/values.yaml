@@ -14,7 +14,7 @@ image:
   sidecarTag: latest
 
 imagePullPolicy: Always
-imagePullSecrets: "azurecr"
+imagePullSecrets: []
 
 
 # TODO: we do not support unprivileged setup yet
