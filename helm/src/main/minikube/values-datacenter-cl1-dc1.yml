@@ -4,6 +4,12 @@
 clusterName: Elassandra
 replicas: 1
 
+#restoreFromBackup:
+#  tag: backup-task-azure-test-credentials
+#  provider: AZURE_BLOB
+#  bucket: test-kop-backup
+#  secretRef: test-cred-backup-azure
+
 # STRICT or SLACK
 nodeAffinityPolicy: STRICT
 decommissionPolicy: DELETE_PVC
@@ -93,7 +99,6 @@ enterprise:
 #  service_key.json: "XXXXXXXXX"
 
 
-#restoreFromBackup: backup-hostname
 
 # Cassandra reaper
 reaperEnabled: true

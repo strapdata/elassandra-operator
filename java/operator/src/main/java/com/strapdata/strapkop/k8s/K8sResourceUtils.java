@@ -7,11 +7,13 @@ import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
 import com.squareup.okhttp.Call;
 import com.strapdata.model.Key;
+import com.strapdata.model.backup.*;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.k8s.task.Task;
 import com.strapdata.model.k8s.task.TaskList;
 import com.strapdata.model.k8s.task.TaskPhase;
 import com.strapdata.model.k8s.task.TaskSpec;
+import com.strapdata.strapkop.StrapkopException;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.ApiResponse;
 import io.kubernetes.client.apis.AppsV1Api;
@@ -19,6 +21,7 @@ import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.apis.CustomObjectsApi;
 import io.kubernetes.client.apis.ExtensionsV1beta1Api;
 import io.kubernetes.client.models.*;
+import io.micronaut.core.util.StringUtils;
 import io.reactivex.Completable;
 import io.reactivex.Single;
 import io.reactivex.functions.Action;
@@ -29,12 +32,16 @@ import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.lang.reflect.Type;
+import java.nio.charset.Charset;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+
+import static com.strapdata.strapkop.utils.CloudStorageSecretsKeys.*;
+import static com.strapdata.strapkop.utils.CloudStorageSecretsKeys.GCP_PROJECT_ID;
 
 @Singleton
 public class K8sResourceUtils {
@@ -233,23 +240,23 @@ public class K8sResourceUtils {
         );
     }
 
-    public Single<V1Secret> readNamespacedSecret(final String namespace, final String name) {
-        return Single.fromCallable(new Callable<V1Secret>() {
-            @Override
-            public V1Secret call() throws Exception {
-                try {
-                    V1Secret secret = coreApi.readNamespacedSecret(name, namespace, null, null, null);
-                    logger.debug("read namespaced secret={}", secret.getMetadata().getName());
-                    return secret;
-                } catch(ApiException e) {
-                    if (e.getCode() == 404) {
-                        logger.warn("secret namespace={} name={} not found", namespace, name);
+    public Single<V1StatefulSet> readNamespacedStatefulSet(final String namespace, final String name) throws ApiException {
+        return Single.fromCallable(() -> {
+                    try {
+                        V1StatefulSet statefulSet2 = appsApi.readNamespacedStatefulSet(name, namespace, null, null, null);
+                        logger.debug("Read namespaced Statefulset '{}' in namespace='{}'", name, namespace);
+                        return statefulSet2;
+                    } catch(ApiException e) {
+                        if (e.getCode() == 404) {
+                            logger.warn("statefulset namespace={} name={} not found", namespace, name);
+                        }
+                        throw e;
                     }
-                    throw e;
+
                 }
-            }
-        });
+        );
     }
+
 
     public V1ServiceAccount readNamespacedServiceAccount(final String namespace, final String name) throws ApiException {
             try {
@@ -295,6 +302,76 @@ public class K8sResourceUtils {
                     return secret2;
                 }
         );
+    }
+    /**
+     * Read secret and check if the content match the storage provider to avoid issue when side car will use it.
+     * if secret doesn't exist exception is thrown and catch as task failure.
+     * @param namespace
+     * @param secretRef
+     * @param provider
+     * @return
+     */
+    public CloudStorageSecret readAndValidateStorageSecret(final String namespace, final String secretRef, final StorageProvider provider) {
+        if (StringUtils.isEmpty(secretRef)) {
+            throw new StrapkopException("Unable to perform backup tasks without a secret reference");
+        }
+
+        V1Secret secret = readNamespacedSecret(namespace, secretRef).blockingGet();
+        switch (provider) {
+            case AZURE_BLOB:
+                if (!(secret.getData().containsKey(AZURE_STORAGE_ACCOUNT_NAME) && secret.getData().containsKey(AZURE_STORAGE_ACCOUNT_KEY))) {
+                    throw new StrapkopException("Azure blob secret configured but one of values is missing (storage-key, storage-account)");
+                } else {
+                    logger.info("Azure blob secret configured for backup");
+                    return  AzureCloudStorageSecret.builder()
+                            .accountKey(new String(secret.getData().get(AZURE_STORAGE_ACCOUNT_KEY), Charset.forName("UTF-8")))
+                            .accountName(new String(secret.getData().get(AZURE_STORAGE_ACCOUNT_NAME), Charset.forName("UTF-8")))
+                            .build();
+                }
+            case AWS_S3:
+                if(!(secret.getData().containsKey(AWS_ACCESS_KEY_REGION)
+                        && secret.getData().containsKey(AWS_ACCESS_KEY_ID)
+                        && secret.getData().containsKey(AWS_ACCESS_KEY_SECRET))) {
+                    throw new StrapkopException("AWS blob secret configured but one of values is missing (region, access-key, secret-key)");
+                } else {
+                    logger.info("AWS blob secret configured for backup");
+                    return AWSCloudStorageSecret.builder()
+                            .accessKeyId(new String(secret.getData().get(AWS_ACCESS_KEY_ID), Charset.forName("UTF-8")))
+                            .accessKeySecret(new String(secret.getData().get(AWS_ACCESS_KEY_SECRET), Charset.forName("UTF-8")))
+                            .region(new String(secret.getData().get(AWS_ACCESS_KEY_REGION), Charset.forName("UTF-8")))
+                            .build();
+                }
+            case GCP_BLOB:
+                if (!(secret.getData().containsKey(GCP_JSON) && secret.getData().containsKey(GCP_PROJECT_ID))) {
+                    throw new StrapkopException("GCP blob secret configured but gcp.json or project_id is missing");
+                } else {
+                    logger.info("GCP blob secret configured for backup");
+                    return  GCPCloudStorageSecret.builder()
+                            .jsonCredentials(secret.getData().get(GCP_JSON))
+                            .projectId(new String(secret.getData().get(GCP_PROJECT_ID), Charset.forName("UTF-8")))
+                            .build();
+                }
+        }
+
+        throw new StrapkopException(provider + " provider isn't supported");
+    }
+
+    public Single<V1Secret> readNamespacedSecret(final String namespace, final String name) {
+        return Single.fromCallable(new Callable<V1Secret>() {
+            @Override
+            public V1Secret call() throws Exception {
+                try {
+                    V1Secret secret = coreApi.readNamespacedSecret(name, namespace, null, null, null);
+                    logger.debug("read namespaced secret={}", secret.getMetadata().getName());
+                    return secret;
+                } catch(ApiException e) {
+                    if (e.getCode() == 404) {
+                        logger.warn("secret namespace={} name={} not found", namespace, name);
+                    }
+                    throw e;
+                }
+            }
+        });
     }
 
     public Completable deleteService(String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) {

@@ -23,7 +23,6 @@ Elassandra Operator features:
 * Create Cassandra roles and automatically grants the desired permissions on Cassandra keyspaces.
 * Automatically disable/enable Elasticsearch search on a node during maintenance operation.
 
-
 How It works
 ------------
 
