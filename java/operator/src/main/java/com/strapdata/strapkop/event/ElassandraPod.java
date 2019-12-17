@@ -22,6 +22,8 @@ public class ElassandraPod {
     private String parent;
     private String rack;
 
+    private boolean ssl = false;
+
     final static Pattern podNamePattern = Pattern.compile("elassandra-([\\w]+)-([\\w]+)-([\\w-]+)-([\\d]+)");
 
     public ElassandraPod(final DataCenter dc, final String rack, final int index) {
@@ -31,7 +33,8 @@ public class ElassandraPod {
                 .setDataCenter(dc.getSpec().getDatacenterName())
                 .setParent(dc.getMetadata().getName())
                 .setNamespace(dc.getMetadata().getNamespace())
-                .setRack(rack);
+                .setRack(rack)
+                .setSsl(dc.getSpec().getSsl());
     }
 
     public ElassandraPod(final String namespace, final String clusterName, String dcName, String podName) {
@@ -45,8 +48,9 @@ public class ElassandraPod {
 
     public static ElassandraPod fromName(final DataCenter dc, final String podName) {
         Matcher matcher = podNamePattern.matcher(podName);
-        if (matcher.matches())
+        if (matcher.matches()) {
             return new ElassandraPod(dc, matcher.group(3), Integer.parseInt(matcher.group(4)));
+        }
         throw new IllegalArgumentException("Pod name="+podName+" does not match expected regular expression");
     }
 

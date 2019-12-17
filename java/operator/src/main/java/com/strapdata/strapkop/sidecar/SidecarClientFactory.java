@@ -22,16 +22,16 @@ public class SidecarClientFactory {
     static final Logger logger = LoggerFactory.getLogger(SidecarClientFactory.class);
     
     private final SidecarConnectionCache sidecarConnectionCache;
-    
+
     public SidecarClientFactory(SidecarConnectionCache sidecarConnectionCache) {
         this.sidecarConnectionCache = sidecarConnectionCache;
     }
-    
+
     /**
      * Get a sidecar client from cache or create it
      */
     public SidecarClient clientForPod(final ElassandraPod pod) throws MalformedURLException {
-        
+
         SidecarClient sidecarClient = sidecarConnectionCache.get(pod);
         
         if (sidecarClient != null && sidecarClient.isRunning()) {
@@ -40,11 +40,12 @@ public class SidecarClientFactory {
         }
 
         logger.debug("creating sidecar for pod={}", pod.getName());
-        sidecarClient = new SidecarClient(new URL("http://" + pod.getFqdn() + ":8080"));
+        URL url = pod.isSsl() ? new URL("https://" + pod.getFqdn() + ":8443") : new URL("http://" + pod.getFqdn() + ":8080");
+        sidecarClient = new SidecarClient(url);
         sidecarConnectionCache.put(pod, sidecarClient);
         return sidecarClient;
     }
-    
+
     
     /**
      * Remove and close a sidecar client from cache
