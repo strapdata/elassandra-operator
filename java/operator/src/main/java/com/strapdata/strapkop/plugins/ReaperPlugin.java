@@ -161,6 +161,13 @@ public class ReaperPlugin extends AbstractPlugin {
         final V1PodSpec podSpec = new V1PodSpec()
                 .addContainersItem(container);
 
+        if (dataCenterSpec.getImagePullSecrets() != null) {
+            for(String secretName : dataCenterSpec.getImagePullSecrets()) {
+                final V1LocalObjectReference pullSecret = new V1LocalObjectReference().name(secretName);
+                podSpec.addImagePullSecretsItem(pullSecret);
+            }
+        }
+
         final V1Deployment deployment = new V1Deployment()
                 .metadata(meta)
                 .spec(new V1DeploymentSpec()

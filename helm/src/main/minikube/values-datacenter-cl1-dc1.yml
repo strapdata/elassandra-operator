@@ -23,7 +23,7 @@ image:
   sidecarTag: latest
 
 imagePullPolicy: Always
-imagePullSecret: ""
+imagePullSecrets: []
 
 kibanaImage: localhost.localdomain:5000/kibana/kibana-oss:6.2.3
 # TODO: we do not support unprivileged setup yet
