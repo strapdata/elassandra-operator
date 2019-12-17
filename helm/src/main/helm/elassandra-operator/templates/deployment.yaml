@@ -22,7 +22,7 @@ spec:
         operator: elassandra
         release: {{ .Release.Name }}
     spec:
-      {{- with .Values.imagePullSecret }}
+      {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         - name: {{ . }}
       {{- end }}
