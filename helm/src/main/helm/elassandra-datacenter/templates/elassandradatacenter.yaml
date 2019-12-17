@@ -14,8 +14,8 @@ metadata:
 spec:
   clusterName: {{ include "elassandra.clusterName" . | required "Invalid clusterName : Release name has to be clustername-dcname (in lowercase), clustername must match ([0-9a-z]+)" }}
   datacenterName: {{ include "elassandra.datacenterName" . | required "Invalid datacenterName : Release name has to be clustername-dcname (in lowercase), datacenterName must match ([0-9a-z]+)" }}
-  workload: {{ .Values.workload }}
-  replicas: {{ .Values.replicas }}
+  workload: {{ default "READ_WRITE" .Values.workload }}
+  replicas: {{ default "1" .Values.replicas }}
 {{- if .Values.replicasMode }}
   replicasMode: {{ .Values.replicasMode }}
 {{- end }}
