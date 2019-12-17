@@ -1,69 +1,6 @@
 Operations
 ----------
 
-Elassandra Operator Deployment
-..............................
-
-The Elassandra operator can be beployed as a Kubernetes deployment, or useing the HELM chart **elassandra-opertor**.
-
-In order to generate X509 certificates, the Elassandra operator requires a root CA certificate and private key stored as
-Kubernetes secrets. If theses secrets does not exist when the operator is deployed, the operator automatically generates a self-signed
-root CA certificate:
-
-* Secret **ca-pub** contains the root CA certificate as a PEM file and PKCS12 keystore. (respectively named *cacert.pem* and *truststore.p12*)
-* Secret **ca-key** contains the root CA private key in a PKCS12 keystore. (named *ca.key*)
-
-.. code-block:: bash
-
-    $ kubectl describe secrets ca-key
-    Name:         ca-key
-    Namespace:    default
-    Labels:       app.kubernetes.io/managed-by=elassandra-operator
-    Annotations:  <none>
-
-    Type:  Opaque
-
-    Data
-    ====
-    ca.key:  1801 bytes
-
-    $ kubectl describe secrets ca-pub
-    Name:         ca-pub
-    Namespace:    default
-    Labels:       app.kubernetes.io/managed-by=elassandra-operator
-    Annotations:  <none>
-
-    Type:  Opaque
-
-    Data
-    ====
-    cacert.pem:      1204 bytes
-    truststore.p12:  1258 bytes
-
-.. warning:: Before deploying the operator, if you want to use backup/restore feature you have to create secrets according to the cloud storage you will use, see `Backup & Restore <backup-restore.html#restore-your-cluster>`_ for more details.
-
-Kubernetes deployment
-_____________________
-
-Create a YAML file including a Kubernetes deployment, and a service:
-
-.. code::
-
-   todo
-
-Deploy into your Kubernetes cluster:
-
-.. code::
-
-    kubectl -f apply elassandra-operator.yml
-
-HELM deployment
-_______________
-
-.. code::
-
-    helm install --namespace default --name strapkop elassandra-operator
-
 Deploy a Datacenter
 ...................
 
@@ -77,15 +14,10 @@ must be composed of the cluster name and the datacenter name separated by a dash
 
     helm install --namespace default --name mycluster-mydatacenter -f custom-values.yaml elassandra-datacenter
 
-When an Elassandra node starts, several init containers runs before starting Elassandra:
-
-* The **increase-vm-max-map-count** tune the system for Elassandra.
-* The **nodeinfo** init container retrieve information form the underlying node, including zone and public IP address if available.
-* The **commitlogs** init container replay Cassandra commitlogs, flush and stop. Because replaying commitlogs may vary depending on commitlogs size on disk, the Kubernetes liveness probe may timeout and lead to an endless restart loop.
 
 
-Get the datacenter status
-.........................
+Datacenter status
+.................
 
 The Elassandra Operator uses the elassandra-datacenter CRD to pilot the Elassandra nodes.
 To determinate what is your datacenter state, you can check the **phase** entry in the **status** section of the CRD.
@@ -123,10 +55,10 @@ If the phase is set to *ERROR*, you can check the last error message with the **
     kubectl get elassandradatacenters elassandra-mycluster-mydatacenter -o jsonpath="{$.status.lastMessage}"
 
 
-Get the node status
-...................
+Elassandra node status
+......................
 
-In the same manner as the datacenter status (see `Get the datacenter status`_) you can access to nodes status through the DataCenter CRD.
+In the same manner as the datacenter status (see `Datacenter status`_) you can access to nodes status through the datacenter CRD.
 
 .. code-block:: bash
 
@@ -164,8 +96,8 @@ Adjust Keyspace RF
 For managed keyspaces registered in the operator, the Cassandra Replication Factor can be automatically adjust according
 to the desired number of replica and the number of available nodes.
 
-Scale Up a data center
-......................
+Scale Up a datacenter
+.....................
 
 The Elassandra operator manages the addition of new Elassandra instances to match the requirement defined into the DataCenter CRD.
 Once you added new nodes into the kubernetes cluster, you can patch the DataCenter CRD with the following command.
@@ -243,3 +175,30 @@ Enable/Disable search
 
 Upgrade Elassandra
 ..................
+
+
+Kubernetes services
+...................
+
+The Elassandra Operator provisions a set of kubernetes services to access to the Running applications.
+Here is the list of services, with _cn_ and _dcn_ respectively the cluster name and the data center name you have configured in the Datacenter CRD.
+
+.. cssclass:: table-bordered
+
++-------------------------------------+------------------------------------------------------------------+
+| Name                                | Description                                                      |
++=====================================+==================================================================+
+| elassandra-<cn>-<dcn>               |  TODO |
++-------------------------------------+------------------------------------------------------------------+
+| elassandra-<cn>-<dcn>-elasticsearch | TODO  |
++-------------------------------------+------------------------------------------------------------------+
+| elassandra-<cn>-<dcn>-external      | TODO  |
++-------------------------------------+------------------------------------------------------------------+
+| elassandra-<cn>-<dcn>-kibana-kibana | TODO  |
++-------------------------------------+------------------------------------------------------------------+
+| elassandra-<cn>-<dcn>-reaper        | TODO  |
++-------------------------------------+------------------------------------------------------------------+
+| elassandra-<cn>-<dcn>-seeds         | TODO  |
++-------------------------------------+------------------------------------------------------------------+
+| myproject-elassandra-operator       | TODO  |
++-------------------------------------+------------------------------------------------------------------+

@@ -1,60 +1,46 @@
 Elassandra Operator
 ===================
 
-Elassandra Operator is a Kubernetes operator for Elassandra.
+The Elassandra Operator provides integration with Kubernetes to automate deployment and management of Elassandra Enterprise datacenters.
+By reducing the complexity of running a Cassandra/Elassandra cluster, the Elassandra operator lets you focus on the desired configuration.
 
-Elassandra Operator features
-----------------------------
+.. node::
 
-* Manage a Kuberentes statefulset of Elassandra nodes per cloud-provider zone to ensure high availability.
-* Manage Cassandra seeds when datacenters are deployed on several Kuberenetes clusters.
-* Generates SSL/TLS certificates for Elassandra nodes
-* Manage backups and restores from/to your blobstore (S3, Azure, GCS)
-* Automatically adjust the Cassandra replication factor for managed Keyspaces
+    The Elassandra Operator only runs Elassandra Enterprise cluster having a valid license.
+
+Elassandra Operator features:
+
+* Manage one `Kubernetes StatefulSet <https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/>`_ per Cassandra rack to ensure data consistency across cloud-provider zones.
+* Manage rolling configuration change, rolling upgrade/downgrade of Elassandra, scale up/down Elassandra datacenters, rolling cleanup after scale up.
+* Deploy `Cassandra Reaper <http://cassandra-reaper.io/>`_ to run continuous Cassandra repairs.
+* Deploy multiple `Kibana <https://www.elastic.co/fr/products/kibana>`_ instances with a dedicated Elasticserach index in Elassandra.
+* Efficiently expose Elassandra metrics for the `Prometheus Operator <https://prometheus.io/docs/prometheus/latest/querying/operators/>`_.
+* Manage Cassandra seeds when datacenters are deployed on several Kubernetes clusters.
+* Automatically generates SSL/TLS certificates.
 * Update Cassandra passwords when a Kubernetes secret change.
-* Create Cassandra roles and automatically grants the desired permissions on keyspaces.
-* Manage Cassandra cleanup after a scale-up
-* Allow to disable/enable Elasticsearch search on a node
-* Copy Cassandra GC logs and Heapdump on your blogbstore for analysis
-* Monitor the Elassandra JVM health and crash-it
-* Efficiently expose Elassandra metrics for the prometheus-operator
-* Deploy Cassandra reaper to ensure continuous Cassandra repairs.
-* Deploy multiple Kibana instances with a dedicated index in Elassandra.
+* Manage Cassandra backups and restores from/to your blobstore (S3, Azure, GCS)
+* Automatically adjust the Cassandra Replication Factor for managed keyspaces.
+* Create Cassandra roles and automatically grants the desired permissions on Cassandra keyspaces.
+* Automatically disable/enable Elasticsearch search on a node during maintenance operation.
 
 
-Getting started with helm
--------------------------
+How It works
+------------
 
-The Elassandra Operator is available under two helm charts, the first one install the operator and underlying resources (CRD, ServiceAccounts, Services...).
-The second one is used to define the configuration of your Elassandra Datacenter thanks to a CustomResourceDefinition.
+The Elassandra Operator extends the Kubernetes API by creating a Custom Resource Definition (CRD) defining a Cassandra/Elassandra datacenter
+and registering a custom Elassandra controller to manage one Kubernetes StatefulSet per Cassandra rack. To ensure data consistency in case of a zone failure,
+all Elassandra pods of a Cassandra rack are pinned to Kubernetes nodes located in an availability zone.
 
-Firstly, deploy a pod with an operator in your kubrenetes cluster. To see the possible values of the helm chart see `Operator Configuration <configuration.html#elassandra-operator>`_
+The Elassandra Operator can also deploy :
+* One Cassandra Reaper deployment to achieve continuous repair in the datacenter.
+* Many Kibana deployment allowing to visualize data indexed in Elasticsearch.
 
-.. code-block:: bash
+.. image:: ./images/k8s-operator.jpg
 
-    helm install --namespace default --name myproject -f custom-values.yaml elassandra-operator
+Once Elassandra pods are deployed and running, the Elassandra operator interacts through an HTTPS connection with the Elassandra sidecar container
+to periodically check the Elassandra status and execute administrative tasks like Cassandra cleanup or upload snapshotted SSTables to a remote repository.
+It also interact directly with the Elassandra container to properly manage keyspace replication factor and deploy Cassandra roles and associated permissions.
 
-Check the pod is up and running.
+.. image:: ./images/elassandra-operatror-components.jpg
 
-.. code-block:: bash
 
-      kubectl --namespace default get pods -l "app=elassandra-operator,release=myproject"
-
-Create CloudStorage secrets in order to receive the backup. (see `Backup & Restore <backup-restore.html>`_)
-Here is an example for GCP cloud storage:
-
-.. code-block:: bash
-
-   kubectl create secret generic elassandra-mycluster-backup-gcp --from-file=/path/to/gcp.json --from-literal=project_id=your_gcp_project_id
-
-Finally, deploy the elassandra-datacenter CRD definition.
-
-.. code-block:: bash
-
-    helm install --namespace default --name mycluster-mydatacenter -f custom-values.yaml elassandra-datacenter
-
-After a short period, you should have some elassandra running pods. You can list them using "elassandra" as value for the "app" label.
-
-.. code-block:: bash
-
-    kubectl --namespace default get pods -l "app=elassandra"

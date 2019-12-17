@@ -127,16 +127,29 @@ The node-reader has the following permissions:
         resources: ["pods"]
         verbs: ["get", "list", "watch"]
 
+
+Certificate management
+......................
+
+In order to generate X509 certificates, the Elassandra operator use a root CA certificate and private key stored as
+Kubernetes secrets. If theses secrets does not exist when the operator is deployed, the operator automatically generates
+a self-signed root CA certificate:
+
+* Secret **ca-pub** contains the root CA certificate as a PEM file and PKCS12 keystore. (respectively named *cacert.pem* and *truststore.p12*)
+* Secret **ca-key** contains the root CA private key in a PKCS12 keystore. (named *ca.key*)
+
 SSL/TLS Certificates
 ....................
 
-The Elassandra operator can generate TLS keystores for Elassandra nodes
+The Elassandra Operator can generate SSL/TLS keystores for Elassandra nodes:
+
 * On startup, the operator generates a self-signed root CA certificate stored in ca-pub and ca-key Kubernetes secrets if these does not exists.
-* When a datacenter is deployed, a TLS keystore is generated from the root CA certificate if it does not exists in the secret
+* When a datacenter is deployed, a SSL/TLS keystore is generated from the root CA certificate if it does not exists in the secret
 ``elassandra-[cluster]-[dc]-keystore``. This certificate has a wildcard certificate subjectAltName extension matching all Elassandra datacenter pods.
 It also have the localhost and 127.0.0.1 extensions to allow local connections.
 
 This TLS certificates and keys are used to secure:
+
 * Cassandra node-to-node and client-to-node connections
 * Cassandra JMX connection for administration and monitoring
 * Elasticsearch client request overs HTTPS and Elasticsearch inter-node transport connections
