@@ -16,9 +16,12 @@ image:
 
 kibana:
   image: docker.elastic.co/kibana/kibana-oss:6.2.3
+  spaces:
+    - name: ""
+      keyspaces: ".*"
 
 reaper:
-  image: thelastpickle/cassandra-reaper:1.4.8
+  image: strapdata.azurecr.io/strapdata/cassandra-reaper:1.4.7.1
   enabled: true
 
 # TODO: we do not support unprivileged setup yet

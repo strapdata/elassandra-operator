@@ -23,7 +23,7 @@ spec:
   {{- if .Values.image.pullSecrets }}
   imagePullSecrets:
   {{- range $pullSecret := .Values.image.pullSecrets }}
-    - name: {{ $pullSecret }}
+    - {{ $pullSecret }}
   {{- end }}
   {{- end }}
   resources:
