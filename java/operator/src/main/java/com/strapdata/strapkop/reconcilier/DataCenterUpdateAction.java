@@ -1400,8 +1400,8 @@ public class DataCenterUpdateAction {
             // kubectl create serviceaccount --namespace default nodeinfo
             // kubectl create clusterrolebinding nodeinfo-cluster-rule --clusterrole=nodeinfo --serviceaccount=default:nodeinfo
             // kubectl get serviceaccount nodeinfo -o json | jq ".secrets[0].name"
-            if (!Strings.isNullOrEmpty(System.getenv("k"))) {
-                // lookup nodeinfo secret name.
+            if (!Strings.isNullOrEmpty(System.getenv("ELASSANDRA_OPERATOR_NAME"))) {
+                // lookup nodeinfo secret name (dash and underscore forbidden by GCP)
                 String name = System.getenv("ELASSANDRA_OPERATOR_NAME")+"nodeinfo";
                 String nodeInfoSecretName = k8sResourceUtils.readNamespacedServiceAccount(dataCenterMetadata.getNamespace(), name).getSecrets().get(0).getName();
                 podSpec.addInitContainersItem(buildInitContainerNodeInfo(nodeInfoSecretName));
