@@ -104,9 +104,9 @@ public class SingleNodeTestSuite extends TestSuiteExecutor {
     protected OnSuccessAction enableReaper() {
         return (dc) -> {
             Step nextStep = this::waitReaperRegistered;
-            if (!dc.getSpec().getReaperEnabled()) {
+            if (!dc.getSpec().getReaper().getEnabled()) {
                 LOGGER.debug("[TEST] Update DC to enable Reaper");
-                dc.getSpec().setReaperEnabled(true);
+                dc.getSpec().getReaper().setEnabled(true);
                 updateDataCenterOrFail(dc);
                 LOGGER.debug("[TEST] Reaper enabled");
             } else {
@@ -138,14 +138,14 @@ public class SingleNodeTestSuite extends TestSuiteExecutor {
 
     protected Step updateSpecConfigMap(DataCenter dc) {
         // update a DC value to trigger a new finger print
-        ElassandraWorkload current = dc.getSpec().getWorkload();
+        Workload current = dc.getSpec().getWorkload();
         switch (current){
             case WRITE:
-                dc.getSpec().setWorkload(ElassandraWorkload.READ);
+                dc.getSpec().setWorkload(Workload.READ);
                 break;
             case READ:
             case READ_WRITE:
-                dc.getSpec().setWorkload(ElassandraWorkload.WRITE);
+                dc.getSpec().setWorkload(Workload.WRITE);
                 break;
         }
         LOGGER.info("[TEST] Update the DC workload from '{}' to '{}'", current, dc.getSpec().getWorkload());

@@ -10,12 +10,16 @@ nodeAffinityPolicy: STRICT
 image:
   elassandraRepository: strapdata.azurecr.io/strapdata/elassandra-node-dev
   sidecarRepository: strapdata.azurecr.io/strapdata/elassandra-sidecar-dev
-  elassandraTag: latest
-  sidecarTag: latest
+  tag: 6.2.3.22
+  pullPolicy: Always
+  pullSecrets: []
 
-imagePullPolicy: Always
-imagePullSecrets: []
+kibana:
+  image: docker.elastic.co/kibana/kibana-oss:6.2.3
 
+reaper:
+  image: thelastpickle/cassandra-reaper:1.4.8
+  enabled: true
 
 # TODO: we do not support unprivileged setup yet
 privilegedSupported: true
@@ -91,9 +95,6 @@ enterprise:
 
 
 #restoreFromBackup: backup-hostname
-
-# Cassandra reaper
-reaperEnabled: true
 
 prometheusEnabled: true
 elasticsearchEnabled: true

@@ -1,17 +1,15 @@
 # Default values for elassandra-operator.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
-
-replicaCount: 1
-
 apiVersion: stable.strapdata.com/v1
 
 image:
   repository: strapdata.azurecr.io/strapdata/elassandra-operator-dev
-  tag: latest
+  tag: 6.2.3.22
+  pullPolicy: Always
+  pullSecrets: []
 
-imagePullPolicy: Always
-imagePullSecrets: azurecr
+replicas: 1
 
 resources: {}
 # Suggested resource limits for the operator itself (not elassandra), works with a reasonable sized minikube.
