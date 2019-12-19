@@ -9,7 +9,7 @@ metadata:
     release: {{ .Release.Name }}
   name: {{ template "elassandra-operator.fullname" . }}
 spec:
-  replicas: 1
+  replicas: {{ default "1" .Values.replicas }}
   selector:
     matchLabels:
       app: {{ template "elassandra-operator.name" . }}
@@ -22,14 +22,16 @@ spec:
         operator: elassandra
         release: {{ .Release.Name }}
     spec:
+      {{- if .Values.image.pullSecrets }}
       imagePullSecrets:
-      {{- with .Values.imagePullSecrets }}
-        - name: {{ . }}
+      {{- range $pullSecret := .Values.image.pullSecrets }}
+        - name: {{ $pullSecret }}
+      {{- end }}
       {{- end }}
       containers:
         - name: {{ template "elassandra-operator.name" . }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: "{{ .Values.imagePullPolicy }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
           terminationMessagePolicy: "FallbackToLogsOnError"
 #          Uncomment and modify to change operator behaviour via start up flags
 #          command: ["java"]

@@ -5,35 +5,28 @@ import com.google.gson.annotations.SerializedName;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.UUID;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Cassandra reaper default configuration.
  */
 @Data
 @NoArgsConstructor
-public class Reaper {
+public class Kibana {
 
     /**
      * Reaper docker image;
      */
     @SerializedName("image")
     @Expose
-    private String image  = "thelastpickle/cassandra-reaper:1.4.8";
+    private String image  = "docker.elastic.co/kibana/kibana-oss:6.2.3";
 
     /**
-     * Reaper JWT secret
+     * Kibana user spaces (key = space name)
      */
-    @SerializedName("jwtSecret")
+    @SerializedName("spaces")
     @Expose
-    private String jwtSecret = UUID.randomUUID().toString();
+    private List<KibanaSpace> spaces = new ArrayList<>();
 
-
-    /**
-     * Enable Cassandra Reaper support.
-     *
-     */
-    @SerializedName("enabled")
-    @Expose
-    private Boolean enabled = false;
 }

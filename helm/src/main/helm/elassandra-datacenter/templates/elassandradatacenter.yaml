@@ -17,12 +17,14 @@ spec:
   workload: {{ default "READ_WRITE" .Values.workload }}
   replicas: {{ default "1" .Values.replicas }}
   autoScaleMode: {{ default "MANUAL" .Values.autoScaleMode }}
-  elassandraImage: "{{ .Values.image.elassandraRepository }}:{{ .Values.image.elassandraTag }}"
-  sidecarImage: "{{ .Values.image.sidecarRepository }}:{{ .Values.image.sidecarTag }}"
-  imagePullPolicy: {{ .Values.imagePullPolicy }}
+  elassandraImage: "{{ .Values.image.elassandraRepository }}:{{ .Values.image.tag }}"
+  sidecarImage: "{{ .Values.image.sidecarRepository }}:{{ .Values.image.tag }}"
+  imagePullPolicy: {{ .Values.image.pullPolicy }}
+  {{- if .Values.image.pullSecrets }}
   imagePullSecrets:
-  {{- with .Values.imagePullSecrets }}
-    - {{ . }}
+  {{- range $pullSecret := .Values.image.pullSecrets }}
+    - name: {{ $pullSecret }}
+  {{- end }}
   {{- end }}
   resources:
 {{ toYaml .Values.resources | indent 4 }}
@@ -52,9 +54,9 @@ spec:
 {{- end }}
   elasticsearchEnabled: {{ .Values.elasticsearchEnabled }}
   prometheusEnabled: {{ default "false" .Values.prometheusEnabled }}
-  reaperEnabled: {{ default "false" .Values.reaperEnabled }}
 {{- if .Values.reaper }}
   reaper:
+    enabled: {{ default "false" .Values.reaper.enabled }}
 {{- if .Values.reaper.image }}
     image:  {{ .Values.reaper.image }}
 {{- end }}
@@ -102,7 +104,13 @@ spec:
   datacenterGroup:
 {{ toYaml .Values.datacenterGroup | indent 4 }}
 {{- end }}
-{{- if .Values.kibanaSpaces }}
-  kibanaSpaces:
-{{ toYaml .Values.kibanaSpaces | indent 4 }}
+{{- if .Values.kibana }}
+  kibana:
+  {{- if .Values.kibana.image }}
+    image:  {{ .Values.kibana.image }}
+  {{- end }}
+  {{- if .Values.kibana.spaces }}
+    spaces:
+  {{ toYaml .Values.kibana.spaces | indent 4 }}
+  {{- end }}
 {{- end }}

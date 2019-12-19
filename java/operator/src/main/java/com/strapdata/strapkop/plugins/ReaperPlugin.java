@@ -57,7 +57,7 @@ public class ReaperPlugin extends AbstractPlugin {
 
     @Override
     public void syncKeyspaces(final CqlKeyspaceManager cqlKeyspaceManager, final DataCenter dataCenter) {
-        if (dataCenter.getSpec().getReaperEnabled()) {
+        if (dataCenter.getSpec().getReaper().getEnabled()) {
             cqlKeyspaceManager.addIfAbsent(dataCenter, REAPER_KEYSPACE.getName(), () -> REAPER_KEYSPACE);
         } else {
             cqlKeyspaceManager.remove(dataCenter, REAPER_KEYSPACE.getName());
@@ -79,7 +79,7 @@ public class ReaperPlugin extends AbstractPlugin {
 
     @Override
     public boolean isActive(final DataCenter dataCenter) {
-        return dataCenter.getSpec().getReaperEnabled();
+        return dataCenter.getSpec().getReaper().getEnabled();
     }
 
     @Override
@@ -100,7 +100,7 @@ public class ReaperPlugin extends AbstractPlugin {
 
     @Override
     public Completable reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
-        return (dataCenter.getSpec().getReaperEnabled()) ? createOrReplaceReaperObjects(dataCenter) : delete(dataCenter);
+        return (dataCenter.getSpec().getReaper().getEnabled()) ? createOrReplaceReaperObjects(dataCenter) : delete(dataCenter);
     }
 
     @Override

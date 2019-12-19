@@ -24,7 +24,7 @@ public class DataCenterSpec {
 
     @SerializedName("workload")
     @Expose
-    private ElassandraWorkload workload = ElassandraWorkload.WRITE;
+    private Workload workload = Workload.WRITE;
     /**
      * Number of Cassandra nodes in this data center.
      */
@@ -42,9 +42,9 @@ public class DataCenterSpec {
     @Expose
     private AutoScaleMode autoScaleMode = AutoScaleMode.MANUAL;
     
-    @SerializedName("nodeAffinityPolicy")
+    @SerializedName("podAffinityPolicy")
     @Expose
-    private ElassandraPodsAffinityPolicy elassandraPodsAffinityPolicy = ElassandraPodsAffinityPolicy.STRICT;
+    private PodsAffinityPolicy podsAffinityPolicy = PodsAffinityPolicy.STRICT;
     
     @SerializedName("elassandraImage")
     @Expose
@@ -114,13 +114,6 @@ public class DataCenterSpec {
     @Expose
     private Boolean prometheusEnabled = false;
 
-    /**
-     * Enable Cassandra Reaper support.
-     *
-     */
-    @SerializedName("reaperEnabled")
-    @Expose
-    private Boolean reaperEnabled = false;
 
     /**
      * Reaper configuration.
@@ -131,19 +124,13 @@ public class DataCenterSpec {
     private Reaper reaper = new Reaper();
 
     /**
-     * Kibana user spaces (key = space name)
+     * Kibana configuration.
+     *
      */
-    @SerializedName("kibanaSpaces")
+    @SerializedName("kibana")
     @Expose
-    private List<KibanaSpace> kibanaSpaces = new ArrayList<>();
+    private Kibana kibana = new Kibana();
 
-    /**
-     * Kibana docker image
-     */
-    @SerializedName("kibanaImage")
-    @Expose
-    private String kibanaImage = "docker.elastic.co/kibana/kibana-oss:6.2.3";
-    
     /**
      * Attempt to run privileged configuration options for better performance
      * 

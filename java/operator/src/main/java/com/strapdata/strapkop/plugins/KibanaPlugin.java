@@ -45,7 +45,7 @@ public class KibanaPlugin extends AbstractPlugin {
 
     @Override
     public void syncKeyspaces(final CqlKeyspaceManager cqlKeyspaceManager, final DataCenter dataCenter) {
-        for(KibanaSpace kibana : dataCenter.getSpec().getKibanaSpaces()) {
+        for(KibanaSpace kibana : dataCenter.getSpec().getKibana().getSpaces()) {
             cqlKeyspaceManager.addIfAbsent(dataCenter, kibana.keyspace(), () -> new CqlKeyspace()
                     .withName(kibana.keyspace())
                     .withRf(3)
@@ -55,7 +55,7 @@ public class KibanaPlugin extends AbstractPlugin {
 
     @Override
     public void syncRoles(final CqlRoleManager cqlRoleManager, final DataCenter dataCenter) {
-        for(KibanaSpace kibana : dataCenter.getSpec().getKibanaSpaces()) {
+        for(KibanaSpace kibana : dataCenter.getSpec().getKibana().getSpaces()) {
             try {
                 createKibanaSecretIfNotExists(dataCenter, kibana);
                 cqlRoleManager.addIfAbsent(dataCenter, kibana.keyspace(), () -> new CqlRole()
@@ -102,8 +102,8 @@ public class KibanaPlugin extends AbstractPlugin {
     public Completable reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
             // remove deleted kibana spaces
             Set<String> deployedKibanaSpaces = dataCenter.getStatus().getKibanaSpaces();
-            Map<String, KibanaSpace> kibanaMap = dataCenter.getSpec().getKibanaSpaces().stream().collect(Collectors.toMap(KibanaSpace::getName, Function.identity()));
-            Completable deleteCompletable = io.reactivex.Observable.fromIterable(Sets.difference(deployedKibanaSpaces, dataCenter.getSpec().getKibanaSpaces().stream().map(KibanaSpace::getName).collect(Collectors.toSet())))
+            Map<String, KibanaSpace> kibanaMap = dataCenter.getSpec().getKibana().getSpaces().stream().collect(Collectors.toMap(KibanaSpace::getName, Function.identity()));
+            Completable deleteCompletable = io.reactivex.Observable.fromIterable(Sets.difference(deployedKibanaSpaces, dataCenter.getSpec().getKibana().getSpaces().stream().map(KibanaSpace::getName).collect(Collectors.toSet())))
                     .flatMapCompletable(spaceToDelete -> {
                         logger.debug("Deleting kibana space={}", spaceToDelete);
                         dataCenter.getStatus().getKibanaSpaces().remove(spaceToDelete);
@@ -111,7 +111,7 @@ public class KibanaPlugin extends AbstractPlugin {
                     });
 
 
-            Completable createCompletable = io.reactivex.Observable.fromIterable(dataCenter.getSpec().getKibanaSpaces())
+            Completable createCompletable = io.reactivex.Observable.fromIterable(dataCenter.getSpec().getKibana().getSpaces())
                     .flatMapCompletable(kibanaSpace -> {
                         dataCenter.getStatus().getKibanaSpaces().add(kibanaSpace.getName());
                         return createOrReplaceReaperObjects(dataCenter, kibanaSpace);
@@ -122,7 +122,7 @@ public class KibanaPlugin extends AbstractPlugin {
 
     @Override
     public Completable delete(final DataCenter dataCenter) throws ApiException {
-        return Completable.mergeArray(dataCenter.getSpec().getKibanaSpaces().stream()
+        return Completable.mergeArray(dataCenter.getSpec().getKibana().getSpaces().stream()
                 .map(kibanaSpace -> delete(dataCenter, kibanaSpace))
                 .toArray(Completable[]::new));
     }
@@ -184,7 +184,7 @@ public class KibanaPlugin extends AbstractPlugin {
 
         container
                 .name("kibana")
-                .image(dataCenter.getSpec().getKibanaImage())
+                .image(dataCenter.getSpec().getKibana().getImage())
                 .terminationMessagePolicy("FallbackToLogsOnError")
                 .addPortsItem(new V1ContainerPort()
                         .name("kibana")

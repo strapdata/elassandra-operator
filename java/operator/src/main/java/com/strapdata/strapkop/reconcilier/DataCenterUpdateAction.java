@@ -900,15 +900,15 @@ public class DataCenterUpdateAction {
                 config.put("hinted_handoff_throttle_in_kb", 4096);
 
                 if (dataCenterSpec.getWorkload() != null) {
-                    if (dataCenterSpec.getWorkload().equals(ElassandraWorkload.READ)
-                            || dataCenterSpec.getWorkload().equals(ElassandraWorkload.READ_WRITE)) {
+                    if (dataCenterSpec.getWorkload().equals(Workload.READ)
+                            || dataCenterSpec.getWorkload().equals(Workload.READ_WRITE)) {
                         // because we are in a read heavy workload, we set the cache to 100MB
                         // (the max value of the auto setting -  (min(5% of Heap (in MB), 100MB)) )
                         config.put("key_cache_size_in_mb", 100);
                     }
 
-                    if (dataCenterSpec.getWorkload().equals(ElassandraWorkload.WRITE)
-                            || dataCenterSpec.getWorkload().equals(ElassandraWorkload.READ_WRITE)) {
+                    if (dataCenterSpec.getWorkload().equals(Workload.WRITE)
+                            || dataCenterSpec.getWorkload().equals(Workload.READ_WRITE)) {
                         // configure memtable_flush_writers has an influence on the memtable_cleanup_threshold (1/(nb_flush_w + 1))
                         // so we set a little bit higher value for Write Heavy Workload
                         // default is 1/(memtable_flush_writers +1) ==> 1/3
@@ -926,7 +926,7 @@ public class DataCenterUpdateAction {
                         config.put("memtable_allocation_type", "offheap_objects");
                     }
 
-                    if (dataCenterSpec.getWorkload().equals(ElassandraWorkload.READ_WRITE)) {
+                    if (dataCenterSpec.getWorkload().equals(Workload.READ_WRITE)) {
                         // The faster you insert data, the faster you need to compact in order to keep the sstable count down,
                         // but in general, setting this to 16 to 32 times the rate you are inserting data is more than sufficient.
                         config.put("compaction_throughput_mb_per_sec", 24); // default is 16 - set to 24 to increase the compaction speed
@@ -1423,7 +1423,7 @@ public class DataCenterUpdateAction {
             final V1NodeSelectorTerm nodeSelectorTerm = new V1NodeSelectorTerm()
                     .addMatchExpressionsItem(new V1NodeSelectorRequirement()
                             .key(OperatorLabels.ZONE).operator("In").addValuesItem(rack));
-            switch (dataCenterSpec.getElassandraPodsAffinityPolicy()) {
+            switch (dataCenterSpec.getPodsAffinityPolicy()) {
                 case STRICT:
                     podSpec.affinity(new V1Affinity()
                             .nodeAffinity(new V1NodeAffinity()
