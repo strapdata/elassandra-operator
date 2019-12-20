@@ -18,7 +18,7 @@ kibana:
   image: docker.elastic.co/kibana/kibana-oss:6.2.3
   spaces:
     - name: ""
-      keyspaces: ".*"
+      keyspaces: []
 
 reaper:
   image: strapdata.azurecr.io/strapdata/cassandra-reaper:1.4.7.1

@@ -52,22 +52,21 @@ spec:
   userSecretVolumeSource:
 {{ toYaml .Values.userSecretVolumeSource | indent 4 }}
 {{- end }}
-  elasticsearchEnabled: {{ .Values.elasticsearchEnabled }}
+  elasticsearchEnabled: {{ default "true" .Values.elasticsearchEnabled }}
   prometheusEnabled: {{ default "false" .Values.prometheusEnabled }}
 {{- if .Values.reaper }}
   reaper:
     enabled: {{ default "false" .Values.reaper.enabled }}
 {{- if .Values.reaper.image }}
-    image:  {{ .Values.reaper.image }}
+    image: {{ .Values.reaper.image }}
 {{- end }}
 {{- end }}
-
   privilegedSupported: {{ default "false" .Values.privilegedSupported }}
   hostPortEnabled: {{ default "false" .Values.hostPortEnabled }}
   hostNetworkEnabled: {{ default "false" .Values.hostNetworkEnabled }}
-  nativePort : {{ default "9042" .Values.nativePort | quote }}
-  storagePort : {{ default "7000" .Values.storagePort | quote }}
-  sslStoragePort : {{ default "7001" .Values.sslStoragePort | quote }}
+  nativePort: {{ default "9042" .Values.nativePort | quote }}
+  storagePort: {{ default "7000" .Values.storagePort | quote }}
+  sslStoragePort: {{ default "7001" .Values.sslStoragePort | quote }}
 {{- if .Values.jdbPort }}
   jdbPort: {{ .Values.jdbPort }}
 {{- end }}
@@ -106,11 +105,11 @@ spec:
 {{- end }}
 {{- if .Values.kibana }}
   kibana:
-  {{- if .Values.kibana.image }}
-    image:  {{ .Values.kibana.image }}
-  {{- end }}
-  {{- if .Values.kibana.spaces }}
+{{- if .Values.kibana.image }}
+    image: {{ .Values.kibana.image }}
+{{- end }}
+{{- if .Values.kibana.spaces }}
     spaces:
-  {{ toYaml .Values.kibana.spaces | indent 4 }}
-  {{- end }}
+{{ toYaml .Values.kibana.spaces | indent 4 }}
+{{- end }}
 {{- end }}
