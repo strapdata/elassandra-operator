@@ -1,5 +1,6 @@
 package com.strapdata.strapkop.plugins.test;
 
+import com.strapdata.model.Key;
 import com.strapdata.model.k8s.cassandra.*;
 import com.strapdata.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.k8s.OperatorLabels;
@@ -7,12 +8,15 @@ import com.strapdata.strapkop.plugins.test.step.OnSuccessAction;
 import com.strapdata.strapkop.plugins.test.step.Step;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.custom.Quantity;
+import io.kubernetes.client.models.V1ObjectMeta;
 import io.kubernetes.client.models.V1ResourceRequirements;
 import io.micronaut.context.annotation.Prototype;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import static com.strapdata.strapkop.plugins.test.step.StepFailedException.failed;
@@ -21,6 +25,8 @@ import static com.strapdata.strapkop.plugins.test.step.StepFailedException.faile
 public class SingleNodeTestSuite extends TestSuiteExecutor {
 
     public static final Quantity UPDATED_CPU_QUANTITY = Quantity.fromString("2500m");
+
+    private AtomicLong dcUpdates = new AtomicLong(1);
 
     @Override
     protected Step initialStep() {
@@ -69,6 +75,7 @@ public class SingleNodeTestSuite extends TestSuiteExecutor {
     }
 
     // TODO move to super class ??
+
     protected Step checkNodeAvailability(final DataCenter dc, final int expectedReplicas, final OnSuccessAction onSuccess, final Step waitingStep) {
         final DataCenterStatus status = dc.getStatus();
         // filter on NORMAL nodes
@@ -97,7 +104,37 @@ public class SingleNodeTestSuite extends TestSuiteExecutor {
                 assertEquals("Expected " + expectedReplicas + " JoinedReplicas", expectedReplicas, rackStatus.getJoinedReplicas());
             });
 
+            checkHistoryDataCenter(dc);
+
             return onSuccess.execute(dc);
+        }
+    }
+
+    /**
+     * Check that the DCSpec is stored in HistoryElassandraDataCenter CRD.
+     * @param dc
+     */
+    protected void checkHistoryDataCenter(final DataCenter dc) {
+        Key key = new Key(dc.getMetadata());
+        try {
+            DataCenter lastStableDC = k8sResourceUtils.readLastHistoryDatacenter(key).blockingGet();
+            V1ObjectMeta metadata = lastStableDC.getMetadata();
+            if (!metadata.getAnnotations().containsKey(OperatorLabels.HISTORY_DATACENTER_CREATIONDATE)){
+                failed("HistoryElassandraDataCenter instance should have the " + OperatorLabels.HISTORY_DATACENTER_CREATIONDATE + " annotation");
+            }
+            if (!(metadata.getLabels().containsKey(OperatorLabels.HISTORY_DATACENTER_GENERATION)
+                    && metadata.getLabels().containsKey(OperatorLabels.HISTORY_DATACENTER_NAME)
+                    && metadata.getLabels().containsKey(OperatorLabels.HISTORY_DATACENTER_PHASE))){
+                failed("HistoryElassandraDataCenter instance should have 3 labels (generation, name and phase)");
+            }
+
+            String stableFingerPrint = metadata.getLabels().get(OperatorLabels.HISTORY_DATACENTER_FINGERPRINT);
+            if (dc.getSpec().fingerprint().equals(stableFingerPrint)) {
+                failed("Last HistoryElassandraDataCenter instance should reference the fingerprint " + dc.getSpec().fingerprint());
+            }
+
+        } catch (Exception e) {
+            failed("Unable to check the HistoryDataCenter : " + e.getMessage());
         }
     }
 
@@ -229,6 +266,7 @@ public class SingleNodeTestSuite extends TestSuiteExecutor {
 
     private void updateDataCenterOrFail(DataCenter dc) {
         try {
+            dcUpdates.incrementAndGet();
             k8sResourceUtils.updateDataCenter(dc).subscribe();
         } catch (ApiException e) {
             LOGGER.error("[TEST] unable to update DataCenter [code : {} | body : {}]", e.getCode(), e.getResponseBody());

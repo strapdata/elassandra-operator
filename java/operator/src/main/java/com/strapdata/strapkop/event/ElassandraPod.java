@@ -1,9 +1,13 @@
 package com.strapdata.strapkop.event;
 
 import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.k8s.OperatorNames;
+import io.kubernetes.client.models.V1ObjectMeta;
+import io.kubernetes.client.models.V1Pod;
 import lombok.Data;
 
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -44,6 +48,20 @@ public class ElassandraPod {
                 .setDataCenter(dcName)
                 .setParent("elassandra-"+clusterName+"-"+dcName)
                 .setNamespace(namespace);
+    }
+
+    public static ElassandraPod fromV1Pod(final V1Pod pod) {
+        V1ObjectMeta metadata = pod.getMetadata();
+        Matcher matcher = podNamePattern.matcher(metadata.getName());
+        if (matcher.matches()) {
+            Map<String, String> labels = metadata.getLabels();
+            return new ElassandraPod(metadata.getNamespace(),
+                    labels.get(OperatorLabels.CLUSTER),
+                    labels.get(OperatorLabels.DATACENTER),
+                    metadata.getName())
+                    .setRack(labels.get(OperatorLabels.RACK));
+        }
+        throw new IllegalArgumentException("Pod name="+ metadata.getName()+" does not match expected regular expression");
     }
 
     public static ElassandraPod fromName(final DataCenter dc, final String podName) {

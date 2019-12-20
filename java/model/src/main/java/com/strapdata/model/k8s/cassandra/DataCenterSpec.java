@@ -1,23 +1,26 @@
 
 package com.strapdata.model.k8s.cassandra;
 
+import com.google.gson.Gson;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
+import com.strapdata.model.GsonUtils;
 import io.kubernetes.client.models.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.apache.commons.codec.digest.DigestUtils;
+import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 @Data
 @NoArgsConstructor
 public class DataCenterSpec {
-    
+
     @SerializedName("clusterName")
     @Expose
     private String clusterName;
-    
+
     @SerializedName("datacenterName")
     @Expose
     private String datacenterName;
@@ -45,7 +48,7 @@ public class DataCenterSpec {
     @SerializedName("podAffinityPolicy")
     @Expose
     private PodsAffinityPolicy podsAffinityPolicy = PodsAffinityPolicy.STRICT;
-    
+
     @SerializedName("elassandraImage")
     @Expose
     private java.lang.String elassandraImage;
@@ -61,10 +64,10 @@ public class DataCenterSpec {
     @SerializedName("imagePullSecrets")
     @Expose
     private List<java.lang.String> imagePullSecrets;
-    
+
     /**
      * List of environment variables to inject in the Cassandra & Sidecar container.
-     * 
+     *
      */
     @SerializedName("env")
     @Expose
@@ -72,7 +75,7 @@ public class DataCenterSpec {
 
     /**
      * Resource requirements for the Cassandra container.
-     * 
+     *
      */
     @SerializedName("resources")
     @Expose
@@ -84,7 +87,7 @@ public class DataCenterSpec {
 
     /**
      * Name of the CassandraBackup to restore from
-     * 
+     *
      */
     @SerializedName("restoreFromBackup")
     @Expose
@@ -92,7 +95,7 @@ public class DataCenterSpec {
 
     /**
      * Name of an optional config map that contains cassandra configuration in the form of yaml fragments
-     * 
+     *
      */
     @SerializedName("userConfigMapVolumeSource")
     @Expose
@@ -100,7 +103,7 @@ public class DataCenterSpec {
 
     /**
      * Name of an optional secret that contains cassandra related secrets
-     * 
+     *
      */
     @SerializedName("userSecretVolumeSource")
     @Expose
@@ -108,7 +111,7 @@ public class DataCenterSpec {
 
     /**
      * Enable Prometheus support.
-`     * `
+     `     * `
      */
     @SerializedName("prometheusEnabled")
     @Expose
@@ -133,7 +136,7 @@ public class DataCenterSpec {
 
     /**
      * Attempt to run privileged configuration options for better performance
-     * 
+     *
      */
     @SerializedName("privilegedSupported")
     @Expose
@@ -159,8 +162,6 @@ public class DataCenterSpec {
     @SerializedName("hostNetworkEnabled")
     @Expose
     private Boolean hostNetworkEnabled = false;
-
-
 
     /**
      * CQL native port (also hostPort)
@@ -256,4 +257,41 @@ public class DataCenterSpec {
     @SerializedName("datacenterGroup")
     @Expose
     private String datacenterGroup = null;
+
+
+    public String fingerprint() {
+        List<Object> acc = new ArrayList<>();
+        acc.add(workload);
+
+        // we exclude Reaper & Kibana config
+        acc.add(podsAffinityPolicy);
+        acc.add(elassandraImage);
+        acc.add(sidecarImage);
+        acc.add(imagePullPolicy);
+        acc.add(imagePullSecrets);
+        acc.add(env);
+        acc.add(resources);
+        acc.add(prometheusEnabled);
+        acc.add(elasticsearchEnabled);
+        acc.add(privilegedSupported);
+        acc.add(hostNetworkEnabled);
+        acc.add(hostPortEnabled);
+        acc.add(nativePort);
+        acc.add(storagePort);
+        acc.add(sslStoragePort);
+        acc.add(jmxPort);
+        acc.add(jmxmpOverSSL);
+        acc.add(jmxmpEnabled);
+        acc.add(jdbPort);
+        acc.add(ssl);
+        acc.add(decommissionPolicy);
+        acc.add(authentication);
+        acc.add(enterprise);
+        acc.add(remoteSeeders);
+        acc.add(remoteSeeds);
+        acc.add(datacenterGroup);
+        acc.add(userSecretVolumeSource);
+        // TODO [ELE] fully copy the configmap to include the cofgimap into the dc fingerprint
+        return DigestUtils.sha1Hex(GsonUtils.toJson(acc)).substring(0,7);
+    }
 }
