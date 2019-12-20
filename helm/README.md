@@ -52,7 +52,7 @@ kubectl create secret docker-registry azurecr \
 Upload HELM package on the Azure blogstore and in the Azure HELM repo.
 
     ./gradlew helm:uploadElassandraDatacenter
-    ./gradelw helm:uploadElassandraOperator
+    ./gradlew helm:uploadElassandraOperator
 
 ## Deploy Elassandra Operator
 
