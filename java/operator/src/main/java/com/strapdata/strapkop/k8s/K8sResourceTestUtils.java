@@ -41,13 +41,6 @@ import java.util.function.Supplier;
 public class K8sResourceTestUtils extends K8sResourceUtils{
     private static final Logger logger = LoggerFactory.getLogger(K8sResourceTestUtils.class);
 
-    public Single<Object> updateDataCenter(final DataCenter dc) throws ApiException {
-        return Single.fromCallable(() -> {
-            return customObjectsApi.patchNamespacedCustomObject("stable.strapdata.com", "v1",
-                    dc.getMetadata().getNamespace(), "elassandradatacenters", dc.getMetadata().getName(), dc);
-        });
-    }
-
     public boolean podExists(final String namespace, final String podName) throws ApiException {
         V1Pod pods = coreApi.readNamespacedPod(podName, namespace, null, null, null);
         return (pods != null);

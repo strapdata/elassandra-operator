@@ -31,8 +31,6 @@ helm-init:
 dashboard:
 	minikube dashboard
 
-
-
 deploy:
 	./gradlew :helm:helmInstallStrapkop
 
@@ -49,3 +47,21 @@ deploy-dc1:
 undeploy-dc1:
 	helm delete --purge cl1-dc1
 
+test-deploy-singlenode:
+	helm install --namespace default --name teststrapkop -f helm/src/main/base-test/values-operator-localregistry.yml helm/src/main/helm/elassandra-operator
+	echo "Wait operator pod ready"
+	sleep 10
+	helm install --namespace default --name singlenode-test -f helm/src/main/base-test/values-datacenter-singlenode-test.yml helm/src/main/helm/elassandra-datacenter
+	echo "Wait elassandra pod ready"
+	sleep 5
+	kubectl wait --for=condition=ready --timeout=360s pod/elassandra-singlenode-test-local-0
+	sleep 5
+	# execute the test suite
+	kubectl apply -f helm/src/test/singlenode/SingleNodeTestSuite.yaml
+
+test-cleanup:
+	helm delete --purge singlenode-test
+	helm delete --purge teststrapkop
+	kubectl delete crd elassandradatacenters.stable.strapdata.com historyelassandradatacenters.stable.strapdata.com elassandratasks.stable.strapdata.com
+	kubectl delete pvc data-volume-elassandra-singlenode-test-local-0
+	kubectl delete deployment.apps/elassandra-singlenode-test-kibana-kibana deployment.apps/elassandra-singlenode-test-reaper
