@@ -9,11 +9,14 @@ import com.squareup.okhttp.Call;
 import com.strapdata.model.Key;
 import com.strapdata.model.backup.*;
 import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.model.k8s.cassandra.DataCenterList;
+import com.strapdata.model.k8s.cassandra.DataCenterPhase;
 import com.strapdata.model.k8s.task.Task;
 import com.strapdata.model.k8s.task.TaskList;
 import com.strapdata.model.k8s.task.TaskPhase;
 import com.strapdata.model.k8s.task.TaskSpec;
 import com.strapdata.strapkop.StrapkopException;
+import com.strapdata.strapkop.event.ElassandraPod;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.ApiResponse;
 import io.kubernetes.client.apis.AppsV1Api;
@@ -21,10 +24,13 @@ import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.apis.CustomObjectsApi;
 import io.kubernetes.client.apis.ExtensionsV1beta1Api;
 import io.kubernetes.client.models.*;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.reactivex.Completable;
 import io.reactivex.Single;
 import io.reactivex.functions.Action;
+import org.joda.time.format.DateTimeFormatter;
+import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,9 +39,7 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.lang.reflect.Type;
 import java.nio.charset.Charset;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -257,7 +261,6 @@ public class K8sResourceUtils {
         );
     }
 
-
     public V1ServiceAccount readNamespacedServiceAccount(final String namespace, final String name) throws ApiException {
             try {
                 coreApi.getApiClient().setDebugging(true);
@@ -417,8 +420,8 @@ public class K8sResourceUtils {
     }
 
     public V1Status deleteConfigMap(final V1ConfigMap configMap) throws ApiException {
-            final V1ObjectMeta configMapMetadata = configMap.getMetadata();
-            return coreApi.deleteNamespacedConfigMap(configMapMetadata.getName(), configMapMetadata.getNamespace(), new V1DeleteOptions(), null, null, null, null, null);
+        final V1ObjectMeta configMapMetadata = configMap.getMetadata();
+        return coreApi.deleteNamespacedConfigMap(configMapMetadata.getName(), configMapMetadata.getNamespace(), new V1DeleteOptions(), null, null, null, null, null);
     }
 
     public Completable deleteStatefulSet(final V1StatefulSet statefulSet) throws ApiException {
@@ -819,6 +822,119 @@ public class K8sResourceUtils {
                     }
                     throw e;
                 }
+            }
+        });
+    }
+
+    /**
+     * Return the last committed history datacenter
+     * @param key
+     * @return
+     */
+    public Single<DataCenter> readLastHistoryDatacenter(final Key key) {
+        return Single.fromCallable(() -> {
+            Map<String, String> labels = new HashMap<>(2);
+            labels.put(OperatorLabels.HISTORY_DATACENTER_NAME, key.name);
+            labels.put(OperatorLabels.HISTORY_DATACENTER_COMMITTED, "true");
+            return searchHistoryDataCenter(key, labels);
+        });
+    }
+
+    private DataCenter searchHistoryDataCenter(Key key, Map<String, String> labelSelectors) throws ApiException {
+        try {
+            final Call call = customObjectsApi.listNamespacedCustomObjectCall("stable.strapdata.com", "v1",
+                    key.getNamespace(), "historyelassandradatacenters",null, OperatorLabels.toSelector(labelSelectors),
+                    null, null, null, null);
+            final ApiResponse<DataCenterList> apiResponse = customObjectsApi.getApiClient().execute(call, DataCenterList.class);
+
+            DataCenterList dcList = apiResponse.getData();
+            final List<DataCenter> items = dcList.getItems();
+
+            if (CollectionUtils.isEmpty(items)) {
+                logger.warn("historyelassandradatacenter not found for datacenter={} in namespace={}", key.name, key.namespace);
+                throw new StrapkopException("HistoryElassandraDataCenter not found");
+            }
+
+            // sort by Generation descending order to provide the last valid dc config
+            items.sort(Comparator.comparing((DataCenter dc) ->
+                    Integer.parseInt(dc.getMetadata().getLabels().get(OperatorLabels.HISTORY_DATACENTER_GENERATION)))
+                    .reversed());
+
+            return items.get(0);
+        } catch(ApiException e) {
+            if (e.getCode() == 404) {
+                logger.warn("historyelassandradatacenter not found for datacenter={} in namespace={}", key.name, key.namespace);
+                throw new StrapkopException("HistoryElassandraDataCenter not found", e);
+            }
+            throw e;
+        }
+    }
+
+    public Single<DataCenter> commitHistoryDataCenter(Key key, String fingerprint) throws ApiException {
+        return Single.fromCallable(() -> {
+            Map<String, String> selectors = new HashMap<>(2);
+            selectors.put(OperatorLabels.HISTORY_DATACENTER_NAME, key.name);
+            selectors.put(OperatorLabels.HISTORY_DATACENTER_FINGERPRINT, fingerprint);
+
+            // read the HistoryDataCenter and mark it as committed
+            DataCenter dc = searchHistoryDataCenter(key, selectors);
+            dc.getMetadata().getLabels().put(OperatorLabels.HISTORY_DATACENTER_COMMITTED, "true");
+
+            final Call call = customObjectsApi.patchNamespacedCustomObjectCall("stable.strapdata.com", "v1",
+                    dc.getMetadata().getNamespace(), "historyelassandradatacenters", dc.getMetadata().getName(), dc, null, null);
+            final ApiResponse<DataCenter> apiResponse = customObjectsApi.getApiClient().execute(call, DataCenter.class);
+            return apiResponse.getData();
+        });
+    }
+
+    public Single<Boolean> createIfNotExistHistoryDataCenter(DataCenter datacenter, DataCenterPhase phase, Optional<String> configMap) throws ApiException {
+        Map<String, String> labels = new HashMap<>(5);
+        labels.put(OperatorLabels.HISTORY_DATACENTER_NAME, datacenter.getMetadata().getName());
+        labels.put(OperatorLabels.HISTORY_DATACENTER_GENERATION, ""+datacenter.getMetadata().getGeneration());
+        labels.put(OperatorLabels.HISTORY_DATACENTER_COMMITTED, "false");
+        labels.put(OperatorLabels.HISTORY_DATACENTER_PHASE, phase.name());
+        labels.put(OperatorLabels.HISTORY_DATACENTER_FINGERPRINT, datacenter.getSpec().fingerprint());
+
+        Map<String, String> annotations = new HashMap<>(1);
+        annotations.put(OperatorLabels.HISTORY_DATACENTER_CREATIONDATE, datacenter.getMetadata().getCreationTimestamp().toString(ISODateTimeFormat.dateTime()));
+        configMap.ifPresent((name) -> annotations.put(OperatorLabels.HISTORY_DATACENTER_USER_CONFIGMAP, name));
+
+        V1ObjectMeta meta = new V1ObjectMeta();
+        meta.setName(OperatorNames.historyDataCenterName(datacenter.getMetadata().getName(), datacenter.getMetadata().getGeneration()));
+        meta.setAnnotations(annotations);
+        meta.setLabels(labels);
+
+        final DataCenter hedc = new DataCenter()
+                .setMetadata(meta)
+                .setSpec(datacenter.getSpec())
+                .setApiVersion("stable.strapdata.com/v1")
+                .setKind("HistoryElassandraDataCenter");
+
+       return createOrReplaceResource(
+               () -> {
+                  customObjectsApi.createNamespacedCustomObject(
+                           "stable.strapdata.com",
+                           "v1",
+                           datacenter.getMetadata().getNamespace(),
+                           "historyelassandradatacenters", hedc, null);
+                   logger.debug("Created datacenter history={}", hedc.getMetadata().getName());
+                   return Boolean.TRUE;
+               },
+               () -> Boolean.TRUE);
+    }
+
+    public Single<DataCenter> updateDataCenter(final DataCenter dc) throws ApiException {
+        return Single.fromCallable( () ->{
+            try {
+                final Call call = customObjectsApi.patchNamespacedCustomObjectCall("stable.strapdata.com", "v1",
+                        dc.getMetadata().getNamespace(), "elassandradatacenters", dc.getMetadata().getName(), dc, null, null);
+                final ApiResponse<DataCenter> apiResponse = customObjectsApi.getApiClient().execute(call, DataCenter.class);
+                return apiResponse.getData();
+            } catch(ApiException e) {
+                if (e.getCode() == 404) {
+                    logger.warn("elassandradatacenter not found for datacenter={} in namespace={}", dc.getMetadata().getName(), dc.getMetadata().getNamespace());
+                }
+                throw e;
             }
         });
     }

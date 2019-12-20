@@ -24,6 +24,8 @@ rules:
 - apiGroups:
   - stable.strapdata.com
   resources:
+  - historyelassandradatacenter
+  - historyelassandradatacenters
   - elassandradatacenter
   - elassandradatacenters
   - elassandradatacenter/status

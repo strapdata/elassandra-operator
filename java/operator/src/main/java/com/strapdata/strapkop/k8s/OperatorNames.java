@@ -6,7 +6,15 @@ import io.kubernetes.client.models.V1OwnerReference;
 import java.util.UUID;
 
 public class OperatorNames {
-    
+
+    public static String configMapUniqueName(final String name, final String fingerprint) {
+        return name + "-" + fingerprint;
+    }
+
+    public static String historyDataCenterName(final String datacenterName, final long generation) {
+        return String.format("%s-%04d", datacenterName, generation);
+    }
+
     public static String clusterChildObjectName(final String nameFormat, final DataCenter dataCenter) {
         return String.format(nameFormat, "elassandra-" + dataCenter.getSpec().getClusterName());
     }

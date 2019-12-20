@@ -27,13 +27,27 @@ public final class OperatorLabels {
     public static final String RELEASE = labelPrefix + "release";
     
     public static final String DATACENTER_GENERATION = labelPrefix + "datacenter-generation";
-    
+    public static final String DATACENTER_FINGERPRINT = labelPrefix + "datacenter-fingerprint";
+
+    public static final String HISTORY_DATACENTER_NAME = "historyelassandradatacenters.stable.strapdata.com/name";
+    public static final String HISTORY_DATACENTER_PHASE = "historyelassandradatacenters.stable.strapdata.com/from-phase";
+    public static final String HISTORY_DATACENTER_GENERATION = "historyelassandradatacenters.stable.strapdata.com/generation";
+    public static final String HISTORY_DATACENTER_COMMITTED = "historyelassandradatacenters.stable.strapdata.com/committed";
+    public static final String HISTORY_DATACENTER_CREATIONDATE = "historyelassandradatacenters.stable.strapdata.com/creationDate";
+    public static final String HISTORY_DATACENTER_FINGERPRINT = "historyelassandradatacenters.stable.strapdata.com/fingerprint";
+    public static final String HISTORY_DATACENTER_USER_CONFIGMAP = "historyelassandradatacenters.stable.strapdata.com/user-configmap";
+
     // this annotation is used to store a hash of the config map in the pod so that statefulset trigger a rolling restart
     // when the config map change
     public static final String CONFIGMAP_FINGERPRINT = labelPrefix + "configmap-fingerprint";
     
     public static final Map<String, String> MANAGED = ImmutableMap.of(
             "app.kubernetes.io/managed-by", "elassandra-operator"
+    );
+
+    public static final Map<String, String> ELASSANDRA_PODS_SELECTOR = ImmutableMap.of(
+            "app.kubernetes.io/managed-by", "elassandra-operator",
+            "app", "elassandra"
     );
 
     private OperatorLabels() {}

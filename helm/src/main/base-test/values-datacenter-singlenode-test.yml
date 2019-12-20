@@ -1,7 +1,6 @@
 # Default values for elassandra.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
-clusterName: Elassandra
 replicas: 1
 
 #restoreFromBackup:
@@ -101,7 +100,7 @@ enterprise:
 
 
 # Cassandra reaper
-reaperEnabled: true
+reaperEnabled: false
 reaper:
   image: localhost:32000/strapdata/cassandra-reaper
 

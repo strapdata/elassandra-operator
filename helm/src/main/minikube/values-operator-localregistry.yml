@@ -7,7 +7,7 @@ replicaCount: 1
 apiVersion: stable.strapdata.com/v1
 
 image:
-  repository: localhost.localdomain:5000/strapdata/strapkop-operator-dev
+  repository: localhost:32000/strapdata/elassandra-operator-dev
   tag: latest
 
 imagePullPolicy: Always
