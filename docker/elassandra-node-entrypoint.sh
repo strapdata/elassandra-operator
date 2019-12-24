@@ -34,7 +34,6 @@ fi
 
 if [ -f "/nodeinfo/public-ip" ] && [ -s "/nodeinfo/public-ip" ]; then
    PUBLIC_IP=$(cat /nodeinfo/public-ip)
-   BROADCAST_ADDRESS=$PUBLIC_IP
    BROADCAST_RPC_ADDRESS=$PUBLIC_IP
    ES_USE_INTERNAL_ADDRESS="-Des.use_internal_address=true"
 fi
