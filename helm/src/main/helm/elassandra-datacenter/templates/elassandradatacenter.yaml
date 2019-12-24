@@ -73,12 +73,8 @@ spec:
 {{- if .Values.jmxPort }}
   jmxPort: {{ .Values.jmxPort }}
 {{- end }}
-{{- if .Values.jmxmpEnabled }}
-  jmxmpEnabled: {{ .Values.jmxmpEnabled }}
-{{- end }}
-{{- if .Values.jmxmpOverSSL }}
-  jmxmpOverSSL: {{ .Values.jmxmpOverSSL }}
-{{- end }}
+  jmxmpEnabled: {{ default "false" .Values.jmxmpEnabled }}
+  jmxmpOverSSL: {{ default "false" .Values.jmxmpOverSSL }}
 {{- if .Values.ssl }}
   ssl:
 {{ toYaml .Values.ssl | indent 4 }}
