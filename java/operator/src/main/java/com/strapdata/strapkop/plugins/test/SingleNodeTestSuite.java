@@ -99,7 +99,7 @@ public class SingleNodeTestSuite extends TestSuiteExecutor {
 
             // TODO refactor as handler to test RackStatuses based on provider
             assertEquals("Expected " + expectedReplicas + " RackStatus", expectedReplicas, status.getRackStatuses().size());
-            status.getRackStatuses().forEach((rackStatus) -> {
+            status.getRackStatuses().values().forEach((rackStatus) -> {
                 assertEquals("Expected " + expectedReplicas + " RackPhase", RackPhase.RUNNING, rackStatus.getPhase());
                 assertEquals("Expected " + expectedReplicas + " JoinedReplicas", expectedReplicas, rackStatus.getJoinedReplicas());
             });

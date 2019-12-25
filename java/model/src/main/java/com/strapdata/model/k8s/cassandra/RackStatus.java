@@ -5,6 +5,8 @@ import com.google.gson.annotations.SerializedName;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
+
 @Data
 @NoArgsConstructor
 public class RackStatus {
@@ -27,4 +29,10 @@ public class RackStatus {
     @Expose
     private Integer joinedReplicas = 0;
 
+    /**
+     * Host id of the seed node in the rack.
+     */
+    @SerializedName("seedHostId")
+    @Expose
+    private UUID seedHostId = UUID.randomUUID();
 }

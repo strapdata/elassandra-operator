@@ -57,7 +57,7 @@ jib {
         ]
         mainClass = mainClassName
         ports = ['8080']
-        labels = [ description:'Strapkop Elassandra sidecar']
+        labels = [ description:'Elassandra sidecar']
     }
     extraDirectories {
         // add the source code of the thirdparty libraries under GPL & LGPL license
@@ -101,6 +101,10 @@ dependencies {
     compile "io.swagger.core.v3:swagger-annotations"
 
     compile group: 'org.glassfish.main.external', name: 'jmxremote_optional-repackaged', version: '5.0'
+
+    compile group: 'com.microsoft.azure', name: 'azure-mgmt-dns', version: '1.29.0'
+    compile group: 'com.microsoft.azure', name: 'azure', version: '1.29.0'
+    compile "com.github.akarnokd:rxjava2-interop:0.13.5"
 
     compile project(':java:model')
     compile project(':java:backup')
