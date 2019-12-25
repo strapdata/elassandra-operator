@@ -76,7 +76,7 @@ public class DataCenterStatus {
      */
     @SerializedName("rackStatuses")
     @Expose
-    private List<RackStatus> rackStatuses = new ArrayList<>();
+    private Map<String, RackStatus> rackStatuses = new HashMap<>();
 
     /**
      * Cassandra node status of pods

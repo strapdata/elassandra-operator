@@ -1,9 +1,6 @@
 package com.strapdata.strapkop.cql;
 
-import com.datastax.driver.core.Cluster;
-import com.datastax.driver.core.RemoteEndpointAwareNettySSLOptions;
-import com.datastax.driver.core.SSLOptions;
-import com.datastax.driver.core.Session;
+import com.datastax.driver.core.*;
 import com.datastax.driver.core.exceptions.AuthenticationException;
 import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.policies.DCAwareRoundRobinPolicy;
@@ -258,7 +255,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
         }
 
         // contact local nodes is boostraped or first DC in the cluster
-        boolean hasSeedBootstrapped = dc.getStatus().getRackStatuses().stream().anyMatch(s -> s.getJoinedReplicas() > 0);
+        boolean hasSeedBootstrapped = dc.getStatus().getRackStatuses().values().stream().anyMatch(s -> s.getJoinedReplicas() > 0);
         if (hasSeedBootstrapped ||
                 ((dc.getSpec().getRemoteSeeds() == null || dc.getSpec().getRemoteSeeds().isEmpty()) && (dc.getSpec().getRemoteSeeders() == null || dc.getSpec().getRemoteSeeders().isEmpty()))) {
             logger.debug("seed={} for datacenter={}", OperatorNames.nodesService(dc), dc.getMetadata().getName());

@@ -1,4 +1,12 @@
 micronaut:
+    dns:
+        subscriptionId: ${AZURE_SUBSCRIPTION_ID}
+        resourceGroup: ${AZURE_RESOURCE_GROUP}
+        clientId: ${AZURE_CLIENT_ID}
+        clientSecret: ${AZURE_CLIENT_SECRET}
+        tenantId: ${AZURE_TENANT_ID}
+        domain: ${DNS_DOMAIN}
+        ttl: ${DNS_TTL:60}
     ssl:
         enabled: ${SIDECAR_SSL_ENABLE:false}
         keyStore:
