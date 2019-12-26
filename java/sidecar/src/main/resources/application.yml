@@ -23,5 +23,8 @@ micronaut:
                     - classpath:META-INF/swagger
                     - classpath:swagger
                 mapping: /swagger/**
+sidecar:
+    dnsDomain: "${DNS_DOMAIN}"
+    dnsTtl: "${DNS_TTL:60}"
 jackson:
     module-scan: false

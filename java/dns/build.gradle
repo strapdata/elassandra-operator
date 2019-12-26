@@ -1,0 +1,39 @@
+
+plugins {
+    id 'java'
+}
+
+tasks.withType(JavaCompile) {
+    options.compilerArgs += '-Xlint:none'
+}
+
+dependencies {
+    compile 'org.projectlombok:lombok:1.18.4'
+    annotationProcessor "org.projectlombok:lombok:1.18.4"
+
+    annotationProcessor "io.micronaut:micronaut-inject-java"
+    annotationProcessor "io.micronaut:micronaut-validation"
+    annotationProcessor "io.micronaut.configuration:micronaut-openapi"
+
+    compile "io.micronaut:micronaut-http-client"
+    compile "io.micronaut:micronaut-inject"
+    compile "io.micronaut:micronaut-inject-java"
+    compile "io.micronaut:micronaut-validation"
+    compile "io.micronaut:micronaut-runtime"
+
+    testAnnotationProcessor "io.micronaut:micronaut-inject-java"
+    compile "javax.annotation:javax.annotation-api"
+
+    compile group: 'com.microsoft.azure', name: 'azure-mgmt-dns', version: '1.29.0'
+    compile group: 'com.microsoft.azure', name: 'azure', version: '1.29.0'
+    compile "com.github.akarnokd:rxjava2-interop:0.13.5"
+
+    testCompile "org.testng:testng:6.14.3"
+    testCompile "commons-io:commons-io:2.5"
+    testCompile "org.javassist:javassist:3.19.0-GA"
+
+}
+
+test {
+    useTestNG()
+}

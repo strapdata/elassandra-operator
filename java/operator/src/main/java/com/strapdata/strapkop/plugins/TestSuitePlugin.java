@@ -19,16 +19,16 @@ import io.micronaut.context.ApplicationContext;
 import io.reactivex.Completable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import static com.strapdata.strapkop.OperatorConfig.TestSuiteConfig.*;
+
 import javax.inject.Singleton;
 import java.util.concurrent.atomic.AtomicReference;
+
+import static com.strapdata.strapkop.OperatorConfig.TestSuiteConfig.Platform;
 
 @Singleton
 public class TestSuitePlugin extends AbstractPlugin implements TestSuiteHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TestSuitePlugin.class);
-
-    private OperatorConfig config;
 
     private AtomicReference<Task> runningTask = new AtomicReference<>();
     private TestSuiteExecutor testExecutor;
@@ -39,8 +39,7 @@ public class TestSuitePlugin extends AbstractPlugin implements TestSuiteHandler 
                            CoreV1Api coreApi,
                            AppsV1Api appsApi,
                            OperatorConfig config) {
-        super(context, k8sResourceUtils, authorityManager, coreApi, appsApi);
-        this.config = config;
+        super(context, k8sResourceUtils, authorityManager, coreApi, appsApi, config);
     }
 
     public TestSuiteExecutor getTestSuite(Platform platform, String testSuiteClass) {
@@ -95,10 +94,10 @@ public class TestSuitePlugin extends AbstractPlugin implements TestSuiteHandler 
      * @return
      */
     public Completable initialize(Task task, DataCenter dc) {
-        if (config.getTest().isEnabled()) {
+        if (operatorConfig.getTest().isEnabled()) {
             this.runningTask.set(task);
             TestTaskSpec testSpec = task.getSpec().getTest();
-            this.testExecutor = getTestSuite(config.getTest().getPlatform(), testSpec.getTestSuite());
+            this.testExecutor = getTestSuite(operatorConfig.getTest().getPlatform(), testSpec.getTestSuite());
             this.testExecutor.setHandler(this);
             this.testExecutor.initialize(task, dc);
         } else {
@@ -112,7 +111,7 @@ public class TestSuitePlugin extends AbstractPlugin implements TestSuiteHandler 
 
     @Override
     public boolean isActive(DataCenter dataCenter) {
-        return config.getTest().isEnabled();
+        return operatorConfig.getTest().isEnabled();
     }
 
     @Override
@@ -127,7 +126,7 @@ public class TestSuitePlugin extends AbstractPlugin implements TestSuiteHandler 
 
     @Override
     public Completable reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
-        if (config.getTest().isEnabled() && hasRunningExecutor()) {
+        if (operatorConfig.getTest().isEnabled() && hasRunningExecutor()) {
             return Completable.fromAction(() -> testExecutor.executeNextStep(this.runningTask.get(), dataCenter));
         } else {
             return Completable.complete();

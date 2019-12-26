@@ -191,3 +191,12 @@ to bootstrap the node.
     The Elassandra operator expose one seed address per rack on the HTTP endpoint ``/seeds/{namespace}/{clusterName}/{datacenterName}``.
     This endpoint can be exposed to a remote Kubernetes cluster hosting a remote Elassandra datacenter by using the
     appropriate Kubernetes service.
+
+
+External contact endpoints
+..........................
+
+The Elassandra operator can configure external DNS with public IP adresses of seeds nodes (pod 0 in each rack statefulsets):
+* When pod-0 starts, the Elassandra sidecer updates the DNS record with the current public IP of the Kubernetes node.
+* When the operator delete the datacenter, the active DNS plugin removes all DNS records from the external zone.
+

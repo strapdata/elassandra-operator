@@ -3,6 +3,7 @@ package com.strapdata.strapkop.plugins;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.strapdata.model.k8s.cassandra.*;
+import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.cql.*;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
@@ -41,8 +42,9 @@ public class ReaperPlugin extends AbstractPlugin {
                         K8sResourceUtils k8sResourceUtils,
                         AuthorityManager authorityManager,
                         CoreV1Api coreApi,
-                        AppsV1Api appsApi) {
-        super(context, k8sResourceUtils, authorityManager, coreApi, appsApi);
+                        AppsV1Api appsApi,
+                        OperatorConfig operatorConfig) {
+        super(context, k8sResourceUtils, authorityManager, coreApi, appsApi, operatorConfig);
     }
 
     public static final CqlKeyspace REAPER_KEYSPACE = new CqlKeyspace("reaper_db", 3) {
@@ -350,7 +352,7 @@ public class ReaperPlugin extends AbstractPlugin {
                 );
 
         // create reaper ingress
-        String ingressDomain = System.getenv("INGRESS_DOMAIN");
+        String ingressDomain = operatorConfig.getDnsDomain();
         final V1beta1Ingress ingress;
         if (!Strings.isNullOrEmpty(ingressDomain)) {
             String reaperAppHost = "reaper-" + dataCenterSpec.getClusterName() + "-" + dataCenterSpec.getDatacenterName() + "." + ingressDomain;

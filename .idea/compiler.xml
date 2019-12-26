@@ -20,6 +20,8 @@
       <module name="strapkop.buildSrc.test" target="1.8" />
       <module name="strapkop.java.backup.main" target="8" />
       <module name="strapkop.java.backup.test" target="1.8" />
+      <module name="strapkop.java.dns.main" target="8" />
+      <module name="strapkop.java.dns.test" target="1.8" />
       <module name="strapkop.java.k8s-addons.main" target="8" />
       <module name="strapkop.java.k8s-addons.test" target="1.8" />
       <module name="strapkop.java.model.main" target="8" />
