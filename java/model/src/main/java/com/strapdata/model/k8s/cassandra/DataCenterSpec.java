@@ -1,7 +1,6 @@
 
 package com.strapdata.model.k8s.cassandra;
 
-import com.google.gson.Gson;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 import com.strapdata.model.GsonUtils;
@@ -9,7 +8,6 @@ import io.kubernetes.client.models.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
