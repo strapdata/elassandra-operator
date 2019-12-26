@@ -262,7 +262,6 @@ public class DataCenterSpec {
     public String fingerprint() {
         List<Object> acc = new ArrayList<>();
         acc.add(workload);
-
         // we exclude Reaper & Kibana config
         acc.add(podsAffinityPolicy);
         acc.add(elassandraImage);
@@ -291,7 +290,9 @@ public class DataCenterSpec {
         acc.add(remoteSeeds);
         acc.add(datacenterGroup);
         acc.add(userSecretVolumeSource);
-        // TODO [ELE] fully copy the configmap to include the cofgimap into the dc fingerprint
+        if (userConfigMapVolumeSource != null) {
+            acc.add(userConfigMapVolumeSource);
+        }
         return DigestUtils.sha1Hex(GsonUtils.toJson(acc)).substring(0,7);
     }
 }
