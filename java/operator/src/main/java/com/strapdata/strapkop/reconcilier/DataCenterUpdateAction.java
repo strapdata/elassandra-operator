@@ -372,7 +372,6 @@ public class DataCenterUpdateAction {
                                     logger.debug("First node NORMAL of rack={}", movingZone.name);
                                 }
 
-                                // commit the DataCenterSpec only if all STS use the same datacenter fingerprint
                                 commitDataCenterSnapshot(zones);
 
                                 break;
@@ -412,6 +411,9 @@ public class DataCenterUpdateAction {
                                     logger.info("All replicas are running in rack={}, Scheduling issue was resolved, Datacenter is back to stable state",  movingZone.name);
                                     movingRack.setPhase(RackPhase.RUNNING);
                                     updateDatacenterStatus(DataCenterPhase.RUNNING, zones, rackStatusByName);
+
+                                    commitDataCenterSnapshot(zones);
+
                                 } else if (dataCenterStatus.getPhase().equals(DataCenterPhase.ROLLING_BACK)){
                                     V1StatefulSet v1StatefulSet = movingZone.getSts().get();
                                     String rack = v1StatefulSet.getSpec().getTemplate().getMetadata().getLabels().get("rack");
@@ -583,7 +585,7 @@ public class DataCenterUpdateAction {
                                 // so we also have to backup the DataCenterSpec.
                                 if (firstStateFulSet) {
                                     todo = todo.andThen(Completable.fromCallable(() -> {
-                                        prepareDataCenterSnapshot(dataCenterStatus.getPhase(), sts);
+                                        prepareDataCenterSnapshot(firstStateFulSet ? DataCenterPhase.CREATING : dataCenterStatus.getPhase(), sts);
                                         return sts;
                                     }));
                                 }
@@ -737,9 +739,32 @@ public class DataCenterUpdateAction {
 
         public ConfigMapVolumeMountBuilder(final V1ConfigMap configMap, final V1ConfigMapVolumeSource volumeSource, final String mountName, final String mountPath) {
             this.configMap = configMap;
-            this.volumeSource = volumeSource;
             this.mountName = mountName;
             this.mountPath = mountPath;
+            if (volumeSource != null) {
+                // copy the volume source to avoid name change when makeUnique is call
+                // otherwise the datacenterSpec fingerprint will change too
+                this.volumeSource = new V1ConfigMapVolumeSource();
+                this.volumeSource.setName(volumeSource.getName());
+                if (volumeSource.isOptional() != null) {
+                    this.volumeSource.setOptional(volumeSource.isOptional().booleanValue());
+                }
+                if (volumeSource.getDefaultMode() != null) {
+                    this.volumeSource.setDefaultMode(volumeSource.getDefaultMode().intValue());
+                }
+                if (volumeSource.getItems() != null) {
+                    List<V1KeyToPath> items = new ArrayList<>();
+                    this.volumeSource.setItems(items);
+                    for (V1KeyToPath src : volumeSource.getItems()) {
+                        items.add(new V1KeyToPath()
+                                .key(src.getKey())
+                                .path(src.getPath())
+                                .mode(src.getMode()));
+                    }
+                }
+            } else {
+                this.volumeSource = null;
+            }
         }
 
         public ConfigMapVolumeMountBuilder makeUnique() {

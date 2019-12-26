@@ -124,12 +124,14 @@ public class SingleNodeTestSuite extends TestSuiteExecutor {
             }
             if (!(metadata.getLabels().containsKey(OperatorLabels.HISTORY_DATACENTER_GENERATION)
                     && metadata.getLabels().containsKey(OperatorLabels.HISTORY_DATACENTER_NAME)
-                    && metadata.getLabels().containsKey(OperatorLabels.HISTORY_DATACENTER_PHASE))){
-                failed("HistoryElassandraDataCenter instance should have 3 labels (generation, name and phase)");
+                    && metadata.getLabels().containsKey(OperatorLabels.HISTORY_DATACENTER_PHASE)
+                    && metadata.getLabels().containsKey(OperatorLabels.HISTORY_DATACENTER_FINGERPRINT)
+                    && metadata.getLabels().containsKey(OperatorLabels.HISTORY_DATACENTER_COMMITTED))){
+                failed("HistoryElassandraDataCenter instance should have 5 labels (committed, fingerprint, generation, name and phase)");
             }
 
             String stableFingerPrint = metadata.getLabels().get(OperatorLabels.HISTORY_DATACENTER_FINGERPRINT);
-            if (dc.getSpec().fingerprint().equals(stableFingerPrint)) {
+            if (!dc.getSpec().fingerprint().equals(stableFingerPrint)) {
                 failed("Last HistoryElassandraDataCenter instance should reference the fingerprint " + dc.getSpec().fingerprint());
             }
 
