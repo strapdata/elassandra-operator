@@ -20,9 +20,20 @@ resources: {}
 #    cpu: 100m
 #    memory: 50Mi
 
+# DNS external updater for contact point
+dns:
+  ttl: 60
+  domain: "941a7aa2-kube1-azure-northeurope.azure.strapcloud.com"
+  azure:
+    secretName: "azure-dns-spn"
+
 env:
-#  NODEINFO_SECRET: "nodeinfo-token-lqfhl"
-#  INGRESS_DOMAIN: "941a7aa2-kube1-azure-northeurope.azure.strapcloud.com"
+#  DNS_DOMAIN
+#  DNS_AZURE_CLIENT_ID:
+#  DNS_AZURE_TENANT_ID:
+#  DNS_AZURE_CLIENT_SECRET:
+#  DNS_AZURE_SUBSCRIPTION_ID:
+#  DNS_AZURE_RESOURCE_GROUP:
 #  K8S_API_DEBUG: true
 
 ingress:

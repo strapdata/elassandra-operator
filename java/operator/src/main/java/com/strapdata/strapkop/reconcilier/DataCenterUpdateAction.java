@@ -11,6 +11,7 @@ import com.strapdata.model.Key;
 import com.strapdata.model.backup.CloudStorageSecret;
 import com.strapdata.model.k8s.cassandra.*;
 import com.strapdata.model.sidecar.ElassandraNodeStatus;
+import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.cql.*;
@@ -95,6 +96,8 @@ public class DataCenterUpdateAction {
     private final CqlLicenseManager cqlLicenseManager;
     private final CqlKeyspaceManager cqlKeyspaceManager;
 
+    private final OperatorConfig operatorConfig;
+
     private final ManifestReaderFactory manifestReaderFactory;
 
     private final ElassandraNodeStatusCache elassandraNodeStatusCache;
@@ -112,13 +115,15 @@ public class DataCenterUpdateAction {
                                   final SidecarClientFactory sidecarClientFactory,
                                   @Parameter("dataCenter") com.strapdata.model.k8s.cassandra.DataCenter dataCenter,
                                   final CqlLicenseManager cqlLicenseManager,
-                                  final ManifestReaderFactory factory) {
+                                  final ManifestReaderFactory factory,
+                                  final OperatorConfig operatorConfig) {
         this.context = context;
         this.coreApi = coreApi;
         this.appsApi = appsApi;
         this.customObjectsApi = customObjectsApi;
         this.k8sResourceUtils = k8sResourceUtils;
         this.authorityManager = authorityManager;
+        this.operatorConfig = operatorConfig;
 
         this.dataCenter = dataCenter;
         this.dataCenterMetadata = dataCenter.getMetadata();
@@ -1487,6 +1492,10 @@ public class DataCenterUpdateAction {
                             .name("cassandra-log-volume")
                             .mountPath("/var/log/cassandra")
                     )
+                    .addVolumeMountsItem(new V1VolumeMount()
+                            .name("nodeinfo")
+                            .mountPath("/nodeinfo")
+                    )
                     .addEnvItem(new V1EnvVar().name("NAMESPACE").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.namespace"))))
                     .addEnvItem(new V1EnvVar().name("POD_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.name"))))
                     .addEnvItem(new V1EnvVar().name("POD_IP").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("status.podIP"))))
@@ -1495,6 +1504,9 @@ public class DataCenterUpdateAction {
                     .addEnvItem(new V1EnvVar().name("SIDECAR_SSL_ENABLE").value(dataCenterSpec.getSsl().toString()))
                     .addEnvItem(new V1EnvVar().name("SEED_HOST_ID").value(rackStatus.getSeedHostId().toString()))
                     ;
+
+            if (operatorConfig.getDnsAzureSecretName() != null)
+                addDnsAzureServicePrincipal(sidecarContainer, operatorConfig.getDnsAzureSecretName());
 
             if (dataCenterSpec.getSsl()) {
                 sidecarContainer
@@ -1743,7 +1755,7 @@ public class DataCenterUpdateAction {
                                 .name("data-volume")
                                 .mountPath("/var/lib/cassandra")
                         );
-                initializeBlobCredentialsForBackup(podSpec, restoreInitContainer, restoreFromBackup);
+                addBlobCredentialsForBackup(podSpec, restoreInitContainer, restoreFromBackup);
                 podSpec.addInitContainersItem(restoreInitContainer);
             }
 
@@ -1805,41 +1817,41 @@ public class DataCenterUpdateAction {
             }
         }
 
-        private void initializeBlobCredentialsForBackup(V1PodSpec podSpec, V1Container container, Restore restoreFrom) {
+        private void addBlobCredentialsForBackup(V1PodSpec podSpec, V1Container container, Restore restoreFrom) {
             k8sResourceUtils.readAndValidateStorageSecret(dataCenterMetadata.getNamespace(), restoreFrom.getSecretRef(), restoreFrom.getProvider());
             switch (restoreFrom.getProvider()) {
                 case AZURE_BLOB:
-                    initAzureBlobCredentiaksForBackup(container, restoreFrom.getSecretRef());
+                    addAzureBlobCredentiaksForBackup(container, restoreFrom.getSecretRef());
                     break;
                 case GCP_BLOB:
-                    initGCPBlobCredentialsForBackup(podSpec, container, restoreFrom.getSecretRef());
+                    addGCPBlobCredentialsForBackup(podSpec, container, restoreFrom.getSecretRef());
                     break;
                 case AWS_S3:
-                    initAWSBlobCredentialsForBackup(container, restoreFrom.getSecretRef());
+                    addAWSBlobCredentialsForBackup(container, restoreFrom.getSecretRef());
                     break;
             }
         }
 
-        private void initAzureDnsServicePrincipal(V1Container container, String secretName) {
-            container.addEnvItem(buildEnvVarFromSecret("AZURE_SUBSCRIPTION_ID", DnsUpdateSecretsKeys.AZURE_SUBSCRIPTION_ID, secretName))
-                    .addEnvItem(buildEnvVarFromSecret("AZURE_RESOURCE_GROUP",  DnsUpdateSecretsKeys.AZURE_RESOURCE_GROUP, secretName))
-                    .addEnvItem(buildEnvVarFromSecret("AZURE_CLIENT_ID",  DnsUpdateSecretsKeys.AZURE_CLIENT_ID, secretName))
-                    .addEnvItem(buildEnvVarFromSecret("AZURE_CLIENT_SECRET",  DnsUpdateSecretsKeys.AZURE_CLIENT_SECRET, secretName))
-                    .addEnvItem(buildEnvVarFromSecret("AZURE_TENANT_ID",  DnsUpdateSecretsKeys.AZURE_TENANT_ID, secretName));
+        private void addDnsAzureServicePrincipal(V1Container container, String secretName) {
+            container.addEnvItem(buildEnvVarFromSecret("DNS_AZURE_SUBSCRIPTION_ID", DnsUpdateSecretsKeys.AZURE_SUBSCRIPTION_ID, secretName))
+                    .addEnvItem(buildEnvVarFromSecret("DNS_AZURE_RESOURCE_GROUP",  DnsUpdateSecretsKeys.AZURE_RESOURCE_GROUP, secretName))
+                    .addEnvItem(buildEnvVarFromSecret("DNS_AZURE_CLIENT_ID",  DnsUpdateSecretsKeys.AZURE_CLIENT_ID, secretName))
+                    .addEnvItem(buildEnvVarFromSecret("DNS_AZURE_CLIENT_SECRET",  DnsUpdateSecretsKeys.AZURE_CLIENT_SECRET, secretName))
+                    .addEnvItem(buildEnvVarFromSecret("DNS_AZURE_TENANT_ID",  DnsUpdateSecretsKeys.AZURE_TENANT_ID, secretName));
         }
 
-        private void initAzureBlobCredentiaksForBackup(V1Container container, String secretName) {
+        private void addAzureBlobCredentiaksForBackup(V1Container container, String secretName) {
             container.addEnvItem(buildEnvVarFromSecret("AZURE_STORAGE_ACCOUNT", CloudStorageSecretsKeys.AZURE_STORAGE_ACCOUNT_NAME, secretName))
                     .addEnvItem(buildEnvVarFromSecret("AZURE_STORAGE_KEY",  CloudStorageSecretsKeys.AZURE_STORAGE_ACCOUNT_KEY, secretName));
         }
 
-        private void initAWSBlobCredentialsForBackup(V1Container container, String secretName) {
+        private void addAWSBlobCredentialsForBackup(V1Container container, String secretName) {
             container.addEnvItem(buildEnvVarFromSecret("AWS_REGION", CloudStorageSecretsKeys.AWS_ACCESS_KEY_REGION, secretName))
                     .addEnvItem(buildEnvVarFromSecret("AWS_ACCESS_KEY_ID",  CloudStorageSecretsKeys.AWS_ACCESS_KEY_ID, secretName))
                     .addEnvItem(buildEnvVarFromSecret("AWS_SECRET_ACCESS_KEY", CloudStorageSecretsKeys.AWS_ACCESS_KEY_SECRET, secretName));
         }
 
-        private void initGCPBlobCredentialsForBackup(V1PodSpec podSpec, V1Container container, String secretName) {
+        private void addGCPBlobCredentialsForBackup(V1PodSpec podSpec, V1Container container, String secretName) {
             final String volumeName = container.getName() + "gcp-secret-volume";
             podSpec.addVolumesItem(new V1Volume()
                     .name(volumeName)

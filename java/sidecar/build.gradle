@@ -45,6 +45,7 @@ jib {
                     '-XX:MaxRAMFraction=2',
                     '-XX:+ExitOnOutOfMemoryError',
                     '-XshowSettings:vm',
+                    '-Djavax.net.debug=all',
                     '-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005',
                     /*
                     '-Dcom.sun.management.jmxremote',
@@ -102,10 +103,7 @@ dependencies {
 
     compile group: 'org.glassfish.main.external', name: 'jmxremote_optional-repackaged', version: '5.0'
 
-    compile group: 'com.microsoft.azure', name: 'azure-mgmt-dns', version: '1.29.0'
-    compile group: 'com.microsoft.azure', name: 'azure', version: '1.29.0'
-    compile "com.github.akarnokd:rxjava2-interop:0.13.5"
-
+    compile project(':java:dns')
     compile project(':java:model')
     compile project(':java:backup')
 }

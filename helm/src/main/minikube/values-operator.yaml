@@ -24,7 +24,7 @@ resources: {}
 
 env:
   NODEINFO_SECRET: "nodeinfo-token-zhfc7"
-  INGRESS_DOMAIN: "minikube.strapcloud.localnet"
+  DNS_DOMAIN: "minikube.strapcloud.localnet"
 
 ingress:
   enabled: true

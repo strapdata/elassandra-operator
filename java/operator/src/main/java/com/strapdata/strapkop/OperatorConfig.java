@@ -1,8 +1,6 @@
 package com.strapdata.strapkop;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.Property;
 import lombok.Getter;
 
 import javax.validation.constraints.NotBlank;
@@ -16,6 +14,22 @@ public class OperatorConfig {
     
     @NotBlank
     String namespace;
+
+
+    /**
+     * The secret containing azure information for dns dynamic updates, mounted as env variables by the sidecar.
+     */
+    String dnsAzureSecretName;
+
+    /**
+     * DNS domain name when deploying ingress for plugins and registering DNS record for seed nodes.
+     */
+    String dnsDomain;
+
+    /**
+     * DNS ttl when registering DNS record for seed nodes
+     */
+    int dnsTtl;
 
     TestSuiteConfig test = new TestSuiteConfig();
 

@@ -13,7 +13,10 @@ jackson:
     module-scan: false
 
 operator:
-    namespace: ${OPERATOR_NAMESPACE:default}
+    namespace: "${OPERATOR_NAMESPACE:default}"
+    dnsDomain: "${DNS_DOMAIN}"
+    dnsTtl: "${DNS_TTL:60}"
+    dnsAzureSecretName: "${DNS_AZURE_SECRET_NAME:azure-dns-spn}"
     test:
-        enabled: ${TESTSUITE_ENABLE:false}
-        platform: ${TESTSUITE_PLATFORM:LOCAL}
+        enabled: "${TESTSUITE_ENABLE:false}"
+        platform: "${TESTSUITE_PLATFORM:LOCAL}"
