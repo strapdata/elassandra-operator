@@ -1,5 +1,6 @@
 package com.strapdata.strapkop.plugins;
 
+import com.strapdata.dns.DnsConfiguration;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.reconcilier.DataCenterUpdateReconcilier;
@@ -19,19 +20,21 @@ public abstract class AbstractPlugin implements Plugin {
     final CoreV1Api coreApi;
     final AppsV1Api appsApi;
     final OperatorConfig operatorConfig;
+    final DnsConfiguration dnsConfiguration;
 
     public AbstractPlugin(final ApplicationContext context,
                           K8sResourceUtils k8sResourceUtils,
                           AuthorityManager authorityManager,
                           CoreV1Api coreApi,
                           AppsV1Api appsApi,
-                          OperatorConfig operatorConfig) {
+                          OperatorConfig operatorConfig,
+                          DnsConfiguration dnsConfiguration) {
         this.context = context;
         this.k8sResourceUtils = k8sResourceUtils;
         this.authorityManager = authorityManager;
         this.coreApi = coreApi;
         this.appsApi = appsApi;
         this.operatorConfig = operatorConfig;
+        this.dnsConfiguration = dnsConfiguration;
     }
-
 }

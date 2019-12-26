@@ -3,6 +3,7 @@ package com.strapdata.strapkop.plugins;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
+import com.strapdata.dns.DnsConfiguration;
 import com.strapdata.model.k8s.cassandra.*;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
@@ -41,8 +42,9 @@ public class KibanaPlugin extends AbstractPlugin {
                         AuthorityManager authorityManager,
                         CoreV1Api coreApi,
                         AppsV1Api appsApi,
-                        OperatorConfig operatorConfig) {
-        super(context, k8sResourceUtils, authorityManager, coreApi, appsApi, operatorConfig);
+                        OperatorConfig operatorConfig,
+                        DnsConfiguration dnsConfiguration) {
+        super(context, k8sResourceUtils, authorityManager, coreApi, appsApi, operatorConfig, dnsConfiguration);
     }
 
     @Override
@@ -293,7 +295,7 @@ public class KibanaPlugin extends AbstractPlugin {
                             ));
                 })
                 .flatMap(s -> {
-                    String ingressDomain = operatorConfig.getDnsDomain();
+                    String ingressDomain = dnsConfiguration.getDomain();
                     if (!Strings.isNullOrEmpty(ingressDomain)) {
                         String kibanaHost = space.name() + "-" + dataCenterSpec.getClusterName() + "-" + dataCenterSpec.getDatacenterName() + "." + ingressDomain;
                         logger.trace("Creating kibana ingress for host={}", kibanaHost);

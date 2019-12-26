@@ -21,16 +21,6 @@ public class OperatorConfig {
      */
     String dnsAzureSecretName;
 
-    /**
-     * DNS domain name when deploying ingress for plugins and registering DNS record for seed nodes.
-     */
-    String dnsDomain;
-
-    /**
-     * DNS ttl when registering DNS record for seed nodes
-     */
-    int dnsTtl;
-
     TestSuiteConfig test = new TestSuiteConfig();
 
     @Getter

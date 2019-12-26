@@ -24,7 +24,8 @@ micronaut:
                     - classpath:swagger
                 mapping: /swagger/**
 sidecar:
-    dnsDomain: "${DNS_DOMAIN}"
-    dnsTtl: "${DNS_TTL:60}"
+    dns:
+        domain: "${DNS_DOMAIN}"
+        ttl: "${DNS_TTL:60}"
 jackson:
     module-scan: false
