@@ -2,7 +2,7 @@ package com.strapdata.strapkop.sidecar.services;
 
 
 import com.strapdata.dns.AzureDnsUpdater;
-import com.strapdata.strapkop.sidecar.SidecarConfiguration;
+import com.strapdata.dns.DnsConfiguration;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.discovery.event.ServiceStartedEvent;
 
@@ -15,9 +15,13 @@ import java.io.IOException;
 @Singleton
 public class DnsService extends AzureDnsUpdater implements ApplicationEventListener<ServiceStartedEvent> {
 
-    public DnsService(SidecarConfiguration sidecarConfiguration) throws IOException {
-        super(sidecarConfiguration.dnsDomain, sidecarConfiguration.dnsTtl);
+    public DnsService(DnsConfiguration dnsConfiguration) throws IOException {
+        super(dnsConfiguration);
     }
 
+    // trigger dns update on startup
+    public void onApplicationEvent(final ServiceStartedEvent event) {
+        onStart(event);
+    }
 }
 

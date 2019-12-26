@@ -7,8 +7,6 @@ import com.microsoft.azure.credentials.AzureTokenCredentials;
 import com.microsoft.azure.management.Azure;
 import com.microsoft.rest.LogLevel;
 import hu.akarnokd.rxjava.interop.RxJavaInterop;
-import io.micronaut.context.event.ApplicationEventListener;
-import io.micronaut.discovery.event.ServiceStartedEvent;
 import io.reactivex.Completable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,15 +19,15 @@ import java.util.HashMap;
  * Manage public DNS records on Azure
  */
 @Singleton
-public class AzureDnsUpdater extends DnsUpdater implements ApplicationEventListener<ServiceStartedEvent> {
+public class AzureDnsUpdater extends DnsUpdater {
 
     private static final Logger logger = LoggerFactory.getLogger(AzureDnsUpdater.class);
 
     Azure azure;
     String resourceGroup;
 
-    public AzureDnsUpdater(String dnsDomain, int dnsTtl) throws IOException {
-        super(dnsDomain, dnsTtl);
+    public AzureDnsUpdater(DnsConfiguration dnsConfiguration) throws IOException {
+        super(dnsConfiguration);
 
         String clientId = System.getenv("DNS_AZURE_CLIENT_ID");
         String tenantId = System.getenv("DNS_AZURE_TENANT_ID");
@@ -70,14 +68,14 @@ public class AzureDnsUpdater extends DnsUpdater implements ApplicationEventListe
     public Completable updateDnsARecord(String name, String externalIp) {
         if (azure == null)
             throw new IllegalStateException("Azure authentication failed");
-        return RxJavaInterop.toV2Observable(azure.dnsZones().getByResourceGroupAsync(this.resourceGroup, dnsDomain)
+        return RxJavaInterop.toV2Observable(azure.dnsZones().getByResourceGroupAsync(this.resourceGroup, dnsConfiguration.domain)
                 .flatMap(zone -> {
                     logger.debug("creating DNS records {} = {}", name, externalIp);
                     return zone.update()
                             // A name = externalIP
                             .defineARecordSet(name)
                             .withIPv4Address(externalIp)
-                            .withTimeToLive(this.dnsTtl).attach()
+                            .withTimeToLive(dnsConfiguration.ttl).attach()
                             .applyAsync();
                 })).ignoreElements();
     }
@@ -91,7 +89,7 @@ public class AzureDnsUpdater extends DnsUpdater implements ApplicationEventListe
         logger.debug("deleting DNS record name={}", name);
         if (azure == null)
             throw new IllegalStateException("Azure authentication failed");
-        return RxJavaInterop.toV2Observable(azure.dnsZones().getByResourceGroupAsync(resourceGroup, dnsDomain)
+        return RxJavaInterop.toV2Observable(azure.dnsZones().getByResourceGroupAsync(resourceGroup, dnsConfiguration.domain)
                 .flatMap(zone -> {
                     logger.debug("deleting DNS records {}", name);
                     return zone.update()

@@ -1,5 +1,6 @@
 package com.strapdata.strapkop.plugins;
 
+import com.strapdata.dns.DnsConfiguration;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.k8s.task.Task;
 import com.strapdata.model.k8s.task.TaskPhase;
@@ -38,8 +39,9 @@ public class TestSuitePlugin extends AbstractPlugin implements TestSuiteHandler 
                            AuthorityManager authorityManager,
                            CoreV1Api coreApi,
                            AppsV1Api appsApi,
-                           OperatorConfig config) {
-        super(context, k8sResourceUtils, authorityManager, coreApi, appsApi, config);
+                           OperatorConfig config,
+                           DnsConfiguration dnsConfiguration) {
+        super(context, k8sResourceUtils, authorityManager, coreApi, appsApi, config, dnsConfiguration);
     }
 
     public TestSuiteExecutor getTestSuite(Platform platform, String testSuiteClass) {
