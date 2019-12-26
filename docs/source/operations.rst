@@ -108,6 +108,179 @@ Once you added new nodes into the kubernetes cluster, you can patch the DataCent
 
 Until the number of replicas is reach the DataCenter phase will have the *SCALING_UP* value to end with *RUNNING* once all new nodes are up and running.
 
+Rollback CRD
+.................
+
+To update a Datacenter configuration, you have to change the datacenter CRD using the kubectl *patch* command.
+When a new configuration can't be applied, for example when you request to mush CPU for an elassandra node, the elassandra pod will stay in a pending state and the datacenter status will enter in the *ERROR* phase.
+The updated StatefulSet with this new configuration will enter in the  *SCHEDULING_PENDING* phase.
+
+Here is a status example :
+
+.. code-block:: bash
+  status:
+    cqlStatus: ESTABLISHED
+    cqlStatusMessage: Connected to cluster=[cltest] with role=[elassandra_operator]
+      secret=[elassandra-cltest/cassandra.elassandra_operator_password]
+    elassandraNodeStatuses:
+      elassandra-cltest-dc1-0-0: UNKNOWN
+      elassandra-cltest-dc1-1-0: NORMAL
+      elassandra-cltest-dc1-2-0: NORMAL
+    joinedReplicas: 3
+    keyspaceManagerStatus:
+      keyspaces:
+      - _kibana
+      replicas: 3
+    kibanaSpaces:
+    - ""
+    lastMessage: Unable to schedule Pod elassandra-cltest-dc1-0-0
+    needCleanup: false
+    phase: ERROR
+    rackStatuses:
+    - joinedReplicas: 1
+      name: "0"
+      phase: SCHEDULING_PENDING
+    - joinedReplicas: 1
+      name: "1"
+      phase: RUNNING
+    - joinedReplicas: 1
+      name: "2"
+      phase: RUNNING
+    readyReplicas: 2
+    reaperPhase: ROLE_CREATED
+    replicas: 3
+
+In this situation, you can't update the CRD because the operator will stop the reconciliation to preserve working nodes.
+
+To solve this kind of issue, the operator keep the datacenter history to know which version was reconciled successfully in order to rollback on the previous working configuration.
+
+Here is the procedure to rollback to the previous stable datacener CRD:
+
+* list pods
+* create a port-forward to the operator pod in order to call the rollback endpoint
+* request a rollback
+* identify the pending pods and delete them
+
+
+.. code-block:: bash
+  # list pods
+  kubectl get pods
+  NAME                                                     READY   STATUS    RESTARTS   AGE
+  elassandra-cltest-dc1-0-0                                0/2     Pending   0          13m
+  elassandra-cltest-dc1-1-0                                2/2     Running   0          23m
+  elassandra-cltest-dc1-2-0                                2/2     Running   0          19m
+  strapkop-elassandra-operator-f9d4d4454-88pkm             1/1     Running   0          31m
+
+  # create a port-forward to the operator pod
+  kubectl port-forward strapkop-elassandra-operator-f9d4d4454-88pkm 8080:8080
+
+  # request the rollback endpoint
+  curl -vv -X POST "http://localhost:8080/datacenter/default/clteste/dc1/rollback"
+  *   Trying 127.0.0.1...
+  * Connected to localhost (127.0.0.1) port 8080 (#0)
+  > POST /datacenter/default/cltest/dc1/rollback HTTP/1.1
+  > Host: localhost:8080
+  > User-Agent: curl/7.47.0
+  > Accept: */*
+  >
+  < HTTP/1.1 202 Accepted
+  < Date: Thu, 26 Dec 2019 16:15:07 GMT
+  < connection: keep-alive
+  < transfer-encoding: chunked
+  <
+  * Connection #0 to host localhost left intact
+
+  # The Datacenter phase should be "UPDATING"
+  kubectl get edc elassandra-cltest-dc1
+  ...
+  status:
+    cqlStatus: ESTABLISHED
+    cqlStatusMessage: Connected to cluster=[cltest] with role=[elassandra_operator]
+      secret=[elassandra-cltest/cassandra.elassandra_operator_password]
+    elassandraNodeStatuses:
+      elassandra-cltest-dc1-0-0: UNKNOWN
+      elassandra-cltest-dc1-1-0: NORMAL
+      elassandra-cltest-dc1-2-0: NORMAL
+    joinedReplicas: 3
+    keyspaceManagerStatus:
+      keyspaces:
+      - _kibana
+      replicas: 3
+    kibanaSpaces:
+    - ""
+    lastMessage: ""
+    needCleanup: false
+    phase: UPDATING
+    rackStatuses:
+    - joinedReplicas: 1
+      name: "0"
+      phase: SCHEDULING_PENDING
+    - joinedReplicas: 1
+      name: "1"
+      phase: RUNNING
+    - joinedReplicas: 1
+      name: "2"
+      phase: RUNNING
+    readyReplicas: 2
+    reaperPhase: ROLE_CREATED
+    replicas: 3
+
+  # now, identify the pending pods ...
+  kubectl get pods
+  NAME                                                     READY   STATUS    RESTARTS   AGE
+  elassandra-cltest-dc1-0-0                                0/2     Pending   0          13m
+  elassandra-cltest-dc1-1-0                                2/2     Running   0          23m
+  elassandra-cltest-dc1-2-0                                2/2     Running   0          19m
+  strapkop-elassandra-operator-f9d4d4454-88pkm             1/1     Running   0          31m
+
+  # ... and delete them
+  kubectl delete pod elassandra-cltest-dc1-0-0
+
+  # the pod will restart with the new Statefulset configuration
+  kubectl get pods
+  NAME                                                     READY   STATUS    RESTARTS   AGE
+  elassandra-cltest-dc1-0-0                                2/2     Running   0          53s
+  elassandra-cltest-dc1-1-0                                2/2     Running   0          23m
+  elassandra-cltest-dc1-2-0                                2/2     Running   0          19m
+  strapkop-elassandra-operator-f9d4d4454-88pkm             1/1     Running   0          31m
+
+  # once all pods are Running, the datacenter status should be in the RUNNING phase
+  kubectl get edc elassandra-cltest-dc1
+  ...
+  status:
+    cqlStatus: ESTABLISHED
+    cqlStatusMessage: Connected to cluster=[cltestele] with role=[elassandra_operator]
+      secret=[elassandra-cltestele/cassandra.elassandra_operator_password]
+    elassandraNodeStatuses:
+      elassandra-cltestele-dc1-0-0: NORMAL
+      elassandra-cltestele-dc1-1-0: NORMAL
+      elassandra-cltestele-dc1-2-0: NORMAL
+    joinedReplicas: 3
+    keyspaceManagerStatus:
+      keyspaces:
+      - _kibana
+      replicas: 3
+    kibanaSpaces:
+    - ""
+    lastMessage: Unable to schedule Pod elassandra-cltestele-dc1-0-0
+    needCleanup: false
+    phase: RUNNING
+    rackStatuses:
+    - joinedReplicas: 1
+      name: "0"
+      phase: RUNNING
+    - joinedReplicas: 1
+      name: "1"
+      phase: RUNNING
+    - joinedReplicas: 1
+      name: "2"
+      phase: RUNNING
+    readyReplicas: 3
+    reaperPhase: ROLE_CREATED
+    replicas: 3
+
+
+
 Cassandra cleanup
 .................
 

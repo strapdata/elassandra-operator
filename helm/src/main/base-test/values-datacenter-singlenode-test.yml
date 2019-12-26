@@ -18,11 +18,9 @@ workload: "READ"
 image:
   elassandraRepository: localhost:32000/strapdata/elassandra-node-dev
   sidecarRepository: localhost:32000/strapdata/elassandra-sidecar-dev
-  elassandraTag: latest
-  sidecarTag: latest
-
-imagePullPolicy: Always
-imagePullSecret: ""
+  tag: latest
+  pullPolicy: Always
+  pullSecrets: []
 
 #kibanaImage: localhost:32000/kibana/kibana-oss:6.2.3
 # TODO: we do not support unprivileged setup yet
@@ -100,9 +98,9 @@ enterprise:
 
 
 # Cassandra reaper
-reaperEnabled: false
 reaper:
   image: localhost:32000/strapdata/cassandra-reaper
+  enabled: false
 
 # Elassandra datacenter group
 # datacenterGroup:
@@ -121,8 +119,10 @@ jmxPort: 7199
 jdbPort: 4242
 remoteSeeds: []
 
-kibanaSpaces:
-  - name: ""
+kibana:
+  spaces:
+    - name: ""
+      keyspaces: []
 
 
 # Override some config files in /etc/cassandra
