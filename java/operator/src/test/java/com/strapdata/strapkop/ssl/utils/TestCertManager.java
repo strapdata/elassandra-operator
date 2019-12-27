@@ -26,7 +26,8 @@ public class TestCertManager {
         byte[] truststore = certMng.generateTruststoreBytes(certAndPk, PASSWORD);
 
         // Create an instance of KeyStore using the generated p12
-        // and check if GCP & AZ are present in addition of the TEST-STRAPKOP cert
+        // GCP & AZ root CA are now added to the Cacert of the sidecar container.
+        // there are useless in the Generated Truststore
         boolean foundAlias = false;
         int nbOfAliases = 0;
         KeyStore keyStore = KeyStore.getInstance("pkcs12");
@@ -41,6 +42,6 @@ public class TestCertManager {
             nbOfAliases++;
         }
         assertTrue(foundAlias);
-        assertTrue(nbOfAliases > 2);
+        assertEquals(1, nbOfAliases);
     }
 }
