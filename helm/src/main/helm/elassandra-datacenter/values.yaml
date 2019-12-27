@@ -27,6 +27,9 @@ reaper:
 # TODO: we do not support unprivileged setup yet
 privilegedSupported: true
 
+# PVC delete policy, KEEP_PVC or DELETE_PVC
+decommissionPolicy: "DELETE_PVC"
+
 resources:
   requests:
     cpu: 500m
