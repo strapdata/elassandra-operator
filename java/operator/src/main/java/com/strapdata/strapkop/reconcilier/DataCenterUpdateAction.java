@@ -670,7 +670,8 @@ public class DataCenterUpdateAction {
      * @throws ApiException
      */
     private void commitDataCenterSnapshot(Zones zones) throws ApiException {
-        if (zones.totalReplicas() == dataCenterSpec.getReplicas() && zones.isReady() && zones.hasConsistentConfiguration()) {
+        if (zones.totalReplicas() == dataCenterSpec.getReplicas() && zones.isReady() && zones.hasConsistentConfiguration() &&
+                zones.first().isPresent() && zones.first().get().getDataCenterFingerPrint().isPresent()) {
             k8sResourceUtils.commitHistoryDataCenter(new Key(dataCenterMetadata), zones.first().get().getDataCenterFingerPrint().get()).blockingGet();
         }
     }
