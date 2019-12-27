@@ -64,23 +64,12 @@ jib {
 tasks.jibDockerBuild.dependsOn project(':java:backup').jar
 tasks.jibDockerBuild.dependsOn project(':java:model').jar
 
-task downloadFile {
-    doLast {
-        download {
-            src 'https://pki.goog/roots.pem'
-            dest 'src/main/resources/cacert/cacert.pem'
-            overwrite true
-        }
-    }
-}
-
 compileJava {
 
     sourceCompatibility = 1.8
     targetCompatibility = 1.8
     options.encoding = 'UTF-8'
     options.compilerArgs = [ '-parameters', '-Xlint:all', '-Xlint:-processing', '-Xlint:-serial', '-Werror']
-    dependsOn(  downloadFile )
 }
 
 compileTestJava {

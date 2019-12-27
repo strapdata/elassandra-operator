@@ -1496,6 +1496,10 @@ public class DataCenterUpdateAction {
                             .name("nodeinfo")
                             .mountPath("/nodeinfo")
                     )
+                    .addVolumeMountsItem(new V1VolumeMount()
+                            .name("sidecar-truststore-volume")
+                            .mountPath("/tmp/sidecar-truststore")
+                    )
                     .addEnvItem(new V1EnvVar().name("NAMESPACE").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.namespace"))))
                     .addEnvItem(new V1EnvVar().name("POD_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.name"))))
                     .addEnvItem(new V1EnvVar().name("POD_IP").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("status.podIP"))))
@@ -1519,18 +1523,26 @@ public class DataCenterUpdateAction {
                                 .value("file:"+OPERATOR_KEYSTORE_MOUNT_PATH + "/" + OPERATOR_KEYSTORE));
             }
 
-            String javaToolOptions = "";
-            // WARN: Cannot enable SSL on JMXMP because VisualVM does not support it => JMXMP in clear with no auth
-            javaToolOptions += dataCenterSpec.getJmxmpEnabled() ? " -Dcassandra.jmxmp " : "";
-            javaToolOptions += (useJmxOverSSL() ? " -Dssl.enable=true " + nodetoolSsl() : "");
-            if (javaToolOptions.length() > 0) {
-                sidecarContainer.addEnvItem(new V1EnvVar().name("JAVA_TOOL_OPTIONS").value(javaToolOptions));
+            {
+                String javaToolOptions = "";
+                // WARN: Cannot enable SSL on JMXMP because VisualVM does not support it => JMXMP in clear with no auth
+                javaToolOptions += dataCenterSpec.getJmxmpEnabled() ? " -Dcassandra.jmxmp " : "";
+                javaToolOptions += (useJmxOverSSL() ?
+                        "-Dssl.enable=true " +
+                        "-Dcom.sun.management.jmxremote.registry.ssl=true " +
+                        "-Djavax.net.ssl.trustStore=/tmp/sidecar-truststore/cacerts " +
+                        "-Djavax.net.ssl.trustStorePassword=changeit " :
+                        "");
+                if (javaToolOptions.length() > 0) {
+                    sidecarContainer.addEnvItem(new V1EnvVar().name("JAVA_TOOL_OPTIONS").value(javaToolOptions));
+                }
             }
 
             final V1PodSpec podSpec = new V1PodSpec()
                     .securityContext(new V1PodSecurityContext().fsGroup(CASSANDRA_GROUP_ID))
                     .hostNetwork(dataCenterSpec.getHostNetworkEnabled())
                     .addInitContainersItem(buildInitContainerVmMaxMapCount())
+                    .addInitContainersItem(buildInitContainerMergeTrustCerts())
                     .addContainersItem(cassandraContainer)
                     .addContainersItem(sidecarContainer)
                     .addVolumesItem(new V1Volume()
@@ -1556,6 +1568,10 @@ public class DataCenterUpdateAction {
                     )
                     .addVolumesItem(new V1Volume()
                             .name("sidecar-config-volume")
+                            .emptyDir(new V1EmptyDirVolumeSource())
+                    )
+                    .addVolumesItem(new V1Volume()
+                            .name("sidecar-truststore-volume")
                             .emptyDir(new V1EmptyDirVolumeSource())
                     )
                     .addVolumesItem(new V1Volume()
@@ -2000,6 +2016,22 @@ public class DataCenterUpdateAction {
                     .imagePullPolicy("IfNotPresent")
                     .terminationMessagePolicy("FallbackToLogsOnError")
                     .command(ImmutableList.of("sysctl", "-w", "vm.max_map_count=1048575"));
+        }
+
+        private V1Container buildInitContainerMergeTrustCerts() {
+            return new V1Container()
+                    .securityContext(new V1SecurityContext().privileged(false))
+                    .name("merge-trust-certs")
+                    .image("openjdk:alpine")
+                    .imagePullPolicy("IfNotPresent")
+                    .terminationMessagePolicy("FallbackToLogsOnError")
+                    .command(ImmutableList.of("sh","-c",
+                                    "cp $JAVA_HOME/jre/lib/security/cacerts /tmp/sidecar-truststore/ && " +
+                                    String.format(Locale.ROOT, "keytool -import -trustcacerts -keystore /tmp/sidecar-truststore/cacerts -storepass changeit -alias strapkop -noprompt -file %s/cacert.pem",
+                                            authorityManager.getPublicCaMountPath())
+                    ))
+                    .addVolumeMountsItem(new V1VolumeMount().name("operator-truststore").mountPath(authorityManager.getPublicCaMountPath()))
+                    .addVolumeMountsItem(new V1VolumeMount().name("sidecar-truststore-volume").mountPath("/tmp/sidecar-truststore"));
         }
 
         // Nodeinfo init container if NODEINFO_SECRET is available as env var
