@@ -3,7 +3,6 @@ package com.strapdata.strapkop.reconcilier;
 import com.strapdata.model.Key;
 import com.strapdata.model.k8s.cassandra.DataCenterPhase;
 import com.strapdata.model.k8s.cassandra.DataCenterStatus;
-import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.plugins.PluginRegistry;
 import io.kubernetes.client.ApiException;
@@ -11,7 +10,6 @@ import io.kubernetes.client.apis.CoreV1Api;
 import io.micronaut.context.ApplicationContext;
 import io.reactivex.Completable;
 import io.reactivex.schedulers.Schedulers;
-import io.vavr.Tuple2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,10 +26,12 @@ public class DataCenterRollbackReconcilier extends Reconcilier<Key> {
 
     private final PluginRegistry pluginRegistry;
 
-    public DataCenterRollbackReconcilier(final ApplicationContext context,
+    public DataCenterRollbackReconcilier(final ReconcilierObserver reconcilierObserver,
+                                         ApplicationContext context,
                                          final K8sResourceUtils k8sResourceUtils,
                                          final CoreV1Api coreApi,
                                          final PluginRegistry pluginRegistry) {
+        super(reconcilierObserver);
         this.context = context;
         this.k8sResourceUtils = k8sResourceUtils;
         this.pluginRegistry = pluginRegistry;
@@ -41,6 +41,7 @@ public class DataCenterRollbackReconcilier extends Reconcilier<Key> {
     public Completable reconcile(final Key key) throws ApiException {
         // this is a "read-before-write" to ensure we are processing the latest resource version (otherwise, status update will failed with a 409 conflict)
         return k8sResourceUtils.readDatacenter(key)
+                .flatMap(dc -> reconcilierObserver.onReconciliationBegin().toSingleDefault(dc))
                 .flatMapCompletable(dc -> {
                     if (dc.getStatus() != null && !Objects.equals(dc.getStatus().getPhase(), DataCenterPhase.ERROR)) {
                         logger.debug("Rollback cancelled, the DataCenter phase is ({})", dc.getStatus().getPhase());
@@ -67,6 +68,8 @@ public class DataCenterRollbackReconcilier extends Reconcilier<Key> {
                         throw e;
                     }
                 })
+                .doOnError(t -> { if (!(t instanceof ReconcilierShutdownException)) reconcilierObserver.failedReconciliationAction(); })
+                .doOnComplete(reconcilierObserver.endReconciliationAction())
                 .observeOn(Schedulers.io());
     }
 

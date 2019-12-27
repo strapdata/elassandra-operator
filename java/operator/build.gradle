@@ -96,7 +96,11 @@ dependencies {
     compile "io.micronaut:micronaut-runtime"
     compile "io.micronaut:micronaut-views"
     compile "io.micronaut:micronaut-multitenancy"
+
     compile "io.micronaut:micronaut-management"
+    compile "io.micronaut.configuration:micronaut-micrometer-core"
+    compile 'io.micronaut.configuration:micronaut-micrometer-registry-prometheus'
+    
     compile "io.micronaut.configuration:micronaut-cassandra"
 
 

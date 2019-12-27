@@ -24,16 +24,19 @@ public class DataCenterUnscheduledReconcilier extends Reconcilier<Tuple2<Key, El
     private final ApplicationContext context;
     private final K8sResourceUtils k8sResourceUtils;
 
-    public DataCenterUnscheduledReconcilier(final ApplicationContext context,
+    public DataCenterUnscheduledReconcilier(final ReconcilierObserver reconcilierObserver,
+                                            final ApplicationContext context,
                                             final K8sResourceUtils k8sResourceUtils) {
+        super(reconcilierObserver);
         this.context = context;
         this.k8sResourceUtils = k8sResourceUtils;
     }
 
     @Override
-    public Completable reconcile(final Tuple2<Key, ElassandraPod> tuple) throws ApiException {
+    public Completable reconcile(final Tuple2<Key, ElassandraPod> tuple) throws ApiException, InterruptedException {
         // this is a "read-before-write" to ensure we are processing the latest resource version (otherwise, status update will failed with a 409 conflict)
         return k8sResourceUtils.readDatacenter(tuple._1)
+                .flatMap(dc -> reconcilierObserver.onReconciliationBegin().toSingleDefault(dc))
                 .flatMapCompletable(dc -> {
                     if (dc.getStatus() != null && !Objects.equals(dc.getStatus().getPhase(), DataCenterPhase.UPDATING)) {
                         logger.debug("do not reconcile datacenter on unscheduled pod, the DataCenter phase is  ({})", dc.getStatus().getPhase());
@@ -60,6 +63,8 @@ public class DataCenterUnscheduledReconcilier extends Reconcilier<Tuple2<Key, El
                         throw e;
                     }
                 })
+                .doOnError(t -> { if (!(t instanceof ReconcilierShutdownException)) reconcilierObserver.failedReconciliationAction(); })
+                .doOnComplete(reconcilierObserver.endReconciliationAction())
                 .observeOn(Schedulers.io());
     }
     

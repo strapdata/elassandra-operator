@@ -26,10 +26,12 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
 
     private final PluginRegistry pluginRegistry;
 
-    public DataCenterUpdateReconcilier(final ApplicationContext context,
+    public DataCenterUpdateReconcilier(final ReconcilierObserver reconcilierObserver,
+                                       final ApplicationContext context,
                                        final K8sResourceUtils k8sResourceUtils,
                                        final CoreV1Api coreApi,
                                        final PluginRegistry pluginRegistry) {
+        super(reconcilierObserver);
         this.context = context;
         this.k8sResourceUtils = k8sResourceUtils;
         this.pluginRegistry = pluginRegistry;
@@ -41,6 +43,7 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
         // TODO: maybe we can use the datacenter cache in a smart way.
         //      ...something like : when we update the dc status, we notify the cache to invalidate the data until we receive an update
         return k8sResourceUtils.readDatacenter(key)
+                .flatMap(dc -> reconcilierObserver.onReconciliationBegin().toSingleDefault(dc))
                 .flatMapCompletable(dc -> {
                     if (dc.getStatus() != null && Objects.equals(dc.getStatus().getPhase(), DataCenterPhase.EXECUTING_TASK)) {
                         logger.debug("do not reconcile datacenter as a task is already being executed ({})", dc.getStatus().getCurrentTask());
@@ -67,6 +70,8 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
                         throw e;
                     }
                 })
+                .doOnError(t -> { if (!(t instanceof ReconcilierShutdownException)) reconcilierObserver.failedReconciliationAction(); })
+                .doOnComplete(reconcilierObserver.endReconciliationAction())
                 .observeOn(Schedulers.io());
     }
     

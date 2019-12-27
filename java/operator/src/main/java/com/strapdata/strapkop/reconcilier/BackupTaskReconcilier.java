@@ -1,41 +1,38 @@
 package com.strapdata.strapkop.reconcilier;
 
-import com.strapdata.model.backup.*;
+import com.strapdata.model.backup.BackupArguments;
+import com.strapdata.model.backup.CloudStorageSecret;
+import com.strapdata.model.backup.CommonBackupArguments;
+import com.strapdata.model.backup.StorageProvider;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.k8s.task.BackupTaskSpec;
 import com.strapdata.model.k8s.task.Task;
 import com.strapdata.model.k8s.task.TaskPhase;
-import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CustomObjectsApi;
-import io.kubernetes.client.models.*;
 import io.micronaut.context.annotation.Infrastructure;
-import io.micronaut.core.util.StringUtils;
 import io.reactivex.Completable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
-import java.nio.charset.Charset;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
-
-import static com.strapdata.strapkop.utils.CloudStorageSecretsKeys.*;
 @Singleton
 @Infrastructure
 public class BackupTaskReconcilier extends TaskReconcilier {
     private static final Logger logger = LoggerFactory.getLogger(BackupTaskReconcilier.class);
     private final SidecarClientFactory sidecarClientFactory;
     
-    public BackupTaskReconcilier(K8sResourceUtils k8sResourceUtils, SidecarClientFactory sidecarClientFactory, CustomObjectsApi customObjectsApi) {
-        super("backup", k8sResourceUtils);
+    public BackupTaskReconcilier(ReconcilierObserver reconcilierObserver, K8sResourceUtils k8sResourceUtils, SidecarClientFactory sidecarClientFactory, CustomObjectsApi customObjectsApi) {
+        super(reconcilierObserver, "backup", k8sResourceUtils);
         this.sidecarClientFactory = sidecarClientFactory;
     }
     
