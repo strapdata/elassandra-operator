@@ -110,6 +110,7 @@ public class DataCenterDeleteAction {
                         k8sResourceUtils.listNamespacedPods(dataCenter.getMetadata().getNamespace(), null, labelSelector).forEach(pod -> {
                             try {
                                 k8sResourceUtils.deletePersistentVolumeClaim(pod);
+                                logger.debug("PVC={} deleted", pod.getSpec().getVolumes().get(0).getPersistentVolumeClaim().getClaimName());
                             } catch (final JsonSyntaxException e) {
                                 logger.debug("Caught JSON exception while deleting PVC. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
                             } catch (final ApiException e) {
