@@ -9,6 +9,30 @@ micronaut:
                     - classpath:META-INF/swagger
                     - classpath:swagger
                 mapping: /swagger/**
+    metrics:
+        enabled: true
+        export:
+            prometheus:
+                enabled: true
+                step: PT1M
+                descriptions: true
+endpoints:
+    metrics:
+        enabled: true
+        sensitive: false
+        binders:
+            jvm:
+                enabled: true
+            web:
+                enabled: true
+            uptime:
+                enabled: true
+            processor:
+                enabled: true
+
+    prometheus:
+        sensitive: false
+
 jackson:
     module-scan: false
 

@@ -7,7 +7,6 @@ import com.strapdata.model.k8s.cassandra.DataCenterPhase;
 import com.strapdata.model.k8s.task.Task;
 import com.strapdata.model.k8s.task.TaskPhase;
 import com.strapdata.model.k8s.task.TaskStatus;
-import com.strapdata.model.k8s.task.TestTaskSpec;
 import com.strapdata.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
@@ -15,11 +14,12 @@ import io.kubernetes.client.ApiException;
 import io.reactivex.Completable;
 import io.reactivex.Single;
 import io.vavr.Tuple2;
-import org.bouncycastle.util.test.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 
 public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier.Action, Task>> {
 
@@ -27,7 +27,8 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
     final K8sResourceUtils k8sResourceUtils;
     private final String taskType;
     
-    TaskReconcilier(String taskType, K8sResourceUtils k8sResourceUtils) {
+    TaskReconcilier(ReconcilierObserver reconcilierObserver, String taskType, K8sResourceUtils k8sResourceUtils) {
+        super(reconcilierObserver);
         this.k8sResourceUtils = k8sResourceUtils;
         this.taskType = taskType;
     }
@@ -44,7 +45,7 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
 
     @Override
     public Completable reconcile(final Tuple2<Action, Task> item) throws Exception {
-        
+
         final Task task = item._2;
         
         if (item._1.equals(Action.SUBMIT)) {
@@ -78,6 +79,7 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
 
         // fetch corresponding dc
         return fetchDataCenter(task)
+                .flatMap(dc -> reconcilierObserver.onReconciliationBegin().toSingleDefault(dc))
                 .flatMap(dc -> {
                     if (task.getStatus().getPhase() != null && isTerminated(task)) {
                         logger.debug("task {} was terminated", task.getMetadata().getName());
@@ -117,7 +119,9 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
                                 .andThen(doTask(task, dc));
                     }
 
-                });
+                })
+                .doOnError(t -> { if (!(t instanceof ReconcilierShutdownException)) reconcilierObserver.failedReconciliationAction(); })
+                .doOnComplete(reconcilierObserver.endReconciliationAction());
     }
 
     private boolean isTerminated(Task task) {

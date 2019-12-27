@@ -27,8 +27,8 @@ public final class CleanupTaskReconcilier extends TaskReconcilier {
     
     private final SidecarClientFactory sidecarClientFactory;
     
-    public CleanupTaskReconcilier(K8sResourceUtils k8sResourceUtils, SidecarClientFactory sidecarClientFactory) {
-        super("cleanup", k8sResourceUtils);
+    public CleanupTaskReconcilier(ReconcilierObserver reconcilierObserver, K8sResourceUtils k8sResourceUtils, SidecarClientFactory sidecarClientFactory) {
+        super(reconcilierObserver,"cleanup", k8sResourceUtils);
         this.sidecarClientFactory = sidecarClientFactory;
     }
     

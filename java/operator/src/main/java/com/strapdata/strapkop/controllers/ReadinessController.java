@@ -24,4 +24,5 @@ public class ReadinessController {
     public HttpStatus index() {
         return (this.preflightService.isExecuted()) ? HttpStatus.OK : HttpStatus.NOT_FOUND;
     }
+
 }

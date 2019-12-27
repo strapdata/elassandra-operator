@@ -3,6 +3,8 @@ package com.strapdata.strapkop.controllers;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.annotation.Controller;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 

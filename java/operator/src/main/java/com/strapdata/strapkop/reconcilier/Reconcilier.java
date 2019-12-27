@@ -7,7 +7,13 @@ import io.reactivex.Completable;
  * @param <T>
  */
 public abstract class Reconcilier<T> {
-    
+
+    ReconcilierObserver reconcilierObserver;
+
+    public Reconcilier(ReconcilierObserver reconcilierObserver) {
+        this.reconcilierObserver = reconcilierObserver;
+    }
+
     /**
      * Reconcilier must implement the reconciliation logic in this method
      */

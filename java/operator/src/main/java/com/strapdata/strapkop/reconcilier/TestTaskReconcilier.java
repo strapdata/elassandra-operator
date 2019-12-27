@@ -14,8 +14,8 @@ public class TestTaskReconcilier extends TaskReconcilier {
 
     private final TestSuitePlugin testSuitePlugin;
 
-    public TestTaskReconcilier(K8sResourceUtils k8sResourceUtils, TestSuitePlugin testPlugin) {
-        super("test", k8sResourceUtils);
+    public TestTaskReconcilier(ReconcilierObserver reconcilierObserver, K8sResourceUtils k8sResourceUtils, TestSuitePlugin testPlugin) {
+        super(reconcilierObserver, "test", k8sResourceUtils);
         this.testSuitePlugin = testPlugin;
     }
 

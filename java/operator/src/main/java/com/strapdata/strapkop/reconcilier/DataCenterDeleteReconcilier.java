@@ -21,9 +21,11 @@ public class DataCenterDeleteReconcilier extends Reconcilier<DataCenter> {
     private final PluginRegistry pluginRegistry;
     private final CqlRoleManager cqlRoleManager;
 
-    public DataCenterDeleteReconcilier(final ApplicationContext context,
+    public DataCenterDeleteReconcilier(final ReconcilierObserver reconcilierObserver,
+                                       final ApplicationContext context,
                                        final CqlRoleManager cqlRoleManager,
                                        final PluginRegistry pluginRegistry) {
+        super(reconcilierObserver);
         this.context = context;
         this.pluginRegistry = pluginRegistry;
         this.cqlRoleManager = cqlRoleManager;
@@ -32,8 +34,11 @@ public class DataCenterDeleteReconcilier extends Reconcilier<DataCenter> {
     @Override
     public Completable reconcile(final DataCenter dataCenter) throws Exception {
         final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
-        return  pluginRegistry.deleteAll(dataCenter)
+        return reconcilierObserver.onReconciliationBegin()
+                .andThen(pluginRegistry.deleteAll(dataCenter))
                 .andThen(context.createBean(DataCenterDeleteAction.class, dataCenter).deleteDataCenter(cqlSessionHandler))
+                .doOnError(t -> { if (!(t instanceof ReconcilierShutdownException)) reconcilierObserver.failedReconciliationAction(); })
+                .doOnComplete(reconcilierObserver.endReconciliationAction())
                 .doFinally(new Action() {
                     @Override
                     public void run() throws Exception {

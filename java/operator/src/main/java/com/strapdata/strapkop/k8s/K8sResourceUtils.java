@@ -16,7 +16,6 @@ import com.strapdata.model.k8s.task.TaskList;
 import com.strapdata.model.k8s.task.TaskPhase;
 import com.strapdata.model.k8s.task.TaskSpec;
 import com.strapdata.strapkop.StrapkopException;
-import com.strapdata.strapkop.event.ElassandraPod;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.ApiResponse;
 import io.kubernetes.client.apis.AppsV1Api;
@@ -29,7 +28,6 @@ import io.micronaut.core.util.StringUtils;
 import io.reactivex.Completable;
 import io.reactivex.Single;
 import io.reactivex.functions.Action;
-import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,7 +43,6 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import static com.strapdata.strapkop.utils.CloudStorageSecretsKeys.*;
-import static com.strapdata.strapkop.utils.CloudStorageSecretsKeys.GCP_PROJECT_ID;
 
 @Singleton
 public class K8sResourceUtils {
@@ -580,6 +577,36 @@ public class K8sResourceUtils {
         }
         return new ResourceListIterable<>( new V1PodPage(null));
     }
+
+    public Iterable<DataCenter> listNamespacedDataCenters(final String namespace, @Nullable final String labelSelector) throws ApiException {
+        class V1DataCenterPage implements ResourceListIterable.Page<DataCenter> {
+            private final DataCenterList dcList;
+
+            private V1DataCenterPage(final String continueToken) throws ApiException {
+                final Call call = customObjectsApi.listClusterCustomObjectCall("stable.strapdata.com", "v1",
+                        "elassandradatacenters", null, labelSelector, null, null, null, null);
+                final ApiResponse<DataCenterList> apiResponse = customObjectsApi.getApiClient().execute(call, DataCenterList.class);
+                dcList = apiResponse.getData();
+            }
+
+            @Override
+            public Collection<DataCenter> items() {
+                return dcList.getItems();
+            }
+
+            @Override
+            public ResourceListIterable.Page<DataCenter> nextPage() throws ApiException {
+                final String continueToken = dcList.getMetadata().getContinue();
+
+                if (Strings.isNullOrEmpty(continueToken))
+                    return null;
+
+                return new V1DataCenterPage(continueToken);
+            }
+        }
+        return new ResourceListIterable<>(new V1DataCenterPage(null));
+    }
+
 
     public Iterable<V1StatefulSet> listNamespacedStatefulSets(final String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) throws ApiException {
         class V1StatefulSetPage implements ResourceListIterable.Page<V1StatefulSet> {

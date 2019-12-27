@@ -28,6 +28,7 @@ spec:
         - name: {{ $pullSecret }}
       {{- end }}
       {{- end }}
+      terminationGracePeriodSeconds: 45
       containers:
         - name: {{ template "elassandra-operator.name" . }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -49,6 +50,11 @@ spec:
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 10
+          lifecycle:
+            preStop:
+              httpGet:
+                path: /shutdown/gracefull
+                port: 8080
           resources:
 {{ toYaml .Values.resources | indent 12 }}
           env:
