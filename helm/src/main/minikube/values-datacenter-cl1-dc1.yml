@@ -5,7 +5,7 @@ clusterName: Elassandra
 replicas: 1
 
 #restoreFromBackup:
-#  tag: backup-task-azure-test-credentials
+#  tag: backup-task-azure-test-cacert-002
 #  provider: AZURE_BLOB
 #  bucket: test-kop-backup
 #  secretRef: test-cred-backup-azure
@@ -19,8 +19,9 @@ workload: "READ"
 image:
   elassandraRepository: localhost:32000/strapdata/elassandra-node-dev
   sidecarRepository: localhost:32000/strapdata/elassandra-sidecar-dev
-  elassandraTag: latest
-  sidecarTag: latest
+  tag: latest
+  pullPolicy: Always
+  pullSecrets: []
 
 imagePullPolicy: Always
 imagePullSecrets: []

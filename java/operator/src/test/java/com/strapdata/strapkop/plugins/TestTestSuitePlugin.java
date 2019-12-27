@@ -1,5 +1,6 @@
 package com.strapdata.strapkop.plugins;
 
+import com.strapdata.dns.DnsConfiguration;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.k8s.cassandra.DataCenterPhase;
 import com.strapdata.model.k8s.task.*;
@@ -30,6 +31,7 @@ public class TestTestSuitePlugin {
     private TestSuitePlugin plugin;
 
     private OperatorConfig opConfigMock = mock(OperatorConfig.class);
+    private DnsConfiguration dnsConfigMock = mock(DnsConfiguration.class);
 
     private ApplicationContext contextMock = mock(ApplicationContext.class);
     private K8sResourceUtils k8sResourceUtilsMock = mock(K8sResourceUtils.class);
@@ -39,7 +41,7 @@ public class TestTestSuitePlugin {
 
     @BeforeEach
     public void initTest() throws Exception {
-        plugin = new TestSuitePlugin(contextMock, k8sResourceUtilsMock, authorityManagerMock, coreApiMock, appsApiMock, opConfigMock);
+        plugin = new TestSuitePlugin(contextMock, k8sResourceUtilsMock, authorityManagerMock, coreApiMock, appsApiMock, opConfigMock, dnsConfigMock);
         when(k8sResourceUtilsMock.updateTaskStatus(any())).thenReturn(Completable.complete());
         when(contextMock.getBean(FakeExecutor.class)).thenReturn(new FakeExecutor());
     }
