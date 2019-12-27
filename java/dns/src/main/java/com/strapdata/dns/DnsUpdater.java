@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.List;
 
 public abstract class DnsUpdater {
 
@@ -30,20 +31,22 @@ public abstract class DnsUpdater {
         String seedHostId = System.getenv("SEED_HOST_ID");
         logger.debug("POD_NAME={} SEED_HOST_ID={} DNS_DOMAIN={}", podName, seedHostId, dnsConfiguration.domain);
         try {
-            String publicIp = readFile("/nodeinfo/public-ip", Charset.forName("UTF-8"));
+            String publicIp = readFirstLine("/nodeinfo/public-ip", Charset.forName("UTF-8"));
             if (dnsConfiguration.domain != null && !Strings.isNullOrEmpty(publicIp) && seedHostId != null && podName.endsWith("-0")) {
-                updateDnsARecord(seedHostId, publicIp).blockingGet();
+                Throwable t = updateDnsARecord(seedHostId, publicIp).blockingGet();
+                if (t != null)
+                    throw t;
                 logger.info("Dns updated at startup pod={} {}.{} = {}", podName, seedHostId, dnsConfiguration.domain, publicIp);
             }
-        } catch (Exception e) {
-            logger.warn("Failed to update DNS seed public ip", e);
+        } catch (Throwable e) {
+            logger.error("Failed to update DNS seed public ip:" + e.getMessage(), e);
         }
     }
 
 
-    static String readFile(String path, Charset encoding) throws IOException
+    static String readFirstLine(String path, Charset encoding) throws IOException
     {
-        byte[] encoded = Files.readAllBytes(Paths.get(path));
-        return new String(encoded, encoding);
+        List<String> lines = Files.readAllLines(Paths.get(path), encoding);
+        return lines.size() > 0 ? lines.get(0) : null;
     }
 }

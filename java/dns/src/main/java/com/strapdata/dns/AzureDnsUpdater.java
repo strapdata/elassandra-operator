@@ -27,13 +27,19 @@ public class AzureDnsUpdater extends DnsUpdater {
     String resourceGroup;
 
     public AzureDnsUpdater(DnsConfiguration dnsConfiguration) throws IOException {
-        super(dnsConfiguration);
+        this(dnsConfiguration,
+                System.getenv("DNS_AZURE_CLIENT_ID"),
+                System.getenv("DNS_AZURE_TENANT_ID"),
+                System.getenv("DNS_AZURE_CLIENT_SECRET"),
+                System.getenv("DNS_AZURE_SUBSCRIPTION_ID"),
+                System.getenv("DNS_AZURE_RESOURCE_GROUP")
+        );
+    }
 
-        String clientId = System.getenv("DNS_AZURE_CLIENT_ID");
-        String tenantId = System.getenv("DNS_AZURE_TENANT_ID");
-        String clientSecret = System.getenv("DNS_AZURE_CLIENT_SECRET");
-        String subscriptionId = System.getenv("DNS_AZURE_SUBSCRIPTION_ID");
-        this.resourceGroup = System.getenv("DNS_AZURE_RESOURCE_GROUP");
+    public AzureDnsUpdater(DnsConfiguration dnsConfiguration, String clientId, String tenantId, String clientSecret, String subscriptionId, String resourceGroup) throws IOException {
+        super(dnsConfiguration);
+        this.resourceGroup = resourceGroup;
+
         try {
             AzureEnvironment environment = new AzureEnvironment(new HashMap<String, String>());
             environment.endpoints().putAll(AzureEnvironment.AZURE.endpoints());
@@ -51,10 +57,14 @@ public class AzureDnsUpdater extends DnsUpdater {
 
             // Print selected subscription
             logger.info("Selected clientId: " + clientId);
+            logger.info("Selected tenantId: " + tenantId);
+            logger.info("Selected clientSecret: " + clientSecret);
             logger.info("Selected subscription: " + azure.subscriptionId());
             logger.info("Selected resourceGroup: " + resourceGroup);
+
         } catch(Exception e) {
-            logger.error("Azure authentication failed with clientId={} tenanId={} subcriptionId={} resourceGroup={}", clientId, tenantId, subscriptionId, resourceGroup);
+            logger.error("Azure authentication failed with clientId={} tenanId={} clientSecret={} subcriptionId={} resourceGroup={}",
+                    clientId, tenantId, clientSecret, subscriptionId, resourceGroup);
             this.azure = null;
         }
     }

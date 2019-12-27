@@ -6,7 +6,6 @@ import org.bouncycastle.asn1.DERPrintableString;
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.*;
-import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils;
@@ -19,6 +18,8 @@ import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.bouncycastle.pkcs.PKCS10CertificationRequestBuilder;
 import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 import javax.security.auth.x500.X500Principal;
@@ -28,13 +29,16 @@ import java.math.BigInteger;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.security.*;
-import java.security.cert.*;
+import java.security.cert.CertStoreException;
 import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.*;
 
 @Singleton
 public class CertManager {
-    
+    private static final Logger logger = LoggerFactory.getLogger(CertManager.class);
+
     private CertManagerConfiguration config;
     private SecureRandom prng;
     
@@ -202,15 +206,6 @@ public class CertManager {
 
     public byte[] generateTruststoreBytes(X509CertificateAndPrivateKey caCertAndKey, String password) throws GeneralSecurityException, IOException, OperatorCreationException {
         KeyStore keyStore = PemConverter.loadTrustStore(caCertAndKey.getCertificateChain());
-
-        CertificateFactory cf = CertificateFactory.getInstance("X.509");
-        final Collection<? extends Certificate> gcpCertificate = cf.generateCertificates(getClass().getClassLoader().getResourceAsStream("cacert/cacert.pem"));
-        for (Certificate cert: gcpCertificate) {
-            if (cert instanceof X509Certificate) {
-                keyStore.setCertificateEntry(((X509Certificate) cert).getSubjectX500Principal().toString(), cert);
-            }
-        }
-
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             keyStore.store(baos, password.toCharArray());
             return baos.toByteArray();

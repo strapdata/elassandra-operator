@@ -9,7 +9,12 @@
         </encoder>
     </appender>
 
-    <root level="TRACE">
+    <!--
+    <logger name="com.strapdata.dns" level="TRACE" />
+    -->
+    
+    <root level="INFO">
         <appender-ref ref="STDOUT" />
     </root>
+
 </configuration>
