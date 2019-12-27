@@ -153,6 +153,8 @@ public class BackupTask {
         for (final KeyspaceColumnFamilySnapshot keyspaceColumnFamilySnapshot : keyspaceColumnFamilySnapshots) {
             final Path bucketKey = Paths.get(Directories.CASSANDRA_DATA).resolve(Paths.get(keyspaceColumnFamilySnapshot.keyspace, keyspaceColumnFamilySnapshot.columnFamily));
             Iterables.addAll(manifest, ssTableManifest(keyspaceColumnFamilySnapshot.snapshotDirectory, bucketKey));
+            final Path schemaBucketKey = Paths.get(Directories.CASSANDRA_SCHEMA).resolve(Paths.get(arguments.snapshotTag, keyspaceColumnFamilySnapshot.keyspace, keyspaceColumnFamilySnapshot.columnFamily));
+            Iterables.addAll(manifest, schemaManifest(keyspaceColumnFamilySnapshot.snapshotDirectory, schemaBucketKey));
         }
         
         logger.debug("{} files in manifest for snapshot \"{}\".", manifest.size(), tag);
@@ -296,6 +298,20 @@ public class BackupTask {
                 manifest.add(new ManifestEntry(backupPath, path, ManifestEntry.Type.FILE));
             }
         }
+        return manifest;
+    }
+
+    public static Collection<ManifestEntry> schemaManifest(Path tablePath, Path tableBackupPath) throws IOException {
+        final Path schemaPath = tablePath.resolve(Paths.get("schema.cql"));
+
+        final LinkedList<ManifestEntry> manifest = new LinkedList<>();
+
+        if (schemaPath.toFile().exists()) {
+            final Path tableRelative = tablePath.relativize(schemaPath);
+            final Path backupPath = tableBackupPath.resolve(tableRelative);
+            manifest.add(new ManifestEntry(backupPath, schemaPath, ManifestEntry.Type.FILE));
+        }
+
         return manifest;
     }
 
