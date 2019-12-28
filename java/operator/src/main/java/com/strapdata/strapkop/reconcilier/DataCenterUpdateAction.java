@@ -299,22 +299,28 @@ public class DataCenterUpdateAction {
                 k8sResourceUtils.createOrReplaceNamespacedService(builder.buildServiceExternalNodes()),
                 (s1, s2, s3) -> builder.clusterObjectMeta(OperatorNames.clusterSecret(dataCenter))
         )
-                .flatMap(clusterSecret -> {
+                .flatMap(clusterSecretMeta -> {
                     // create cluster secret if not exists
-                    Map<String, String> passwords = new HashMap<>();
+                    final Map<String, String> passwords = new HashMap<>();
                     passwords.put(CqlRole.KEY_CASSANDRA_PASSWORD, UUID.randomUUID().toString());
                     passwords.put(CqlRole.KEY_ELASSANDRA_OPERATOR_PASSWORD, UUID.randomUUID().toString());
                     passwords.put(CqlRole.KEY_ADMIN_PASSWORD, UUID.randomUUID().toString());
                     passwords.put(KEY_JMX_PASSWORD, UUID.randomUUID().toString());
                     passwords.put(KEY_SHARED_SECRET, "aaa.shared_secret: " + UUID.randomUUID().toString());
                     passwords.put(KEY_REAPER_PASSWORD, UUID.randomUUID().toString());
-                    return k8sResourceUtils.readOrCreateNamespacedSecret(clusterSecret, () -> {
-                                V1Secret secret = new V1Secret().metadata(clusterSecret);
+                    return k8sResourceUtils.readOrCreateNamespacedSecret(clusterSecretMeta, () -> {
+                                V1Secret secret = new V1Secret().metadata(clusterSecretMeta);
                                 for(Map.Entry<String,String> entry : passwords.entrySet())
                                     secret.putStringDataItem(entry.getKey(), entry.getValue());
                                 return secret;
-                            }
-                    ).map(s -> passwords);
+                            });
+                })
+                .map(s -> {
+                    Map<String, String> passwords = s.getData().entrySet().stream().collect(Collectors.toMap(e -> e.getKey(), e -> new String(e.getValue())));
+                    if (context.getEnvironment().getActiveNames().contains("test")) {
+                        logger.warn("secret passwords={}", passwords);
+                    }
+                    return passwords;
                 })
                 .flatMap(passwords -> {
                     // create rc file
@@ -968,7 +974,9 @@ public class DataCenterUpdateAction {
                             .clusterIP("None")
                             // a port needs to be defined for the service to be resolvable (#there-was-a-bug-ID-and-now-I-cant-find-it)
                             .ports(ImmutableList.of(
-                                    new V1ServicePort().name("internode").port(dataCenterSpec.getSsl() ? dataCenterSpec.getSslStoragePort() : dataCenterSpec.getStoragePort())))
+                                    new V1ServicePort().name("internode").port(dataCenterSpec.getSsl() ? dataCenterSpec.getSslStoragePort() : dataCenterSpec.getStoragePort()),
+                                    new V1ServicePort().name("jmx").port(dataCenterSpec.getJmxPort()))
+                            )
                             // only select the pod 0 in a rack as seed, which is not good for local DC discovery (if rack X is unavailable).
                             // We should use
                             .selector(OperatorLabels.rack(dataCenter, rack))
@@ -1392,6 +1400,16 @@ public class DataCenterUpdateAction {
                                     wildcardStatefulsetName,
                                     ImmutableList.of(wildcardStatefulsetName, headlessServiceName, elasticsearchServiceName, "localhost"),
                                     ImmutableList.of(InetAddresses.forString("127.0.0.1")),
+                                    dataCenterMetadata.getName(),
+                                    "changeit"
+                            ))
+                    // add a client certificate in a PKCS12 keystore for TLS client auth
+                    .putDataItem("client-keystore.p12",
+                            authorityManager.issueCertificateKeystore(
+                                    x509CertificateAndPrivateKey,
+                                    "client",
+                                    ImmutableList.of(),
+                                    ImmutableList.of(),
                                     dataCenterMetadata.getName(),
                                     "changeit"
                             ));
