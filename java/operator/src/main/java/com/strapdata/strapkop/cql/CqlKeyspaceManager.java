@@ -5,7 +5,10 @@ import com.datastax.driver.core.Session;
 import com.strapdata.model.k8s.cassandra.CqlStatus;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.k8s.cassandra.DataCenterPhase;
+import com.strapdata.model.k8s.task.RepairTaskSpec;
+import com.strapdata.model.k8s.task.TaskSpec;
 import com.strapdata.strapkop.StrapkopException;
+import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.plugins.Plugin;
 import com.strapdata.strapkop.plugins.PluginRegistry;
 import io.reactivex.Completable;
@@ -15,6 +18,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
@@ -28,10 +32,12 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
 
 
     final PluginRegistry pluginRegistry;
+    final K8sResourceUtils k8sResourceUtils;
 
-    public CqlKeyspaceManager(final PluginRegistry pluginRegistry) {
+    public CqlKeyspaceManager(final PluginRegistry pluginRegistry, final K8sResourceUtils k8sResourceUtils) {
         super();
         this.pluginRegistry = pluginRegistry;
+        this.k8sResourceUtils = k8sResourceUtils;
     }
 
     private String elasticAdminKeyspaceName(DataCenter dataCenter) {
@@ -117,23 +123,20 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
 
     public void removeDatacenter(final DataCenter dataCenter, CqlSessionSupplier sessionSupplier) throws Exception {
         // abort if dc is not running normally or not connected
-        if (!dataCenter.getStatus().getPhase().equals(DataCenterPhase.RUNNING) || !dataCenter.getStatus().getCqlStatus().equals(CqlStatus.ESTABLISHED)) {
-            return;
+        if (dataCenter.getStatus().getPhase().equals(DataCenterPhase.RUNNING) && dataCenter.getStatus().getCqlStatus().equals(CqlStatus.ESTABLISHED)) {
+            // adjust RF for system keyspaces
+            for(String keyspace : SYSTEM_KEYSPACES) {
+                updateKeyspaceReplcationMap(dataCenter, keyspace, 0, sessionSupplier).blockingGet();
+            }
+
+            // monitor elastic_admin keyspace to reduce RF when scaling down the DC.
+            updateKeyspaceReplcationMap(dataCenter, elasticAdminKeyspaceName(dataCenter), 0, sessionSupplier).blockingGet();
+
+            // adjust user keyspace RF
+            for(CqlKeyspace keyspace : get(dataCenter).values()) {
+                updateKeyspaceReplcationMap(dataCenter, keyspace.name, 0, sessionSupplier).blockingGet();
+            }
         }
-
-        // adjust RF for system keyspaces
-        for(String keyspace : SYSTEM_KEYSPACES) {
-            updateKeyspaceReplcationMap(dataCenter, keyspace, 0, sessionSupplier).blockingGet();
-        }
-
-        // monitor elastic_admin keyspace to reduce RF when scaling down the DC.
-        updateKeyspaceReplcationMap(dataCenter, elasticAdminKeyspaceName(dataCenter), 0, sessionSupplier).blockingGet();
-
-        // adjust user keyspace RF
-        for(CqlKeyspace keyspace : get(dataCenter).values()) {
-            updateKeyspaceReplcationMap(dataCenter, keyspace.name, 0, sessionSupplier).blockingGet();
-        }
-
         remove(dataCenter);
     }
 
@@ -164,22 +167,34 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                 currentRfMap.put(dc.getSpec().getDatacenterName(), targetRf);
                 if (currentRfMap.entrySet().stream().filter(e -> e.getValue() > 0).count() > 0) {
                     return alterKeyspace(dc, sessionSupplier, keyspace, currentRfMap)
-                            .map(s -> {
+                            .flatMapCompletable(s -> {
                                 if (targetRf > currentRf) {
                                     // RF increased
                                     if (currentRf > 1) {
                                         logger.info("Trigger a repair for keyspace={} in dc={}", keyspace, dc.getMetadata().getName());
                                         // TODO: trigger repair if RF is manually increased while DC was RUNNING (if RF is incremented just before scaling up, streaming propely pull data)
+                                        return k8sResourceUtils.createTask(dc, "repair", new Consumer<TaskSpec>() {
+                                            @Override
+                                            public void accept(TaskSpec taskSpec) {
+                                                taskSpec.setRepair(new RepairTaskSpec().setKeyspace(keyspace));
+                                            }
+                                        }).ignoreElement();
                                     }
                                 } else {
                                     // RF deacreased
                                     if (targetRf < dc.getStatus().getReplicas()) {
                                         logger.info("Trigger a cleanup for keyspace={} in dc={}", keyspace, dc.getMetadata().getName());
                                         // TODO: trigger cleanup when RF is manually decrease while DC was RUNNING.
+                                        return k8sResourceUtils.createTask(dc, "cleanup", new Consumer<TaskSpec>() {
+                                            @Override
+                                            public void accept(TaskSpec taskSpec) {
+                                                taskSpec.setRepair(new RepairTaskSpec().setKeyspace(keyspace));
+                                            }
+                                        }).ignoreElement();
                                     }
                                 }
-                                return s;
-                            }).ignoreElement();
+                                return Completable.complete();
+                            });
                 }
             }
             return Completable.complete();

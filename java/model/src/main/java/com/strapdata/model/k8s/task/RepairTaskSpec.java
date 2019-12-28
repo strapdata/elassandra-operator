@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
-public class CleanupTaskSpec {
+public class RepairTaskSpec {
 
     @SerializedName("keyspace")
     @Expose

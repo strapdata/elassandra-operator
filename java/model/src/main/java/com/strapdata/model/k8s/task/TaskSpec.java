@@ -27,7 +27,11 @@ public class TaskSpec {
     @SerializedName("cleanup")
     @Expose
     private CleanupTaskSpec cleanup;
-    
+
+    @SerializedName("repair")
+    @Expose
+    private RepairTaskSpec repair;
+
     @SerializedName("backup")
     @Expose
     private BackupTaskSpec backup;

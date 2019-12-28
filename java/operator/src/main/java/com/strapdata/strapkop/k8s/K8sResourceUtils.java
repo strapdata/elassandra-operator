@@ -88,13 +88,13 @@ public class K8sResourceUtils {
             @Override
             public T call() throws Exception {
                 try {
-                    logger.trace("Attempting to create resource.");
+                    logger.trace("Attempting to get resource.");
                     return getResourceCallable.call();
                 } catch (final ApiException e) {
                     if (e.getCode() != 404)
                         throw e;
 
-                    logger.trace("Resource already exists. Attempting to replace.");
+                    logger.trace("Resource does not exist, create it.");
                     return createResourceCallable.call();
                 }
             }
@@ -293,16 +293,22 @@ public class K8sResourceUtils {
         return readOrCreateResource(
                 () -> {
                         V1Secret secret2 = coreApi.readNamespacedSecret(secretObjectMeta.getName(), secretObjectMeta.getNamespace(), null, null, null);
-                        logger.debug("Replaced namespaced secret={} in namespace={}", secret2.getMetadata().getName(), secret2.getMetadata().getNamespace());
+                        /*
+                        logger.warn("Get namespaced secret={} in namespace={} stringData={} data={}",
+                                secret2.getMetadata().getName(), secret2.getMetadata().getNamespace(),
+                                secret2.getStringData(),
+                                secret2.getData().entrySet().stream().collect(Collectors.toMap(e -> e.getKey(), e -> new String(e.getValue()))));
+                         */
                         return secret2;
                 },
                 () -> {
                     V1Secret secret2 = coreApi.createNamespacedSecret(secretObjectMeta.getNamespace(), secretSupplier.get(), null, null, null);
-                    logger.debug("Created namespaced secret={}", secret2.getMetadata().getName());
+                    logger.warn("Created namespaced secret={}", secret2.getMetadata().getName());
                     return secret2;
                 }
         );
     }
+
     /**
      * Read secret and check if the content match the storage provider to avoid issue when side car will use it.
      * if secret doesn't exist exception is thrown and catch as task failure.
@@ -462,6 +468,27 @@ public class K8sResourceUtils {
                 }
             }
             return (V1Status) null;
+        });
+    }
+
+    public Single<DataCenter> deleteDataCenter(final V1ObjectMeta metadata) throws ApiException {
+        return Single.fromCallable(new Callable<DataCenter>() {
+            @Override
+            public DataCenter call() throws Exception {
+                try {
+                    logger.debug("Deleting DataCenter namespace={} name={}", metadata.getNamespace(), metadata.getName());
+                    V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
+                    Call call = customObjectsApi.deleteNamespacedCustomObjectAsync("stable.strapdata.com", "v1",
+                            metadata.getNamespace(), "elassandradatacenters", metadata.getName(), deleteOptions, null, null, "Foreground", null);
+                    final ApiResponse<DataCenter> apiResponse = customObjectsApi.getApiClient().execute(call, DataCenter.class);
+                    return apiResponse.getData();
+                } catch (ApiException e) {
+                    if (e.getCode() == 404) {
+                        logger.warn("elassandradatacenter not found for datacenter={} in namespace={}", metadata.getName(), metadata.getNamespace());
+                    }
+                    throw e;
+                }
+            }
         });
     }
 
@@ -994,20 +1021,69 @@ public class K8sResourceUtils {
             }
         });
     }
-    
-    public void createTask(Task task) throws ApiException {
-        customObjectsApi.createNamespacedCustomObject("stable.strapdata.com", "v1",
-                task.getMetadata().getNamespace(), "elassandratasks", task, null);
+
+    public Single<Task> createTask(Task task) throws ApiException {
+        return Single.fromCallable(new Callable<Task>() {
+            @Override
+            public Task call() throws Exception {
+                try {
+                    final Call call = customObjectsApi.getNamespacedCustomObjectCall("stable.strapdata.com", "v1",
+                            task.getMetadata().getNamespace(), "elassandratasks", task.getMetadata().getName(), null, null);
+                    final ApiResponse<Task> apiResponse = customObjectsApi.getApiClient().execute(call, DataCenter.class);
+                    return apiResponse.getData();
+                } catch(ApiException e) {
+                    if (e.getCode() == 404) {
+                        logger.warn("elassandratasks not found for name={} in namespace={}", task.getMetadata().getName(), task.getMetadata().getNamespace());
+                    }
+                    throw e;
+                }
+            }
+        });
     }
-    
-    public void createTask(DataCenter dc, String taskType, Consumer<TaskSpec> modifier) throws ApiException {
+
+    public Completable deleteTasks(String namespace, @Nullable final String labelSelector) throws ApiException {
+        return Completable.fromAction(new Action() {
+            @Override
+            public void run() throws Exception {
+                for (Task task : listNamespacedTask(namespace, labelSelector)) {
+                    try {
+                        deleteTask(task.getMetadata());
+                        logger.debug("Deleted task namespace={} name={}", task.getMetadata().getNamespace(), task.getMetadata().getName());
+                    } catch (final JsonSyntaxException e) {
+                        logger.debug("Caught JSON exception while deleting Service. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
+                    }
+                }
+            }
+        });
+    }
+
+    public Single<Task> deleteTask(final V1ObjectMeta metadata) throws ApiException {
+        return Single.fromCallable(new Callable<Task>() {
+            @Override
+            public Task call() throws Exception {
+                try {
+                    logger.debug("Deleting DataCenter namespace={} name={}", metadata.getNamespace(), metadata.getName());
+                    V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
+                    Call call = customObjectsApi.deleteNamespacedCustomObjectAsync("stable.strapdata.com", "v1",
+                            metadata.getNamespace(), "elassandratasks", metadata.getName(), deleteOptions, null, null, "Foreground", null);
+                    final ApiResponse<Task> apiResponse = customObjectsApi.getApiClient().execute(call, Task.class);
+                    return apiResponse.getData();
+                } catch (ApiException e) {
+                    if (e.getCode() == 404) {
+                        logger.warn("elassandratasks not found for task={} in namespace={}", metadata.getName(), metadata.getNamespace());
+                    }
+                    throw e;
+                }
+            }
+        });
+    }
+
+    public Single<Task> createTask(DataCenter dc, String taskType, Consumer<TaskSpec> modifier) throws ApiException {
             final String name = OperatorNames.generateTaskName(dc, taskType);
             final Task task = Task.fromDataCenter(name, dc);
             modifier.accept(task.getSpec());
-            this.createTask(task);
+            return this.createTask(task);
     }
 
-    public void deleteTasks(DataCenter dc) throws ApiException {
 
-    }
 }

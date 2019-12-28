@@ -22,13 +22,13 @@ import java.util.stream.Collectors;
 
 @Singleton
 @Infrastructure
-public final class CleanupTaskReconcilier extends TaskReconcilier {
-    private static final Logger logger = LoggerFactory.getLogger(CleanupTaskReconcilier.class);
-    
+public final class RepairTaskReconcilier extends TaskReconcilier {
+    private static final Logger logger = LoggerFactory.getLogger(RepairTaskReconcilier.class);
+
     private final SidecarClientFactory sidecarClientFactory;
-    
-    public CleanupTaskReconcilier(ReconcilierObserver reconcilierObserver, K8sResourceUtils k8sResourceUtils, SidecarClientFactory sidecarClientFactory) {
-        super(reconcilierObserver,"cleanup", k8sResourceUtils);
+
+    public RepairTaskReconcilier(ReconcilierObserver reconcilierObserver, K8sResourceUtils k8sResourceUtils, SidecarClientFactory sidecarClientFactory) {
+        super(reconcilierObserver,"repair", k8sResourceUtils);
         this.sidecarClientFactory = sidecarClientFactory;
     }
     
@@ -62,11 +62,11 @@ public final class CleanupTaskReconcilier extends TaskReconcilier {
                 (pod, timer) -> pod)
                 .doOnNext(pod -> {
                     try {
-                        final Throwable t = sidecarClientFactory.clientForPod(ElassandraPod.fromName(dc, pod)).cleanup(task.getSpec().getCleanup().getKeyspace()).blockingGet();
+                        final Throwable t = sidecarClientFactory.clientForPod(ElassandraPod.fromName(dc, pod)).repairPrimaryRange(task.getSpec().getRepair().getKeyspace()).blockingGet();
                         if (t != null) throw t;
                         task.getStatus().getPods().put(pod, TaskPhase.SUCCEED);
                     } catch (Throwable throwable) {
-                        logger.error("error while executing cleanup on {}", pod, throwable);
+                        logger.error("error while executing repair on {}", pod, throwable);
                         task.getStatus().getPods().put(pod, TaskPhase.FAILED);
                         task.getStatus().setLastMessage(throwable.getMessage());
                         task.getStatus().setPhase(TaskPhase.FAILED);
