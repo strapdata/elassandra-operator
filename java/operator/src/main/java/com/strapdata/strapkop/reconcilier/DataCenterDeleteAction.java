@@ -120,6 +120,9 @@ public class DataCenterDeleteAction {
                         break;
                 }
 
+                // delete tasks
+                k8sResourceUtils.deleteTasks(dataCenter.getMetadata().getNamespace(), null);
+
                 logger.info("Deleted DataCenter namespace={} name={}", dataCenter.getMetadata().getNamespace(), dataCenter.getMetadata().getName());
             }
         });

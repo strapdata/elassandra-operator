@@ -7,7 +7,9 @@ import io.micronaut.http.client.RxHttpClient;
 import io.reactivex.Completable;
 import io.reactivex.Single;
 
+import java.io.UnsupportedEncodingException;
 import java.net.URL;
+import java.net.URLEncoder;
 
 import static io.micronaut.http.HttpRequest.GET;
 import static io.micronaut.http.HttpRequest.POST;
@@ -32,10 +34,14 @@ public class SidecarClient {
         return httpClient.exchange(POST("/operations/decommission", "")).ignoreElements();
     }
     
-    public Completable cleanup() {
-        return httpClient.exchange(POST("/operations/cleanup", "")).ignoreElements();
+    public Completable cleanup(String keyspace) throws UnsupportedEncodingException {
+        return httpClient.exchange(POST("/operations/cleanup?keyspace=" + URLEncoder.encode(keyspace,"UTF-8"), "")).ignoreElements();
     }
-    
+
+    public Completable repairPrimaryRange(String keyspace) throws UnsupportedEncodingException {
+        return httpClient.exchange(POST("/operations/repair?keyspace=" + URLEncoder.encode(keyspace,"UTF-8"), "")).ignoreElements();
+    }
+
     public Single<BackupResponse> backup(BackupArguments backupArguments) {
         return httpClient.retrieve(POST("/backups", backupArguments), BackupResponse.class).singleOrError();
     }

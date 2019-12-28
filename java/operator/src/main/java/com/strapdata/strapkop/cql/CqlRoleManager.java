@@ -259,8 +259,16 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
         boolean hasSeedBootstrapped = dc.getStatus().getRackStatuses().values().stream().anyMatch(s -> s.getJoinedReplicas() > 0);
         if (hasSeedBootstrapped ||
                 ((dc.getSpec().getRemoteSeeds() == null || dc.getSpec().getRemoteSeeds().isEmpty()) && (dc.getSpec().getRemoteSeeders() == null || dc.getSpec().getRemoteSeeders().isEmpty()))) {
-            logger.debug("seed={} for datacenter={}", OperatorNames.nodesService(dc), dc.getMetadata().getName());
-            builder.addContactPoint(OperatorNames.nodesService(dc));
+            try {
+                logger.debug("seed={} for datacenter={}", OperatorNames.nodesService(dc), dc.getMetadata().getName());
+                builder.addContactPoint(OperatorNames.nodesService(dc));
+            } catch(IllegalArgumentException e) {
+                if (e.getCause() != null && e.getCause() instanceof  java.net.UnknownHostException) {
+                    // ignore DNS resolution failure because dc removed....
+                } else {
+                    throw e;
+                }
+            }
         }
 
 
