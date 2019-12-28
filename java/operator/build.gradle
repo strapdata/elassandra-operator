@@ -44,6 +44,7 @@ jib {
                     '-XX:+UnlockExperimentalVMOptions', '-XX:+UseCGroupMemoryLimitForHeap', '-XX:MaxRAMFraction=2',
                     '-XX:+ExitOnOutOfMemoryError',
                     '-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005',
+                    '-Dmicronaut.environments=$MICRONAUT_ENV',
                     '-Dcom.sun.management.jmxremote',
                     '-Dcom.sun.management.jmxremote.port=7199',
                     '-Dcom.sun.management.jmxremote.rmi.port=7199',
