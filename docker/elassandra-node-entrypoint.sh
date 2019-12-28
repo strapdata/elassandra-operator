@@ -14,6 +14,54 @@ do
 done
 )
 
+# usage:
+#   config_injection CASSANDRA $CASSANDRA_CONFIG/cassandra.yaml
+# or:
+#   config_injection ELASTICSEARCH $CASSANDRA_CONFIG/elasticsearch.yml
+config_injection() {
+
+  local filename="$2";
+  local filter
+  local tempFile
+
+    for v in $(compgen -v "${1}__"); do
+     echo "v=$v"
+     val="${!v}"
+     if [ "$val" ]; then
+        var=$(echo ${v#"${1}"}|sed 's/__/\./g')
+        if is_num ${val}; then
+          filter="${var}=${val}"
+        else
+          case ${val} in
+            true)  filter="${var}=true";;
+            false) filter="${var}=false";;
+            *)     filter="${var}=\"${val}\"";;
+          esac
+        fi
+
+        tempFile="$(mktemp)"
+        if [[ "$(yq --yaml-output . $filename | wc -l | xargs)" == 0 ]]; then
+            echo "${filter:1}" | sed 's/=/: /g' > "$tempFile"
+        else
+           yq --yaml-output ". * $(echo "${filter};" | gron -u)" $filename > "$tempFile"
+        fi
+        cat "$tempFile" > $filename
+        rm "$tempFile"
+     fi
+    done
+
+    if [ "$DEBUG" ]; then
+       echo "config_injection $filename:"
+       cat "$filename"
+    fi
+}
+
+is_num() {
+  re='^-?[0-9]+$'
+  [[ $1 =~ $re ]] && true
+}
+
+
 # default settings
 ES_USE_INTERNAL_ADDRESS=""
 LISTEN_ADDRESS="$POD_IP"
@@ -55,6 +103,8 @@ if [ -n "$JMX_PASSWORD" ]; then
    chmod 400 /etc/cassandra/jmxremote.password
 fi
 
+config_injection CASSANDRA $CASSANDRA_CONFIG/cassandra.yaml
+config_injection ELASTICSEARCH $CASSANDRA_CONFIG/elasticsearch.yml
 
 # handle kubernetes SIGTERM and gracefully stop elassandra
 _term() {
