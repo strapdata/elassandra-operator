@@ -26,12 +26,20 @@ public class DataCenterSpec {
     @SerializedName("workload")
     @Expose
     private Workload workload = Workload.WRITE;
+
     /**
      * Number of Cassandra nodes in this data center.
      */
     @SerializedName("replicas")
     @Expose
     private int replicas;
+
+    /**
+     * Park the datacenter by setting sts to zero replica, but keep PVC and replica unchanged.
+     */
+    @SerializedName("parked")
+    @Expose
+    private boolean parked = false;
 
     /**
      * How the operator decide to spawn a new E* node
