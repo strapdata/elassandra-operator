@@ -2,6 +2,7 @@ package com.strapdata.strapkop.cql;
 
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.Session;
+import com.google.common.collect.ImmutableSet;
 import com.strapdata.model.k8s.cassandra.CqlStatus;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.k8s.cassandra.DataCenterPhase;
@@ -27,9 +28,13 @@ import java.util.stream.Collectors;
  */
 @Singleton
 public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
-    private static final Logger logger = LoggerFactory.getLogger(CqlKeyspaceManager.class);
-    private static final Set<String> SYSTEM_KEYSPACES = new HashSet<>(Arrays.asList(new String[] { "system_auth", "system_distributed", "system_traces" }));
 
+    private static final Logger logger = LoggerFactory.getLogger(CqlKeyspaceManager.class);
+
+    private static final Set<CqlKeyspace> SYSTEM_KEYSPACES = ImmutableSet.of(
+            new CqlKeyspace().withName("system_auth").withRf(3),
+            new CqlKeyspace().withName("system_distributed").withRf(3),
+            new CqlKeyspace().withName("system_traces").withRf(3));
 
     final PluginRegistry pluginRegistry;
     final K8sResourceUtils k8sResourceUtils;
@@ -77,9 +82,9 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                 if (!Optional.ofNullable(dataCenter.getStatus().getKeyspaceManagerStatus().getReplicas()).orElse(0).equals(dataCenter.getStatus().getReplicas())) {
 
                     // adjust RF for system keyspaces
-                    for (String keyspace : SYSTEM_KEYSPACES) {
+                    for (CqlKeyspace keyspace : SYSTEM_KEYSPACES) {
                         try {
-                            updateKeyspaceReplcationMap(dataCenter, keyspace, effectiveRF(dataCenter, 3), sessionSupplier).blockingGet();
+                            updateKeyspaceReplcationMap(dataCenter, keyspace.name, effectiveRF(dataCenter, keyspace.rf), sessionSupplier).blockingGet();
                         } catch (Exception e) {
                             logger.warn("Failed to adjust RF for keyspace="+keyspace, e);
                         }
@@ -125,8 +130,8 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
         // abort if dc is not running normally or not connected
         if (dataCenter.getStatus().getPhase().equals(DataCenterPhase.RUNNING) && dataCenter.getStatus().getCqlStatus().equals(CqlStatus.ESTABLISHED)) {
             // adjust RF for system keyspaces
-            for(String keyspace : SYSTEM_KEYSPACES) {
-                updateKeyspaceReplcationMap(dataCenter, keyspace, 0, sessionSupplier).blockingGet();
+            for(CqlKeyspace keyspace : SYSTEM_KEYSPACES) {
+                updateKeyspaceReplcationMap(dataCenter, keyspace.name, 0, sessionSupplier).blockingGet();
             }
 
             // monitor elastic_admin keyspace to reduce RF when scaling down the DC.
@@ -140,66 +145,86 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
         remove(dataCenter);
     }
 
+    public Completable decreaseRfBeforeScalingDownDc(final DataCenter dataCenter, int targetDcSize, final CqlSessionSupplier sessionSupplier) throws Exception {
+        if (dataCenter.getStatus().getPhase().equals(DataCenterPhase.RUNNING) && dataCenter.getStatus().getCqlStatus().equals(CqlStatus.ESTABLISHED))
+        {
+            List<CqlKeyspace> keyspaces = new ArrayList<>();
+            keyspaces.addAll(SYSTEM_KEYSPACES);
+            keyspaces.add(new CqlKeyspace().setName(elasticAdminKeyspaceName(dataCenter)).setRf(3));
+            keyspaces.addAll(get(dataCenter).values());
+            List<Completable> completables = new ArrayList<>(keyspaces.size());
+            for(CqlKeyspace keyspace : keyspaces) {
+                completables.add(updateKeyspaceReplcationMap(dataCenter, keyspace.name, Math.min(keyspace.rf, targetDcSize), sessionSupplier));
+            }
+            return Completable.mergeArray(completables.toArray(new Completable[completables.size()]));
+        }
+        return Completable.complete();
+    }
+
     /**
      * Alter rf map but keep other dc replication factor
+     *
      * @throws StrapkopException
      */
     private Completable updateKeyspaceReplcationMap(final DataCenter dc, final String keyspace, int targetRf, final CqlSessionSupplier sessionSupplier) throws Exception {
-        return sessionSupplier.getSession(dc).flatMapCompletable(session -> {
-            final Row row = session.execute("SELECT keyspace_name, replication FROM system_schema.keyspaces WHERE keyspace_name = ?", keyspace).one();
-            if (row == null) {
-                logger.warn("keyspace={} does not exist in dc={}, ignoring.", keyspace, dc.getMetadata().getName());
-                return Completable.complete();
-            }
-            final Map<String, String> replication = row.getMap("replication", String.class, String.class);
-            final String strategy = replication.get("class");
-            Objects.requireNonNull(strategy, "replication strategy cannot be null");
+        return sessionSupplier.getSession(dc)
+                .flatMap(session ->
+                        Single.fromFuture(session.executeAsync("SELECT keyspace_name, replication FROM system_schema.keyspaces WHERE keyspace_name = ?", keyspace))
+                )
+                .flatMapCompletable(rs -> {
+                    Row row = rs.one();
+                    if (row == null) {
+                        logger.warn("keyspace={} does not exist in dc={}, ignoring.", keyspace, dc.getMetadata().getName());
+                        return Completable.complete();
+                    }
+                    final Map<String, String> replication = row.getMap("replication", String.class, String.class);
+                    final String strategy = replication.get("class");
+                    Objects.requireNonNull(strategy, "replication strategy cannot be null");
 
-            final Map<String, Integer> currentRfMap = replication.entrySet().stream()
-                    .filter(e -> !e.getKey().equals("class") && !e.getKey().equals("replication_factor"))
-                    .collect(Collectors.toMap(
-                            Map.Entry::getKey,
-                            e -> Integer.parseInt(e.getValue())
-                    ));
-            final int currentRf = currentRfMap.getOrDefault(dc.getSpec().getDatacenterName(), 0);
-
-            if (currentRf != targetRf) {
-                currentRfMap.put(dc.getSpec().getDatacenterName(), targetRf);
-                if (currentRfMap.entrySet().stream().filter(e -> e.getValue() > 0).count() > 0) {
-                    return alterKeyspace(dc, sessionSupplier, keyspace, currentRfMap)
-                            .flatMapCompletable(s -> {
-                                if (targetRf > currentRf) {
-                                    // RF increased
-                                    if (currentRf > 1) {
-                                        logger.info("Trigger a repair for keyspace={} in dc={}", keyspace, dc.getMetadata().getName());
-                                        // TODO: trigger repair if RF is manually increased while DC was RUNNING (if RF is incremented just before scaling up, streaming propely pull data)
-                                        return k8sResourceUtils.createTask(dc, "repair", new Consumer<TaskSpec>() {
-                                            @Override
-                                            public void accept(TaskSpec taskSpec) {
-                                                taskSpec.setRepair(new RepairTaskSpec().setKeyspace(keyspace));
+                    final Map<String, Integer> currentRfMap = replication.entrySet().stream()
+                            .filter(e -> !e.getKey().equals("class") && !e.getKey().equals("replication_factor"))
+                            .collect(Collectors.toMap(
+                                    Map.Entry::getKey,
+                                    e -> Integer.parseInt(e.getValue())
+                            ));
+                    final int currentRf = currentRfMap.getOrDefault(dc.getSpec().getDatacenterName(), 0);
+                    logger.debug("keyspace={} currentRf={} targetRf={}", keyspace, currentRf, targetRf);
+                    if (currentRf != targetRf) {
+                        currentRfMap.put(dc.getSpec().getDatacenterName(), targetRf);
+                        if (currentRfMap.entrySet().stream().filter(e -> e.getValue() > 0).count() > 0) {
+                            return alterKeyspace(dc, sessionSupplier, keyspace, currentRfMap)
+                                    .flatMapCompletable(s -> {
+                                        if (targetRf > currentRf) {
+                                            // RF increased
+                                            if (targetRf > 1) {
+                                                logger.info("Trigger a repair for keyspace={} in dc={}", keyspace, dc.getMetadata().getName());
+                                                // TODO: trigger repair if RF is manually increased while DC was RUNNING (if RF is incremented just before scaling up, streaming propely pull data)
+                                                return k8sResourceUtils.createTask(dc, "repair", new Consumer<TaskSpec>() {
+                                                    @Override
+                                                    public void accept(TaskSpec taskSpec) {
+                                                        taskSpec.setRepair(new RepairTaskSpec().setKeyspace(keyspace));
+                                                    }
+                                                }).ignoreElement();
                                             }
-                                        }).ignoreElement();
-                                    }
-                                } else {
-                                    // RF deacreased
-                                    if (targetRf < dc.getStatus().getReplicas()) {
-                                        logger.info("Trigger a cleanup for keyspace={} in dc={}", keyspace, dc.getMetadata().getName());
-                                        // TODO: trigger cleanup when RF is manually decrease while DC was RUNNING.
-                                        return k8sResourceUtils.createTask(dc, "cleanup", new Consumer<TaskSpec>() {
-                                            @Override
-                                            public void accept(TaskSpec taskSpec) {
-                                                taskSpec.setRepair(new RepairTaskSpec().setKeyspace(keyspace));
+                                        } else {
+                                            // RF deacreased
+                                            if (targetRf < dc.getStatus().getReplicas()) {
+                                                logger.info("Trigger a cleanup for keyspace={} in dc={}", keyspace, dc.getMetadata().getName());
+                                                // TODO: trigger cleanup when RF is manually decrease while DC was RUNNING.
+                                                return k8sResourceUtils.createTask(dc, "cleanup", new Consumer<TaskSpec>() {
+                                                    @Override
+                                                    public void accept(TaskSpec taskSpec) {
+                                                        taskSpec.setRepair(new RepairTaskSpec().setKeyspace(keyspace));
+                                                    }
+                                                }).ignoreElement();
                                             }
-                                        }).ignoreElement();
-                                    }
-                                }
-                                return Completable.complete();
-                            });
-                }
-            }
-            return Completable.complete();
-        });
-
+                                        }
+                                        return Completable.complete();
+                                    });
+                        }
+                    }
+                    return Completable.complete();
+                });
     }
 
     private Single<Session> alterKeyspace(final DataCenter dc, final CqlSessionSupplier sessionSupplier, final String name, Map<String, Integer> rfMap) throws Exception {
