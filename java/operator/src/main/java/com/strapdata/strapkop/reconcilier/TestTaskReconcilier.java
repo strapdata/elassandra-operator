@@ -7,6 +7,7 @@ import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.plugins.TestSuitePlugin;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.reactivex.Completable;
+import io.reactivex.Single;
 
 import javax.inject.Singleton;
 
@@ -24,12 +25,13 @@ public class TestTaskReconcilier extends TaskReconcilier {
     }
 
     @Override
-    protected Completable doTask(Task task, DataCenter dc) throws Exception {
+    protected Single<TaskPhase> doTask(Task task, DataCenter dc) throws Exception {
         if (testSuitePlugin.isBusy(task) && !testSuitePlugin.isRunning(task)) {
             // a test is already running, postpone this one
-            return k8sResourceUtils.updateTaskStatus(task, TaskPhase.WAITING);
+            return Single.just(TaskPhase.WAITING);
         }
 
+        /*
         if (!testSuitePlugin.isRunning(task)) {
             // a test is already running, postpone this one
             return testSuitePlugin.initialize(task, dc);
@@ -37,6 +39,9 @@ public class TestTaskReconcilier extends TaskReconcilier {
             testSuitePlugin.runTest(task, dc);
             return Completable.complete();
         }
+         */
+
+        return Single.just(TaskPhase.WAITING);
     }
 
     @Override

@@ -15,7 +15,6 @@ import io.micronaut.context.annotation.Prototype;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
@@ -213,7 +212,6 @@ public class SingleNodeTestSuite extends TestSuiteExecutor {
                     break;
 
                 case CREATING:
-                case EXECUTING_TASK:
                     LOGGER.info("[TEST] Unexpected DC Phase");
                     failed("Unexpected DC Phase during config map update ('" + dc.getStatus().getPhase() + "')");
                     break;
