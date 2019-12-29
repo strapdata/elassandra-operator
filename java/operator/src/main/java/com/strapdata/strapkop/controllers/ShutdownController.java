@@ -45,9 +45,8 @@ public class ShutdownController {
     public Single<List<String>> purge() throws ApiException {
             return Observable.fromIterable(k8sResourceUtils.listNamespacedDataCenters(operatorConfig.getNamespace(), null))
                     .flatMapSingle(dc -> {
-                        reconcilierObserver.gracefullStop(); // disable next reconciliation
-                        logger.warn("Purging datacenter={} in namespace={}", dc.getMetadata().getName(), dc.getMetadata().getNamespace());
-                        return dataCenterDeleteReconcilier.reconcile(dc).toSingleDefault(dc.getMetadata().getName());
+                        logger.warn("Deleting datacenter={} in namespace={}", dc.getMetadata().getName(), dc.getMetadata().getNamespace());
+                        return k8sResourceUtils.deleteDataCenter(dc.getMetadata()).map(dc2 -> dc2.getMetadata().getName());
                     })
                     .toList();
     }
