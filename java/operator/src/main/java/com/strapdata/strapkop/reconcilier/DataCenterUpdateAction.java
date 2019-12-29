@@ -351,9 +351,9 @@ public class DataCenterUpdateAction {
                 .flatMap(s4 -> fetchExistingStatefulSetsByZone())
                 .flatMapCompletable(existingStsMap -> {
                     Zones zones = new Zones(this.coreApi, existingStsMap);
+                    final Map<String, RackStatus> rackStatusByName = new HashMap<>();
 
                     // 1.lookup for evolving rack
-                    final Map<String, RackStatus> rackStatusByName = new HashMap<>();
                     RackStatus movingRack = null;
                     for(RackStatus rackStatus : dataCenterStatus.getRackStatuses().values()) {
                         rackStatusByName.put(rackStatus.getName(), rackStatus);
@@ -367,7 +367,7 @@ public class DataCenterUpdateAction {
                     ElassandraPod failedPod = null;
 
                     if (movingRack != null) {
-                        Zone movingZone = zones.zones.get(movingRack.getName());
+                        Zone movingZone = zones.zoneMap.get(movingRack.getName());
                         logger.debug("movingRack={} phase={} isReady={} isUpdating={} isScalingUp={} isScalingDown={} firstPodStatus={} lastPodStatus={}",
                                 movingRack.getName(), movingRack.getPhase(), movingZone.isReady(), movingZone.isScalingUp(), movingZone.isScalingDown(),
                                 elassandraNodeStatusCache.get(movingZone.firstPod(dataCenter)), elassandraNodeStatusCache.get(movingZone.lastPod(dataCenter)));
@@ -488,9 +488,9 @@ public class DataCenterUpdateAction {
                     }
 
                     Completable todo = Completable.complete();
+                    final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
                     if (totalNormalPod > 0) {
                         // before scaling, if at least a pod is NORMAL, update keyspaces and roles if needed
-                        final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
                         todo = this.cqlKeyspaceManager.reconcileKeyspaces(dataCenter, cqlSessionHandler)
                                 .andThen(this.cqlRoleManager.reconcileRole(dataCenter, cqlSessionHandler))
                                 .andThen(this.cqlLicenseManager.verifyLicense(dataCenter, cqlSessionHandler))
@@ -551,7 +551,7 @@ public class DataCenterUpdateAction {
                         GlobalManifest manifests = reader.aggregateManifest(restoreFromBackup.getSnapshotTag());
 
                         Set<String> nodesToRestore = manifests.getNodes();
-                        Set<String> availableNodes = zones.zones.values().stream().flatMap(zone -> {
+                        Set<String> availableNodes = zones.zoneMap.values().stream().flatMap(zone -> {
                             String stsName = OperatorNames.stsName(dataCenter, zone.name);
                             return IntStream.range(0, zone.size).mapToObj(Integer::toString).map(index -> stsName+"-"+index);
                         }).collect(Collectors.toSet());
@@ -642,7 +642,10 @@ public class DataCenterUpdateAction {
                                     logger.debug("SCALE_DOWN started in rack={} size={}, decommissioning pod={} status={}",
                                             zone.name, zone.size, elassandraPod, elassandraNodeStatus);
                                     // decomission node
-                                    return todo.andThen(sidecarClientFactory.clientForPod(elassandraPod).decommission()
+                                    logger.debug("Adjusting RF and Decomissionning elassandra pod={}", elassandraPod);
+                                    return todo
+                                            .andThen(cqlKeyspaceManager.decreaseRfBeforeScalingDownDc(dataCenter, zones.totalReplicas() - 1, cqlSessionHandler))
+                                            .andThen(sidecarClientFactory.clientForPod(elassandraPod).decommission()
                                             .retryWhen(errors -> errors
                                                     .zipWith(Flowable.range(1, 5), (n, i) -> i)
                                                     .flatMap(retryCount -> Flowable.timer(2, TimeUnit.SECONDS))
@@ -2189,7 +2192,7 @@ public class DataCenterUpdateAction {
     }
 
     public static class Zones implements Iterable<Zone> {
-        Map<String, Zone> zones = new LinkedHashMap<>();
+        Map<String, Zone> zoneMap = new LinkedHashMap<>();
 
         public Zones(CoreV1Api coreApi, Map<String, V1StatefulSet> existingStatefulSetsByZone) throws ApiException {
             this(coreApi.listNode(false, null, null, null, null,
@@ -2202,7 +2205,7 @@ public class DataCenterUpdateAction {
                 if (zoneName == null) {
                     throw new RuntimeException(new StrapkopException(String.format("missing label %s on node %s", OperatorLabels.ZONE, node.getMetadata().getName())));
                 }
-                zones.compute(zoneName, (k,z) -> {
+                zoneMap.compute(zoneName, (k, z) -> {
                     if (z == null) {
                         z = new Zone(zoneName);
                     }
@@ -2214,23 +2217,23 @@ public class DataCenterUpdateAction {
         }
 
         public int totalNodes() {
-            return zones.values().stream().map(z -> z.size).reduce(0, Integer::sum);
+            return zoneMap.values().stream().map(z -> z.size).reduce(0, Integer::sum);
         }
 
         public int totalReplicas() {
-            return zones.values().stream().map(Zone::replicas).reduce(0, Integer::sum);
+            return zoneMap.values().stream().map(Zone::replicas).reduce(0, Integer::sum);
         }
 
         public int totalCurrentReplicas() {
-            return zones.values().stream().map(Zone::currentReplicas).reduce(0, Integer::sum);
+            return zoneMap.values().stream().map(Zone::currentReplicas).reduce(0, Integer::sum);
         }
 
         public int totalReadyReplicas() {
-            return zones.values().stream().map(Zone::readyReplicas).reduce(0, Integer::sum);
+            return zoneMap.values().stream().map(Zone::readyReplicas).reduce(0, Integer::sum);
         }
 
         public Optional<Zone> nextToScalueUp() {
-            return (totalNodes() == totalReplicas()) ? Optional.empty() : zones.values().stream()
+            return (totalNodes() == totalReplicas()) ? Optional.empty() : zoneMap.values().stream()
                     // filter-out full nodes
                     .filter(z -> z.freeNodeCount() > 0)
                     // select the preferred zone based on some priorities
@@ -2238,7 +2241,7 @@ public class DataCenterUpdateAction {
         }
 
         public Optional<Zone> nextToScaleDown() {
-            return (totalReplicas() == 0) ? Optional.empty() : zones.values().stream()
+            return (totalReplicas() == 0) ? Optional.empty() : zoneMap.values().stream()
                     // filter-out full nodes
                     .filter(z -> z.replicas() > 0 || !z.sts.isPresent())
                     // select the preferred zone based on some priorities
@@ -2246,15 +2249,15 @@ public class DataCenterUpdateAction {
         }
 
         public Optional<Zone> first() {
-            return zones.values().stream().min(Zone.scaleComparator);
+            return zoneMap.values().stream().min(Zone.scaleComparator);
         }
 
         public boolean isReady() {
-            return zones.values().stream().allMatch(Zone::isReady);
+            return zoneMap.values().stream().allMatch(Zone::isReady);
         }
 
         public boolean hasConsistentConfiguration() {
-            return zones.values().stream()
+            return zoneMap.values().stream()
                     .map(z -> z.getDataCenterFingerPrint())
                     .filter(Optional::isPresent).collect(Collectors.toSet()).size() == 1;
         }
@@ -2266,7 +2269,7 @@ public class DataCenterUpdateAction {
          */
         @Override
         public Iterator<Zone> iterator() {
-            return zones.values().iterator();
+            return zoneMap.values().iterator();
         }
     }
 
