@@ -8,14 +8,19 @@ import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.k8s.task.BackupTaskSpec;
 import com.strapdata.model.k8s.task.Task;
 import com.strapdata.model.k8s.task.TaskPhase;
+import com.strapdata.model.k8s.task.TaskStatus;
 import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CustomObjectsApi;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.annotation.Infrastructure;
-import io.reactivex.Completable;
+import io.reactivex.Observable;
+import io.reactivex.Single;
+import io.reactivex.schedulers.Schedulers;
+import io.vavr.Tuple2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,26 +30,32 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+
 @Singleton
 @Infrastructure
 public class BackupTaskReconcilier extends TaskReconcilier {
     private static final Logger logger = LoggerFactory.getLogger(BackupTaskReconcilier.class);
     private final SidecarClientFactory sidecarClientFactory;
     
-    public BackupTaskReconcilier(ReconcilierObserver reconcilierObserver, K8sResourceUtils k8sResourceUtils, SidecarClientFactory sidecarClientFactory, CustomObjectsApi customObjectsApi) {
-        super(reconcilierObserver, "backup", k8sResourceUtils);
+    public BackupTaskReconcilier(ReconcilierObserver reconcilierObserver,
+                                 final K8sResourceUtils k8sResourceUtils,
+                                 final SidecarClientFactory sidecarClientFactory,
+                                 final CustomObjectsApi customObjectsApi,
+                                 final MeterRegistry meterRegistry) {
+        super(reconcilierObserver, "backup", k8sResourceUtils, meterRegistry);
         this.sidecarClientFactory = sidecarClientFactory;
     }
-    
-    
+
+    /**
+     * Execute backup concurrently on all nodes
+     * @param task
+     * @param dc
+     * @return
+     * @throws ApiException
+     */
     @Override
-    protected Completable doTask(Task task, DataCenter dc) throws ApiException {
-        // if it's the first time, initialize the map of pods status
-        if (task.getStatus().getPods() == null) {
-            task.getStatus().setPhase(TaskPhase.STARTED);
-            initializePodMap(task, dc);
-        }
-        
+    protected Single<TaskPhase> doTask(Task task, DataCenter dc) throws ApiException {
+
         // find the next pods to cleanup
         final List<String> pods = task.getStatus().getPods().entrySet().stream()
                 .filter(e -> Objects.equals(e.getValue(), TaskPhase.WAITING))
@@ -53,51 +64,49 @@ public class BackupTaskReconcilier extends TaskReconcilier {
         
         // if there is no more we are done
         if (pods.isEmpty()) {
-            task.getStatus().setPhase(TaskPhase.SUCCEED);
-            k8sResourceUtils.updateTaskStatus(task);
-            return ensureUnlockDc(task, dc);
+            return Single.just(TaskPhase.SUCCEED);
         }
 
         // TODO: better backup with sstableloader and progress tracking
-        // right now it just call the backup api on every nodes sidecar
-        try {
+        // right now it just call the backup api on every nodes sidecar in parallel
+        final BackupTaskSpec backupSpec = task.getSpec().getBackup();
+        final CloudStorageSecret cloudSecret = k8sResourceUtils.readAndValidateStorageSecret(task.getMetadata().getNamespace(), backupSpec.getSecretRef(), backupSpec.getProvider());
 
-            final BackupTaskSpec backupSpec = task.getSpec().getBackup();
-            final CloudStorageSecret cloudSecret = k8sResourceUtils.readAndValidateStorageSecret(task.getMetadata().getNamespace(), backupSpec.getSecretRef(), backupSpec.getProvider());
+        return Observable.fromIterable(pods)
+                .subscribeOn(Schedulers.io())
+                .flatMapSingle(pod -> {
+                    final BackupArguments backupArguments = generateBackupArguments(
+                            task.getMetadata().getName(),
+                            backupSpec.getProvider(),
+                            backupSpec.getBucket(),
+                            OperatorNames.dataCenterResource(task.getSpec().getCluster(), task.getSpec().getDatacenter()),
+                            pod,
+                            cloudSecret);
 
-            for (String pod : pods) {
-                final BackupArguments backupArguments = generateBackupArguments(
-                        task.getMetadata().getName(),
-                        backupSpec.getProvider(),
-                        backupSpec.getBucket(),
-                        OperatorNames.dataCenterResource(task.getSpec().getCluster(), task.getSpec().getDatacenter()),
-                        pod,
-                        cloudSecret);
-
-                final boolean success = sidecarClientFactory.clientForPod(ElassandraPod.fromName(dc, pod))
-                        .backup(backupArguments)
-                        .doOnSuccess(backupResponse -> logger.debug("received backupSpec response with status = {}", backupResponse.getStatus()))
-                        .map(backupResponse -> backupResponse.getStatus().equalsIgnoreCase("success"))
-                        .onErrorReturn(throwable -> {
-                            logger.warn("error occurred from sidecar backupSpec", throwable);
-                            task.getStatus().setLastMessage(throwable.getMessage());
-                            return true;
-                        }).blockingGet();
-        
-                task.getStatus().getPods().put(pod, success ? TaskPhase.SUCCEED : TaskPhase.FAILED);
-        
-                if (!success) {
-                    task.getStatus().setPhase(TaskPhase.FAILED);
-                    break;
-                }
-            }
-        }
-        catch (Throwable throwable) {
-            task.getStatus().setLastMessage(throwable.getMessage());
-            task.getStatus().setPhase(TaskPhase.FAILED);
-        }
-        
-        return k8sResourceUtils.updateTaskStatus(task);
+                    return sidecarClientFactory.clientForPod(ElassandraPod.fromName(dc, pod))
+                            .backup(backupArguments)
+                            .map(backupResponse -> {
+                                logger.debug("Received backupSpec response with status = {}", backupResponse.getStatus());
+                                boolean success = backupResponse.getStatus().equalsIgnoreCase("success");
+                                if (!success)
+                                    task.getStatus().setLastMessage("Basckup task="+task.getMetadata().getName()+" on pod="+pod+" failed");
+                                return new Tuple2<String, Boolean>(pod, success);
+                            });
+                })
+                .toList()
+                .map(list -> {
+                    // update pod status map a the end to avoid concurrency issue
+                    TaskStatus status = task.getStatus();
+                    Map<String, TaskPhase> podsMap = task.getStatus().getPods();
+                    Map<String, TaskPhase> podStatus = status.getPods();
+                    TaskPhase taskPhase = TaskPhase.SUCCEED;
+                    for(Tuple2<String, Boolean> e : list) {
+                        podsMap.put(e._1, e._2 ? TaskPhase.SUCCEED : TaskPhase.FAILED);
+                        if (!e._2)
+                            taskPhase = TaskPhase.FAILED;
+                    }
+                    return taskPhase;
+                });
     }
 
 
