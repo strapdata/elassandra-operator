@@ -5,6 +5,7 @@ import com.strapdata.model.k8s.task.Task;
 import com.strapdata.model.k8s.task.TaskPhase;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.plugins.TestSuitePlugin;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.reactivex.Completable;
 
 import javax.inject.Singleton;
@@ -14,8 +15,11 @@ public class TestTaskReconcilier extends TaskReconcilier {
 
     private final TestSuitePlugin testSuitePlugin;
 
-    public TestTaskReconcilier(ReconcilierObserver reconcilierObserver, K8sResourceUtils k8sResourceUtils, TestSuitePlugin testPlugin) {
-        super(reconcilierObserver, "test", k8sResourceUtils);
+    public TestTaskReconcilier(ReconcilierObserver reconcilierObserver,
+                               final K8sResourceUtils k8sResourceUtils,
+                               final TestSuitePlugin testPlugin,
+                               final MeterRegistry meterRegistry) {
+        super(reconcilierObserver, "test", k8sResourceUtils, meterRegistry);
         this.testSuitePlugin = testPlugin;
     }
 

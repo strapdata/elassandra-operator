@@ -2,7 +2,7 @@ package com.strapdata.model.k8s.task;
 
 public enum TaskPhase {
     WAITING,
-    STARTED,
+    RUNNING,
     SUCCEED,
     FAILED;
 

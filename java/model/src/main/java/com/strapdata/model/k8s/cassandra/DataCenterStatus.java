@@ -13,6 +13,13 @@ import java.util.*;
 public class DataCenterStatus {
 
     /**
+     * Reconciliation block
+     */
+    @SerializedName("block")
+    @Expose
+    private Block block = new Block();
+
+    /**
      * Current DC phase
      */
     @SerializedName("phase")

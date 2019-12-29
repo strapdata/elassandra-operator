@@ -14,7 +14,7 @@ public class TaskStatus {
     
     @SerializedName("phase")
     @Expose
-    private TaskPhase phase = null;
+    private TaskPhase phase = TaskPhase.WAITING;
     
     @SerializedName("lastMessage")
     @Expose
@@ -22,5 +22,5 @@ public class TaskStatus {
     
     @SerializedName("pods")
     @Expose
-    private Map<String, TaskPhase> pods = null;
+    private Map<String, TaskPhase> pods = new HashMap<>();
 }

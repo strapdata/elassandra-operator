@@ -14,7 +14,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
-import java.util.Objects;
 
 @Singleton
 public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
@@ -45,8 +44,9 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
         return k8sResourceUtils.readDatacenter(key)
                 .flatMap(dc -> reconcilierObserver.onReconciliationBegin().toSingleDefault(dc))
                 .flatMapCompletable(dc -> {
-                    if (dc.getStatus() != null && Objects.equals(dc.getStatus().getPhase(), DataCenterPhase.EXECUTING_TASK)) {
-                        logger.debug("do not reconcile datacenter as a task is already being executed ({})", dc.getStatus().getCurrentTask());
+                    if (dc.getStatus() != null && dc.getStatus().getBlock().isLocked()) {
+                        logger.info("Do not reconcile datacenter block reasons={} as a task is already being executed ({})",
+                                dc.getStatus().getBlock().getReasons(), dc.getStatus().getCurrentTask());
                         return Completable.complete();
                     }
                     try {

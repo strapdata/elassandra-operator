@@ -7,9 +7,12 @@ import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import io.kubernetes.client.ApiException;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.annotation.Infrastructure;
-import io.reactivex.Completable;
 import io.reactivex.Observable;
+import io.reactivex.Single;
+import io.reactivex.schedulers.Schedulers;
+import io.vavr.Tuple2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,53 +30,61 @@ public final class CleanupTaskReconcilier extends TaskReconcilier {
     
     private final SidecarClientFactory sidecarClientFactory;
     
-    public CleanupTaskReconcilier(ReconcilierObserver reconcilierObserver, K8sResourceUtils k8sResourceUtils, SidecarClientFactory sidecarClientFactory) {
-        super(reconcilierObserver,"cleanup", k8sResourceUtils);
+    public CleanupTaskReconcilier(ReconcilierObserver reconcilierObserver,
+                                  final K8sResourceUtils k8sResourceUtils,
+                                  final SidecarClientFactory sidecarClientFactory,
+                                  final MeterRegistry meterRegistry) {
+        super(reconcilierObserver,"cleanup", k8sResourceUtils, meterRegistry);
         this.sidecarClientFactory = sidecarClientFactory;
     }
-    
+
+    /**
+     * Execute task on each pod and update the task status
+     * @param task
+     * @param dc
+     * @return
+     * @throws ApiException
+     */
     @Override
-    protected Completable doTask(Task task, DataCenter dc) throws ApiException {
-        
-        // if it's the first time, initialize the map of pods status
-        if (task.getStatus().getPods() == null) {
-            task.getStatus().setPhase(TaskPhase.STARTED);
-            initializePodMap(task, dc);
-        }
+    protected Single<TaskPhase> doTask(Task task, DataCenter dc) throws ApiException {
         
         // find the next pods to cleanup
         final List<String> pods = task.getStatus().getPods().entrySet().stream()
                 .filter(e -> Objects.equals(e.getValue(), TaskPhase.WAITING))
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
-        
-        // if there is no more we are done
+
         if (pods.isEmpty()) {
-            task.getStatus().setPhase(TaskPhase.SUCCEED);
-            k8sResourceUtils.updateTaskStatus(task);
-            return ensureUnlockDc(task, dc);
+            return Single.just(TaskPhase.SUCCEED);
         }
-        
+
         // do clean up on each pod with 10 sec interval
         // TODO: maybe we should try to caught outer exception (even if we already catch inside doOnNext)
-        Observable.zip(
-                Observable.fromIterable(pods),
-                Observable.interval(10, TimeUnit.SECONDS),
-                (pod, timer) -> pod)
-                .doOnNext(pod -> {
+        return Observable.zip(Observable.fromIterable(pods), Observable.interval(10, TimeUnit.SECONDS), (pod, timer) -> pod)
+                .subscribeOn(Schedulers.computation())
+                .flatMapSingle(pod -> {
+                    // execute cleanup on a each pod sequentially
+                    TaskPhase podPhase = TaskPhase.SUCCEED;
                     try {
                         final Throwable t = sidecarClientFactory.clientForPod(ElassandraPod.fromName(dc, pod)).cleanup(task.getSpec().getCleanup().getKeyspace()).blockingGet();
                         if (t != null) throw t;
-                        task.getStatus().getPods().put(pod, TaskPhase.SUCCEED);
                     } catch (Throwable throwable) {
-                        logger.error("error while executing cleanup on {}", pod, throwable);
-                        task.getStatus().getPods().put(pod, TaskPhase.FAILED);
+                        logger.error("Error while executing cleanup on {}", pod, throwable);
+                        podPhase = TaskPhase.FAILED;
                         task.getStatus().setLastMessage(throwable.getMessage());
-                        task.getStatus().setPhase(TaskPhase.FAILED);
                     }
+                    task.getStatus().getPods().put(pod, podPhase);
+                    return updateTaskStatus(dc, task, TaskPhase.RUNNING).toSingleDefault(new Tuple2<String, TaskPhase>(pod, podPhase));
                 })
-                .toList().blockingGet();
-
-        return k8sResourceUtils.updateTaskStatus(task);
+                .toList()
+                .map(list -> {
+                    // finally compute the task phase
+                    TaskPhase taskPhase = TaskPhase.SUCCEED;
+                    for(Tuple2<String, TaskPhase>  t : list) {
+                        if (t._2.equals(TaskPhase.FAILED))
+                            taskPhase = TaskPhase.FAILED;
+                    }
+                    return taskPhase;
+                });
     }
 }
