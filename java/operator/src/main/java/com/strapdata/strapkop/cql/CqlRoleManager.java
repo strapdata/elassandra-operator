@@ -140,33 +140,35 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
 
                     Tuple2<Cluster,Session> tuple = null;
                     CqlRole connectedRole = null;
-                    try {
-                        for (CqlRole role : roles) {
-                            try {
-                                role.loadPassword(dc, k8sResourceUtils).blockingGet();
-                                tuple = connect(dc, Optional.of(role));
-                                connectedRole = role;
-                                break;
-                            } catch (AuthenticationException e) {
-                                // authentication failed
-                                logger.debug("Authentication to dc={} failed with role={} from secret={}",
-                                        dc.getMetadata().getName(), role.username, (role.secretKey == null) ? null : role.secret(dc));
-                            } catch (ApiException e) {
-                                // cannot load k8s secret
-                                logger.debug("Cannot load secret in dc={} for role={} from secret={}",
-                                        dc.getMetadata().getName(), role.username, (role.secretKey == null) ? null : role.secret(dc));
-                            } catch (StrapkopException e) {
-                                // password contains illegal caracters
-                                logger.debug("Bas password in dc={} for role={} from secret={}",
-                                        dc.getMetadata().getName(), role.username, role.secret(dc));
-                            }
+                    Exception lastException = null;
+                    for (CqlRole role : roles) {
+                        try {
+                            role.loadPassword(dc, k8sResourceUtils).blockingGet();
+                            tuple = connect(dc, Optional.of(role));
+                            connectedRole = role;
+                            break;
+                        } catch (AuthenticationException e) {
+                            // authentication failed
+                            logger.debug("Authentication to dc={} failed with role={} from secret={}",
+                                    dc.getMetadata().getName(), role.username, (role.secretKey == null) ? null : role.secret(dc));
+                            lastException = e;
+                        } catch (ApiException e) {
+                            // cannot load k8s secret
+                            logger.warn("Cannot load secret in dc={} for role={} from secret={}",
+                                    dc.getMetadata().getName(), role.username, (role.secretKey == null) ? null : role.secret(dc));
+                            lastException = e;
+                        } catch (StrapkopException e) {
+                            // password contains illegal caracters
+                            logger.warn("Bas password in dc={} for role={} from secret={}",
+                                    dc.getMetadata().getName(), role.username, role.secret(dc));
+                            lastException = e;
+                        } catch(DriverException e) {
+                            logger.warn("Driver exception:" + e.getMessage(), e);
+                            lastException = e;
+                        } catch(Exception e) {
+                            logger.debug("Unexpected exception:" + e.getMessage(), e);
+                            lastException = e;
                         }
-                    } catch (DriverException | SSLException | java.lang.IllegalArgumentException e) {
-                        // unrecoverable errors
-                        logger.warn("Cannot connect dc="+dc.getMetadata().getName()+": " + e.getMessage(), e);
-                        dc.getStatus().setCqlStatus(CqlStatus.ERRORED);
-                        dc.getStatus().setCqlStatusMessage(e.getMessage());
-                        throw e;
                     }
 
                     if (connectedRole == null) {
@@ -175,7 +177,10 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                         logger.warn("Cannot connect dc={} with roles={}", dc.getMetadata().getName(), r);
                         dc.getStatus().setCqlStatus(CqlStatus.ERRORED);
                         dc.getStatus().setCqlStatusMessage("Authentication failed with roles=" + r);
-                        throw new StrapkopException("CQL connection failed");
+                        if (lastException != null) {
+                            logger.warn("Authentication failed with roles=" + r + " error:" + lastException.getMessage(), lastException);
+                            throw lastException;
+                        }
                     }
 
                     if (!connectedRole.username.equals(CqlRole.STRAPKOP_ROLE.username)) {
