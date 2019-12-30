@@ -59,6 +59,18 @@ test-deploy-singlenode:
 	# execute the test suite
 	kubectl apply -f helm/src/test/singlenode/SingleNodeTestSuite.yaml
 
+test-deploy-singlenode-jmxmp:
+	helm install --namespace default --name teststrapkop -f helm/src/main/base-test/values-operator-localregistry.yml helm/src/main/helm/elassandra-operator
+	echo "Wait operator pod ready"
+	sleep 10
+	helm install --namespace default --name singlenode-test -f helm/src/main/base-test/values-datacenter-singlenode-test.yml --set jmxmpEnabled=true --set jmxmpOverSSL=true helm/src/main/helm/elassandra-datacenter
+	echo "Wait elassandra pod ready"
+	sleep 5
+	kubectl wait --for=condition=ready --timeout=360s pod/elassandra-singlenode-test-local-0
+	sleep 5
+	# execute the test suite
+	kubectl apply -f helm/src/test/singlenode/SingleNodeTestSuite.yaml
+
 test-cleanup:
 	helm delete --purge singlenode-test
 	helm delete --purge teststrapkop
