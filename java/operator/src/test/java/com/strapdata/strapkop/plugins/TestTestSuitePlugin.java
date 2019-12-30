@@ -156,12 +156,11 @@ public class TestTestSuitePlugin {
                 .setSpec(new TaskSpec()
                         .setCluster(CLUSTER)
                         .setDatacenter(DATACENTER)
-                        .setExclusive(false)
                         .setTest(new TestTaskSpec()
                                 .setTimeOut(timeout)
                                 .setTestSuite(FakeExecutor.class.getName())))
                 .setStatus(new TaskStatus().
-                        setPhase(TaskPhase.STARTED));
+                        setPhase(TaskPhase.RUNNING));
     }
 
     private void activateTestPlugin(boolean b) {
