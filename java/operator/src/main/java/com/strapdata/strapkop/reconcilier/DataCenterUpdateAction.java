@@ -25,6 +25,8 @@ import com.strapdata.strapkop.ssl.utils.X509CertificateAndPrivateKey;
 import com.strapdata.strapkop.utils.CloudStorageSecretsKeys;
 import com.strapdata.strapkop.utils.DnsUpdateSecretsKeys;
 import com.strapdata.strapkop.utils.ManifestReaderFactory;
+import com.strapdata.strapkop.utils.RestorePointCache;
+import com.strapdata.strapkop.utils.RestorePointCache.RestorePoint;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
@@ -219,8 +221,8 @@ public class DataCenterUpdateAction {
                 });
     }
 
-    public Completable rollbackDataCenter() throws Exception {
-       return fetchExistingStatefulSetsByZone()
+    public Completable rollbackDataCenter(Optional<RestorePoint> restorePoint) throws Exception {
+        return fetchExistingStatefulSetsByZone()
                 .flatMapCompletable(existingStsMap -> {
                     Zones zones = new Zones(this.coreApi, existingStsMap);
 
@@ -240,37 +242,41 @@ public class DataCenterUpdateAction {
                     }
 
                     return Completable.fromSingle(
-                            k8sResourceUtils.readLastHistoryDatacenter(new Key(dataCenterMetadata))
-                            .flatMap((previousDatacenter) -> {
-                                final Map<String, String> labels = previousDatacenter.getMetadata().getLabels();
-                                final Map<String, String> annotation = previousDatacenter.getMetadata().getAnnotations();
-                                logger.info("Try to restore DataCenter configuration from Generation '{}' for '{}'", labels.get(OperatorLabels.HISTORY_DATACENTER_GENERATION), dataCenterMetadata.getName());
+                            Single.fromCallable( () -> {
 
-                                // restore previous user-configmap first in order to avoid updating DCSpec in case of ApiException
-                                final String configMapToRestore = annotation.get(OperatorLabels.HISTORY_DATACENTER_USER_CONFIGMAP);
-                                if (configMapToRestore != null) {
-                                    logger.trace("ROLLBACK user ConfigMap : {}", dataCenterSpec.getUserConfigMapVolumeSource().getName());
-                                    V1ConfigMap previousUserConfig = k8sResourceUtils.readNamespacedConfigMap(dataCenterMetadata.getNamespace(), configMapToRestore).blockingGet();
-                                    // override the current ConfigMap with the Previous one
-                                    // force the ConfigMap name with the previous one without fingerprint
-                                    logger.trace("RESTORE user ConfigMap : {}", previousDatacenter.getSpec().getUserConfigMapVolumeSource().getName());
-                                    previousUserConfig.getMetadata().setName(previousDatacenter.getSpec().getUserConfigMapVolumeSource().getName());
-                                    k8sResourceUtils.createOrReplaceNamespacedConfigMap(previousUserConfig).blockingGet();
+                                if (restorePoint.isPresent()) {
+
+                                    final RestorePoint previousStableState =restorePoint.get();
+                                    logger.info("Try to restore DataCenter configuration with fingerprint '{}' and userConfigMap '{}'", previousStableState.getSpec().fingerprint(), previousStableState.getUserConfigMap());
+
+                                    if (previousStableState.getUserConfigMap() != null) {
+                                        logger.trace("ROLLBACK user ConfigMap : {}", dataCenterSpec.getUserConfigMapVolumeSource().getName());
+                                        V1ConfigMap previousUserConfig = k8sResourceUtils.readNamespacedConfigMap(dataCenterMetadata.getNamespace(), previousStableState.getUserConfigMap()).blockingGet();
+                                        // override the current ConfigMap with the Previous one
+                                        // force the ConfigMap name with the previous one without fingerprint
+                                        logger.trace("RESTORE user ConfigMap : {}", previousStableState.getSpec().getUserConfigMapVolumeSource().getName());
+                                        previousUserConfig.getMetadata().setName(previousStableState.getSpec().getUserConfigMapVolumeSource().getName());
+                                        k8sResourceUtils.createOrReplaceNamespacedConfigMap(previousUserConfig).blockingGet();
+                                    } else {
+                                        logger.info("No user ConfigMap to restore");
+                                    }
+
+                                    // restore previous configuration
+                                    logger.trace("ROLLBACK DataCenter Spec : {}", dataCenterSpec);
+                                    logger.trace("RESTORE DataCenter Spec : {}",previousStableState.getSpec());
+                                    dataCenter.setSpec(previousStableState.getSpec());
+
+                                    return k8sResourceUtils.updateDataCenter(dataCenter)
+                                            .map((updatedDatacenter) -> {
+                                                // update dc status
+                                                updateDatacenterStatus(updatedDatacenter.getStatus(), DataCenterPhase.ROLLING_BACK, zones, rackStatusByName, Optional.of(""));
+                                                return k8sResourceUtils.updateDataCenterStatus(updatedDatacenter).blockingGet();
+                                            }).blockingGet();
                                 } else {
-                                    logger.info("No user ConfigMap to restore from Generation '{}' for '{}'", labels.get(OperatorLabels.HISTORY_DATACENTER_GENERATION), dataCenterMetadata.getName());
+                                    // update dc status
+                                    updateDatacenterStatus(dataCenterStatus, DataCenterPhase.ROLLING_BACK, zones, rackStatusByName, Optional.of(""));
+                                    return k8sResourceUtils.updateDataCenterStatus(dataCenter).blockingGet();
                                 }
-
-                                // restore previous configuration
-                                logger.trace("ROLLBACK DataCenter Spec : {}", dataCenterSpec);
-                                logger.trace("RESTORE DataCenter Spec : {}",previousDatacenter.getSpec());
-                                dataCenter.setSpec(previousDatacenter.getSpec());
-
-                                return k8sResourceUtils.updateDataCenter(dataCenter)
-                                        .map((updatedDatacenter) -> {
-                                            // update dc status
-                                            updateDatacenterStatus(updatedDatacenter.getStatus(), DataCenterPhase.ROLLING_BACK, zones, rackStatusByName, Optional.of(""));
-                                            return k8sResourceUtils.updateDataCenterStatus(updatedDatacenter).blockingGet();
-                                        });
                             }));
                 });
     }
@@ -681,7 +687,7 @@ public class DataCenterUpdateAction {
     private void commitDataCenterSnapshot(Zones zones) throws ApiException {
         if (zones.totalReplicas() == dataCenterSpec.getReplicas() && zones.isReady() && zones.hasConsistentConfiguration() &&
                 zones.first().isPresent() && zones.first().get().getDataCenterFingerPrint().isPresent()) {
-            k8sResourceUtils.commitHistoryDataCenter(new Key(dataCenterMetadata), zones.first().get().getDataCenterFingerPrint().get()).blockingGet();
+            RestorePointCache.commitRestorePoint(dataCenterSpec);
         }
     }
 
@@ -703,13 +709,7 @@ public class DataCenterUpdateAction {
                 .map((sts) -> sts.getMetadata().getAnnotations().get(OperatorLabels.CONFIGMAP_FINGERPRINT))
                 .flatMap(this::extractUserConfigFingerPrint)
                 .map(fingerprint -> OperatorNames.configMapUniqueName(dataCenterSpec.getUserConfigMapVolumeSource().getName(), fingerprint));
-
-        k8sResourceUtils.createIfNotExistHistoryDataCenter(dataCenter, phase, userConfigmap)
-                .doOnError((error) -> logger.error("Unable to preserve the stable '{}' state for Datacenter '{}' : {}",
-                        dataCenterMetadata.getGeneration(), dataCenterMetadata.getName(),
-                        error instanceof ApiException ? ((ApiException )error).getResponseBody() : error.getMessage(),
-                        error))
-                .subscribe();
+        RestorePointCache.prepareRestorePoint(dataCenterSpec, userConfigmap);
     }
 
     private Optional<String> extractUserConfigFingerPrint(final String statefulsetFingerPrint) {

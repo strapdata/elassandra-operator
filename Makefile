@@ -62,6 +62,6 @@ test-deploy-singlenode:
 test-cleanup:
 	helm delete --purge singlenode-test
 	helm delete --purge teststrapkop
-	kubectl delete crd elassandradatacenters.stable.strapdata.com historyelassandradatacenters.stable.strapdata.com elassandratasks.stable.strapdata.com
+	kubectl delete crd elassandradatacenters.stable.strapdata.com elassandratasks.stable.strapdata.com
 	kubectl delete pvc data-volume-elassandra-singlenode-test-local-0
 	kubectl delete deployment.apps/elassandra-singlenode-test-kibana-kibana deployment.apps/elassandra-singlenode-test-reaper
