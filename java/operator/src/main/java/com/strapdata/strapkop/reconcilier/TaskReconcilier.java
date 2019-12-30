@@ -219,9 +219,7 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
      * Implementation class should return the appropriate BlockReason.
      * @return
      */
-    public BlockReason blockReason() {
-        return BlockReason.NONE;
-    }
+    public abstract BlockReason blockReason();
 
     protected Completable initializePodMap(Task task, DataCenter dc) {
         for (Map.Entry<String, ElassandraNodeStatus> entry : dc.getStatus().getElassandraNodeStatuses().entrySet()) {

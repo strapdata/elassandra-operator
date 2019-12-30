@@ -4,6 +4,7 @@ import com.strapdata.model.backup.BackupArguments;
 import com.strapdata.model.backup.CloudStorageSecret;
 import com.strapdata.model.backup.CommonBackupArguments;
 import com.strapdata.model.backup.StorageProvider;
+import com.strapdata.model.k8s.cassandra.BlockReason;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.k8s.task.BackupTaskSpec;
 import com.strapdata.model.k8s.task.Task;
@@ -44,6 +45,10 @@ public class BackupTaskReconcilier extends TaskReconcilier {
                                  final MeterRegistry meterRegistry) {
         super(reconcilierObserver, "backup", k8sResourceUtils, meterRegistry);
         this.sidecarClientFactory = sidecarClientFactory;
+    }
+
+    public BlockReason blockReason() {
+        return BlockReason.BACKUP;
     }
 
     /**

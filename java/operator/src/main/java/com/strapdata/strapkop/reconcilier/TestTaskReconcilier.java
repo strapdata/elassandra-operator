@@ -1,5 +1,6 @@
 package com.strapdata.strapkop.reconcilier;
 
+import com.strapdata.model.k8s.cassandra.BlockReason;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.k8s.task.Task;
 import com.strapdata.model.k8s.task.TaskPhase;
@@ -22,6 +23,10 @@ public class TestTaskReconcilier extends TaskReconcilier {
                                final MeterRegistry meterRegistry) {
         super(reconcilierObserver, "test", k8sResourceUtils, meterRegistry);
         this.testSuitePlugin = testPlugin;
+    }
+
+    public BlockReason blockReason() {
+        return BlockReason.NONE;
     }
 
     @Override
