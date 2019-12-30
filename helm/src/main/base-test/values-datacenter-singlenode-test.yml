@@ -117,6 +117,9 @@ sslStoragePort: 37001
 nativePort: 39042
 jmxPort: 7199
 jdbPort: 4242
+#jmxmpEnabled: true
+#jmxmpOverSSL: true
+
 remoteSeeds: []
 
 kibana:

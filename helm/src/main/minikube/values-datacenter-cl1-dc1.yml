@@ -102,9 +102,9 @@ enterprise:
 
 
 # Cassandra reaper
-reaperEnabled: true
 reaper:
-  image: localhost:32000/strapdata/cassandra-reaper
+  image: localhost:32000/strapdata/cassandra-reaper:latest
+  enabled: true
 
 # Elassandra datacenter group
 # datacenterGroup:

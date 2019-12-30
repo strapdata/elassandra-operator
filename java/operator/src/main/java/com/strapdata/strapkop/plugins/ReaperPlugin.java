@@ -328,8 +328,8 @@ public class ReaperPlugin extends AbstractPlugin {
                             .mountPath("/truststore")
                             .name("truststore")
                     );
-            // accumulate trustore options into JAVA_OPTS builder
-            javaOptsBuilder.append(" -Djavax.net.ssl.trustStore=/truststore/truststore.p12 -Djavax.net.ssl.trustStorePassword=changeit ");
+            // accumulate truststore options into JAVA_OPTS builder
+            javaOptsBuilder.append(" -Dssl.enable=true -Djavax.net.ssl.trustStore=/truststore/truststore.p12 -Djavax.net.ssl.trustStorePassword=changeit ");
 
         } else {
             container.addEnvItem(new V1EnvVar()
