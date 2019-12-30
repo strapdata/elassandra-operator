@@ -6,6 +6,7 @@ import com.strapdata.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.plugins.test.step.OnSuccessAction;
 import com.strapdata.strapkop.plugins.test.step.Step;
+import com.strapdata.strapkop.utils.RestorePointCache;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.models.V1ObjectMeta;
@@ -15,6 +16,7 @@ import io.micronaut.context.annotation.Prototype;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
@@ -110,32 +112,18 @@ public class SingleNodeTestSuite extends TestSuiteExecutor {
     }
 
     /**
-     * Check that the DCSpec is stored in HistoryElassandraDataCenter CRD.
+     * Check that the DCSpec is stored in RestorePointCache.
      * @param dc
      */
     protected void checkHistoryDataCenter(final DataCenter dc) {
-        Key key = new Key(dc.getMetadata());
-        try {
-            DataCenter lastStableDC = k8sResourceUtils.readLastHistoryDatacenter(key).blockingGet();
-            V1ObjectMeta metadata = lastStableDC.getMetadata();
-            if (!metadata.getAnnotations().containsKey(OperatorLabels.HISTORY_DATACENTER_CREATIONDATE)){
-                failed("HistoryElassandraDataCenter instance should have the " + OperatorLabels.HISTORY_DATACENTER_CREATIONDATE + " annotation");
-            }
-            if (!(metadata.getLabels().containsKey(OperatorLabels.HISTORY_DATACENTER_GENERATION)
-                    && metadata.getLabels().containsKey(OperatorLabels.HISTORY_DATACENTER_NAME)
-                    && metadata.getLabels().containsKey(OperatorLabels.HISTORY_DATACENTER_PHASE)
-                    && metadata.getLabels().containsKey(OperatorLabels.HISTORY_DATACENTER_FINGERPRINT)
-                    && metadata.getLabels().containsKey(OperatorLabels.HISTORY_DATACENTER_COMMITTED))){
-                failed("HistoryElassandraDataCenter instance should have 5 labels (committed, fingerprint, generation, name and phase)");
-            }
+        Optional<RestorePointCache.RestorePoint> restorePoint = RestorePointCache.getRestorePoint();
+        if (!restorePoint.isPresent() || restorePoint.get().getSpec() == null) {
+            failed("ElassandraDataCenter should have a restore point");
+        }
 
-            String stableFingerPrint = metadata.getLabels().get(OperatorLabels.HISTORY_DATACENTER_FINGERPRINT);
-            if (!dc.getSpec().fingerprint().equals(stableFingerPrint)) {
-                failed("Last HistoryElassandraDataCenter instance should reference the fingerprint " + dc.getSpec().fingerprint());
-            }
-
-        } catch (Exception e) {
-            failed("Unable to check the HistoryDataCenter : " + e.getMessage());
+        String stableFingerPrint = restorePoint.get().getSpec().fingerprint();
+        if (!dc.getSpec().fingerprint().equals(stableFingerPrint)) {
+            failed("ElassandraDataCenter RestorePoint instance should reference the fingerprint " + dc.getSpec().fingerprint());
         }
     }
 

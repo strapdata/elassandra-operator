@@ -880,12 +880,7 @@ public class K8sResourceUtils {
         });
     }
 
-    /**
-     * Return the last committed history datacenter
-     * @param key
-     * @return
-     */
-    public Single<DataCenter> readLastHistoryDatacenter(final Key key) {
+/*    public Single<DataCenter> readLastHistoryDatacenter(final Key key) {
         return Single.fromCallable(() -> {
             Map<String, String> labels = new HashMap<>(2);
             labels.put(OperatorLabels.HISTORY_DATACENTER_NAME, key.name);
@@ -975,7 +970,7 @@ public class K8sResourceUtils {
                    return Boolean.TRUE;
                },
                () -> Boolean.TRUE);
-    }
+    }*/
 
     public Single<DataCenter> updateDataCenter(final DataCenter dc) throws ApiException {
         return Single.fromCallable( () ->{
