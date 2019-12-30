@@ -40,7 +40,7 @@ public class ReconcilierObserver {
     };
 
     public ReconcilierObserver(MeterRegistry meterRegistry) {
-        count = new Integer(0);
+        count = Integer.valueOf(0);
         this.meterRegistry = meterRegistry;
         meterRegistry.gauge("reconciliation.current", count);
         meterRegistry.counter("reconciliation.begin");
