@@ -36,6 +36,13 @@ public class TestTaskReconcilier extends TaskReconcilier {
             return Single.just(TaskPhase.WAITING);
         }
 
+        if (!testSuitePlugin.isBusy(task)) {
+            testSuitePlugin.initialize(task, dc);
+            return Single.just(TaskPhase.RUNNING);
+        }
+
+        testSuitePlugin.runTest(task, dc);
+        return Single.just(TaskPhase.RUNNING);
         /*
         if (!testSuitePlugin.isRunning(task)) {
             // a test is already running, postpone this one
@@ -45,8 +52,6 @@ public class TestTaskReconcilier extends TaskReconcilier {
             return Completable.complete();
         }
          */
-
-        return Single.just(TaskPhase.WAITING);
     }
 
     @Override

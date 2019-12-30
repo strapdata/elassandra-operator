@@ -16,6 +16,7 @@ resources: {}
 
 env:
   TESTSUITE_ENABLE: true
+  LOGBACK_com_strapdata_strapkop_test: DEBUG
 
 ingress:
   enabled: false

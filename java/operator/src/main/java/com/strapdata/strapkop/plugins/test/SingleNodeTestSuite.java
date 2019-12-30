@@ -255,7 +255,7 @@ public class SingleNodeTestSuite extends TestSuiteExecutor {
     private void updateDataCenterOrFail(DataCenter dc) {
         try {
             dcUpdates.incrementAndGet();
-            k8sResourceUtils.updateDataCenter(dc).subscribe();
+            k8sResourceUtils.updateDataCenter(dc).blockingGet();
         } catch (ApiException e) {
             LOGGER.error("[TEST] unable to update DataCenter [code : {} | body : {}]", e.getCode(), e.getResponseBody());
             failed(e.getMessage());
