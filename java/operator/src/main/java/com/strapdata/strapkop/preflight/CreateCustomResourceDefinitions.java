@@ -29,7 +29,6 @@ public class CreateCustomResourceDefinitions implements Preflight<Void> {
     @Override
     public Void call() throws Exception {
         createCrdFromResource("/datacenter-crd.yaml");
-        createCrdFromResource("/datacenter-history-crd.yaml");
         createCrdFromResource("/task-crd.yaml");
         return null;
     }

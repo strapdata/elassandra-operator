@@ -150,9 +150,9 @@ Here is a status example :
     reaperPhase: ROLE_CREATED
     replicas: 3
 
-In this situation, you can't update the CRD because the operator will stop the reconciliation to preserve working nodes.
+In this situation, updating the CRD is not enough because the operator will stop the reconciliation to preserve working nodes.
 
-To solve this kind of issue, the operator keep the datacenter history to know which version was reconciled successfully in order to rollback on the previous working configuration.
+To solve this kind of issue, the operator keep the last successfully applied datacenter in order to rollback on the previous working configuration.
 
 Here is the procedure to rollback to the previous stable datacener CRD:
 
@@ -160,7 +160,6 @@ Here is the procedure to rollback to the previous stable datacener CRD:
 * create a port-forward to the operator pod in order to call the rollback endpoint
 * request a rollback
 * identify the pending pods and delete them
-
 
 .. code-block:: bash
   # list pods
@@ -175,7 +174,7 @@ Here is the procedure to rollback to the previous stable datacener CRD:
   kubectl port-forward strapkop-elassandra-operator-f9d4d4454-88pkm 8080:8080
 
   # request the rollback endpoint
-  curl -vv -X POST "http://localhost:8080/datacenter/default/clteste/dc1/rollback"
+  curl -vv -X POST "http://localhost:8080/datacenter/default/cltest/dc1/rollback"
   *   Trying 127.0.0.1...
   * Connected to localhost (127.0.0.1) port 8080 (#0)
   > POST /datacenter/default/cltest/dc1/rollback HTTP/1.1
@@ -249,12 +248,12 @@ Here is the procedure to rollback to the previous stable datacener CRD:
   ...
   status:
     cqlStatus: ESTABLISHED
-    cqlStatusMessage: Connected to cluster=[cltestele] with role=[elassandra_operator]
-      secret=[elassandra-cltestele/cassandra.elassandra_operator_password]
+    cqlStatusMessage: Connected to cluster=[cltest] with role=[elassandra_operator]
+      secret=[elassandra-cltest/cassandra.elassandra_operator_password]
     elassandraNodeStatuses:
-      elassandra-cltestele-dc1-0-0: NORMAL
-      elassandra-cltestele-dc1-1-0: NORMAL
-      elassandra-cltestele-dc1-2-0: NORMAL
+      elassandra-cltest-dc1-0-0: NORMAL
+      elassandra-cltest-dc1-1-0: NORMAL
+      elassandra-cltest-dc1-2-0: NORMAL
     joinedReplicas: 3
     keyspaceManagerStatus:
       keyspaces:
@@ -262,7 +261,7 @@ Here is the procedure to rollback to the previous stable datacener CRD:
       replicas: 3
     kibanaSpaces:
     - ""
-    lastMessage: Unable to schedule Pod elassandra-cltestele-dc1-0-0
+    lastMessage: Unable to schedule Pod elassandra-cltest-dc1-0-0
     needCleanup: false
     phase: RUNNING
     rackStatuses:
@@ -279,6 +278,24 @@ Here is the procedure to rollback to the previous stable datacener CRD:
     reaperPhase: ROLE_CREATED
     replicas: 3
 
+.. note::
+    Currently the datacenter copy is keep in memory, so if the operator pod restart this copy is lost. In this situation, the rollback endpoint return a **204** status code instead of **202**.
+    In this situation, you can patch the CRD with new values and call *reconcile* endpoint instead of the *rollback* one
+
+.. code-block:: bash
+
+    curl -vv -X POST "http://localhost:8888/datacenter/default/cltest/dc1/reconcile"
+    *   Trying 127.0.0.1...
+    * Connected to localhost (127.0.0.1) port 8888 (#0)
+    > POST /datacenter/default/cltest/dc1/reconcile HTTP/1.1
+    > Host: localhost:8888
+    > User-Agent: curl/7.47.0
+    > Accept: */*
+    >
+    < HTTP/1.1 202 Accepted
+    < Date: Mon, 30 Dec 2019 08:36:13 GMT
+    < connection: keep-alive
+    < transfer-encoding: chunked
 
 
 Cassandra cleanup
