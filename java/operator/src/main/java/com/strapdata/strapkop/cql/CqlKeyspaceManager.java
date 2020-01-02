@@ -6,6 +6,7 @@ import com.google.common.collect.ImmutableSet;
 import com.strapdata.model.k8s.cassandra.CqlStatus;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.k8s.cassandra.DataCenterPhase;
+import com.strapdata.model.k8s.task.CleanupTaskSpec;
 import com.strapdata.model.k8s.task.RepairTaskSpec;
 import com.strapdata.model.k8s.task.TaskSpec;
 import com.strapdata.strapkop.StrapkopException;
@@ -84,7 +85,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                     // adjust RF for system keyspaces
                     for (CqlKeyspace keyspace : SYSTEM_KEYSPACES) {
                         try {
-                            updateKeyspaceReplcationMap(dataCenter, keyspace.name, effectiveRF(dataCenter, keyspace.rf), sessionSupplier).blockingGet();
+                            updateKeyspaceReplicationMap(dataCenter, keyspace.name, effectiveRF(dataCenter, keyspace.rf), sessionSupplier).blockingGet();
                         } catch (Exception e) {
                             logger.warn("Failed to adjust RF for keyspace="+keyspace, e);
                         }
@@ -93,7 +94,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                     // monitor elastic_admin keyspace to reduce RF when scaling down the DC.
                     String elasticAdminKeyspace = (dataCenter.getSpec().getDatacenterGroup() != null) ? "elastic_admin_" + dataCenter.getSpec().getDatacenterGroup() : "elastic_admin";
                     try {
-                        updateKeyspaceReplcationMap(dataCenter, elasticAdminKeyspace, dataCenter.getSpec().getReplicas(), sessionSupplier).blockingGet();
+                        updateKeyspaceReplicationMap(dataCenter, elasticAdminKeyspace, dataCenter.getSpec().getReplicas(), sessionSupplier).blockingGet();
                     } catch (Exception e) {
                         logger.warn("Failed to adjust RF for keyspace="+elasticAdminKeyspace, e);
                     }
@@ -102,7 +103,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                     if (get(dataCenter) != null) {
                         for (CqlKeyspace keyspace : get(dataCenter).values()) {
                             try {
-                                updateKeyspaceReplcationMap(dataCenter, keyspace.name, effectiveRF(dataCenter, keyspace.rf), sessionSupplier).blockingGet();
+                                updateKeyspaceReplicationMap(dataCenter, keyspace.name, effectiveRF(dataCenter, keyspace.rf), sessionSupplier).blockingGet();
                             } catch (Exception e) {
                                 logger.warn("Failed to adjust RF for keyspace="+keyspace, e);
                             }
@@ -131,15 +132,15 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
         if (dataCenter.getStatus().getPhase().equals(DataCenterPhase.RUNNING) && dataCenter.getStatus().getCqlStatus().equals(CqlStatus.ESTABLISHED)) {
             // adjust RF for system keyspaces
             for(CqlKeyspace keyspace : SYSTEM_KEYSPACES) {
-                updateKeyspaceReplcationMap(dataCenter, keyspace.name, 0, sessionSupplier).blockingGet();
+                updateKeyspaceReplicationMap(dataCenter, keyspace.name, 0, sessionSupplier).blockingGet();
             }
 
             // monitor elastic_admin keyspace to reduce RF when scaling down the DC.
-            updateKeyspaceReplcationMap(dataCenter, elasticAdminKeyspaceName(dataCenter), 0, sessionSupplier).blockingGet();
+            updateKeyspaceReplicationMap(dataCenter, elasticAdminKeyspaceName(dataCenter), 0, sessionSupplier).blockingGet();
 
             // adjust user keyspace RF
             for(CqlKeyspace keyspace : get(dataCenter).values()) {
-                updateKeyspaceReplcationMap(dataCenter, keyspace.name, 0, sessionSupplier).blockingGet();
+                updateKeyspaceReplicationMap(dataCenter, keyspace.name, 0, sessionSupplier).blockingGet();
             }
         }
         remove(dataCenter);
@@ -154,7 +155,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
             keyspaces.addAll(get(dataCenter).values());
             List<Completable> completables = new ArrayList<>(keyspaces.size());
             for(CqlKeyspace keyspace : keyspaces) {
-                completables.add(updateKeyspaceReplcationMap(dataCenter, keyspace.name, Math.min(keyspace.rf, targetDcSize), sessionSupplier));
+                completables.add(updateKeyspaceReplicationMap(dataCenter, keyspace.name, Math.min(keyspace.rf, targetDcSize), sessionSupplier));
             }
             return Completable.mergeArray(completables.toArray(new Completable[completables.size()]));
         }
@@ -166,7 +167,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
      *
      * @throws StrapkopException
      */
-    private Completable updateKeyspaceReplcationMap(final DataCenter dc, final String keyspace, int targetRf, final CqlSessionSupplier sessionSupplier) throws Exception {
+    private Completable updateKeyspaceReplicationMap(final DataCenter dc, final String keyspace, int targetRf, final CqlSessionSupplier sessionSupplier) throws Exception {
         return sessionSupplier.getSession(dc)
                 .flatMap(session ->
                         Single.fromFuture(session.executeAsync("SELECT keyspace_name, replication FROM system_schema.keyspaces WHERE keyspace_name = ?", keyspace))
@@ -214,7 +215,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                                                 return k8sResourceUtils.createTask(dc, "cleanup", new Consumer<TaskSpec>() {
                                                     @Override
                                                     public void accept(TaskSpec taskSpec) {
-                                                        taskSpec.setRepair(new RepairTaskSpec().setKeyspace(keyspace));
+                                                        taskSpec.setCleanup(new CleanupTaskSpec().setKeyspace(keyspace));
                                                     }
                                                 }).ignoreElement();
                                             }

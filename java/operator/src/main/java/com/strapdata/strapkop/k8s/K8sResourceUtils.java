@@ -16,6 +16,7 @@ import com.strapdata.model.k8s.task.TaskList;
 import com.strapdata.model.k8s.task.TaskPhase;
 import com.strapdata.model.k8s.task.TaskSpec;
 import com.strapdata.strapkop.StrapkopException;
+import com.strapdata.strapkop.reconcilier.TaskReconcilier;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.ApiResponse;
 import io.kubernetes.client.apis.AppsV1Api;
@@ -25,6 +26,7 @@ import io.kubernetes.client.apis.ExtensionsV1beta1Api;
 import io.kubernetes.client.models.*;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.scheduling.$DefaultTaskExceptionHandlerDefinitionClass;
 import io.reactivex.Completable;
 import io.reactivex.Single;
 import io.reactivex.functions.Action;
@@ -880,97 +882,24 @@ public class K8sResourceUtils {
         });
     }
 
-/*    public Single<DataCenter> readLastHistoryDatacenter(final Key key) {
-        return Single.fromCallable(() -> {
-            Map<String, String> labels = new HashMap<>(2);
-            labels.put(OperatorLabels.HISTORY_DATACENTER_NAME, key.name);
-            labels.put(OperatorLabels.HISTORY_DATACENTER_COMMITTED, "true");
-            return searchHistoryDataCenter(key, labels);
+    public Single<Optional<Task>> readTask(final String namespace, final String name) throws ApiException {
+        return Single.fromCallable(new Callable<Optional<Task>>() {
+            @Override
+            public Optional<Task> call() throws Exception {
+                try {
+                    final Call call = customObjectsApi.getNamespacedCustomObjectCall("stable.strapdata.com", "v1",
+                            namespace, "elassandratasks", name, null, null);
+                    final ApiResponse<Task> apiResponse = customObjectsApi.getApiClient().execute(call, Task.class);
+                    return Optional.ofNullable(apiResponse.getData());
+                } catch(ApiException e) {
+                    if (e.getCode() == 404) {
+                        logger.warn("elassandratask not found for task={} in namespace={}", name, namespace);
+                    }
+                    return Optional.<Task>empty();
+                }
+            }
         });
     }
-
-    private DataCenter searchHistoryDataCenter(Key key, Map<String, String> labelSelectors) throws ApiException {
-        try {
-            final Call call = customObjectsApi.listNamespacedCustomObjectCall("stable.strapdata.com", "v1",
-                    key.getNamespace(), "historyelassandradatacenters",null, OperatorLabels.toSelector(labelSelectors),
-                    null, null, null, null);
-            final ApiResponse<DataCenterList> apiResponse = customObjectsApi.getApiClient().execute(call, DataCenterList.class);
-
-            DataCenterList dcList = apiResponse.getData();
-            final List<DataCenter> items = dcList.getItems();
-
-            if (CollectionUtils.isEmpty(items)) {
-                logger.warn("historyelassandradatacenter not found for datacenter={} in namespace={}", key.name, key.namespace);
-                throw new StrapkopException("HistoryElassandraDataCenter not found");
-            }
-
-            // sort by Generation descending order to provide the last valid dc config
-            items.sort(Comparator.comparing((DataCenter dc) ->
-                    Integer.parseInt(dc.getMetadata().getLabels().get(OperatorLabels.HISTORY_DATACENTER_GENERATION)))
-                    .reversed());
-
-            return items.get(0);
-        } catch(ApiException e) {
-            if (e.getCode() == 404) {
-                logger.warn("historyelassandradatacenter not found for datacenter={} in namespace={}", key.name, key.namespace);
-                throw new StrapkopException("HistoryElassandraDataCenter not found", e);
-            }
-            throw e;
-        }
-    }
-
-    public Single<DataCenter> commitHistoryDataCenter(Key key, String fingerprint) throws ApiException {
-        return Single.fromCallable(() -> {
-            Map<String, String> selectors = new HashMap<>(2);
-            selectors.put(OperatorLabels.HISTORY_DATACENTER_NAME, key.name);
-            selectors.put(OperatorLabels.HISTORY_DATACENTER_FINGERPRINT, fingerprint);
-
-            // read the HistoryDataCenter and mark it as committed
-            DataCenter dc = searchHistoryDataCenter(key, selectors);
-            dc.getMetadata().getLabels().put(OperatorLabels.HISTORY_DATACENTER_COMMITTED, "true");
-
-            final Call call = customObjectsApi.patchNamespacedCustomObjectCall("stable.strapdata.com", "v1",
-                    dc.getMetadata().getNamespace(), "historyelassandradatacenters", dc.getMetadata().getName(), dc, null, null);
-            final ApiResponse<DataCenter> apiResponse = customObjectsApi.getApiClient().execute(call, DataCenter.class);
-            return apiResponse.getData();
-        });
-    }
-
-    public Single<Boolean> createIfNotExistHistoryDataCenter(DataCenter datacenter, DataCenterPhase phase, Optional<String> configMap) throws ApiException {
-        Map<String, String> labels = new HashMap<>(5);
-        labels.put(OperatorLabels.HISTORY_DATACENTER_NAME, datacenter.getMetadata().getName());
-        labels.put(OperatorLabels.HISTORY_DATACENTER_GENERATION, ""+datacenter.getMetadata().getGeneration());
-        labels.put(OperatorLabels.HISTORY_DATACENTER_COMMITTED, "false");
-        labels.put(OperatorLabels.HISTORY_DATACENTER_PHASE, phase.name());
-        labels.put(OperatorLabels.HISTORY_DATACENTER_FINGERPRINT, datacenter.getSpec().fingerprint());
-
-        Map<String, String> annotations = new HashMap<>(1);
-        annotations.put(OperatorLabels.HISTORY_DATACENTER_CREATIONDATE, datacenter.getMetadata().getCreationTimestamp().toString(ISODateTimeFormat.dateTime()));
-        configMap.ifPresent((name) -> annotations.put(OperatorLabels.HISTORY_DATACENTER_USER_CONFIGMAP, name));
-
-        V1ObjectMeta meta = new V1ObjectMeta();
-        meta.setName(OperatorNames.historyDataCenterName(datacenter.getMetadata().getName(), datacenter.getMetadata().getGeneration()));
-        meta.setAnnotations(annotations);
-        meta.setLabels(labels);
-
-        final DataCenter hedc = new DataCenter()
-                .setMetadata(meta)
-                .setSpec(datacenter.getSpec())
-                .setApiVersion("stable.strapdata.com/v1")
-                .setKind("HistoryElassandraDataCenter");
-
-       return createOrReplaceResource(
-               () -> {
-                  customObjectsApi.createNamespacedCustomObject(
-                           "stable.strapdata.com",
-                           "v1",
-                           datacenter.getMetadata().getNamespace(),
-                           "historyelassandradatacenters", hedc, null);
-                   logger.debug("Created datacenter history={}", hedc.getMetadata().getName());
-                   return Boolean.TRUE;
-               },
-               () -> Boolean.TRUE);
-    }*/
 
     public Single<DataCenter> updateDataCenter(final DataCenter dc) throws ApiException {
         return Single.fromCallable( () ->{
@@ -995,14 +924,14 @@ public class K8sResourceUtils {
         });
     }
 
-    public Completable updateTaskStatus(Task task, TaskPhase phase) throws ApiException {
-        task.getStatus().setPhase(phase);
-        return updateTaskStatus(task);
+    public Completable updateTaskStatus(TaskReconcilier.TaskWrapper taskWrapper, TaskPhase phase) throws ApiException {
+        taskWrapper.getTask().getStatus().setPhase(phase);
+        return updateTaskStatus(taskWrapper);
     }
 
 
-    public Completable updateTaskStatus(Task task) throws ApiException {
-        return Completable.fromCallable(new Callable<Object>() {
+    public Completable updateTaskStatus(TaskReconcilier.TaskWrapper taskWrapper) throws ApiException {
+        return Completable.fromCallable(new Callable<TaskReconcilier.TaskWrapper>() {
             /**
              * Computes a result, or throws an exception if unable to do so.
              *
@@ -1010,9 +939,20 @@ public class K8sResourceUtils {
              * @throws Exception if unable to compute a result
              */
             @Override
-            public Object call() throws Exception {
-                return customObjectsApi.replaceNamespacedCustomObjectStatus("stable.strapdata.com", "v1",
-                        task.getMetadata().getNamespace(), "elassandratasks", task.getMetadata().getName(), task);
+            public TaskReconcilier.TaskWrapper call() throws Exception {
+                final Task task = taskWrapper.getTask();
+                try {
+                    final Call call = customObjectsApi.replaceNamespacedCustomObjectStatusCall("stable.strapdata.com", "v1",
+                            task.getMetadata().getNamespace(), "elassandratasks", task.getMetadata().getName(), task, null, null);
+                    final ApiResponse<Task> apiResponse = customObjectsApi.getApiClient().execute(call, Task.class);
+                    taskWrapper.updateTaskRef(apiResponse.getData());
+                    return taskWrapper;
+                } catch(ApiException e) {
+                    if (e.getCode() == 404) {
+                        logger.warn("elassandratask not found for task={} in namespace={}", task.getMetadata().getName(), task.getMetadata().getNamespace());
+                    }
+                    throw e;
+                }
             }
         });
     }
@@ -1022,14 +962,12 @@ public class K8sResourceUtils {
             @Override
             public Task call() throws Exception {
                 try {
-                    final Call call = customObjectsApi.getNamespacedCustomObjectCall("stable.strapdata.com", "v1",
-                            task.getMetadata().getNamespace(), "elassandratasks", task.getMetadata().getName(), null, null);
-                    final ApiResponse<Task> apiResponse = customObjectsApi.getApiClient().execute(call, DataCenter.class);
+                    final Call call = customObjectsApi.createNamespacedCustomObjectCall("stable.strapdata.com", "v1",
+                            task.getMetadata().getNamespace(), "elassandratasks", task, null, null, null);
+                    final ApiResponse<Task> apiResponse = customObjectsApi.getApiClient().execute(call, Task.class);
                     return apiResponse.getData();
                 } catch(ApiException e) {
-                    if (e.getCode() == 404) {
-                        logger.warn("elassandratasks not found for name={} in namespace={}", task.getMetadata().getName(), task.getMetadata().getNamespace());
-                    }
+                    logger.warn("Unable to create task name={} in namespace={}, code={} - reason={}", task.getMetadata().getName(), task.getMetadata().getNamespace(), e.getCode(), e.getResponseBody());
                     throw e;
                 }
             }

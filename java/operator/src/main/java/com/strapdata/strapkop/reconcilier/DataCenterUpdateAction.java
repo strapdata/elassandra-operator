@@ -375,7 +375,7 @@ public class DataCenterUpdateAction {
                     if (movingRack != null) {
                         Zone movingZone = zones.zoneMap.get(movingRack.getName());
                         logger.debug("movingRack={} phase={} isReady={} isUpdating={} isScalingUp={} isScalingDown={} firstPodStatus={} lastPodStatus={}",
-                                movingRack.getName(), movingRack.getPhase(), movingZone.isReady(), movingZone.isScalingUp(), movingZone.isScalingDown(),
+                                movingRack.getName(), movingRack.getPhase(), movingZone.isReady(), movingZone.isUpdating(), movingZone.isScalingUp(), movingZone.isScalingDown(),
                                 elassandraNodeStatusCache.get(movingZone.firstPod(dataCenter)), elassandraNodeStatusCache.get(movingZone.lastPod(dataCenter)));
                         // check is operation is finished ?
                         switch(movingRack.getPhase()) {
@@ -413,11 +413,35 @@ public class DataCenterUpdateAction {
                                 break;
                             case SCALING_DOWN:
                                 // scale down
-                                if (!movingZone.isScalingDown()) {
+                                if (!movingZone.isScalingDown() && zones.totalCurrentReplicas() == dataCenterSpec.getReplicas()) {
                                     movingRack.setJoinedReplicas(movingZone.size);
                                     movingRack.setPhase(RackPhase.RUNNING);
                                     updateDatacenterStatus(DataCenterPhase.RUNNING, zones, rackStatusByName);
                                     logger.debug("SCALE_DOWN done in rack={} size={}", movingZone.name, movingZone.size);
+                                } else {
+                                    // have to update the STS here to avoid multiple moving rack...
+                                    Optional<ElassandraPod> decommissionedPod = movingZone.pods(dataCenter).stream()
+                                            .filter((pod) -> elassandraNodeStatusCache.get(pod).equals(ElassandraNodeStatus.DECOMMISSIONED))
+                                            .findFirst();
+
+                                    if (decommissionedPod.isPresent()) {
+                                        V1StatefulSet sts = movingZone.getSts().get();
+                                        // decrease the number of replicas only once... by testing the STS status
+                                        if (sts.getStatus().getUpdatedReplicas() == sts.getStatus().getCurrentReplicas()
+                                        && sts.getStatus().getUpdatedReplicas() == sts.getStatus().getReadyReplicas()) {
+
+                                            sts.getSpec().setReplicas(sts.getSpec().getReplicas() - 1);
+                                            logger.info("Scaling down sts={} to {}, removing pod={}",
+                                                    sts.getMetadata().getName(), sts.getSpec().getReplicas(), decommissionedPod.get());
+
+                                            rackStatusByName.get(movingZone.name).setPhase(RackPhase.SCALING_DOWN);
+                                            updateDatacenterStatus(DataCenterPhase.SCALING_DOWN, zones, rackStatusByName);
+                                            // scale down sts
+                                            logger.debug("SCALE_DOWN started in rack={} size={}, removing pod={} status={}",
+                                                    movingZone.name, movingZone.size, decommissionedPod.get(), dataCenterStatus.getElassandraNodeStatuses().get(decommissionedPod.get()));
+                                            return replaceNamespacedStatefulSet(sts);
+                                        }
+                                    }
                                 }
 
                                 break;
@@ -637,7 +661,7 @@ public class DataCenterUpdateAction {
                         if (scaleDownZone.isPresent()) {
                             Zone zone = scaleDownZone.get();
                             V1StatefulSet sts = zone.getSts().get();
-                            ElassandraPod elassandraPod = zone.lastPod(dataCenter);
+                            ElassandraPod elassandraPod = zone.lastPod(dataCenter); // TODO [ELE] changer  cet appel pour prendre le dernier pod avec un état différent de UNKNOWN
                             ElassandraNodeStatus elassandraNodeStatus = elassandraNodeStatusCache.getOrDefault(elassandraPod, ElassandraNodeStatus.UNKNOWN);
                             // UNKNOWN, STARTING, NORMAL, JOINING, LEAVING, DECOMMISSIONED, MOVING, DRAINING, DRAINED, DOWN;
                             switch(elassandraNodeStatus) {

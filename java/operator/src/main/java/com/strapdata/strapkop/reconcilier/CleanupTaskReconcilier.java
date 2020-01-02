@@ -45,14 +45,15 @@ public final class CleanupTaskReconcilier extends TaskReconcilier {
 
     /**
      * Execute task on each pod and update the task status
-     * @param task
+     * @param taskWrapper
      * @param dc
      * @return
      * @throws ApiException
      */
     @Override
-    protected Single<TaskPhase> doTask(Task task, DataCenter dc) throws ApiException {
-        
+    protected Single<TaskPhase> doTask(TaskWrapper taskWrapper, DataCenter dc) throws ApiException {
+        final Task task = taskWrapper.getTask();
+
         // find the next pods to cleanup
         final List<String> pods = task.getStatus().getPods().entrySet().stream()
                 .filter(e -> Objects.equals(e.getValue(), TaskPhase.WAITING))
@@ -79,7 +80,7 @@ public final class CleanupTaskReconcilier extends TaskReconcilier {
                         task.getStatus().setLastMessage(throwable.getMessage());
                     }
                     task.getStatus().getPods().put(pod, podPhase);
-                    return updateTaskStatus(dc, task, TaskPhase.RUNNING).toSingleDefault(new Tuple2<String, TaskPhase>(pod, podPhase));
+                    return updateTaskStatus(dc, taskWrapper, TaskPhase.RUNNING).toSingleDefault(new Tuple2<String, TaskPhase>(pod, podPhase));
                 })
                 .toList()
                 .map(list -> {

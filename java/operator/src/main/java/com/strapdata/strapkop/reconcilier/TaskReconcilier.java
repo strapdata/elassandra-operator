@@ -48,9 +48,9 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
         SUBMIT, CANCEL
     }
     
-    protected abstract Single<TaskPhase> doTask(Task task, DataCenter dc) throws Exception;
+    protected abstract Single<TaskPhase> doTask(TaskWrapper taskWrapper, DataCenter dc) throws Exception;
 
-    protected Completable validTask(Task task, DataCenter dc) throws Exception {
+    protected Completable validTask(TaskWrapper task, DataCenter dc) throws Exception {
         return Completable.complete();
     }
 
@@ -85,43 +85,45 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
     Completable processSubmit(Task task) throws Exception {
         logger.info("processing {} task submit", taskType);
 
-        // create status if necessary
+/*        // create status if necessary
         if (task.getStatus() == null) {
             task.setStatus(new TaskStatus());
-        }
+        }*/
 
-        // fetch corresponding dc
-        return fetchDataCenter(task)
+        TaskWrapper taskWrapper = new TaskWrapper(task);
+
+        return fetchTask(taskWrapper)// refresh the task to avoid conflict and multiple execution
+                .flatMap((t) -> fetchDataCenter(taskWrapper))
                 .flatMapCompletable(dc -> {
                     // finish on going task
-                    if (task.getStatus().getPhase() != null && isTerminated(task)) {
+                    if (taskWrapper.getTask().getStatus().getPhase() != null && isTerminated(taskWrapper.getTask())) {
                         logger.debug("task {} was terminated", task.getMetadata().getName());
-                        return ensureUnlockDc(dc, task);
+                        return ensureUnlockDc(dc, taskWrapper);
                     }
 
                     // dc ready ?
-                    if (!ensureDcIsReady(task, dc)) {
-                        return updateTaskStatus(dc, task, TaskPhase.WAITING);
+                    if (!ensureDcIsReady(taskWrapper, dc)) {
+                        return updateTaskStatus(dc, taskWrapper, TaskPhase.WAITING);
                     }
 
-                    switch(task.getStatus().getPhase()) {
+                    switch(taskWrapper.task.getStatus().getPhase()) {
                         case WAITING:
-                            return validTask(task, dc)
+                            return validTask(taskWrapper, dc)
                                     .subscribeOn(Schedulers.io())
-                                    .andThen(ensureLockDc(task, dc))
-                                    .andThen(initializePodMap(task, dc))
-                                    .andThen(updateTaskStatus(dc, task, TaskPhase.RUNNING))
-                                    .andThen(doTask(task, dc)
+                                    .andThen(ensureLockDc(taskWrapper, dc))
+                                    .andThen(initializePodMap(taskWrapper, dc))
+                                    .andThen(updateTaskStatus(dc, taskWrapper, TaskPhase.RUNNING))
+                                    .andThen(doTask(taskWrapper, dc)
                                             .onErrorReturn(t -> TaskPhase.FAILED)
-                                            .flatMapCompletable(s -> updateTaskStatus(dc, task, s)))
-                                    .andThen(ensureUnlockDc(dc, task));
+                                            .flatMapCompletable(s -> updateTaskStatus(dc, taskWrapper, s)))
+                                    .andThen(ensureUnlockDc(dc, taskWrapper));
                         case RUNNING:
-                            return ensureLockDc(task, dc)
+                            return ensureLockDc(taskWrapper, dc)
                                     .subscribeOn(Schedulers.io())
-                                    .andThen(doTask(task, dc)
+                                    .andThen(doTask(taskWrapper, dc)
                                             .onErrorReturn(t -> TaskPhase.FAILED)
-                                            .flatMapCompletable(s -> updateTaskStatus(dc, task, s)))
-                                    .andThen(ensureUnlockDc(dc, task));
+                                            .flatMapCompletable(s -> updateTaskStatus(dc, taskWrapper, s)))
+                                    .andThen(ensureUnlockDc(dc, taskWrapper));
                         default:
                             // nothing to do
                             return Completable.complete();
@@ -148,22 +150,41 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
         }
     }
 
-    public Completable updateTaskStatus(DataCenter dc, Task task, TaskPhase phase) throws ApiException {
+    public Completable updateTaskStatus(DataCenter dc, TaskWrapper taskWrapper, TaskPhase phase) throws ApiException {
+        final Task task = taskWrapper.getTask();
         logger.debug("Update task {}/{} in dc name={} namespace={} phase={}",
                 taskType, task.getMetadata().getName(), dc.getMetadata().getName(), dc.getMetadata().getNamespace(), phase);
         task.getStatus().setPhase(phase);
-        return k8sResourceUtils.updateTaskStatus(task);
+        // TODO update wrapper
+        return k8sResourceUtils.updateTaskStatus(taskWrapper);
     }
 
-    Single<DataCenter> fetchDataCenter(Task task) throws ApiException {
+    Single<DataCenter> fetchDataCenter(TaskWrapper taskWrapper) throws ApiException {
+        final Task task = taskWrapper.getTask();
         final Key dcKey =  new Key(
                 OperatorNames.dataCenterResource(task.getSpec().getCluster(), task.getSpec().getDatacenter()),
                 task.getMetadata().getNamespace()
         );
         return k8sResourceUtils.readDatacenter(dcKey);
     }
-    
-    boolean ensureDcIsReady(Task task, DataCenter dc) {
+
+    Single<TaskWrapper>  fetchTask(TaskWrapper taskWrapper) throws ApiException {
+        final Task task = taskWrapper.getTask();
+        return k8sResourceUtils.readTask(task.getMetadata().getNamespace(), task.getMetadata().getName())
+                .map((freshTask) -> {
+                    freshTask.ifPresent((t) -> {
+                            // create status if necessary
+                            if (t.getStatus() == null) {
+                                t.setStatus(new TaskStatus());
+                            }
+                            taskWrapper.updateTaskRef(t);
+                    });
+                    return taskWrapper;
+                });
+    }
+
+    boolean ensureDcIsReady(TaskWrapper taskWrapper, DataCenter dc) {
+        final Task task = taskWrapper.getTask();
         if (dc.getStatus() == null) {
             return false;
         }
@@ -183,7 +204,9 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
         }
     }
 
-    protected Completable ensureLockDc(Task task, DataCenter dc) throws ApiException {
+    protected Completable ensureLockDc(TaskWrapper taskWrapper, DataCenter dc) throws ApiException {
+        final Task task = taskWrapper.getTask();
+
         BlockReason reason = blockReason();
         if (!reason.equals(BlockReason.NONE)) {
             logger.info("Locking dc name={} in namespace={} for task {} {}",
@@ -193,11 +216,11 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
             block.getReasons().add(reason);
             block.setLocked(true);
         }
-
         return k8sResourceUtils.updateDataCenterStatus(dc).ignoreElement();
     }
 
-    protected Completable ensureUnlockDc(DataCenter dc, Task task) throws ApiException {
+    protected Completable ensureUnlockDc(DataCenter dc, TaskWrapper taskWrapper) throws ApiException {
+        final Task task = taskWrapper.getTask();
         BlockReason reason = blockReason();
         if (!reason.equals(BlockReason.NONE)) {
             logger.debug("Unlocking datacenter name={}  in namespace={} after task {} {} terminated",
@@ -208,6 +231,7 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
             block.getReasons().remove(reason);
             if (block.getReasons().isEmpty())
                 block.setLocked(false);
+
 
             // lock and unlock can't be executed in the same reconciliation (it will conflict when updating status otherwise)
             return k8sResourceUtils.updateDataCenterStatus(dc).ignoreElement();
@@ -221,11 +245,29 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
      */
     public abstract BlockReason blockReason();
 
-    protected Completable initializePodMap(Task task, DataCenter dc) {
+    protected Completable initializePodMap(TaskWrapper taskWrapper, DataCenter dc) {
         for (Map.Entry<String, ElassandraNodeStatus> entry : dc.getStatus().getElassandraNodeStatuses().entrySet()) {
-            task.getStatus().getPods().put(entry.getKey(), TaskPhase.WAITING);
+            if (!entry.getValue().equals(ElassandraNodeStatus.UNKNOWN)) {
+                // only add reachable nodes (usually UNKNWON is used for unreachable or non bootstrapped node)
+                taskWrapper.task.getStatus().getPods().put(entry.getKey(), TaskPhase.WAITING);
+            }
         }
         return Completable.complete();
     }
 
+    public final static class TaskWrapper {
+        private Task task;
+
+        public TaskWrapper(Task task) {
+            this.task = task;
+        }
+
+        public Task getTask() {
+            return task;
+        }
+
+        public void updateTaskRef(Task task) {
+            this.task = task;
+        }
+    }
 }

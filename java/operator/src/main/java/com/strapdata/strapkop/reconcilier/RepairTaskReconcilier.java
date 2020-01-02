@@ -43,7 +43,8 @@ public final class RepairTaskReconcilier extends TaskReconcilier {
     }
     
     @Override
-    protected Single<TaskPhase> doTask(Task task, DataCenter dc) throws ApiException {
+    protected Single<TaskPhase> doTask(TaskWrapper taskWrapper, DataCenter dc) throws ApiException {
+        final Task task = taskWrapper.getTask();
 
         // find the next pods to cleanup
         final List<String> pods = task.getStatus().getPods().entrySet().stream()
@@ -55,7 +56,7 @@ public final class RepairTaskReconcilier extends TaskReconcilier {
             return Single.just(TaskPhase.SUCCEED);
         }
 
-        // do clean up on each pod with 10 sec interval
+        // do repair on each pod with 10 sec interval
         // TODO: maybe we should try to caught outer exception (even if we already catch inside doOnNext)
         return Observable.zip(Observable.fromIterable(pods), Observable.interval(10, TimeUnit.SECONDS), (pod, timer) -> pod)
                 .flatMapSingle(pod -> {
@@ -66,9 +67,10 @@ public final class RepairTaskReconcilier extends TaskReconcilier {
                     } catch (Throwable throwable) {
                         logger.error("Error while executing repair on {}", pod, throwable);
                         task.getStatus().setLastMessage(throwable.getMessage());
+                        podPhase = TaskPhase.FAILED;
                     }
                     task.getStatus().getPods().put(pod, podPhase);
-                    return updateTaskStatus(dc, task, TaskPhase.RUNNING).toSingleDefault(new Tuple2<>(pod, podPhase));
+                    return updateTaskStatus(dc, taskWrapper, TaskPhase.RUNNING).toSingleDefault(new Tuple2<>(pod, podPhase));
                 })
                 .toList()
                 .map(list -> {
