@@ -40,6 +40,10 @@ public class CqlSessionHandler implements CqlSessionSupplier {
         if (cluster != null) {
             logger.debug("Closing cluster={}", cluster.getClusterName());
             cluster.close();
+            // reset cluster & session because getSession maybe call on the same instance
+            // after a close
+            cluster = null;
+            session = null;
         }
     }
 }

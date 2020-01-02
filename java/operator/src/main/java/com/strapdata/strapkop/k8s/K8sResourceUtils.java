@@ -814,7 +814,8 @@ public class K8sResourceUtils {
             private final TaskList taskList;
 
             private TaskPage(final String continueToken) throws ApiException {
-                com.squareup.okhttp.Call call = customObjectsApi.listNamespacedCustomObjectCall(Task.NAME, Task.VERSION, namespace, Task.PLURAL, "false", labelSelector, null, Boolean.FALSE, null, null);
+                com.squareup.okhttp.Call call = customObjectsApi.listNamespacedCustomObjectCall("stable.strapdata.com", Task.VERSION, namespace, Task.PLURAL,
+                        "false", labelSelector, null, null, null, null);
                 Type localVarReturnType = new TypeToken<TaskList>(){}.getType();
                 ApiResponse<TaskList> resp = customObjectsApi.getApiClient().execute(call, localVarReturnType);
                 taskList = resp.getData();
@@ -991,7 +992,7 @@ public class K8sResourceUtils {
             public void run() throws Exception {
                 for (Task task : listNamespacedTask(namespace, labelSelector)) {
                     try {
-                        deleteTask(task.getMetadata());
+                        deleteTask(task.getMetadata()).blockingGet();
                         logger.debug("Deleted task namespace={} name={}", task.getMetadata().getNamespace(), task.getMetadata().getName());
                     } catch (final JsonSyntaxException e) {
                         logger.debug("Caught JSON exception while deleting Service. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
@@ -1008,8 +1009,9 @@ public class K8sResourceUtils {
                 try {
                     logger.debug("Deleting DataCenter namespace={} name={}", metadata.getNamespace(), metadata.getName());
                     V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
-                    Call call = customObjectsApi.deleteNamespacedCustomObjectAsync("stable.strapdata.com", "v1",
-                            metadata.getNamespace(), "elassandratasks", metadata.getName(), deleteOptions, null, null, "Foreground", null);
+                    Call call = customObjectsApi.deleteNamespacedCustomObjectCall("stable.strapdata.com", "v1",
+                            metadata.getNamespace(), "elassandratasks", metadata.getName(), deleteOptions,
+                            null, null, "Foreground", null, null);
                     final ApiResponse<Task> apiResponse = customObjectsApi.getApiClient().execute(call, Task.class);
                     return apiResponse.getData();
                 } catch (ApiException e) {
@@ -1022,18 +1024,10 @@ public class K8sResourceUtils {
         });
     }
 
-    public Single<Task> createTask(DataCenter dc, String taskType, Consumer<TaskSpec> modifier, Map<String, String> labels) throws ApiException {
+    public Single<Task> createTask(DataCenter dc, String taskType, Consumer<TaskSpec> modifier) throws ApiException {
             final String name = OperatorNames.generateTaskName(dc, taskType);
             final Task task = Task.fromDataCenter(name, dc);
             modifier.accept(task.getSpec());
-            if (labels != null) {
-                Map<String, String> mdLabels = task.getMetadata().getLabels();
-                if (mdLabels == null) {
-                    mdLabels = new HashMap<>();
-                    task.getMetadata().labels(mdLabels);
-                }
-                mdLabels.putAll(labels);
-            }
             return this.createTask(task);
     }
 
