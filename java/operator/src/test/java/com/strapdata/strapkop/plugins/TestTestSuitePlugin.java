@@ -9,6 +9,7 @@ import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.plugins.test.TestSuiteExecutor;
 import com.strapdata.strapkop.plugins.test.step.Step;
 import com.strapdata.strapkop.plugins.test.step.StepFailedException;
+import com.strapdata.strapkop.reconcilier.TaskReconcilier;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
@@ -70,7 +71,7 @@ public class TestTestSuitePlugin {
         assertFalse(plugin.isBusy(task));
         assertFalse(plugin.isRunning(task));
 
-        Completable complatable = plugin.initialize(task, createFakeDc());
+        Completable complatable = plugin.initialize(new TaskReconcilier.TaskWrapper(task), createFakeDc());
         complatable.blockingGet();
 
         assertTrue(plugin.isRunning(task));
@@ -97,7 +98,7 @@ public class TestTestSuitePlugin {
         assertFalse(plugin.isBusy(task));
         assertFalse(plugin.isRunning(task));
 
-        Completable complatable = plugin.initialize(task, createFakeDc());
+        Completable complatable = plugin.initialize(new TaskReconcilier.TaskWrapper(task), createFakeDc());
         complatable.blockingGet();
 
         assertFalse(plugin.isBusy(task));
@@ -114,7 +115,7 @@ public class TestTestSuitePlugin {
         assertFalse(plugin.isBusy(task));
         assertFalse(plugin.isRunning(task));
 
-        Completable complatable = plugin.initialize(task, new DataCenter());
+        Completable complatable = plugin.initialize(new TaskReconcilier.TaskWrapper(task), new DataCenter());
         complatable.blockingGet();
 
         assertTrue(plugin.isRunning(task));

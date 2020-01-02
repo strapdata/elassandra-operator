@@ -6,10 +6,7 @@ import com.strapdata.model.k8s.task.Task;
 import com.strapdata.model.k8s.task.TaskSpec;
 import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.pipeline.WorkQueue;
-import com.strapdata.strapkop.reconcilier.BackupTaskReconcilier;
-import com.strapdata.strapkop.reconcilier.CleanupTaskReconcilier;
-import com.strapdata.strapkop.reconcilier.TaskReconcilier;
-import com.strapdata.strapkop.reconcilier.TestTaskReconcilier;
+import com.strapdata.strapkop.reconcilier.*;
 import io.vavr.Tuple;
 import io.vavr.Tuple2;
 import org.slf4j.Logger;
@@ -37,13 +34,15 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
     public TaskHandler(WorkQueue workQueue,
                        BackupTaskReconcilier backupTaskReconcilier,
                        CleanupTaskReconcilier cleanupTaskReconcilier,
-                       TestTaskReconcilier testTaskReconcilier) {
+                       TestTaskReconcilier testTaskReconcilier,
+                       RepairTaskReconcilier repairTaskReconcilier) {
      
         this.workQueue = workQueue;
     
         taskFamily = ImmutableList.of(
                 Tuple.of(backupTaskReconcilier, TaskSpec::getBackup),
                 Tuple.of(cleanupTaskReconcilier, TaskSpec::getCleanup),
+                Tuple.of(repairTaskReconcilier, TaskSpec::getRepair),
                 Tuple.of(testTaskReconcilier, TaskSpec::getTest)
         );
     }
@@ -75,7 +74,7 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
     }
     
     private void handleWrongTaskType(K8sWatchEvent<Task> data) {
-        logger.error("wrong task arguments for {}", data.getResource().getMetadata().getName());
+        logger.error("wrong task arguments for {}, no task reconcilier found", data.getResource().getMetadata().getName());
         // TODO: write message in task status
     }
     

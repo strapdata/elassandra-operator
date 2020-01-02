@@ -53,14 +53,14 @@ public class BackupTaskReconcilier extends TaskReconcilier {
 
     /**
      * Execute backup concurrently on all nodes
-     * @param task
+     * @param taskWrapper
      * @param dc
      * @return
      * @throws ApiException
      */
     @Override
-    protected Single<TaskPhase> doTask(Task task, DataCenter dc) throws ApiException {
-
+    protected Single<TaskPhase> doTask(TaskWrapper taskWrapper, DataCenter dc) throws ApiException {
+        final Task task = taskWrapper.getTask();
         // find the next pods to cleanup
         final List<String> pods = task.getStatus().getPods().entrySet().stream()
                 .filter(e -> Objects.equals(e.getValue(), TaskPhase.WAITING))
