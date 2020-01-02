@@ -11,6 +11,7 @@ import com.strapdata.model.k8s.task.RepairTaskSpec;
 import com.strapdata.model.k8s.task.TaskSpec;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
+import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.plugins.Plugin;
 import com.strapdata.strapkop.plugins.PluginRegistry;
 import io.reactivex.Completable;
@@ -130,17 +131,22 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
     public void removeDatacenter(final DataCenter dataCenter, CqlSessionSupplier sessionSupplier) throws Exception {
         // abort if dc is not running normally or not connected
         if (dataCenter.getStatus().getPhase().equals(DataCenterPhase.RUNNING) && dataCenter.getStatus().getCqlStatus().equals(CqlStatus.ESTABLISHED)) {
-            // adjust RF for system keyspaces
-            for(CqlKeyspace keyspace : SYSTEM_KEYSPACES) {
-                updateKeyspaceReplicationMap(dataCenter, keyspace.name, 0, sessionSupplier).blockingGet();
-            }
+            try {
+                // adjust RF for system keyspaces
+                for (CqlKeyspace keyspace : SYSTEM_KEYSPACES) {
+                    updateKeyspaceReplicationMap(dataCenter, keyspace.name, 0, sessionSupplier).blockingGet();
+                }
 
-            // monitor elastic_admin keyspace to reduce RF when scaling down the DC.
-            updateKeyspaceReplicationMap(dataCenter, elasticAdminKeyspaceName(dataCenter), 0, sessionSupplier).blockingGet();
+                // monitor elastic_admin keyspace to reduce RF when scaling down the DC.
+                updateKeyspaceReplicationMap(dataCenter, elasticAdminKeyspaceName(dataCenter), 0, sessionSupplier).blockingGet();
 
-            // adjust user keyspace RF
-            for(CqlKeyspace keyspace : get(dataCenter).values()) {
-                updateKeyspaceReplicationMap(dataCenter, keyspace.name, 0, sessionSupplier).blockingGet();
+                // adjust user keyspace RF
+                for (CqlKeyspace keyspace : get(dataCenter).values()) {
+                    updateKeyspaceReplicationMap(dataCenter, keyspace.name, 0, sessionSupplier).blockingGet();
+                }
+            } catch (Exception e) {
+                // TODO [ELE] should be ignored in single DC deployment but maybe retry in multiDC configuration...
+                logger.warn("Unable to update Keyspace Replication Map due to '{}'", e.getMessage(), e);
             }
         }
         remove(dataCenter);
@@ -205,7 +211,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                                                     public void accept(TaskSpec taskSpec) {
                                                         taskSpec.setRepair(new RepairTaskSpec().setKeyspace(keyspace));
                                                     }
-                                                }).ignoreElement();
+                                                }, OperatorLabels.datacenter(dc)).ignoreElement();
                                             }
                                         } else {
                                             // RF deacreased
@@ -217,7 +223,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                                                     public void accept(TaskSpec taskSpec) {
                                                         taskSpec.setCleanup(new CleanupTaskSpec().setKeyspace(keyspace));
                                                     }
-                                                }).ignoreElement();
+                                                }, OperatorLabels.datacenter(dc)).ignoreElement();
                                             }
                                         }
                                         return Completable.complete();
