@@ -10,6 +10,7 @@ import com.strapdata.cassandra.k8s.ElassandraOperatorSeedProvider;
 import com.strapdata.model.k8s.cassandra.Authentication;
 import com.strapdata.model.k8s.cassandra.CqlStatus;
 import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
@@ -228,12 +229,16 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
     }
 
     private Cluster createClusterObject(final DataCenter dc, final Optional<CqlRole> optionalCqlRole) throws StrapkopException, ApiException, SSLException {
+        // check the number of available node to adapt the ConsistencyLevel otherwise creating a DC with more than 1 node isn't possible
+        // because licence can't be checked (UnavailableException: Not enough replicas available for query at consistency LOCAL_QUORUM (2 required but only 1 alive))
+        // TODO [ELE] is it really the right fix? Do we have to adapt the RF and update the RF when cluster scales up instead???
+        final long bootstrapedNode = dc.getStatus().getElassandraNodeStatuses().values().stream().filter(s -> !s.equals(ElassandraNodeStatus.UNKNOWN)).count();
 
         // TODO: updateConnection remote seeds as contact point
         final Cluster.Builder builder = Cluster.builder()
                 .withClusterName(dc.getSpec().getClusterName())
                 .withPort(dc.getSpec().getNativePort())
-                .withQueryOptions(new QueryOptions().setConsistencyLevel(ConsistencyLevel.LOCAL_QUORUM))
+                .withQueryOptions(new QueryOptions().setConsistencyLevel(bootstrapedNode <= 1 ? ConsistencyLevel.LOCAL_ONE : ConsistencyLevel.LOCAL_QUORUM))
                 .withLoadBalancingPolicy(new TokenAwarePolicy(
                         DCAwareRoundRobinPolicy.builder()
                                 .withLocalDc(dc.getSpec().getDatacenterName())
@@ -271,12 +276,12 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
             } catch(IllegalArgumentException e) {
                 if (e.getCause() != null && e.getCause() instanceof  java.net.UnknownHostException) {
                     // ignore DNS resolution failure because dc removed....
+                    logger.debug("seed={} for datacenter={} can't be added due to UnknownHostException, DC removed", OperatorNames.nodesService(dc), dc.getMetadata().getName());
                 } else {
                     throw e;
                 }
             }
         }
-
 
         if (Objects.equals(dc.getSpec().getSsl(), Boolean.TRUE)) {
             builder.withSSL(getSSLOptions());
