@@ -211,7 +211,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                                                     public void accept(TaskSpec taskSpec) {
                                                         taskSpec.setRepair(new RepairTaskSpec().setKeyspace(keyspace));
                                                     }
-                                                }, OperatorLabels.datacenter(dc)).ignoreElement();
+                                                }).ignoreElement();
                                             }
                                         } else {
                                             // RF deacreased
@@ -223,7 +223,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                                                     public void accept(TaskSpec taskSpec) {
                                                         taskSpec.setCleanup(new CleanupTaskSpec().setKeyspace(keyspace));
                                                     }
-                                                }, OperatorLabels.datacenter(dc)).ignoreElement();
+                                                }).ignoreElement();
                                             }
                                         }
                                         return Completable.complete();
