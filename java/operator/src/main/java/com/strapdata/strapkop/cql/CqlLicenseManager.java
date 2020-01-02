@@ -19,7 +19,6 @@ import java.util.stream.StreamSupport;
 public class CqlLicenseManager extends AbstractManager<License> implements LicenseVerifierService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(CqlLicenseManager.class);
-    public static final String LICENSE_KEY = "license";
     public static final String SELECT_STATEMENT = "SELECT * from elastic_admin.licenses";
 
     public Completable verifyLicense(DataCenter dataCenter, CqlSessionHandler sessionHandler) {

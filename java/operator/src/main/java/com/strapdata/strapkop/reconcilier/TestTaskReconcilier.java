@@ -30,34 +30,27 @@ public class TestTaskReconcilier extends TaskReconcilier {
     }
 
     @Override
-    protected Single<TaskPhase> doTask(Task task, DataCenter dc) throws Exception {
+    protected Single<TaskPhase> doTask(TaskWrapper taskWrapper, DataCenter dc) throws Exception {
+        final Task task = taskWrapper.getTask();
+
         if (testSuitePlugin.isBusy(task) && !testSuitePlugin.isRunning(task)) {
             // a test is already running, postpone this one
             return Single.just(TaskPhase.WAITING);
         }
 
         if (!testSuitePlugin.isBusy(task)) {
-            testSuitePlugin.initialize(task, dc);
+            testSuitePlugin.initialize(taskWrapper, dc);
             return Single.just(TaskPhase.RUNNING);
         }
 
-        testSuitePlugin.runTest(task, dc);
+        testSuitePlugin.runTest(taskWrapper, dc);
         return Single.just(TaskPhase.RUNNING);
-        /*
-        if (!testSuitePlugin.isRunning(task)) {
-            // a test is already running, postpone this one
-            return testSuitePlugin.initialize(task, dc);
-        } else {
-            testSuitePlugin.runTest(task, dc);
-            return Completable.complete();
-        }
-         */
     }
 
     @Override
-    protected Completable validTask(Task task, DataCenter dc) throws Exception {
-        if (testSuitePlugin.isRunning(task)) {
-            testSuitePlugin.runTest(task, dc);
+    protected Completable validTask(TaskWrapper taskWrapper, DataCenter dc) throws Exception {
+        if (testSuitePlugin.isRunning(taskWrapper.getTask())) {
+            testSuitePlugin.runTest(taskWrapper, dc);
         }
         return Completable.complete();
     }
