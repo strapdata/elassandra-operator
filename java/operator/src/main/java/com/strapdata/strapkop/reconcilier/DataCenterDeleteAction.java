@@ -52,6 +52,7 @@ public class DataCenterDeleteAction {
         return Completable.fromAction(new Action() {
             @Override
             public void run() throws Exception {
+
                 cqlKeyspaceManager.removeDatacenter(dataCenter, cqlSessionSupplier);
 
                 final String labelSelector = OperatorLabels.toSelector(OperatorLabels.datacenter(dataCenter));
@@ -60,12 +61,10 @@ public class DataCenterDeleteAction {
                 elassandraNodeStatusCache.purgeDataCenter(dataCenter);
                 sidecarConnectionCache.purgeDataCenter(dataCenter);
 
-                // delete tasks
-
                 // delete StatefulSets
                 k8sResourceUtils.listNamespacedStatefulSets(dataCenter.getMetadata().getNamespace(), null, labelSelector).forEach(statefulSet -> {
                     try {
-                        k8sResourceUtils.deleteStatefulSet(statefulSet);
+                        k8sResourceUtils.deleteStatefulSet(statefulSet).subscribe();
                         logger.debug("Deleted StatefulSet namespace={} name={}", dataCenter.getMetadata().getNamespace(), statefulSet.getMetadata().getName());
                     } catch (final JsonSyntaxException e) {
                         logger.debug("Caught JSON exception while deleting StatefulSet. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
@@ -98,7 +97,7 @@ public class DataCenterDeleteAction {
                 }
 
                 // delete Services
-                k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, labelSelector);
+                k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, labelSelector).subscribe();
 
                 // delete persistent volume claims
                 switch (dataCenter.getSpec().getDecommissionPolicy()) {
@@ -107,22 +106,23 @@ public class DataCenterDeleteAction {
                     case BACKUP_AND_DELETE_PVC:
                         // TODO: backup
                     case DELETE_PVC:
-                        k8sResourceUtils.listNamespacedPods(dataCenter.getMetadata().getNamespace(), null, labelSelector).forEach(pod -> {
+                        k8sResourceUtils.listNamespacedPodsPersitentVolumeClaims(dataCenter.getMetadata().getNamespace(), null, labelSelector).forEach(volumeClaim -> {
                             try {
-                                k8sResourceUtils.deletePersistentVolumeClaim(pod);
-                                logger.debug("PVC={} deleted", pod.getSpec().getVolumes().get(0).getPersistentVolumeClaim().getClaimName());
+                                k8sResourceUtils.deletePersistentVolumeClaim(volumeClaim).subscribe();
+                                logger.debug("PVC={} deleted", volumeClaim.getMetadata().getName());
                             } catch (final JsonSyntaxException e) {
                                 logger.debug("Caught JSON exception while deleting PVC. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
                             } catch (final ApiException e) {
-                                logger.error("Failed to delete PVC for pod={}" + pod.getMetadata().getName(), e);
+                                logger.error("Failed to delete PVC for volumeClaim={}" + volumeClaim.getMetadata().getName(), e);
                             }
                         });
                         break;
                 }
 
                 // delete tasks
-                k8sResourceUtils.deleteTasks(dataCenter.getMetadata().getNamespace(), null);
+                k8sResourceUtils.deleteTasks(dataCenter.getMetadata().getNamespace(), labelSelector).subscribe();
 
+                // TODO on delete dc, reset applied attributes for CqlRole otherwise, they will be ignore during the next dc creation...
                 logger.info("Deleted DataCenter namespace={} name={}", dataCenter.getMetadata().getNamespace(), dataCenter.getMetadata().getName());
             }
         });

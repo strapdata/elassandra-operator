@@ -35,9 +35,14 @@ public class DataCenterDeleteReconcilier extends Reconcilier<DataCenter> {
     public Completable reconcile(final DataCenter dataCenter) throws Exception {
         final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
         return reconcilierObserver.onReconciliationBegin()
-                .andThen(pluginRegistry.deleteAll(dataCenter))
                 .andThen(context.createBean(DataCenterDeleteAction.class, dataCenter).deleteDataCenter(cqlSessionHandler))
-                .doOnError(t -> { if (!(t instanceof ReconcilierShutdownException)) reconcilierObserver.failedReconciliationAction(); })
+                .andThen(pluginRegistry.deleteAll(dataCenter))
+                .doOnError(t -> { // TODO au lieu de faire le deleteDC en premier ne faut-il pas faire une action deleteDC sur erreur ou simplement logguer les erreur de deletePlugin ???
+                    logger.warn("An error occured during delete datacenter action : {} ", t.getMessage(), t);
+                    if (!(t instanceof ReconcilierShutdownException)) {
+                        reconcilierObserver.failedReconciliationAction();
+                    }
+                })
                 .doOnComplete(reconcilierObserver.endReconciliationAction())
                 .doFinally(new Action() {
                     @Override

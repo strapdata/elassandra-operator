@@ -508,18 +508,17 @@ public class K8sResourceUtils {
         });
     }
     
-    public Completable deletePersistentVolumeClaim(final V1Pod pod) throws ApiException {
+    public Completable deletePersistentVolumeClaim(final V1PersistentVolumeClaim persistentVolumeClaim) throws ApiException {
         return deleteResource(() -> {
             final V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
 
-            // TODO: maybe delete all volumes?
-            final String pvcName = pod.getSpec().getVolumes().get(0).getPersistentVolumeClaim().getClaimName();
-            final V1PersistentVolumeClaim pvc = coreApi.readNamespacedPersistentVolumeClaim(pvcName, pod.getMetadata().getNamespace(), null, null, null);
+            final String pvcName = persistentVolumeClaim.getMetadata().getName();
+            final V1PersistentVolumeClaim pvc = coreApi.readNamespacedPersistentVolumeClaim(pvcName, persistentVolumeClaim.getMetadata().getNamespace(), null, null, null);
 
             V1Status v1Status = null;
             try {
                 logger.debug("Deleting PVC name={}", pvcName);
-                v1Status = coreApi.deleteNamespacedPersistentVolumeClaim(pvcName, pod.getMetadata().getNamespace(), deleteOptions, null, null, null, null, "Foreground");
+                v1Status = coreApi.deleteNamespacedPersistentVolumeClaim(pvcName, persistentVolumeClaim.getMetadata().getNamespace(), deleteOptions, null, null, null, null, "Foreground");
             } catch (final JsonSyntaxException e) {
                 logger.debug("Caught JSON exception while deleting Service. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
             }
@@ -527,21 +526,6 @@ public class K8sResourceUtils {
         });
     }
 
-    /*
-    public void deletePersistentVolumeAndPersistentVolumeClaim(final V1Pod pod) throws ApiException {
-        logger.debug("Deleting Pod Persistent Volumes and Claims.");
-
-        final V1DeleteOptions deleteOptions = new V1DeleteOptions()
-                .propagationPolicy("Foreground");
-
-        // TODO: maybe delete all volumes?
-        final String pvcName = pod.getSpec().getVolumes().get(0).getPersistentVolumeClaim().getClaimName();
-        final V1PersistentVolumeClaim pvc = coreApi.readNamespacedPersistentVolumeClaim(pvcName, pod.getMetadata().getNamespace(), null, null, null);
-
-        coreApi.deleteNamespacedPersistentVolumeClaim(pvcName, pod.getMetadata().getNamespace(), deleteOptions, null, null, null, null, null);
-        coreApi.deletePersistentVolume(pvc.getSpec().getVolumeName(), deleteOptions, null, null, null, null, null);
-    }
-    */
 
     static class ResourceListIterable<T> implements Iterable<T> {
         interface Page<T> {
@@ -605,6 +589,33 @@ public class K8sResourceUtils {
             }
         }
         return new ResourceListIterable<>( new V1PodPage(null));
+    }
+
+
+    public Iterable<V1PersistentVolumeClaim> listNamespacedPodsPersitentVolumeClaims(final String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) throws ApiException {
+        class V1PersistentVolumeClaimPage implements ResourceListIterable.Page<V1PersistentVolumeClaim> {
+            private final V1PersistentVolumeClaimList podList;
+
+            private V1PersistentVolumeClaimPage(final String continueToken) throws ApiException {
+                podList = coreApi.listNamespacedPersistentVolumeClaim(namespace, null, null, continueToken, fieldSelector, labelSelector, null, null, null, null);
+            }
+
+            @Override
+            public Collection<V1PersistentVolumeClaim> items() {
+                return podList.getItems();
+            }
+
+            @Override
+            public V1PersistentVolumeClaimPage nextPage() throws ApiException {
+                final String continueToken = podList.getMetadata().getContinue();
+
+                if (Strings.isNullOrEmpty(continueToken))
+                    return null;
+
+                return new V1PersistentVolumeClaimPage(continueToken);
+            }
+        }
+        return new ResourceListIterable<>( new V1PersistentVolumeClaimPage(null));
     }
 
     public Iterable<DataCenter> listNamespacedDataCenters(final String namespace, @Nullable final String labelSelector) throws ApiException {
@@ -1011,10 +1022,18 @@ public class K8sResourceUtils {
         });
     }
 
-    public Single<Task> createTask(DataCenter dc, String taskType, Consumer<TaskSpec> modifier) throws ApiException {
+    public Single<Task> createTask(DataCenter dc, String taskType, Consumer<TaskSpec> modifier, Map<String, String> labels) throws ApiException {
             final String name = OperatorNames.generateTaskName(dc, taskType);
             final Task task = Task.fromDataCenter(name, dc);
             modifier.accept(task.getSpec());
+            if (labels != null) {
+                Map<String, String> mdLabels = task.getMetadata().getLabels();
+                if (mdLabels == null) {
+                    mdLabels = new HashMap<>();
+                    task.getMetadata().labels(mdLabels);
+                }
+                mdLabels.putAll(labels);
+            }
             return this.createTask(task);
     }
 
