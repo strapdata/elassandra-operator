@@ -120,7 +120,7 @@ public class DataCenterDeleteAction {
                 }
 
                 // delete tasks
-                k8sResourceUtils.deleteTasks(dataCenter.getMetadata().getNamespace(), labelSelector).subscribe();
+                k8sResourceUtils.deleteTasks(dataCenter.getMetadata().getNamespace(), null).subscribe();
 
                 // TODO on delete dc, reset applied attributes for CqlRole otherwise, they will be ignore during the next dc creation...
                 logger.info("Deleted DataCenter namespace={} name={}", dataCenter.getMetadata().getNamespace(), dataCenter.getMetadata().getName());
