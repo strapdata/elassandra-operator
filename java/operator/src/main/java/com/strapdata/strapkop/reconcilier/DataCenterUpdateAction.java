@@ -40,6 +40,7 @@ import io.reactivex.Completable;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
 import io.reactivex.functions.Action;
+import io.vavr.collection.Stream;
 import lombok.Data;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.bouncycastle.operator.OperatorCreationException;
@@ -221,6 +222,42 @@ public class DataCenterUpdateAction {
                 });
     }
 
+    public Completable freePodResource(ElassandraPod deletedPod) throws Exception {
+        return Completable.fromAction(() -> {
+            // delete PVC only if the node was decommissioned to avoid deleting PVC in unexpectedly killed pod during a DC ScaleDown
+            ElassandraNodeStatus podStatus = Optional.ofNullable(elassandraNodeStatusCache.get(deletedPod)).orElse(ElassandraNodeStatus.UNKNOWN);
+            if (ElassandraNodeStatus.DECOMMISSIONED.equals(podStatus)) {
+                switch (dataCenterSpec.getDecommissionPolicy()) {
+                    case KEEP_PVC:
+                        break;
+                    case BACKUP_AND_DELETE_PVC:
+                        // TODO
+                        break;
+                    case DELETE_PVC:
+                        List<V1PersistentVolumeClaim> pvcsToDelete = Stream.ofAll(k8sResourceUtils.listNamespacedPodsPersitentVolumeClaims(
+                                dataCenterMetadata.getNamespace(),
+                                null,
+                                OperatorLabels.toSelector(OperatorLabels.rack(dataCenter, deletedPod.getRack()))))
+                                .filter(pvc -> {
+                                    boolean match = pvc.getMetadata().getName().endsWith(deletedPod.getName());
+                                    logger.info("PVC {} will be deleted due to pod {} deletion", pvc.getMetadata().getName(), deletedPod.getName());
+                                    return match;
+                                }).collect(Collectors.toList());
+
+                        if (pvcsToDelete.size() > 1) {
+                            logger.warn("Too many PVC found for deletion, cancel it ! (List of PVC = {})", pvcsToDelete);
+                        } else {
+                            for (V1PersistentVolumeClaim pvc : pvcsToDelete) {
+                                k8sResourceUtils.deletePersistentVolumeClaim(pvc).subscribe();
+                            }
+                        }
+                }
+            } else {
+                logger.info("Resources can't be delete for pod {} in status {}", deletedPod.getName(), podStatus);
+            }
+        });
+    }
+
     public Completable rollbackDataCenter(Optional<RestorePoint> restorePoint) throws Exception {
         return fetchExistingStatefulSetsByZone()
                 .flatMapCompletable(existingStsMap -> {
@@ -393,7 +430,7 @@ public class DataCenterUpdateAction {
                                 break;
                             case UPDATING:
                                 // rolling update done and first node NORMAL
-                                if (!movingZone.isUpdating() && elassandraNodeStatusCache.isNormal(movingZone.firstPod(dataCenter))) {// TODO use same condition as SCALING_UP ??
+                                if (!movingZone.isUpdating() && allReplicasRunnning(movingZone)) {
                                     movingRack.setPhase(RackPhase.RUNNING);
                                     updateDatacenterStatus(DataCenterPhase.RUNNING, zones, rackStatusByName);
                                     logger.debug("First node NORMAL after rolling UPDATE in rack={} size={}", movingZone.name, movingZone.size);
@@ -404,7 +441,7 @@ public class DataCenterUpdateAction {
                             case SCALING_UP:
                                 // scale up done and last node NORMAL
                                 if (!movingZone.isScalingUp() && allReplicasRunnning(movingZone)) {
-                                    movingRack.setJoinedReplicas(movingZone.size);
+                                    movingRack.setJoinedReplicas(movingZone.size);// TODO [ELU] should be NON UNKNOWN node?
                                     movingRack.setPhase(RackPhase.RUNNING);
                                     updateDatacenterStatus(DataCenterPhase.RUNNING, zones, rackStatusByName);
                                     logger.debug("Last node NORMAL after SCALE_UP in rack={} size={}", movingZone.name, movingZone.size);
@@ -661,43 +698,65 @@ public class DataCenterUpdateAction {
                         if (scaleDownZone.isPresent()) {
                             Zone zone = scaleDownZone.get();
                             V1StatefulSet sts = zone.getSts().get();
-                            ElassandraPod elassandraPod = zone.lastPod(dataCenter); // TODO [ELE] changer  cet appel pour prendre le dernier pod avec un état différent de UNKNOWN
-                            ElassandraNodeStatus elassandraNodeStatus = elassandraNodeStatusCache.getOrDefault(elassandraPod, ElassandraNodeStatus.UNKNOWN);
-                            // UNKNOWN, STARTING, NORMAL, JOINING, LEAVING, DECOMMISSIONED, MOVING, DRAINING, DRAINED, DOWN;
-                            switch(elassandraNodeStatus) {
-                                case NORMAL:
-                                    // blocking call to decommission, max 5 times, with 2 second delays between each try
-                                    rackStatusByName.get(zone.name).setPhase(RackPhase.SCALING_DOWN);
-                                    updateDatacenterStatus(DataCenterPhase.SCALING_DOWN, zones, rackStatusByName);
-                                    logger.debug("SCALE_DOWN started in rack={} size={}, decommissioning pod={} status={}",
-                                            zone.name, zone.size, elassandraPod, elassandraNodeStatus);
-                                    // decomission node
-                                    logger.debug("Adjusting RF and Decomissionning elassandra pod={}", elassandraPod);
-                                    return todo
-                                            .andThen(cqlKeyspaceManager.decreaseRfBeforeScalingDownDc(dataCenter, zones.totalReplicas() - 1, cqlSessionHandler))
-                                            .andThen(sidecarClientFactory.clientForPod(elassandraPod).decommission()
-                                            .retryWhen(errors -> errors
-                                                    .zipWith(Flowable.range(1, 5), (n, i) -> i)
-                                                    .flatMap(retryCount -> Flowable.timer(2, TimeUnit.SECONDS))
-                                            ));
-                                case DECOMMISSIONED:
-                                case DRAINED:
-                                case DOWN:
-                                    sts.getSpec().setReplicas(sts.getSpec().getReplicas() - 1);
-                                    logger.info("Scaling down sts={} to {}, removing pod={}",
-                                            sts.getMetadata().getName(), sts.getSpec().getReplicas(), elassandraPod);
-                                    rackStatusByName.get(zone.name).setPhase(RackPhase.SCALING_DOWN);
-                                    updateDatacenterStatus(DataCenterPhase.SCALING_DOWN, zones, rackStatusByName);
-                                    // scale down sts
-                                    logger.debug("SCALE_DOWN started in rack={} size={}, removing pod={} status={}",
-                                            zone.name, zone.size, elassandraPod, elassandraNodeStatus);
-                                    return todo.andThen(replaceNamespacedStatefulSet(sts));
-                                default:
-                                    logger.info("Waiting a valid status to remove pod={} from sts={} in namspace={}",
-                                            elassandraPod,sts.getMetadata().getName(), dataCenterMetadata.getNamespace());
+                            Optional<ElassandraPod> electedElassandraPod = electDecomissioningNode(zone);
+                            if (electedElassandraPod.isPresent() && allReplicasRunnning(zone)) { // decommission a node only if all node of the rack are running in a NORMAL state
+                                ElassandraPod elassandraPod = electedElassandraPod.get();
+                                ElassandraNodeStatus elassandraNodeStatus = elassandraNodeStatusCache.getOrDefault(elassandraPod, ElassandraNodeStatus.UNKNOWN);
+                                // UNKNOWN, STARTING, NORMAL, JOINING, LEAVING, DECOMMISSIONED, MOVING, DRAINING, DRAINED, DOWN;
+                                switch (elassandraNodeStatus) {
+                                    case NORMAL:
+                                        // blocking call to decommission, max 5 times, with 2 second delays between each try
+                                        // decommission node
+                                        logger.debug("Adjusting RF and Decommissioning elassandra pod={}", elassandraPod);
+                                        return todo
+                                                .andThen(cqlKeyspaceManager.decreaseRfBeforeScalingDownDc(dataCenter, zones.totalReplicas() - 1, cqlSessionHandler))
+                                                .andThen(Completable.fromAction(() -> {
+                                                    // update the DC status after the decreaseRf because decreaseRf test DC phase is RUNNING...
+                                                    rackStatusByName.get(zone.name).setPhase(RackPhase.SCALING_DOWN);
+                                                    updateDatacenterStatus(DataCenterPhase.SCALING_DOWN, zones, rackStatusByName);
+                                                    logger.debug("SCALE_DOWN started in rack={} size={}, decommissioning pod={} status={}",
+                                                            zone.name, zone.size, elassandraPod, elassandraNodeStatus);
+                                                }))
+                                                .andThen(sidecarClientFactory.clientForPod(elassandraPod).decommission()
+                                                        .retryWhen(errors -> errors
+                                                                .zipWith(Flowable.range(1, 5), (n, i) -> i)
+                                                                .flatMap(retryCount -> Flowable.timer(2, TimeUnit.SECONDS))
+                                                        ));
+                                    case DECOMMISSIONED:
+                                    case DRAINED:
+                                    case DOWN:
+
+                                        // decrease the number of replicas only once... by testing the STS status
+                                        if (sts.getStatus().getUpdatedReplicas() == sts.getStatus().getCurrentReplicas()
+                                                && sts.getStatus().getUpdatedReplicas() == sts.getStatus().getReadyReplicas()) {
+
+                                            sts.getSpec().setReplicas(sts.getSpec().getReplicas() - 1);
+                                            logger.info("Scaling down sts={} to {}, removing pod={}",
+                                                    sts.getMetadata().getName(), sts.getSpec().getReplicas(), elassandraPod);
+                                            rackStatusByName.get(zone.name).setPhase(RackPhase.SCALING_DOWN);
+                                            updateDatacenterStatus(DataCenterPhase.SCALING_DOWN, zones, rackStatusByName);
+                                            // scale down sts
+                                            logger.debug("SCALE_DOWN started in rack={} size={}, removing pod={} status={}",
+                                                    zone.name, zone.size, elassandraPod, elassandraNodeStatus);
+                                            return todo.andThen(replaceNamespacedStatefulSet(sts));
+
+                                        } else {
+                                            logger.debug("SCALE_DOWN ongoing in rack={} size={}, removing pod={} status={}",
+                                                    zone.name, zone.size, elassandraPod, elassandraNodeStatus);
+                                            return todo;
+                                        }
+
+                                    default:
+                                        logger.info("Waiting a valid status to remove pod={} from sts={} in namespace={}",
+                                                elassandraPod, sts.getMetadata().getName(), dataCenterMetadata.getNamespace());
+                                }
+                            } else {
+                                logger.info("No pod eligible for Decommission from sts={} in namespace={}",
+                                        sts.getMetadata().getName(), dataCenterMetadata.getNamespace());
                             }
+                        } else {
+                            logger.warn("Cannot scale down, no more replicas in datacenter={} in namespace={}", dataCenterMetadata.getName(), dataCenterMetadata.getNamespace());
                         }
-                        logger.warn("Cannot scale down, no more replicas in datacenter={} in namespace={}", dataCenterMetadata.getName(), dataCenterMetadata.getNamespace());
                     }
                     return todo;
                 });
@@ -726,6 +785,10 @@ public class DataCenterUpdateAction {
     private boolean allReplicasRunnning(Zone movingZone) {
         Integer expectedReplicas = movingZone.sts.get().getSpec().getReplicas();
         return (expectedReplicas == elassandraNodeStatusCache.countNodesInStateForRack(movingZone.name, ElassandraNodeStatus.NORMAL));
+    }
+
+    private Optional<ElassandraPod> electDecomissioningNode(Zone movingZone) {
+        return elassandraNodeStatusCache.getLastBootstrappedNodesForRack(movingZone.name);
     }
 
     private void prepareDataCenterSnapshot(DataCenterPhase phase, V1StatefulSet statefulSet) throws ApiException {

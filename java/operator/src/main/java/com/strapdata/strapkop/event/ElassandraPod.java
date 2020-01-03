@@ -6,6 +6,7 @@ import com.strapdata.strapkop.k8s.OperatorNames;
 import io.kubernetes.client.models.V1ObjectMeta;
 import io.kubernetes.client.models.V1Pod;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -24,8 +25,11 @@ public class ElassandraPod {
     private String cluster;
     private String namespace;
     private String parent;
+    // rack & ssl not always initialize and this object is define as a key in ElassandraPod cache, exclude these fields
+    @EqualsAndHashCode.Exclude
     private String rack;
 
+    @EqualsAndHashCode.Exclude
     private boolean ssl = false;
 
     final static Pattern podNamePattern = Pattern.compile("elassandra-([\\w]+)-([\\w]+)-([\\w-]+)-([\\d]+)");

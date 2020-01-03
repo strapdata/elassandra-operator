@@ -60,9 +60,25 @@ public class ElassandraPodStatusSource implements EventSource<NodeStatusEvent> {
                         }
                 )
                 .map(event -> {
-                    event.setPreviousMode(elassandraNodeStatusCache.getOrDefault(event.getPod(), ElassandraNodeStatus.UNKNOWN));
-                    logger.debug("caching {}={} previous={}", event.getPod(), event.getCurrentMode(),  event.getPreviousMode());
-                    elassandraNodeStatusCache.put(event.getPod(), event.getCurrentMode());
+                    ElassandraNodeStatus previousStatus = elassandraNodeStatusCache.getOrDefault(event.getPod(), ElassandraNodeStatus.UNKNOWN);
+                    event.setPreviousMode(previousStatus);
+                    switch (previousStatus) {
+                        case DOWN:
+                        case DECOMMISSIONED:
+                        case DRAINED:
+                            // do not change the status if the current one is UNKNOWN to allow resource releasing
+                            // in other case the Node is coming back and the status must be updated
+                            if (!ElassandraNodeStatus.UNKNOWN.equals(event.getCurrentMode())) {
+                                logger.debug("caching {}={} previous={}", event.getPod(), event.getCurrentMode(),  event.getPreviousMode());
+                                elassandraNodeStatusCache.put(event.getPod(), event.getCurrentMode());
+                            } else {
+                                logger.debug("ignore caching {}={} previous={}", event.getPod(), event.getCurrentMode(),  event.getPreviousMode());
+                            }
+                            break;
+                        default:
+                            logger.debug("caching {}={} previous={}", event.getPod(), event.getCurrentMode(),  event.getPreviousMode());
+                            elassandraNodeStatusCache.put(event.getPod(), event.getCurrentMode());
+                    }
                     return event;
                 })
                 .filter(event -> !Objects.equals(event.getCurrentMode(), event.getPreviousMode()));
