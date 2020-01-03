@@ -22,24 +22,42 @@ public abstract class DnsUpdater {
         this.dnsConfiguration = dnsConfiguration;
     }
 
-    public abstract Completable updateDnsARecord(String name, String externalIp);
+    public final Completable updateDnsARecord(String name, String externalIp) {
+        if (dnsConfiguration.enabled) {
+            return innerUpdateDnsARecord(name, externalIp);
+        } else {
+            return Completable.complete();
+        }
+    }
 
-    public abstract Completable deleteDnsARecord(String name);
+    public abstract Completable innerUpdateDnsARecord(String name, String externalIp);
+
+    public final Completable deleteDnsARecord(String name) {
+        if (dnsConfiguration.enabled) {
+            return innerDeleteDnsARecord(name);
+        } else {
+            return Completable.complete();
+        }
+    }
+
+    public abstract Completable innerDeleteDnsARecord(String name);
 
     public void onStart(final ServiceStartedEvent event) {
-        String podName = System.getenv("POD_NAME");
-        String seedHostId = System.getenv("SEED_HOST_ID");
-        logger.debug("POD_NAME={} SEED_HOST_ID={} DNS_DOMAIN={}", podName, seedHostId, dnsConfiguration.domain);
-        try {
-            String publicIp = readFirstLine("/nodeinfo/public-ip", Charset.forName("UTF-8"));
-            if (dnsConfiguration.domain != null && !Strings.isNullOrEmpty(publicIp) && seedHostId != null && podName.endsWith("-0")) {
-                Throwable t = updateDnsARecord(seedHostId, publicIp).blockingGet();
-                if (t != null)
-                    throw t;
-                logger.info("Dns updated at startup pod={} {}.{} = {}", podName, seedHostId, dnsConfiguration.domain, publicIp);
+        if (dnsConfiguration.enabled) {
+            String podName = System.getenv("POD_NAME");
+            String seedHostId = System.getenv("SEED_HOST_ID");
+            logger.debug("POD_NAME={} SEED_HOST_ID={} DNS_DOMAIN={}", podName, seedHostId, dnsConfiguration.domain);
+            try {
+                String publicIp = readFirstLine("/nodeinfo/public-ip", Charset.forName("UTF-8"));
+                if (dnsConfiguration.domain != null && !Strings.isNullOrEmpty(publicIp) && seedHostId != null && podName.endsWith("-0")) {
+                    Throwable t = updateDnsARecord(seedHostId, publicIp).blockingGet();
+                    if (t != null)
+                        throw t;
+                    logger.info("Dns updated at startup pod={} {}.{} = {}", podName, seedHostId, dnsConfiguration.domain, publicIp);
+                }
+            } catch (Throwable e) {
+                logger.error("Failed to update DNS seed public ip:" + e.getMessage(), e);
             }
-        } catch (Throwable e) {
-            logger.error("Failed to update DNS seed public ip:" + e.getMessage(), e);
         }
     }
 

@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Objects;
 
 /**
  * Manage public DNS records on Azure
@@ -40,32 +41,43 @@ public class AzureDnsUpdater extends DnsUpdater {
         super(dnsConfiguration);
         this.resourceGroup = resourceGroup;
 
-        try {
-            AzureEnvironment environment = new AzureEnvironment(new HashMap<String, String>());
-            environment.endpoints().putAll(AzureEnvironment.AZURE.endpoints());
+        if (dnsConfiguration.enabled) {
+            Objects.requireNonNull(tenantId, "TenantId required");
+            Objects.requireNonNull(clientId, "ClientId required");
+            Objects.requireNonNull(clientSecret, "ClientSecret required");
+            Objects.requireNonNull(resourceGroup, "ResourceGroup required");
+            Objects.requireNonNull(subscriptionId, "SubscriptionId required");
 
-            AzureTokenCredentials credentials = new ApplicationTokenCredentials(
-                    clientId,
-                    tenantId,
-                    clientSecret,
-                    environment).withDefaultSubscriptionId(subscriptionId);
+            try {
+                AzureEnvironment environment = new AzureEnvironment(new HashMap<String, String>());
+                environment.endpoints().putAll(AzureEnvironment.AZURE.endpoints());
 
-            this.azure = Azure.configure()
-                    .withLogLevel(LogLevel.BASIC)
-                    .authenticate(credentials)
-                    .withDefaultSubscription();
+                AzureTokenCredentials credentials = new ApplicationTokenCredentials(
+                        clientId,
+                        tenantId,
+                        clientSecret,
+                        environment).withDefaultSubscriptionId(subscriptionId);
 
-            // Print selected subscription
-            logger.info("Selected clientId: " + clientId);
-            logger.info("Selected tenantId: " + tenantId);
-            logger.info("Selected clientSecret: " + clientSecret);
-            logger.info("Selected subscription: " + azure.subscriptionId());
-            logger.info("Selected resourceGroup: " + resourceGroup);
+                this.azure = Azure.configure()
+                        .withLogLevel(LogLevel.BASIC)
+                        .authenticate(credentials)
+                        .withDefaultSubscription();
 
-        } catch(Exception e) {
-            logger.error("Azure authentication failed with clientId={} tenanId={} clientSecret={} subcriptionId={} resourceGroup={}",
-                    clientId, tenantId, clientSecret, subscriptionId, resourceGroup);
-            this.azure = null;
+                // Print selected subscription
+                logger.info("Selected clientId: " + clientId);
+                logger.info("Selected tenantId: " + tenantId);
+                logger.info("Selected clientSecret: " + clientSecret);
+                logger.info("Selected subscription: " + azure.subscriptionId());
+                logger.info("Selected resourceGroup: " + resourceGroup);
+
+            } catch (Exception e) {
+                logger.error("Azure authentication failed with clientId={} tenanId={} clientSecret={} subcriptionId={} resourceGroup={}",
+                        clientId, tenantId, clientSecret, subscriptionId, resourceGroup);
+                this.azure = null;
+            }
+
+        } else {
+            logger.info("DnsUpdater disabled");
         }
     }
 
@@ -75,7 +87,7 @@ public class AzureDnsUpdater extends DnsUpdater {
      * @param externalIp
      * @return
      */
-    public Completable updateDnsARecord(String name, String externalIp) {
+    public Completable innerUpdateDnsARecord(String name, String externalIp) {
         if (azure == null)
             throw new IllegalStateException("Azure authentication failed");
         return RxJavaInterop.toV2Observable(azure.dnsZones().getByResourceGroupAsync(this.resourceGroup, dnsConfiguration.domain)
@@ -95,7 +107,7 @@ public class AzureDnsUpdater extends DnsUpdater {
      * @param name
      * @return
      */
-    public Completable deleteDnsARecord(String name) {
+    public Completable innerDeleteDnsARecord(String name) {
         logger.debug("deleting DNS record name={}", name);
         if (azure == null)
             throw new IllegalStateException("Azure authentication failed");
