@@ -17,16 +17,16 @@ import javax.inject.Singleton;
 import java.util.Objects;
 
 @Singleton
-public class DataCenterUnscheduledReconcilier extends Reconcilier<Tuple2<Key, ElassandraPod>> {
+public class DataCenterPodDeletedReconcilier extends Reconcilier<Tuple2<Key, ElassandraPod>> {
 
-    private final Logger logger = LoggerFactory.getLogger(DataCenterUnscheduledReconcilier.class);
+    private final Logger logger = LoggerFactory.getLogger(DataCenterPodDeletedReconcilier.class);
 
     private final ApplicationContext context;
     private final K8sResourceUtils k8sResourceUtils;
 
-    public DataCenterUnscheduledReconcilier(final ReconcilierObserver reconcilierObserver,
-                                            final ApplicationContext context,
-                                            final K8sResourceUtils k8sResourceUtils) {
+    public DataCenterPodDeletedReconcilier(final ReconcilierObserver reconcilierObserver,
+                                           final ApplicationContext context,
+                                           final K8sResourceUtils k8sResourceUtils) {
         super(reconcilierObserver);
         this.context = context;
         this.k8sResourceUtils = k8sResourceUtils;
@@ -38,18 +38,15 @@ public class DataCenterUnscheduledReconcilier extends Reconcilier<Tuple2<Key, El
         return k8sResourceUtils.readDatacenter(tuple._1)
                 .flatMap(dc -> reconcilierObserver.onReconciliationBegin().toSingleDefault(dc))
                 .flatMapCompletable(dc -> {
-                    if (dc.getStatus() != null && !Objects.equals(dc.getStatus().getPhase(), DataCenterPhase.UPDATING)) {
-                        logger.debug("do not reconcile datacenter on unscheduled pod, the DataCenter phase is  ({})", dc.getStatus().getPhase());
+                    // Test on the DataCenterPhase.SCALING_DOWN is safer but the pod deletion maybe triggered after the DC phase becomes RUNNING
+                    // so we only test the pod status using the ElassandraNode cache inside the freePodResource method...
+                    /*if (dc.getStatus() != null && !Objects.equals(dc.getStatus().getPhase(), DataCenterPhase.SCALING_DOWN)) {
+                        logger.debug("do not free pod resources if the DC isn't scaling down, the DataCenter phase is  ({})", dc.getStatus().getPhase());
                         return Completable.complete();
-                    }
-
+                    }*/
                     try {
-                        // call the statefullset reconciliation  (before scaling up/down to properly stream data according to the adjusted RF)
-                        logger.trace("processing an UnscheduledPod during datacenter reconciliation request for {} in thread {}", dc.getMetadata().getName(), Thread.currentThread().getName());
-
-                        return context.createBean(DataCenterUpdateAction.class, dc)
-                                .switchDataCenterUpdateOff(tuple._2)
-                                .andThen(k8sResourceUtils.updateDataCenterStatus(dc).ignoreElement());
+                        logger.trace("freeing resource of pod {} during datacenter reconciliation request for {} in thread {}", tuple._2.getName(), dc.getMetadata().getName(), Thread.currentThread().getName());
+                        return context.createBean(DataCenterUpdateAction.class, dc).freePodResource(tuple._2);
                     } catch (Exception e) {
                         logger.error("an error occurred while processing UnscheduledPod during DataCenter update reconciliation for {}", tuple._1.getName(), e);
                         if (dc != null) {
