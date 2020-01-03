@@ -7,8 +7,6 @@ replicaCount: 1
 apiVersion: stable.strapdata.com/v1
 
 dns:
-  ttl: 60
-  domain: "941a7aa2-kube1-azure-northeurope.azure.strapcloud.com"
   azure:
     secretName:
 

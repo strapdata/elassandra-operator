@@ -75,6 +75,8 @@ spec:
           - name: "DNS_TTL"
             value: {{ default "60" .Values.dns.ttl | quote }}
           {{- if .Values.dns.azure.secretName }}
+          - name: "DNS_UPDATER_ENABLED"
+            value: "true"
           - name: "DNS_AZURE_SECRET_NAME"
             value: {{ .Values.dns.azure.secretName | quote }}
           - name: "DNS_AZURE_CLIENT_ID"

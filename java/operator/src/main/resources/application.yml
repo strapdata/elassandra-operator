@@ -38,10 +38,13 @@ jackson:
 
 operator:
     namespace: "${OPERATOR_NAMESPACE:default}"
-    dnsAzureSecretName: "${DNS_AZURE_SECRET_NAME:azure-dns-spn}"
+    dnsAzureSecretName: "${DNS_AZURE_SECRET_NAME:}"
+    dnsUpdaterEnabled: "${DNS_UPDATER_ENABLED:false}"
     dns:
         domain: "${DNS_DOMAIN}"
         ttl: "${DNS_TTL:60}"
+        enabled: "${DNS_UPDATER_ENABLED:false}"
+
     test:
         enabled: "${TESTSUITE_ENABLE:false}"
         platform: "${TESTSUITE_PLATFORM:LOCAL}"

@@ -27,6 +27,7 @@ dns:
   azure:
     secretName: "azure-dns-spn"
 
+
 env:
 #  DNS_DOMAIN
 #  DNS_AZURE_CLIENT_ID:

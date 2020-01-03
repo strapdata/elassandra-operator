@@ -15,11 +15,12 @@ public class OperatorConfig {
     @NotBlank
     String namespace;
 
-
     /**
      * The secret containing azure information for dns dynamic updates, mounted as env variables by the sidecar.
      */
     String dnsAzureSecretName;
+
+    boolean dnsUpdaterEnabled = false;
 
     TestSuiteConfig test = new TestSuiteConfig();
 
