@@ -7,7 +7,6 @@ import com.google.common.net.InetAddresses;
 import com.strapdata.backup.manifest.GlobalManifest;
 import com.strapdata.backup.manifest.ManifestReader;
 import com.strapdata.cassandra.k8s.ElassandraOperatorSeedProviderAndNotifier;
-import com.strapdata.model.Key;
 import com.strapdata.model.backup.CloudStorageSecret;
 import com.strapdata.model.k8s.cassandra.*;
 import com.strapdata.model.sidecar.ElassandraNodeStatus;
@@ -1618,8 +1617,11 @@ public class DataCenterUpdateAction {
                     .addEnvItem(new V1EnvVar().name("SEED_HOST_ID").value(rackStatus.getSeedHostId().toString()))
                     ;
 
-            if (operatorConfig.getDnsAzureSecretName() != null)
+            if (operatorConfig.getDnsAzureSecretName() != null && operatorConfig.isDnsUpdaterEnabled()) {
                 addDnsAzureServicePrincipal(sidecarContainer, operatorConfig.getDnsAzureSecretName());
+            } else {
+                sidecarContainer.addEnvItem(new V1EnvVar().name("DNS_UPDATER_ENABLED").value("false"));
+            }
 
             if (dataCenterSpec.getSsl()) {
                 sidecarContainer

@@ -7,6 +7,7 @@ import lombok.Getter;
 @Getter
 public class DnsConfiguration {
 
+    boolean enabled = false;
 
     /**
      * DNS domain name when deploying ingress for plugins and registering DNS record for seed nodes.
