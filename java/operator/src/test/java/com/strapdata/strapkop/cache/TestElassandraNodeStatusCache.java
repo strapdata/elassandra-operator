@@ -9,7 +9,9 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 public class TestElassandraNodeStatusCache extends ElassandraNodeStatusCache {
     final String clusterName = "cl1";
@@ -35,15 +37,14 @@ public class TestElassandraNodeStatusCache extends ElassandraNodeStatusCache {
         generateRackPods(dc, rack1, rack1Normal);
         generateRackPods(dc, rack2, rack2Normal);
         generateRackPods(dc, rack3, rack3Normal);
-
     }
 
     private void generateRackPods(DataCenter dc, String rack, int pod) {
         int i = 0;
-        for (; i < pod; ++i) {
+        for (; i < pod; i++) {
             this.putIfAbsent(ElassandraPod.fromName(dc, podTemplate.replaceFirst("\\{\\}", rack).replaceFirst("\\{\\}", "" + i)), ElassandraNodeStatus.NORMAL);
         }
-        for (; i < pod*2; ++i) {
+        for (; i < pod*2; i++) {
             this.putIfAbsent(ElassandraPod.fromName(dc, podTemplate.replaceFirst("\\{\\}", rack).replaceFirst("\\{\\}", "" + i)), i % 2 == 0 ? ElassandraNodeStatus.UNKNOWN : ElassandraNodeStatus.JOINING);
         }
     }
@@ -58,5 +59,23 @@ public class TestElassandraNodeStatusCache extends ElassandraNodeStatusCache {
         assertEquals(rack1Normal, countNodesInStateForRack(rack1, ElassandraNodeStatus.NORMAL));
         assertEquals(rack2Normal, countNodesInStateForRack(rack2, ElassandraNodeStatus.NORMAL));
         assertEquals(rack3Normal, countNodesInStateForRack(rack3, ElassandraNodeStatus.NORMAL));
+    }
+
+    @Test
+    public void testGetLastBootstrappedNode() {
+        Optional<ElassandraPod> node = getLastBootstrappedNodesForRack(rack1);
+        assertTrue(node.isPresent());
+        assertEquals(
+                podTemplate.replaceFirst("\\{\\}", rack1).replaceFirst("\\{\\}", "" + (rack1Normal-1)),
+                node.get().getName());
+
+        node = getLastBootstrappedNodesForRack(rack2);
+        assertTrue(node.isPresent());
+        assertEquals(
+                podTemplate.replaceFirst("\\{\\}", rack2).replaceFirst("\\{\\}", "" + (rack2Normal-1)),
+                node.get().getName());
+
+        node = getLastBootstrappedNodesForRack(rack3);
+        assertFalse(node.isPresent());
     }
 }
