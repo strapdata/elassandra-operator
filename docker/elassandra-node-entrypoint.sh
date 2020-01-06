@@ -109,7 +109,7 @@ config_injection ELASTICSEARCH $CASSANDRA_CONFIG/elasticsearch.yml
 # handle kubernetes SIGTERM and gracefully stop elassandra
 _term() {
   echo "entry-point: received SIGTERM"
-  current_mode=$(nodetool ${NODETOOL_OPTS} netstats | head -n 1 | sed 's/^Mode: \(.*\)$/\1/g')
+  current_mode=$(nodetool ${NODETOOL_OPTS} netstats | grep "Mode" | head -n 1 | sed 's/^Mode: \(.*\)$/\1/g')
   echo "current mode is ${current_mode}"
   case "$current_mode" in
   NORMAL)
