@@ -36,4 +36,5 @@ dependencies {
 
 test {
     useJUnitPlatform()
+    exclude '**/AzureTests.class'
 }
