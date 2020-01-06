@@ -11,7 +11,6 @@ import com.strapdata.model.k8s.task.RepairTaskSpec;
 import com.strapdata.model.k8s.task.TaskSpec;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.plugins.Plugin;
 import com.strapdata.strapkop.plugins.PluginRegistry;
 import io.reactivex.Completable;
@@ -239,7 +238,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                 .flatMap(session -> {
                     final String query = String.format(Locale.ROOT,
                             "ALTER KEYSPACE %s WITH replication = {'class': 'NetworkTopologyStrategy', %s};",
-                            name, stringifyRfMap(rfMap));
+                            quoteKeyspaceName(name), stringifyRfMap(rfMap));
                     logger.debug("dc={} execute: {}", dc.getMetadata().getName(), query);
                     return Single.fromFuture(session.executeAsync(query)).map(x -> session);
                 });
@@ -250,5 +249,9 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                 .filter(e -> e.getValue() > 0)
                 .map(e -> String.format("'%s': %d", e.getKey(), e.getValue()))
                 .collect(Collectors.joining(", "));
+    }
+
+    private String quoteKeyspaceName(final String keyspace) {
+        return keyspace.startsWith("_") ? "\"" + keyspace + "\"" : keyspace;
     }
 }
