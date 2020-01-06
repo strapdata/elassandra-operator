@@ -517,7 +517,7 @@ public class DataCenterUpdateAction {
                                 break;
                             case PARKING:
 
-                                if (!movingZone.isParked()) {
+                                if (movingZone.isParked()) {
                                     movingRack.setJoinedReplicas(movingZone.size);
                                     movingRack.setPhase(RackPhase.PARKED);
                                     updateDatacenterStatus(zones.parkedDatacenter() ?  DataCenterPhase.PARKED : DataCenterPhase.PARKING, zones, rackStatusByName);
@@ -2295,7 +2295,9 @@ public class DataCenterUpdateAction {
 
         public boolean isParked() {
             V1StatefulSetStatus status = sts.get().getStatus();
-            return status.getReplicas() == sts.get().getSpec().getReplicas() && status.getCurrentReplicas() == 0;
+            return status.getReplicas() == sts.get().getSpec().getReplicas() &&
+                    status.getReplicas() == 0
+                    && Optional.ofNullable(status.getCurrentReplicas()).orElse(0) == 0;
         }
 
         public ElassandraPod lastPod(DataCenter dataCenter) {
