@@ -30,9 +30,23 @@ public class RackStatus {
     private Integer joinedReplicas = 0;
 
     /**
+     * Number of parked pods.
+     */
+    @SerializedName("parkedReplicas")
+    @Expose
+    private Integer parkedReplicas = 0;
+    /**
      * Host id of the seed node in the rack.
      */
     @SerializedName("seedHostId")
     @Expose
     private UUID seedHostId = UUID.randomUUID();
+
+    public boolean isParked() {
+        return RackPhase.PARKED.equals(phase);
+    }
+
+    public boolean isNotParked() {
+        return !isParked();
+    }
 }

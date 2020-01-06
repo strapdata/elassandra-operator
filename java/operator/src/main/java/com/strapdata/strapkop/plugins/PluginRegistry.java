@@ -42,14 +42,16 @@ public class PluginRegistry {
 
     public Completable[] reconcileAll(DataCenter dc) {
         List<Completable> pluginCompletables = new ArrayList<>();
-        for(Plugin plugin : plugins) {
-            try {
-                if (plugin.isActive(dc))
-                    pluginCompletables.add(plugin.reconcile(dc));
-                else
-                    pluginCompletables.add(plugin.delete(dc));
-            } catch (Exception e) {
-                logger.error("Plugin class=" + plugin.getClass().getSimpleName() + " reconcilation failed:", e);
+        if (!dc.getSpec().isParked()) {
+            for (Plugin plugin : plugins) {
+                try {
+                    if (plugin.isActive(dc))
+                        pluginCompletables.add(plugin.reconcile(dc));
+                    else
+                        pluginCompletables.add(plugin.delete(dc));
+                } catch (Exception e) {
+                    logger.error("Plugin class=" + plugin.getClass().getSimpleName() + " reconcilation failed:", e);
+                }
             }
         }
         return pluginCompletables.toArray(new Completable[pluginCompletables.size()]);
