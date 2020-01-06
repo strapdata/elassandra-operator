@@ -267,8 +267,13 @@ public class DataCenterSpec {
 
     public String fingerprint() {
         List<Object> acc = new ArrayList<>();
+
+        // we exclude :
+        // * Reaper config
+        // * Kibana config
+        // * parked attribute
+
         acc.add(workload);
-        // we exclude Reaper & Kibana config
         acc.add(podsAffinityPolicy);
         acc.add(elassandraImage);
         acc.add(sidecarImage);
