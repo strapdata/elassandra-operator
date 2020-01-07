@@ -77,3 +77,16 @@ test-cleanup:
 	kubectl delete crd elassandradatacenters.stable.strapdata.com elassandratasks.stable.strapdata.com
 	kubectl delete pvc data-volume-elassandra-singlenode-test-local-0
 	kubectl delete deployment.apps/elassandra-singlenode-test-kibana-kibana deployment.apps/elassandra-singlenode-test-reaper
+
+test-azure:
+	helm install --namespace default --name teststrapkop -f helm/src/main/base-test/values-operator-azure.yml helm/src/main/helm/elassandra-operator
+	echo "Wait operator pod ready"
+	sleep 10
+	kubectl wait --for=condition=ready --timeout=360s -l operator=elassandra po
+	helm install --namespace default --name integazure-test -f helm/src/main/base-test/values-datacenter-integazure-test.yml helm/src/main/helm/elassandra-datacenter
+	echo "Wait elassandra pod ready"
+	sleep 5
+	kubectl wait --for=condition=ready --timeout=360s -l app=elassandra po
+	sleep 5
+	# execute the test suite
+	kubectl apply -f helm/src/test/threenodes/ThreeNodesTestSuite.yaml
