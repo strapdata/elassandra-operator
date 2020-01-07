@@ -1,13 +1,17 @@
 package com.strapdata.strapkop.plugins.test;
 
-import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.google.protobuf.Api;
+import com.strapdata.model.k8s.cassandra.*;
 import com.strapdata.model.k8s.task.Task;
+import com.strapdata.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.k8s.K8sResourceTestUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
+import com.strapdata.strapkop.plugins.test.step.OnSuccessAction;
 import com.strapdata.strapkop.plugins.test.step.Step;
 import com.strapdata.strapkop.plugins.test.step.StepFailedException;
 import com.strapdata.strapkop.ssl.AuthorityManager;
+import com.strapdata.strapkop.utils.RestorePointCache;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
@@ -19,9 +23,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
-import java.util.Objects;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import static com.strapdata.strapkop.plugins.test.step.StepFailedException.failed;
 
@@ -135,6 +138,134 @@ public abstract class TestSuiteExecutor {
                 failed("ApiException on pod existence test : [code="+e.getCode()+" | boyd=" + e.getResponseBody() +"]");
             }
             return false;
+        }
+    }
+
+
+    protected Step checkNodeAvailability(final DataCenter dc, final int expectedReplicas, final OnSuccessAction onSuccess, final Step waitingStep) {
+        final DataCenterStatus status = dc.getStatus();
+        // filter on NORMAL nodes
+        List<String> nodeNames = status.getElassandraNodeStatuses().entrySet().stream()
+                .filter(e -> Objects.equals(e.getValue(), ElassandraNodeStatus.NORMAL))
+                .map(e -> e.getKey()).collect(Collectors.toList());
+
+        if (nodeNames.size() != expectedReplicas) {
+            LOGGER.info("[TEST] {}/{} nodes in NORMAL state, waiting... ", nodeNames.size(), expectedReplicas);
+            return waitingStep;
+        } else {
+            LOGGER.info("[TEST] {}/{} nodes in NORMAL state, other values... ", nodeNames.size(), expectedReplicas);
+
+            assertEquals("CQL Status should be ESTABLISHED", CqlStatus.ESTABLISHED, status.getCqlStatus());
+
+            assertEquals("Expected " + expectedReplicas + " Replicas", expectedReplicas, status.getReplicas());
+            assertEquals("Expected " + expectedReplicas + " ReadyReplicas", expectedReplicas, status.getReadyReplicas());
+
+            assertEquals("Expected at least one RackStatus", true, status.getRackStatuses().size() >= 1);
+            status.getRackStatuses().values().forEach((rackStatus) -> {
+                assertEquals("Expected " + expectedReplicas + " RackPhase", RackPhase.RUNNING, rackStatus.getPhase());
+            });
+
+            checkHistoryDataCenter(dc);
+
+            return onSuccess.execute(dc);
+        }
+    }
+
+    /**
+     * Check that the DCSpec is stored in RestorePointCache.
+     * @param dc
+     */
+    protected void checkHistoryDataCenter(final DataCenter dc) {
+        Optional<RestorePointCache.RestorePoint> restorePoint = RestorePointCache.getRestorePoint();
+        if (restorePoint.isPresent()) {
+            if (restorePoint.get().getSpec() == null) {
+                failed("ElassandraDataCenter should have a restore point");
+            }
+
+            String stableFingerPrint = restorePoint.get().getSpec().fingerprint();
+            if (!dc.getSpec().fingerprint().equals(stableFingerPrint)) {
+                failed("ElassandraDataCenter RestorePoint instance should reference the fingerprint " + dc.getSpec().fingerprint());
+            }
+        }
+    }
+
+    /**
+     *
+     * @param onNodeAvailable action returning a Step to call if waitClusterUpdated succeeded
+     * @param phaseHasBeenUpdating flag to keep track of DC Phase changes (true if UPDATING phase has been checked)
+     * @return
+     */
+    protected Step waitClusterUpdated(int expectedReplicas, OnSuccessAction onNodeAvailable, boolean phaseHasBeenUpdating) {
+        return (dc) -> {
+            Step nextStep = null;
+            switch (dc.getStatus().getPhase()) {
+                case UPDATING:
+                    LOGGER.info("[TEST] DC is updating the configuration, waiting...");
+                    nextStep = waitClusterUpdated(expectedReplicas, onNodeAvailable, true);
+                    break;
+                case ERROR:
+                    LOGGER.info("[TEST] DC update failed");
+                    failed("DC update failed with DataCenterPhase set to ERROR");
+                    break;
+
+                case CREATING:
+                    LOGGER.info("[TEST] Unexpected DC Phase");
+                    failed("Unexpected DC Phase during config map update ('" + dc.getStatus().getPhase() + "')");
+                    break;
+
+                case RUNNING:
+                    if (phaseHasBeenUpdating) {
+                        LOGGER.info("[TEST] DC Phase is now in Phase RUNNING after UPDATING one");
+                        // check Node availability, if OK test will finish, otherwise wait using this step
+                        return checkNodeAvailability(dc, expectedReplicas, onNodeAvailable, waitClusterUpdated(expectedReplicas, onNodeAvailable,true));
+                    } else {
+                        failed("Unexpected DC Phase RUNNING without UPDATING one");
+                    }
+                    break;
+            }
+            return nextStep;
+        };
+    }
+
+
+    protected void updateDataCenterOrFail(DataCenter dc) {
+        try {
+            k8sResourceUtils.updateDataCenter(dc).blockingGet();
+        } catch (ApiException e) {
+            LOGGER.error("[TEST] unable to update DataCenter [code : {} | body : {}]", e.getCode(), e.getResponseBody());
+            failed(e.getMessage());
+        }
+    }
+
+    protected Step checkNodeParked(final DataCenter dc, final int expectedReplicas, final OnSuccessAction onSuccess, final Step waitingStep) {
+        final DataCenterStatus status = dc.getStatus();
+        // filter on NORMAL nodes
+        List<String> nodeNames = status.getElassandraNodeStatuses().entrySet().stream()
+                .filter(e -> Objects.equals(e.getValue(), ElassandraNodeStatus.NORMAL))
+                .map(e -> e.getKey()).collect(Collectors.toList());
+
+        if (!DataCenterPhase.PARKED.equals(dc.getStatus())) {
+            LOGGER.info("[TEST] DC Phase is {} instead of {}, waiting... ", dc.getStatus(), DataCenterPhase.PARKED);
+            return waitingStep;
+        }
+
+        if (nodeNames.size() != 0) {
+            LOGGER.info("[TEST] {}/{} nodes in NORMAL state, waiting... ", nodeNames.size(), expectedReplicas);
+            return waitingStep;
+        } else {
+            LOGGER.info("[TEST] {}/{} nodes in NORMAL state ", nodeNames.size(), expectedReplicas);
+
+            Map<String, String> labels = OperatorLabels.datacenter(dc);
+            labels.put(OperatorLabels.APP, "elassandra");
+            try {
+                if (k8sResourceUtils.listNamespacedPods(dc.getMetadata().getNamespace(), null, OperatorLabels.toSelector(labels)).iterator().hasNext()) {
+                    LOGGER.info("[TEST] PARKED dc still have existing pods, waiting... ");
+                    return waitingStep;
+                }
+            } catch(ApiException e) {
+                failed(e.getMessage());
+            }
+            return onSuccess.execute(dc);
         }
     }
 }

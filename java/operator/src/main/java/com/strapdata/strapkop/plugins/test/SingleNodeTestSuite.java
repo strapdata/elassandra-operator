@@ -27,8 +27,6 @@ public class SingleNodeTestSuite extends TestSuiteExecutor {
 
     public static final Quantity UPDATED_CPU_QUANTITY = Quantity.fromString("2500m");
 
-    private AtomicLong dcUpdates = new AtomicLong(1);
-
     @Override
     protected Step initialStep() {
         return this::createReplicas;
@@ -73,58 +71,6 @@ public class SingleNodeTestSuite extends TestSuiteExecutor {
         }
 
         return nextStep;
-    }
-
-    // TODO move to super class ??
-
-    protected Step checkNodeAvailability(final DataCenter dc, final int expectedReplicas, final OnSuccessAction onSuccess, final Step waitingStep) {
-        final DataCenterStatus status = dc.getStatus();
-        // filter on NORMAL nodes
-        List<String> nodeNames = status.getElassandraNodeStatuses().entrySet().stream()
-                .filter(e -> Objects.equals(e.getValue(), ElassandraNodeStatus.NORMAL))
-                .map(e -> e.getKey()).collect(Collectors.toList());
-
-        if (nodeNames.size() != expectedReplicas) {
-            LOGGER.info("[TEST] {}/{} nodes in NORMAL state, waiting... ", nodeNames.size(), expectedReplicas);
-            return this::waitRunningDcPhase;
-        } else {
-            LOGGER.info("[TEST] {}/{} nodes in NORMAL state, other values... ", nodeNames.size(), expectedReplicas);
-
-            // TODO foreach node, check pod existence
-
-            assertEquals("CQL Status should be ESTABLISHED", CqlStatus.ESTABLISHED, status.getCqlStatus());
-
-            assertEquals("Expected " + expectedReplicas + " Replicas", expectedReplicas, status.getReplicas());
-            assertEquals("Expected " + expectedReplicas + " ReadyReplicas", expectedReplicas, status.getReadyReplicas());
-            assertEquals("Expected " + expectedReplicas + " JoinedReplicas", expectedReplicas, status.getJoinedReplicas());
-
-            // TODO refactor as handler to test RackStatuses based on provider
-            assertEquals("Expected " + expectedReplicas + " RackStatus", expectedReplicas, status.getRackStatuses().size());
-            status.getRackStatuses().values().forEach((rackStatus) -> {
-                assertEquals("Expected " + expectedReplicas + " RackPhase", RackPhase.RUNNING, rackStatus.getPhase());
-                assertEquals("Expected " + expectedReplicas + " JoinedReplicas", expectedReplicas, rackStatus.getJoinedReplicas());
-            });
-
-            checkHistoryDataCenter(dc);
-
-            return onSuccess.execute(dc);
-        }
-    }
-
-    /**
-     * Check that the DCSpec is stored in RestorePointCache.
-     * @param dc
-     */
-    protected void checkHistoryDataCenter(final DataCenter dc) {
-        Optional<RestorePointCache.RestorePoint> restorePoint = RestorePointCache.getRestorePoint();
-        if (!restorePoint.isPresent() || restorePoint.get().getSpec() == null) {
-            failed("ElassandraDataCenter should have a restore point");
-        }
-
-        String stableFingerPrint = restorePoint.get().getSpec().fingerprint();
-        if (!dc.getSpec().fingerprint().equals(stableFingerPrint)) {
-            failed("ElassandraDataCenter RestorePoint instance should reference the fingerprint " + dc.getSpec().fingerprint());
-        }
     }
 
     protected OnSuccessAction enableReaper() {
@@ -177,45 +123,7 @@ public class SingleNodeTestSuite extends TestSuiteExecutor {
         LOGGER.info("[TEST] Update the DC workload from '{}' to '{}'", current, dc.getSpec().getWorkload());
         updateDataCenterOrFail(dc);
         // wait before cluster update, on success process updateDataCenterCPUResources
-        return waitClusterUpdated(this::updateDataCenterCPUResources, false);
-    }
-
-    /**
-     *
-     * @param onNodeAvailable action returning a Step to call if waitClusterUpdated succeeded
-     * @param phaseHasBeenUpdating flag to keep track of DC Phase changes (true if UPDATING phase has been checked)
-     * @return
-     */
-    protected Step waitClusterUpdated(OnSuccessAction onNodeAvailable, boolean phaseHasBeenUpdating) {
-        return (dc) -> {
-            Step nextStep = null;
-            switch (dc.getStatus().getPhase()) {
-                case UPDATING:
-                    LOGGER.info("[TEST] DC is updating the configuration, waiting...");
-                    nextStep = waitClusterUpdated(onNodeAvailable, true);
-                    break;
-                case ERROR:
-                    LOGGER.info("[TEST] DC update failed");
-                    failed("DC update failed with DataCenterPhase set to ERROR");
-                    break;
-
-                case CREATING:
-                    LOGGER.info("[TEST] Unexpected DC Phase");
-                    failed("Unexpected DC Phase during config map update ('" + dc.getStatus().getPhase() + "')");
-                    break;
-
-                case RUNNING:
-                    if (phaseHasBeenUpdating) {
-                        LOGGER.info("[TEST] DC Phase is now in Phase RUNNING after UPDATING one");
-                        // check Node availability, if OK test will finish, otherwise wait using this step
-                        return checkNodeAvailability(dc, 1, onNodeAvailable, waitClusterUpdated(onNodeAvailable,true));
-                    } else {
-                        failed("Unexpected DC Phase RUNNING without UPDATING one");
-                    }
-                    break;
-            }
-            return nextStep;
-        };
+        return waitClusterUpdated(1, this::updateDataCenterCPUResources, false);
     }
 
     protected Step updateDataCenterCPUResources(DataCenter dc) {
@@ -245,20 +153,10 @@ public class SingleNodeTestSuite extends TestSuiteExecutor {
             current.getRequests().put("cpu", UPDATED_CPU_QUANTITY);
 
             updateDataCenterOrFail(dc);
-            return waitClusterUpdated(this::shutdownTest, false);
+            return waitClusterUpdated(1, this::shutdownTest, false);
         } else {
             LOGGER.info("[TEST] DC CPU Limit already set to '{}'", UPDATED_CPU_QUANTITY);
             return shutdownTest(dc); // call end of test
-        }
-    }
-
-    private void updateDataCenterOrFail(DataCenter dc) {
-        try {
-            dcUpdates.incrementAndGet();
-            k8sResourceUtils.updateDataCenter(dc).blockingGet();
-        } catch (ApiException e) {
-            LOGGER.error("[TEST] unable to update DataCenter [code : {} | body : {}]", e.getCode(), e.getResponseBody());
-            failed(e.getMessage());
         }
     }
 }
