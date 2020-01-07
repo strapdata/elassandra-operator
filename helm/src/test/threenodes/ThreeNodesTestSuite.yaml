@@ -1,0 +1,10 @@
+apiVersion: stable.strapdata.com/v1
+kind: ElassandraTask
+metadata:
+  name: "test-task-010"
+spec:
+  cluster: "integazure"
+  datacenter: "test"
+  test:
+    testSuite: "com.strapdata.strapkop.plugins.test.ThreeNodesTestSuite"
+    timeOut: 1200000
