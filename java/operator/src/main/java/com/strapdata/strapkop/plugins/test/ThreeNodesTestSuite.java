@@ -1,22 +1,18 @@
 package com.strapdata.strapkop.plugins.test;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.strapdata.model.k8s.cassandra.*;
 import com.strapdata.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.k8s.OperatorLabels;
+import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.plugins.test.step.OnSuccessAction;
 import com.strapdata.strapkop.plugins.test.step.Step;
-import com.strapdata.strapkop.utils.RestorePointCache;
-import io.kubernetes.client.ApiException;
-import io.kubernetes.client.custom.Quantity;
-import io.kubernetes.client.models.V1ResourceRequirements;
+import com.strapdata.strapkop.plugins.test.util.ESRestClient;
 import io.micronaut.context.annotation.Prototype;
 
+import java.io.IOException;
 import java.util.HashMap;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
+import java.util.Map;
 
 import static com.strapdata.strapkop.plugins.test.step.StepFailedException.failed;
 
@@ -35,9 +31,15 @@ public class ThreeNodesTestSuite extends TestSuiteExecutor {
     public static final int INITIAL_NUMBER_OF_REPLICAS = 2;
     public static final int MAX_NUMBER_OF_REPLICAS = 3;
 
-    public static final Quantity UPDATED_CPU_QUANTITY = Quantity.fromString("2500m");
+    public static final int NUMBER_OF_DOC_PER_BATCH= 100;
+
+    // UpperCase are forbidden in index name
+    public static final String KEYSPACE = "ThreeNodesTestSuite".toLowerCase();
+    public static final String TABLE = "TestSuite".toLowerCase();
 
     private int currentExpectedReplicas = INITIAL_NUMBER_OF_REPLICAS;
+    private int documentBatchs = 0;
+
     @Override
     protected Step initialStep() {
         return this::createReplicas;
@@ -72,6 +74,7 @@ public class ThreeNodesTestSuite extends TestSuiteExecutor {
                     break;
                 case CREATING:
                 case SCALING_UP:
+                case SCALING_DOWN:
                     LOGGER.info("[TEST] DataCenter is scaling up ...");
                     nextStep = this::waitRunningDcPhase;
                     break;
@@ -135,10 +138,27 @@ public class ThreeNodesTestSuite extends TestSuiteExecutor {
         LOGGER.info("[TEST] Update the DC workload from '{}' to '{}'", current, dc.getSpec().getWorkload());
         updateDataCenterOrFail(dc);
         // wait before cluster update, on success process updateDataCenterCPUResources
-        return waitClusterUpdated(currentExpectedReplicas, this::scaleUp, false);
+        return waitClusterUpdated(currentExpectedReplicas, this::insertDocumentsAndScaleUp, false);
     }
 
-    protected Step scaleUp(DataCenter dc) {
+    protected Step insertDocumentsAndScaleUp(DataCenter dc) {
+        LOGGER.info("[TEST] Insert {} documents", NUMBER_OF_DOC_PER_BATCH);
+        executeESRequest(dc, (d, client) -> {
+            for (int i = 0; i < NUMBER_OF_DOC_PER_BATCH; ++i) {
+                Map<String, String> doc = new HashMap<>();
+                doc.put("entry1", ""+i);
+                doc.put("entry2", "some"+i);
+                doc.put("entry3", "other"+i);
+                client.upload(KEYSPACE, TABLE, doc);
+            }
+
+            client.refresh(KEYSPACE);
+
+            this.documentBatchs = this.documentBatchs + 1;
+            JsonNode node = client.getDocuments(KEYSPACE, TABLE, "{}");
+            assertEquals("Wrong number of Hits after insert", NUMBER_OF_DOC_PER_BATCH * documentBatchs , node.path("hits").path("total").intValue());
+        });
+
         int previousReplicas = this.currentExpectedReplicas;
         this.currentExpectedReplicas = MAX_NUMBER_OF_REPLICAS;
 
@@ -146,7 +166,7 @@ public class ThreeNodesTestSuite extends TestSuiteExecutor {
         dc.getSpec().setReplicas(this.currentExpectedReplicas);
         updateDataCenterOrFail(dc);
 
-        return waitScaleUp(this.currentExpectedReplicas, this::scaleDown, false);
+        return waitScaleUp(this.currentExpectedReplicas, this::insertDocumentsBeforeScaleDown, false);
     }
 
     protected Step waitScaleUp(int expectedReplicas, OnSuccessAction onNodeAvailable, boolean phaseHasbeenScalingUp) {
@@ -181,7 +201,27 @@ public class ThreeNodesTestSuite extends TestSuiteExecutor {
         };
     }
 
-    protected Step scaleDown(DataCenter dc) {
+    protected Step insertDocumentsBeforeScaleDown(DataCenter dc) {
+        LOGGER.info("[TEST] Check number of documents and insert {} before ScalingDown", NUMBER_OF_DOC_PER_BATCH);
+        executeESRequest(dc, (d, client) -> {
+            JsonNode node = client.getDocuments(KEYSPACE, TABLE, "{}");
+            assertEquals("Wrong number of Hits after ScaleUP", NUMBER_OF_DOC_PER_BATCH * documentBatchs , node.path("hits").path("total").intValue());
+
+            for (int i = 0; i < NUMBER_OF_DOC_PER_BATCH; ++i) {
+                Map<String, String> doc = new HashMap<>();
+                doc.put("entry1", ""+i);
+                doc.put("entry2", "some"+i);
+                doc.put("entry3", "other"+i);
+                client.upload(KEYSPACE, TABLE, doc);
+            }
+            this.documentBatchs = this.documentBatchs + 1;
+
+            client.refresh(KEYSPACE);
+
+            node = client.getDocuments(KEYSPACE, TABLE, "{}");
+            assertEquals("Wrong number of Hits after insert", NUMBER_OF_DOC_PER_BATCH * documentBatchs , node.path("hits").path("total").intValue());
+        });
+
         int previousReplicas = this.currentExpectedReplicas;
         this.currentExpectedReplicas = INITIAL_NUMBER_OF_REPLICAS;
 
@@ -189,7 +229,7 @@ public class ThreeNodesTestSuite extends TestSuiteExecutor {
         dc.getSpec().setReplicas(this.currentExpectedReplicas);
         updateDataCenterOrFail(dc);
 
-        return waitScaleUp(this.currentExpectedReplicas, this::park, false);
+        return waitScaleDown(this.currentExpectedReplicas, this::checkDocumentsAndPark, false);
     }
 
     protected Step waitScaleDown(int expectedReplicas, OnSuccessAction onNodeAvailable, boolean phaseHasbeenScalingUp) {
@@ -224,7 +264,13 @@ public class ThreeNodesTestSuite extends TestSuiteExecutor {
         };
     }
 
-    protected Step park(DataCenter dc) {
+    protected Step checkDocumentsAndPark(DataCenter dc) {
+        LOGGER.info("[TEST] Check number of document before Park");
+        executeESRequest(dc, (d, client) -> {
+            JsonNode node = client.getDocuments(KEYSPACE, TABLE, "{}");
+            assertEquals("Wrong number of Hits after ScaleDown", NUMBER_OF_DOC_PER_BATCH * documentBatchs , node.path("hits").path("total").intValue());
+        });
+
         LOGGER.info("[TEST] Park ");
         dc.getSpec().setParked(true);
         updateDataCenterOrFail(dc);
@@ -249,7 +295,7 @@ public class ThreeNodesTestSuite extends TestSuiteExecutor {
                     if (phaseHasBeenParking) {
                         LOGGER.info("[TEST] DC Phase is now in Phase PARKED after SCALING_DOWN one");
                         // check Node availability, if OK test will finish, otherwise wait using this step
-                        return checkNodeParked(dc, expectedReplicas, onNodeParked, waitParked(expectedReplicas, onNodeParked,true));
+                        nextStep = checkNodeParked(dc, expectedReplicas, onNodeParked, waitParked(expectedReplicas, onNodeParked,true));
                     } else {
                         failed("Unexpected DC Phase RUNNING without PARKING one");
                     }
@@ -269,7 +315,16 @@ public class ThreeNodesTestSuite extends TestSuiteExecutor {
         dc.getSpec().setParked(false);
         updateDataCenterOrFail(dc);
 
-        return waitClusterUpdated(this.currentExpectedReplicas, this::shutdownTest, false);
+        return waitClusterUpdated(this.currentExpectedReplicas, this::checkDocumentsAndShutdown, false);
     }
 
+
+    protected Step checkDocumentsAndShutdown(DataCenter dc) {
+        LOGGER.info("[TEST] Check number of document after Unpark");
+        executeESRequest(dc, (d, client) -> {
+            JsonNode node = client.getDocuments(KEYSPACE, TABLE, "{}");
+            assertEquals("Wrong number of Hits after ScaleDown", NUMBER_OF_DOC_PER_BATCH * documentBatchs , node.path("hits").path("total").intValue());
+        });
+        return shutdownTest(dc);
+    }
 }

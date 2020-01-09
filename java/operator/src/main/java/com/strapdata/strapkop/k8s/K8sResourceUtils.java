@@ -513,7 +513,6 @@ public class K8sResourceUtils {
             final V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
 
             final String pvcName = persistentVolumeClaim.getMetadata().getName();
-            final V1PersistentVolumeClaim pvc = coreApi.readNamespacedPersistentVolumeClaim(pvcName, persistentVolumeClaim.getMetadata().getNamespace(), null, null, null);
 
             V1Status v1Status = null;
             try {

@@ -127,8 +127,8 @@ public class ReconcilierObserver {
     public void gracefullStop() throws InterruptedException {
         monitor.enterWhen(countIsZero);
         try {
-            gracefullStop = false;// TODO set to true??
-            logger.info("Gracefull stopping");
+            gracefullStop = true;
+            logger.info("Graceful stopping");
         } finally {
             monitor.leave();
         }

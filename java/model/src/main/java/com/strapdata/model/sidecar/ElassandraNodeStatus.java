@@ -19,4 +19,9 @@ public enum ElassandraNodeStatus {
     public boolean isMoving() {
         return JOINING.equals(this) || DRAINING.equals(this) || LEAVING.equals(this) || MOVING.equals(this) || STARTING.equals(this);
     }
+
+    // test if the Node belongs to the cluster
+    public boolean isJoined() {
+        return MOVING.equals(this) || NORMAL.equals(this);
+    }
 }

@@ -1,15 +1,20 @@
 package com.strapdata.strapkop.plugins.test;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.protobuf.Api;
 import com.strapdata.model.k8s.cassandra.*;
 import com.strapdata.model.k8s.task.Task;
+import com.strapdata.model.k8s.task.TaskPhase;
 import com.strapdata.model.sidecar.ElassandraNodeStatus;
+import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.k8s.K8sResourceTestUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
+import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.plugins.test.step.OnSuccessAction;
 import com.strapdata.strapkop.plugins.test.step.Step;
 import com.strapdata.strapkop.plugins.test.step.StepFailedException;
+import com.strapdata.strapkop.plugins.test.util.ESRestClient;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import com.strapdata.strapkop.utils.RestorePointCache;
 import io.kubernetes.client.ApiException;
@@ -23,8 +28,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import static com.strapdata.strapkop.plugins.test.step.StepFailedException.failed;
 
@@ -50,6 +58,9 @@ public abstract class TestSuiteExecutor {
 
     @Inject
     protected CqlRoleManager cqlRoleManager;
+
+    @Inject
+    private ElassandraNodeStatusCache elassandraNodeStatusCache;
 
     private Timer timer = new Timer();
     protected Step currentStep;
@@ -149,10 +160,27 @@ public abstract class TestSuiteExecutor {
                 .filter(e -> Objects.equals(e.getValue(), ElassandraNodeStatus.NORMAL))
                 .map(e -> e.getKey()).collect(Collectors.toList());
 
+
+
         if (nodeNames.size() != expectedReplicas) {
             LOGGER.info("[TEST] {}/{} nodes in NORMAL state, waiting... ", nodeNames.size(), expectedReplicas);
             return waitingStep;
         } else {
+
+            try {
+                final Iterable<Task> tasks = k8sResourceUtils.listNamespacedTask(dc.getMetadata().getNamespace(), OperatorLabels.toSelector(OperatorLabels.datacenter(dc)));
+                final long count = StreamSupport.stream(tasks.spliterator(), false)
+                        .filter(task -> TaskPhase.RUNNING.equals(task.getStatus().getPhase()))
+                        .filter(task -> task.getSpec().getTest() == null) // exclude the TestSuite Tasks
+                        .count();
+                if (count > 0) {
+                    LOGGER.info("[TEST] {} tasks are RUNNING ", count);
+                    return waitingStep;
+                }
+            } catch (ApiException e) {
+                LOGGER.warn("[TEST] Unable to list tasks, try to continue...", e);
+            }
+
             LOGGER.info("[TEST] {}/{} nodes in NORMAL state, other values... ", nodeNames.size(), expectedReplicas);
 
             assertEquals("CQL Status should be ESTABLISHED", CqlStatus.ESTABLISHED, status.getCqlStatus());
@@ -238,34 +266,54 @@ public abstract class TestSuiteExecutor {
     }
 
     protected Step checkNodeParked(final DataCenter dc, final int expectedReplicas, final OnSuccessAction onSuccess, final Step waitingStep) {
-        final DataCenterStatus status = dc.getStatus();
-        // filter on NORMAL nodes
-        List<String> nodeNames = status.getElassandraNodeStatuses().entrySet().stream()
-                .filter(e -> Objects.equals(e.getValue(), ElassandraNodeStatus.NORMAL))
-                .map(e -> e.getKey()).collect(Collectors.toList());
-
-        if (!DataCenterPhase.PARKED.equals(dc.getStatus())) {
+        if (!DataCenterPhase.PARKED.equals(dc.getStatus().getPhase())) {
             LOGGER.info("[TEST] DC Phase is {} instead of {}, waiting... ", dc.getStatus(), DataCenterPhase.PARKED);
             return waitingStep;
         }
 
-        if (nodeNames.size() != 0) {
-            LOGGER.info("[TEST] {}/{} nodes in NORMAL state, waiting... ", nodeNames.size(), expectedReplicas);
-            return waitingStep;
-        } else {
-            LOGGER.info("[TEST] {}/{} nodes in NORMAL state ", nodeNames.size(), expectedReplicas);
-
-            Map<String, String> labels = OperatorLabels.datacenter(dc);
-            labels.put(OperatorLabels.APP, "elassandra");
-            try {
-                if (k8sResourceUtils.listNamespacedPods(dc.getMetadata().getNamespace(), null, OperatorLabels.toSelector(labels)).iterator().hasNext()) {
-                    LOGGER.info("[TEST] PARKED dc still have existing pods, waiting... ");
-                    return waitingStep;
-                }
-            } catch(ApiException e) {
-                failed(e.getMessage());
+        Map<String, String> labels = new HashMap<>(OperatorLabels.datacenter(dc));
+        labels.put(OperatorLabels.APP, "elassandra");
+        try {
+            if (k8sResourceUtils.listNamespacedPods(dc.getMetadata().getNamespace(), null, OperatorLabels.toSelector(labels)).iterator().hasNext()) {
+                LOGGER.info("[TEST] PARKED dc still have existing pods, waiting... ");
+                return waitingStep;
             }
-            return onSuccess.execute(dc);
+        } catch(ApiException e) {
+            failed(e.getMessage());
         }
+
+        // a parked DC must have all replicas marked as parked
+        Map<String, RackStatus> rackStatuses = dc.getStatus().getRackStatuses();
+        assertEquals("Parked rack should have parked replicas", dc.getSpec().getReplicas(),
+                rackStatuses.values().stream()
+                        .map(rackStatus -> rackStatus.getParkedReplicas())
+                        .reduce(0,Integer::sum));
+
+        return onSuccess.execute(dc);
+    }
+
+    protected final void executeESRequest(final DataCenter dc, ESRequestProcessor processor ) {
+        String pod = dc.getStatus().getElassandraNodeStatuses().entrySet().stream().filter(e -> ElassandraNodeStatus.NORMAL.equals(e.getValue())).map(e -> e.getKey()).findFirst().get();
+        String podFqdn = elassandraNodeStatusCache.findPodByName(pod).get().getFqdn();
+        String eslogin = null;
+        String esPwd = null;
+        if (Authentication.CASSANDRA.equals(dc.getSpec().getAuthentication())) {
+            eslogin = "cassandra";
+            esPwd =  retrieveCassandraPassword(dc);
+        }
+        try (ESRestClient client = new ESRestClient(podFqdn, 9200, dc.getSpec().getEnterprise().getHttps(), eslogin, esPwd)) {
+            processor.execute(dc, client);
+        } catch (IOException e) {
+            failed("ESRequest processor failure : " + e.getMessage());
+        }
+    }
+
+    protected final String retrieveCassandraPassword(DataCenter dc) {
+        return new String(k8sResourceUtils.readNamespacedSecret(dc.getMetadata().getNamespace(), OperatorNames.clusterSecret(dc)).blockingGet().getData().get("cassandra.cassandra_password"));
+    }
+
+    @FunctionalInterface
+    public static interface ESRequestProcessor {
+        void execute(DataCenter dc, ESRestClient client) throws StepFailedException, IOException;
     }
 }

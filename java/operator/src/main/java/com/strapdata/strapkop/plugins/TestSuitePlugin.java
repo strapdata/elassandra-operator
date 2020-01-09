@@ -119,6 +119,11 @@ public class TestSuitePlugin extends AbstractPlugin implements TestSuiteHandler 
     }
 
     @Override
+    public boolean reconsileOnParkState() {
+        return true;
+    }
+
+    @Override
     public void syncKeyspaces(CqlKeyspaceManager cqlKeyspaceManager, DataCenter dataCenter) {
         // do nothing
     }

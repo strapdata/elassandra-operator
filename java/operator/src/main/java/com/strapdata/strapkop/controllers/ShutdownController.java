@@ -54,7 +54,7 @@ public class ShutdownController {
     /**
      * Returns when all reconciliations are done and ignore new one.
      */
-    @Post("/gracefull")
+    @Post("/graceful")
     public HttpStatus gracefulStop() {
         try {
             logger.warn("Gracefully stopping");
