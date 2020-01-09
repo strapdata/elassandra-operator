@@ -104,7 +104,13 @@ public class ReaperPlugin extends AbstractPlugin {
 
     @Override
     public Completable reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
-        return (dataCenter.getSpec().getReaper().getEnabled()) ? createOrReplaceReaperObjects(dataCenter) : delete(dataCenter);
+        if (DataCenterPhase.RUNNING.equals(dataCenter.getStatus().getPhase())) {
+            // reconcile reaper pds only of the DC is in running state in order to avoid connection issue on Reaper startup
+            return (dataCenter.getSpec().getReaper().getEnabled()) ? createOrReplaceReaperObjects(dataCenter) : delete(dataCenter);
+        } else {
+            logger.debug("DataCenter {} isn't in RUNNING Phase, skip reaper reconciliation");
+            return Completable.complete();
+        }
     }
 
     @Override
