@@ -46,6 +46,14 @@ public class ElassandraNodeStatusCache extends Cache<ElassandraPod, ElassandraNo
         return pod;
     }
 
+    public Optional<ElassandraPod> findPodByName(String name) {
+        Objects.requireNonNull(name, "name parameter is null");
+        Optional<ElassandraPod> pod = this.entrySet().stream()
+                .filter(e -> name.equals(e.getKey().getName()))
+                .findFirst().map(Entry::getKey);
+        return pod;
+    }
+
     private int podIndex(String podName) {
         int index = podName.lastIndexOf("-");
         return Integer.parseInt(podName.substring(index));

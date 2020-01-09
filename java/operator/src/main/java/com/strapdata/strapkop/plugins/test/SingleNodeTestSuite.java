@@ -61,6 +61,7 @@ public class SingleNodeTestSuite extends TestSuiteExecutor {
                     break;
                 case CREATING:
                 case SCALING_UP:
+                case SCALING_DOWN:
                     LOGGER.info("[TEST] DataCenter is scaling up ...");
                     nextStep = this::waitRunningDcPhase;
                     break;

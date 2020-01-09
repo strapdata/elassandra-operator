@@ -60,4 +60,10 @@ public class K8sResourceTestUtils extends K8sResourceUtils{
                 null, labelSelector, null, null, null, null);
         return (pods != null && !pods.getItems().isEmpty());
     }
+
+    public boolean deletePod(final String namespace, final String podname) throws ApiException {
+        V1DeleteOptions v1DeleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
+        V1Status status = coreApi.deleteNamespacedPod(podname, namespace, v1DeleteOptions, null, null, null, null, "Foreground");
+        return status.getCode() == 200;
+    }
 }
