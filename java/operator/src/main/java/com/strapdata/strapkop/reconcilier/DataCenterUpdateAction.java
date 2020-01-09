@@ -441,7 +441,7 @@ public class DataCenterUpdateAction {
                             case SCALING_UP:
                                 // scale up done and last node NORMAL
                                 if (!movingZone.isScalingUp() && allReplicasRunnning(movingZone)) {
-                                    movingRack.setJoinedReplicas(movingZone.size);// TODO [ELU] should be NON UNKNOWN node?
+                                    movingRack.setJoinedReplicas(countJoinedNode(movingZone));
                                     movingRack.setPhase(RackPhase.RUNNING);
                                     updateDatacenterStatus(DataCenterPhase.RUNNING, zones, rackStatusByName);
                                     logger.debug("Last node NORMAL after SCALE_UP in rack={} size={}", movingZone.name, movingZone.size);
@@ -451,7 +451,7 @@ public class DataCenterUpdateAction {
                             case SCALING_DOWN:
                                 // scale down
                                 if (!movingZone.isScalingDown() && zones.totalCurrentReplicas() == dataCenterSpec.getReplicas()) {
-                                    movingRack.setJoinedReplicas(movingZone.size);
+                                    movingRack.setJoinedReplicas(countJoinedNode(movingZone));
                                     movingRack.setPhase(RackPhase.RUNNING);
                                     updateDatacenterStatus(DataCenterPhase.RUNNING, zones, rackStatusByName);
                                     logger.debug("SCALE_DOWN done in rack={} size={}", movingZone.name, movingZone.size);
@@ -517,7 +517,6 @@ public class DataCenterUpdateAction {
                             case PARKING:
 
                                 if (movingZone.isParked()) {
-                                    movingRack.setJoinedReplicas(movingZone.size);
                                     movingRack.setPhase(RackPhase.PARKED);
                                     updateDatacenterStatus(zones.parkedDatacenter() ?  DataCenterPhase.PARKED : DataCenterPhase.PARKING, zones, rackStatusByName);
                                     logger.debug("PARKED done in rack={}", movingZone.name, movingZone.size);
@@ -740,7 +739,8 @@ public class DataCenterUpdateAction {
                                                             .retryWhen(errors -> errors
                                                                     .zipWith(Flowable.range(1, 5), (n, i) -> i)
                                                                     .flatMap(retryCount -> Flowable.timer(2, TimeUnit.SECONDS))
-                                                            ));
+                                                            ))
+                                                    .doFinally(() -> cqlSessionHandler.close());
                                         case DECOMMISSIONED:
                                         case DRAINED:
                                         case DOWN:
@@ -782,6 +782,10 @@ public class DataCenterUpdateAction {
                     }
                     return todo;
                 });
+    }
+
+    private int countJoinedNode(Zone movingZone) {
+        return (int) movingZone.pods(dataCenter).stream().filter(pod -> elassandraNodeStatusCache.get(pod).isJoined()).count();
     }
 
     /**
@@ -1924,7 +1928,11 @@ public class DataCenterUpdateAction {
             }
 
             // add commitlog replayer
-            podSpec.addInitContainersItem(commitlogInitContainer);
+            // define a undocumented env variable to ignore this container for test purpose
+            boolean skipeplayer = Optional.ofNullable(System.getenv("SKIP_COMMIT_LOG_REPLAYER")).map(Boolean::valueOf).orElse(false);
+            if (!skipeplayer) {
+                podSpec.addInitContainersItem(commitlogInitContainer);
+            }
 
             final V1StatefulSetSpec statefulSetSpec = new V1StatefulSetSpec()
                     // if the serviceName references a headless service, kubeDNS to create an A record for
