@@ -4,7 +4,6 @@
 clusterName: Elassandra
 replicas: 2
 
-
 # STRICT or SLACK
 nodeAffinityPolicy: STRICT
 decommissionPolicy: DELETE_PVC

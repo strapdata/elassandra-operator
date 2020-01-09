@@ -53,7 +53,7 @@ spec:
           lifecycle:
             preStop:
               httpGet:
-                path: /shutdown/gracefull
+                path: /shutdown/graceful
                 port: 8080
           resources:
 {{ toYaml .Values.resources | indent 12 }}

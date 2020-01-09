@@ -46,7 +46,7 @@ public class RackStatus {
         return RackPhase.PARKED.equals(phase);
     }
 
-    public boolean isNotParked() {
-        return !isParked();
+    public  boolean isRunning() {
+        return RackPhase.RUNNING.equals(phase);
     }
 }

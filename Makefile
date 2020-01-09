@@ -87,6 +87,7 @@ test-azure:
 	echo "Wait elassandra pod ready"
 	sleep 5
 	kubectl wait --for=condition=ready --timeout=360s -l app=elassandra po
-	sleep 5
+	sleep 30
+	kubectl wait --for=condition=ready --timeout=360s -l app=elassandra po
 	# execute the test suite
 	kubectl apply -f helm/src/test/threenodes/ThreeNodesTestSuite.yaml

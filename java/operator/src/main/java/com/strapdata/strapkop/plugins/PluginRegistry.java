@@ -42,8 +42,8 @@ public class PluginRegistry {
 
     public Completable[] reconcileAll(DataCenter dc) {
         List<Completable> pluginCompletables = new ArrayList<>();
-        if (!dc.getSpec().isParked()) {
-            for (Plugin plugin : plugins) {
+        for (Plugin plugin : plugins) {
+            if (!dc.getSpec().isParked() || plugin.reconsileOnParkState()) {
                 try {
                     if (plugin.isActive(dc))
                         pluginCompletables.add(plugin.reconcile(dc));

@@ -7,4 +7,4 @@ spec:
   datacenter: "test"
   test:
     testSuite: "com.strapdata.strapkop.plugins.test.ThreeNodesTestSuite"
-    timeOut: 1200000
+    timeOut: 3600000

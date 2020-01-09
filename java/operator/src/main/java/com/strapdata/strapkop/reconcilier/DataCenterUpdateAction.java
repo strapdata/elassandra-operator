@@ -593,7 +593,7 @@ public class DataCenterUpdateAction {
 
                         final RackStatus rackStatus = rackStatusByName.get(rack);
                         // Trigger an update if ConfigMap fingerprint or DC generation are different
-                        if (rackStatus.isNotParked() && (!configFingerprint.equals(stsFingerprint) || !dataCenterSpec.fingerprint().equals(stsDatacenterFingerprint))) {
+                        if (rackStatus.isRunning() && (!configFingerprint.equals(stsFingerprint) || !dataCenterSpec.fingerprint().equals(stsDatacenterFingerprint))) {
                             if (failedPod != null && !failedPod.getRack().equals(rack)) {
                                 logger.warn("pod={} FAILED, cannot update other rack={} now, please fix the rack={} before.",
                                         failedPod, failedPod.getRack(), rack);
@@ -612,7 +612,7 @@ public class DataCenterUpdateAction {
                                         .andThen(updateRack(zones, builder.buildStatefulSetRack(rack, replicas, configMapVolumeMounts, rackStatus), rack, rackStatusByName));
                             }
 
-                        } else if (dataCenterSpec.isParked() && rackStatus.isNotParked() ) {
+                        } else if (dataCenterSpec.isParked() && rackStatus.isRunning() ) {
                             // drain if performed by the shutdownHook of the Elassandra Container
                             return todo.andThen(parkRack(zones, v1StatefulSet, rack, rackStatusByName));
                         } else if (!dataCenterSpec.isParked() && rackStatus.isParked() ) {
@@ -2426,7 +2426,7 @@ public class DataCenterUpdateAction {
 
     public Completable parkRack(Zones zones, V1StatefulSet v1StatefulSet, String rack, Map<String, RackStatus> rackStatusMap) throws ApiException {
         logger.debug("DataCenter={} in namespace={} phase={} PARKING {} pods of rack={}",
-                dataCenterMetadata.getName(), rack, dataCenterMetadata.getNamespace(),
+                dataCenterMetadata.getName(), dataCenterMetadata.getNamespace(),
                 dataCenterStatus.getPhase(), v1StatefulSet.getSpec().getReplicas(), rack);
         rackStatusMap.get(rack).setParkedReplicas(v1StatefulSet.getSpec().getReplicas());
         v1StatefulSet.getSpec().setReplicas(0);
@@ -2438,7 +2438,7 @@ public class DataCenterUpdateAction {
     public Completable unparkRack(Zones zones, V1StatefulSet v1StatefulSet, String rack, Map<String, RackStatus> rackStatusMap) throws ApiException {
         final int podsToRestore = rackStatusMap.get(rack).getParkedReplicas();
         logger.debug("DataCenter={} in namespace={} phase={} UPDATING {} pods of rack={}",
-                dataCenterMetadata.getName(), rack, dataCenterMetadata.getNamespace(),
+                dataCenterMetadata.getName(), dataCenterMetadata.getNamespace(),
                 dataCenterStatus.getPhase(), podsToRestore, rack);
         rackStatusMap.get(rack).setParkedReplicas(0);
         rackStatusMap.get(rack).setPhase(RackPhase.UPDATING);
