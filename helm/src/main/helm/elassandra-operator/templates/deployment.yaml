@@ -50,6 +50,11 @@ spec:
               port: 8080
             initialDelaySeconds: 5
             periodSeconds: 10
+# https://github.com/kubernetes/kubernetes/issues/55807#issuecomment-459933280
+# preStop maybe call but it is not blocking so the Strapkop Container maybe terminated before the preStop run...
+# nevertheless, shutdown/graceful call should only prevent new reconciliation and not delete all DC
+# otherwise DC may be removed when the operator pod is manually removed to restart it
+# DataCenter deletion should be managed by strapkube or by a helm delete before deleting the operator...
           lifecycle:
             preStop:
               httpGet:
