@@ -51,7 +51,6 @@ import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
 import java.io.StringWriter;
-import java.net.MalformedURLException;
 import java.security.GeneralSecurityException;
 import java.util.*;
 import java.util.concurrent.Callable;
@@ -1677,7 +1676,6 @@ public class DataCenterUpdateAction {
                     .securityContext(new V1PodSecurityContext().fsGroup(CASSANDRA_GROUP_ID))
                     .hostNetwork(dataCenterSpec.getHostNetworkEnabled())
                     .addInitContainersItem(buildInitContainerVmMaxMapCount())
-                    .addInitContainersItem(buildInitContainerMergeTrustCerts())
                     .addContainersItem(cassandraContainer)
                     .addContainersItem(sidecarContainer)
                     .addVolumesItem(new V1Volume()
@@ -1747,6 +1745,8 @@ public class DataCenterUpdateAction {
                                 )
                         )
                 );
+
+                podSpec.addInitContainersItem(buildInitContainerMergeTrustCerts());
             }
 
             // Add the nodeinfo init container if we have the nodeinfo secret name provided in the env var NODEINFO_SECRET
