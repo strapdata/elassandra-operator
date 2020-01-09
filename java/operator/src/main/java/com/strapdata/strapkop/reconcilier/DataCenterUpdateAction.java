@@ -432,6 +432,8 @@ public class DataCenterUpdateAction {
                                 // rolling update done and first node NORMAL
                                 if (!movingZone.isUpdating() && allReplicasRunnning(movingZone)) {
                                     movingRack.setPhase(RackPhase.RUNNING);
+                                    // force the number of parked replicas to 0 here, not into the unparked method
+                                    rackStatusByName.get(movingRack.getName()).setParkedReplicas(0);
                                     updateDatacenterStatus(DataCenterPhase.RUNNING, zones, rackStatusByName);
                                     logger.debug("First node NORMAL after rolling UPDATE in rack={} size={}", movingZone.name, movingZone.size);
                                 }
@@ -2440,7 +2442,9 @@ public class DataCenterUpdateAction {
         logger.debug("DataCenter={} in namespace={} phase={} UPDATING {} pods of rack={}",
                 dataCenterMetadata.getName(), dataCenterMetadata.getNamespace(),
                 dataCenterStatus.getPhase(), podsToRestore, rack);
-        rackStatusMap.get(rack).setParkedReplicas(0);
+        // DO NOT RESET the PARKER replicas here but in at the end of UPDATING phase of the movng rack
+        // in order to avoid invalid ConsistencyLevel computation
+        // rackStatusMap.get(rack).setParkedReplicas(0);
         rackStatusMap.get(rack).setPhase(RackPhase.UPDATING);
         v1StatefulSet.getSpec().setReplicas(podsToRestore);
         updateDatacenterStatus(DataCenterPhase.UPDATING, zones, rackStatusMap);
