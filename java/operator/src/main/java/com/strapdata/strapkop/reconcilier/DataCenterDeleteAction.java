@@ -5,6 +5,7 @@ import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.cache.SidecarConnectionCache;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
+import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.cql.CqlSessionSupplier;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
@@ -31,13 +32,15 @@ public class DataCenterDeleteAction {
     private final ElassandraNodeStatusCache elassandraNodeStatusCache;
     private final SidecarConnectionCache sidecarConnectionCache;
     private final CqlKeyspaceManager cqlKeyspaceManager;
-    
+    private final CqlRoleManager cqlRoleManager;
+
     public DataCenterDeleteAction(K8sResourceUtils k8sResourceUtils,
                                   CoreV1Api coreV1Api,
                                   AppsV1Api appsV1Api,
                                   ElassandraNodeStatusCache elassandraNodeStatusCache,
                                   SidecarConnectionCache sidecarConnectionCache,
                                   CqlKeyspaceManager cqlKeyspaceManager,
+                                  CqlRoleManager cqlRoleManager,
                                   @Parameter("dataCenter") DataCenter dataCenter) {
         this.k8sResourceUtils = k8sResourceUtils;
         this.coreV1Api = coreV1Api;
@@ -45,6 +48,7 @@ public class DataCenterDeleteAction {
         this.elassandraNodeStatusCache = elassandraNodeStatusCache;
         this.sidecarConnectionCache = sidecarConnectionCache;
         this.cqlKeyspaceManager = cqlKeyspaceManager;
+        this.cqlRoleManager = cqlRoleManager;
     }
     
     Completable deleteDataCenter(final CqlSessionSupplier cqlSessionSupplier) throws Exception {
@@ -122,7 +126,8 @@ public class DataCenterDeleteAction {
                 // delete tasks
                 k8sResourceUtils.deleteTasks(dataCenter.getMetadata().getNamespace(), null).subscribe();
 
-                // TODO on delete dc, reset applied attributes for CqlRole otherwise, they will be ignore during the next dc creation...
+                cqlRoleManager.markRolesAsUnapplied(dataCenter);
+
                 logger.info("Deleted DataCenter namespace={} name={}", dataCenter.getMetadata().getNamespace(), dataCenter.getMetadata().getName());
             }
         });

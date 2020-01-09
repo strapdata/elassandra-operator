@@ -110,6 +110,15 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
         });
     }
 
+    public void markRolesAsUnapplied(final DataCenter dc) {
+        logger.debug("Mark roles as non applied for datacenter {}", dc.getMetadata().getName());
+
+        for(CqlRole role : get(dc).values()) {
+            role.setApplied(false);
+            logger.trace("Set applied to false for '{}'", role.username);
+        }
+    }
+
     /**
      * @param dc the datacenter to connect  to
      * @return
@@ -269,7 +278,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
             }
         }
 
-        // contact local nodes is boostraped or first DC in the cluster
+        // contact local nodes is bootstrapped or first DC in the cluster
         boolean hasSeedBootstrapped = dc.getStatus().getRackStatuses().values().stream().anyMatch(s -> s.getJoinedReplicas() > 0);
         if (hasSeedBootstrapped ||
                 ((dc.getSpec().getRemoteSeeds() == null || dc.getSpec().getRemoteSeeds().isEmpty()) && (dc.getSpec().getRemoteSeeders() == null || dc.getSpec().getRemoteSeeders().isEmpty()))) {
