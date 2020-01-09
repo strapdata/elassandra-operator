@@ -91,7 +91,7 @@ public class ESRestClient implements AutoCloseable {
                 case OK:
                 case CREATED:
                     Optional<Map<String, Object>> body = response.getBody();
-                    LOGGER.debug(body.orElse(new HashMap<String, Object>(0)).toString());
+                    LOGGER.trace(body.orElse(new HashMap<String, Object>(0)).toString());
                     break;
                 default:
                     LOGGER.warn("ESREstClient received non OK status '{}' : {}", response.getStatus(), response.body());

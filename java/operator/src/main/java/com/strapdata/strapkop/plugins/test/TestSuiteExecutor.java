@@ -225,7 +225,7 @@ public abstract class TestSuiteExecutor {
      */
     protected Step waitClusterUpdated(int expectedReplicas, OnSuccessAction onNodeAvailable, boolean phaseHasBeenUpdating) {
         return (dc) -> {
-            Step nextStep = null;
+            Step nextStep = waitClusterUpdated(expectedReplicas, onNodeAvailable, true);
             switch (dc.getStatus().getPhase()) {
                 case UPDATING:
                     LOGGER.info("[TEST] DC is updating the configuration, waiting...");
@@ -250,6 +250,8 @@ public abstract class TestSuiteExecutor {
                         failed("Unexpected DC Phase RUNNING without UPDATING one");
                     }
                     break;
+                default:
+                    LOGGER.info("[TEST] waitClusterUpdated (found Phase {})", dc.getStatus().getPhase());
             }
             return nextStep;
         };
