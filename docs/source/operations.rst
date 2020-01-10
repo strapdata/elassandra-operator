@@ -108,6 +108,20 @@ Once you added new nodes into the kubernetes cluster, you can patch the DataCent
 
 Until the number of replicas is reach the DataCenter phase will have the *SCALING_UP* value to end with *RUNNING* once all new nodes are up and running.
 
+
+Scale Down a data center
+........................
+
+The Elassandra operator allows you to remove Elassandra instances to match the requirement defined into the DataCenter CRD.
+If you want to reduce the number of nodes into the kubernetes cluster, you can patch the DataCenter CRD with the following command.
+
+.. code-block:: bash
+
+   kubectl patch -n default elassandradatacenters elassandra-mycluster-mydatacenter --type merge --patch '{ "spec" : { "replicas" : 6 }}'
+
+Until the number of replicas is reach the DataCenter phase will have the *SCALING_DOWN* value to end with *RUNNING* once enough nodes are decommissioned.
+
+
 Rollback CRD
 .................
 
@@ -349,10 +363,31 @@ To check the status of the task :
       pods:
         elassandra-mycluster-mydatacenter-local-0: SUCCEED
 
-Scale Down a data center
-........................
 
-This feature isn't yet managed
+Park Elassandra Pods
+....................
+
+In development environment, it an be useful to stop Elassandra pods without deleting persistent volume in order to free compute resources.
+Elassandra operator allows this by  preserving the number of replicas in the DataCenterStatus and then settings the number of replicas of a statefulset to 0.
+
+Once you want to restart Elassandra nodes, you only have to restore the statefulset replicas.
+
+Here is how to "park" elassandra pods :
+
+.. code-block:: bash
+    $ kubectl patch elassandradatacenters elassandra-cl1-dc1 --type merge --patch '{ "spec" : { "parked" : "true"}}'
+
+    $ # check that the datacenter and the statefulset/racks are in PARKED phase
+    $ kubectl get -o yaml edc elassandra-cl1-dc1
+
+Here is how to "unpark" elassandra pods :
+
+.. code-block:: bash
+    $ kubectl patch elassandradatacenters elassandra-cl1-dc1 --type merge --patch '{ "spec" : { "parked" : "false"}}'
+
+    $ # check that the datacenter and the statefulset/racks are in UPDATING phase during the pods restart (or RUNNING if all pods are ready)
+    $ kubectl get -o yaml edc elassandra-cl1-dc1
+
 
 Update a password
 .................
@@ -363,8 +398,10 @@ Enable/Disable search
 .....................
 
 
+
 Upgrade Elassandra
 ..................
+
 
 
 Kubernetes services
