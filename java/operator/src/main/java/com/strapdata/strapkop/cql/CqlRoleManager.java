@@ -111,12 +111,8 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
     }
 
     public void markRolesAsUnapplied(final DataCenter dc) {
-        logger.debug("Mark roles as non applied for datacenter {}", dc.getMetadata().getName());
-
-        for(CqlRole role : get(dc).values()) {
-            role.setApplied(false);
-            logger.trace("Set applied to false for '{}'", role.username);
-        }
+        logger.debug("Clear roles for datacenter {}", dc.getMetadata().getName());
+        remove(dc);
     }
 
     /**

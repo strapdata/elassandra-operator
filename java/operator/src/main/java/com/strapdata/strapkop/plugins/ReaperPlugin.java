@@ -123,6 +123,8 @@ public class ReaperPlugin extends AbstractPlugin {
         }).andThen(Completable.fromAction(() -> {
             DataCenterStatus status = dataCenter.getStatus();
             status.setReaperPhase(ReaperPhase.ROLE_CREATED); // step back the phase to be in consistent state next time Reaper will be enabled
+            REAPER_ROLE.setApplied(false); // mark Role as not applied to create it if the DC is recreated
+            this.reaperAdminPassword = null;
         }));
     }
 
