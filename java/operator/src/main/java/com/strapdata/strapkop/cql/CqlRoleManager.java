@@ -184,6 +184,10 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                         dc.getStatus().setCqlStatus(CqlStatus.ERRORED);
                         dc.getStatus().setCqlStatusMessage("Authentication failed with roles=" + r);
                         if (lastException != null) {
+                            if (tuple != null) {
+                                CqlSessionSupplier.closeQuietly(tuple._2);
+                                CqlSessionSupplier.closeQuietly(tuple._1);
+                            }
                             logger.warn("Authentication failed with roles=" + r + " error:" + lastException.getMessage(), lastException);
                             throw lastException;
                         }
@@ -213,12 +217,14 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                         CqlRole strakopRole = get(dc, CqlRole.STRAPKOP_ROLE.username);
                         try {
                             Tuple2<Cluster, Session> strapkopConnection = connect(dc, Optional.of(strakopRole));
-                            // connection with strapkop user succeeded
-                            // we close the previous session to avoid non relevant authentication exception
-                            currentSesssion.close();
                             return strapkopConnection;
                         } catch(Exception e) {
                             logger.error("Failed to reconnect with the operator role="+strakopRole+" :"+e.getMessage(), e);
+                        } finally {
+                            // connection with strapkop user succeeded
+                            // we close the previous session to avoid non relevant authentication exception
+                            CqlSessionSupplier.closeQuietly(currentSesssion);
+                            CqlSessionSupplier.closeQuietly(tuple._1);// close also the cluster instance that generates the session
                         }
                     }
                     return tuple;
@@ -227,8 +233,18 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
     }
 
     private Tuple2<Cluster, Session> connect(final DataCenter dc, Optional<CqlRole> optionalCqlRole) throws StrapkopException, ApiException, SSLException {
-        Cluster cluster = createClusterObject(dc, optionalCqlRole);
-        Session session = cluster.connect();
+        Cluster cluster = null;
+        Session session = null;
+        try {
+            cluster = createClusterObject(dc, optionalCqlRole);
+            session = cluster.connect();
+        } catch (DriverException e) {
+            // on DriverException try to close the session to avoid cnx leak or non relevant ERROR log message
+            CqlSessionSupplier.closeQuietly(session);
+            CqlSessionSupplier.closeQuietly(cluster); // also close cluster to free the connection that check the cluster state
+            // rethrow the exception to manage the error in a proper way
+            throw e;
+        }
         dc.getStatus().setCqlStatus(CqlStatus.ESTABLISHED);
         dc.getStatus().setCqlStatusMessage("Connected to cluster=[" + cluster.getClusterName() + "]" +
                 ((optionalCqlRole.isPresent()) ? (" with role=[" + optionalCqlRole.get().username+"] secret=["+optionalCqlRole.get().secret(dc)+"]") : ""));
@@ -298,7 +314,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
         }
 
         if (optionalCqlRole.isPresent()) {
-            logger.debug("username={} password={}", optionalCqlRole.get().getUsername(), optionalCqlRole.get().getPassword());
+            logger.debug("username={} password={}", optionalCqlRole.get().getUsername(), optionalCqlRole.get().secret(dc));
             builder.withCredentials(
                     optionalCqlRole.get().getUsername(),
                     optionalCqlRole.get().getPassword()
