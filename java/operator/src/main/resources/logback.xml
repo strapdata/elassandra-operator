@@ -19,6 +19,8 @@
     <logger name="com.strapdata.strapkop.sidecar" level="${LOGBACK_com_strapdata_strapkop_sidecar:-WARN}" />
     <logger name="com.strapdata.strapkop.plugins.test" level="${LOGBACK_com_strapdata_strapkop_test:-INFO}" />
 
+    <logger name="com.strapdata.strapkop.reconcilier" level="${LOGBACK_com_strapdata_strapkop_reconcilier:-DEBUG}" />
+
     <root level="WARN">
         <appender-ref ref="STDOUT" />
     </root>
