@@ -33,8 +33,11 @@ Create chart name and version as used by the chart label.
 
 {{- define "elassandra.datacenterName" -}}
 {{ $length := len (split "-" .Release.Name) }}
-{{- if le $length 2 -}}
+{{- if eq $length 2 -}}
 {{ (split "-" .Release.Name)._1 | lower }}
+{{- end -}}
+{{- if eq $length 3 -}}
+{{ (split "-" .Release.Name)._2 | lower }}
 {{- end -}}
 {{- end -}}
 
@@ -42,6 +45,9 @@ Create chart name and version as used by the chart label.
 {{ $length := len (split "-" .Release.Name) }}
 {{- if le $length 2 -}}
 {{ (split "-" .Release.Name)._0 | lower }}
+{{- end -}}
+{{- if le $length 3 -}}
+{{ (split "-" .Release.Name)._1 | lower }}
 {{- end -}}
 {{- end -}}
 
