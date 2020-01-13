@@ -8,6 +8,9 @@ import io.reactivex.Single;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Manage CQL session during a reconciliation
  */
@@ -19,6 +22,7 @@ public class CqlSessionHandler implements CqlSessionSupplier {
 
     Session session;
     Cluster cluster;
+    List<Cluster> dirtyClusters = new ArrayList<>();
 
     public CqlSessionHandler(final CqlRoleManager cqlRoleManager) {
         this.cqlRoleManager = cqlRoleManager;
@@ -30,6 +34,9 @@ public class CqlSessionHandler implements CqlSessionSupplier {
             Single.just(session) :
             cqlRoleManager.connect(dataCenter)
                 .map(tuple -> {
+                    if (this.cluster != null) {
+                        dirtyClusters.add(this.cluster);
+                    }
                     this.cluster = tuple._1;
                     this.session = tuple._2;
                     return this.session;
@@ -37,13 +44,14 @@ public class CqlSessionHandler implements CqlSessionSupplier {
     }
 
     public void close() throws Exception {
-        if (cluster != null) {
-            logger.debug("Closing cluster={}", cluster.getClusterName());
-            cluster.close();
-            // reset cluster & session because getSession maybe call on the same instance
-            // after a close
-            cluster = null;
-            session = null;
-        }
+        logger.debug("Closing cluster={}", cluster == null ? null : cluster.getClusterName());
+        CqlSessionSupplier.closeQuietly(session);
+        CqlSessionSupplier.closeQuietly(cluster);
+        this.dirtyClusters.forEach(CqlSessionSupplier::closeQuietly);
+        this.dirtyClusters.clear();
+        // reset cluster & session because getSession maybe call on the same instance
+        // after a close
+        cluster = null;
+        session = null;
     }
 }
