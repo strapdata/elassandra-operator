@@ -47,7 +47,7 @@ helm {
 
 task uploadElassandraDatacenter(type: com.strapdata.AzureStorageDeployTask) {
   dependsOn 'helmPackageElassandraDatacenterChart'
-  connectionString ***REMOVED***
+  connectionString(System.getenv("STRAPKUBE_CONNECTION_STRING"))
   container 'charts'
   fileToDeploy "${project.buildDir}/helm/charts/elassandra-datacenter-0.2.0.tgz"
   mimeType 'application/x-tar'
@@ -55,7 +55,7 @@ task uploadElassandraDatacenter(type: com.strapdata.AzureStorageDeployTask) {
 
 task uploadElassandraOperator(type: com.strapdata.AzureStorageDeployTask) {
   dependsOn 'helmPackageElassandraOperatorChart'
-  connectionString ***REMOVED***
+  connectionString(System.getenv("STRAPKUBE_CONNECTION_STRING"))
   container 'charts'
   fileToDeploy "${project.buildDir}/helm/charts/elassandra-operator-0.2.0.tgz"
   mimeType 'application/x-tar'
