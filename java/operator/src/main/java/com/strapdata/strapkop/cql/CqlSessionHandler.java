@@ -22,7 +22,6 @@ public class CqlSessionHandler implements CqlSessionSupplier {
 
     Session session;
     Cluster cluster;
-    List<Cluster> dirtyClusters = new ArrayList<>();
 
     public CqlSessionHandler(final CqlRoleManager cqlRoleManager) {
         this.cqlRoleManager = cqlRoleManager;
@@ -34,9 +33,6 @@ public class CqlSessionHandler implements CqlSessionSupplier {
             Single.just(session) :
             cqlRoleManager.connect(dataCenter)
                 .map(tuple -> {
-                    if (this.cluster != null) {
-                        dirtyClusters.add(this.cluster);
-                    }
                     this.cluster = tuple._1;
                     this.session = tuple._2;
                     return this.session;
@@ -47,8 +43,6 @@ public class CqlSessionHandler implements CqlSessionSupplier {
         logger.debug("Closing cluster={}", cluster == null ? null : cluster.getClusterName());
         CqlSessionSupplier.closeQuietly(session);
         CqlSessionSupplier.closeQuietly(cluster);
-        this.dirtyClusters.forEach(CqlSessionSupplier::closeQuietly);
-        this.dirtyClusters.clear();
         // reset cluster & session because getSession maybe call on the same instance
         // after a close
         cluster = null;
