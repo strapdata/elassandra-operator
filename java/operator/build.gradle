@@ -40,7 +40,7 @@ jib {
     container {
         // to override JVM_FLAGS during deployment use : -e "JAVA_TOOL_OPTIONS=<JVM flags>"
         // see : https://github.com/GoogleContainerTools/jib/blob/master/docs/faq.md#how-do-i-set-parameters-for-my-image-at-runtime
-        jvmFlags = ['-Xmx1024m',
+        jvmFlags = ['-Xmx512m',
                     '-XX:+UnlockExperimentalVMOptions', '-XX:+UseCGroupMemoryLimitForHeap', '-XX:MaxRAMFraction=2',
                     '-XX:+ExitOnOutOfMemoryError',
                     '-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005',
