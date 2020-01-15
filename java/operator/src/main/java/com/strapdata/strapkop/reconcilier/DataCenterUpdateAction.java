@@ -2013,8 +2013,18 @@ public class DataCenterUpdateAction {
                         .subPath("nodetool-ssl.properties")
                 );
             }
-            addPortsItem(cassandraContainer, dataCenterSpec.getStoragePort(), "internode", dataCenterSpec.getHostPortEnabled());
-            addPortsItem(cassandraContainer, dataCenterSpec.getSslStoragePort(), "internode-ssl", dataCenterSpec.getHostPortEnabled());
+
+            if (dataCenterSpec.getHostPortEnabled()) {
+                // expose only one storage port on node
+                if (dataCenterSpec.getSsl()) {
+                    addPortsItem(cassandraContainer, dataCenterSpec.getSslStoragePort(), "internode-ssl", true);
+                } else {
+                    addPortsItem(cassandraContainer, dataCenterSpec.getStoragePort(), "internode", true);
+                }
+            } else {
+                addPortsItem(cassandraContainer, dataCenterSpec.getStoragePort(), "internode", false);
+                addPortsItem(cassandraContainer, dataCenterSpec.getSslStoragePort(), "internode-ssl", false);
+            }
             addPortsItem(cassandraContainer, dataCenterSpec.getNativePort(), "cql", dataCenterSpec.getHostPortEnabled());
             addPortsItem(cassandraContainer, dataCenterSpec.getJmxPort(), "jmx", false);
             addPortsItem(cassandraContainer, dataCenterSpec.getJdbPort(), "jdb", false);
