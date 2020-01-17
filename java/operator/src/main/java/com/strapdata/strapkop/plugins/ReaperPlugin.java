@@ -362,7 +362,7 @@ public class ReaperPlugin extends AbstractPlugin {
                 );
 
         // create reaper ingress
-        String ingressDomain = dnsConfiguration.getDomain();
+        String ingressDomain = System.getenv("INGRESS_DOMAIN");
         final V1beta1Ingress ingress;
         if (!Strings.isNullOrEmpty(ingressDomain)) {
             String reaperAppHost = "reaper-" + dataCenterSpec.getClusterName() + "-" + dataCenterSpec.getDatacenterName() + "." + ingressDomain;
