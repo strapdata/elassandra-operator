@@ -25,8 +25,8 @@ micronaut:
                 mapping: /swagger/**
 sidecar:
     dns:
-        domain: "${DNS_DOMAIN}"
+        zone: "${DNS_ZONE}"
         ttl: "${DNS_TTL:60}"
-        enabled: "${DNS_UPDATER_ENABLED:false}"
+        enabled: "${DNS_ENABLED:false}"
 jackson:
     module-scan: false
