@@ -295,7 +295,7 @@ public class KibanaPlugin extends AbstractPlugin {
                             ));
                 })
                 .flatMap(s -> {
-                    String ingressDomain = dnsConfiguration.getDomain();
+                    String ingressDomain = System.getenv("INGRESS_DOMAIN");
                     if (!Strings.isNullOrEmpty(ingressDomain)) {
                         String kibanaHost = space.name() + "-" + dataCenterSpec.getClusterName() + "-" + dataCenterSpec.getDatacenterName() + "." + ingressDomain;
                         logger.trace("Creating kibana ingress for host={}", kibanaHost);

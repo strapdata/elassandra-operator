@@ -44,8 +44,11 @@ public abstract class DnsPlugin implements Plugin {
      */
     @Override
     public Completable delete(DataCenter dataCenter) throws ApiException {
-        return Observable.fromIterable(dataCenter.getStatus().getRackStatuses().values()).flatMapCompletable(rackStatus -> {
-            return dnsUpdater.deleteDnsARecord(rackStatus.getSeedHostId().toString());
-        });
+        return Observable.fromIterable(dataCenter.getStatus().getRackStatuses().values()).flatMapCompletable(rackStatus ->
+                Completable.create(emitter -> {
+                    dnsUpdater.onStop(rackStatus.getName());
+                    emitter.onComplete();
+                }
+        ));
     }
 }
