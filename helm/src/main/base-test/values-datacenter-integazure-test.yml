@@ -13,7 +13,7 @@ workload: "READ"
 image:
   elassandraRepository: strapdata.azurecr.io/strapdata/elassandra-node-dev
   sidecarRepository: strapdata.azurecr.io/strapdata/elassandra-sidecar-dev
-  tag: 6.2.3.22-testbackup
+  tag: 6.2.3.24-rc1
   pullPolicy: Always
   pullSecrets: []
 
