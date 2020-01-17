@@ -122,7 +122,7 @@ nativePort: 39042
 jmxPort: 7199
 jdbPort: 4242
 jmxmpEnabled: true
-jmxmpOverSSL: true
+jmxmpOverSSL: false
 remoteSeeds: []
 
 kibanaSpaces:

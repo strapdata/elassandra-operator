@@ -34,6 +34,7 @@ jib {
 
         auth {
             username = registryUsername
+
             password = registryPassword
         }
     }
@@ -97,11 +98,12 @@ dependencies {
     compile "io.micronaut:micronaut-runtime"
     compile "io.micronaut:micronaut-views"
     compile "io.micronaut:micronaut-multitenancy"
+    compile "org.glassfish.main.external:jmxremote_optional-repackaged:5.0"
 
     compile "io.micronaut:micronaut-management"
     compile "io.micronaut.configuration:micronaut-micrometer-core"
     compile 'io.micronaut.configuration:micronaut-micrometer-registry-prometheus'
-    
+
     compile "io.micronaut.configuration:micronaut-cassandra"
 
 
