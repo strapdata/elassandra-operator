@@ -64,12 +64,13 @@ public class AzureDnsUpdater extends DnsUpdater {
                         .withDefaultSubscription();
 
                 // Print selected subscription
+                /* security leak
                 logger.info("Selected clientId: " + clientId);
                 logger.info("Selected tenantId: " + tenantId);
                 logger.info("Selected clientSecret: " + clientSecret);
                 logger.info("Selected subscription: " + azure.subscriptionId());
                 logger.info("Selected resourceGroup: " + resourceGroup);
-
+                */
             } catch (Exception e) {
                 logger.error("Azure authentication failed with clientId={} tenanId={} clientSecret={} subcriptionId={} resourceGroup={}",
                         clientId, tenantId, clientSecret, subscriptionId, resourceGroup);
@@ -90,7 +91,7 @@ public class AzureDnsUpdater extends DnsUpdater {
     public Completable innerUpdateDnsARecord(String name, String externalIp) {
         if (azure == null)
             throw new IllegalStateException("Azure authentication failed");
-        return RxJavaInterop.toV2Observable(azure.dnsZones().getByResourceGroupAsync(this.resourceGroup, dnsConfiguration.domain)
+        return RxJavaInterop.toV2Observable(azure.dnsZones().getByResourceGroupAsync(this.resourceGroup, dnsConfiguration.zone)
                 .flatMap(zone -> {
                     logger.debug("creating DNS records {} = {}", name, externalIp);
                     return zone.update()
@@ -111,7 +112,7 @@ public class AzureDnsUpdater extends DnsUpdater {
         logger.debug("deleting DNS record name={}", name);
         if (azure == null)
             throw new IllegalStateException("Azure authentication failed");
-        return RxJavaInterop.toV2Observable(azure.dnsZones().getByResourceGroupAsync(resourceGroup, dnsConfiguration.domain)
+        return RxJavaInterop.toV2Observable(azure.dnsZones().getByResourceGroupAsync(resourceGroup, dnsConfiguration.zone)
                 .flatMap(zone -> {
                     logger.debug("deleting DNS records {}", name);
                     return zone.update()

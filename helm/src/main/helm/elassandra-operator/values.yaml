@@ -22,11 +22,10 @@ resources: {}
 
 # DNS external updater for contact point
 dns:
+  enabled: true
   ttl: 60
-  domain: "941a7aa2-kube1-azure-northeurope.azure.strapcloud.com"
-  azure:
-    secretName: "azure-dns-spn"
-
+  zone: "azure.strapcloud.com"
+  azureSecretName: "dns-azure-spn"
 
 env:
 #  DNS_DOMAIN

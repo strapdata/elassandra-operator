@@ -1,7 +1,6 @@
 package com.strapdata.dns;
 
 import com.google.common.base.Strings;
-import io.micronaut.discovery.event.ServiceStartedEvent;
 import io.reactivex.Completable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,18 +41,21 @@ public abstract class DnsUpdater {
 
     public abstract Completable innerDeleteDnsARecord(String name);
 
-    public void onStart(final ServiceStartedEvent event) {
+    /**
+     * Add DNS seed name
+     * @param rack
+     */
+    public void onStart(String rack) {
         if (dnsConfiguration.enabled) {
             String podName = System.getenv("POD_NAME");
-            String seedHostId = System.getenv("SEED_HOST_ID");
-            logger.debug("POD_NAME={} SEED_HOST_ID={} DNS_DOMAIN={}", podName, seedHostId, dnsConfiguration.domain);
             try {
                 String publicIp = readFirstLine("/nodeinfo/public-ip", Charset.forName("UTF-8"));
-                if (dnsConfiguration.domain != null && !Strings.isNullOrEmpty(publicIp) && seedHostId != null && podName.endsWith("-0")) {
-                    Throwable t = updateDnsARecord(seedHostId, publicIp).blockingGet();
+                if (dnsConfiguration.zone != null && !Strings.isNullOrEmpty(publicIp) && podName.endsWith("-0")) {
+                    String hostname = buildHostname(System.getenv("CASSANDRA_RACK"));
+                    Throwable t = updateDnsARecord(hostname, publicIp).blockingGet();
                     if (t != null)
                         throw t;
-                    logger.info("Dns updated at startup pod={} {}.{} = {}", podName, seedHostId, dnsConfiguration.domain, publicIp);
+                    logger.info("Dns updated on start pod={} {}.{} = {}", podName, hostname, dnsConfiguration.zone, publicIp);
                 }
             } catch (Throwable e) {
                 logger.error("Failed to update DNS seed public ip:" + e.getMessage(), e);
@@ -61,9 +63,29 @@ public abstract class DnsUpdater {
         }
     }
 
+    /**
+     * Delete DNS seed name
+     * @param rack
+     */
+    public void onStop(String rack) {
+        try {
+            String hostname = buildHostname(rack);
+            deleteDnsARecord(hostname).blockingGet();
+            logger.info("Dns delete on stop {}.{}", hostname, dnsConfiguration.zone);
+        } catch (Throwable e) {
+            logger.error("Failed to update DNS seed public ip:" + e.getMessage(), e);
+        }
+    }
 
-    static String readFirstLine(String path, Charset encoding) throws IOException
-    {
+    public String buildHostname(String rack) {
+        String seedHostId = System.getenv("SEED_HOST_ID");
+        String hostnamePrefix = System.getenv("DNS_HOSTNAME_PREFIX");
+        return (!Strings.isNullOrEmpty(hostnamePrefix)) ?
+                hostnamePrefix + "-" +rack :
+                seedHostId;
+    }
+
+    static String readFirstLine(String path, Charset encoding) throws IOException {
         List<String> lines = Files.readAllLines(Paths.get(path), encoding);
         return lines.size() > 0 ? lines.get(0) : null;
     }

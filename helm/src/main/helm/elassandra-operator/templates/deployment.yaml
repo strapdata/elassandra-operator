@@ -73,41 +73,39 @@ spec:
             value: {{ $val | quote }}
           {{- end }}
           {{- end }}
-          {{- if .Values.dns.domain }}
-          - name: "DNS_DOMAIN"
-            value: {{ .Values.dns.domain | quote }}
-          {{- end }}
+          {{- if .Values.dns.azureSecretName }}
+          - name: "DNS_ENABLED"
+            value: "true"
+          - name: "DNS_ZONE"
+            value: {{ .Values.dns.zone | quote }}
           - name: "DNS_TTL"
             value: {{ default "60" .Values.dns.ttl | quote }}
-          {{- if .Values.dns.azure.secretName }}
-          - name: "DNS_UPDATER_ENABLED"
-            value: "true"
           - name: "DNS_AZURE_SECRET_NAME"
-            value: {{ .Values.dns.azure.secretName | quote }}
+            value: {{ .Values.dns.azureSecretName | quote }}
           - name: "DNS_AZURE_CLIENT_ID"
             valueFrom:
               secretKeyRef:
-                name: {{ .Values.dns.azure.secretName | quote }}
+                name: {{ .Values.dns.azureSecretName | quote }}
                 key: clientId
           - name: "DNS_AZURE_TENANT_ID"
             valueFrom:
               secretKeyRef:
-                name: {{ .Values.dns.azure.secretName | quote }}
+                name: {{ .Values.dns.azureSecretName | quote }}
                 key: tenantId
           - name: "DNS_AZURE_CLIENT_SECRET"
             valueFrom:
               secretKeyRef:
-                name: {{ .Values.dns.azure.secretName | quote}}
+                name: {{ .Values.dns.azureSecretName | quote}}
                 key: clientSecret
           - name: "DNS_AZURE_SUBSCRIPTION_ID"
             valueFrom:
               secretKeyRef:
-                name: {{ .Values.dns.azure.secretName | quote }}
+                name: {{ .Values.dns.azureSecretName | quote }}
                 key: subscriptionId
           - name: "DNS_AZURE_RESOURCE_GROUP"
             valueFrom:
                secretKeyRef:
-                 name: {{ .Values.dns.azure.secretName | quote }}
+                 name: {{ .Values.dns.azureSecretName | quote }}
                  key: resourceGroup
          {{- end }}
     {{- if .Values.nodeSelector }}

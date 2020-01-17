@@ -21,7 +21,7 @@ public class DnsService extends AzureDnsUpdater implements ApplicationEventListe
 
     // trigger dns update on startup
     public void onApplicationEvent(final ServiceStartedEvent event) {
-        onStart(event);
+        onStart(System.getenv("CASSANDRA_RACK"));
     }
 }
 
