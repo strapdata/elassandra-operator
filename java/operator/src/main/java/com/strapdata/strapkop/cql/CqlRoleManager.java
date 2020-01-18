@@ -10,13 +10,13 @@ import com.strapdata.cassandra.k8s.ElassandraOperatorSeedProvider;
 import com.strapdata.model.k8s.cassandra.Authentication;
 import com.strapdata.model.k8s.cassandra.CqlStatus;
 import com.strapdata.model.k8s.cassandra.DataCenter;
-import com.strapdata.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.plugins.Plugin;
 import com.strapdata.strapkop.plugins.PluginRegistry;
 import com.strapdata.strapkop.ssl.AuthorityManager;
+import com.strapdata.strapkop.ssl.utils.X509CertificateAndPrivateKey;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.netty.handler.ssl.SslContext;
@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 /**
@@ -232,13 +233,13 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
             });
     }
 
-    private Tuple2<Cluster, Session> connect(final DataCenter dc, Optional<CqlRole> optionalCqlRole) throws StrapkopException, ApiException, SSLException {
+    private Tuple2<Cluster, Session> connect(final DataCenter dc, Optional<CqlRole> optionalCqlRole) throws StrapkopException, ApiException, SSLException, ExecutionException, InterruptedException {
         Cluster cluster = null;
         Session session = null;
         try {
             cluster = createClusterObject(dc, optionalCqlRole);
             session = cluster.connect();
-        } catch (DriverException e) {
+        } catch (DriverException | ExecutionException | InterruptedException e) {
             // on DriverException try to close the session to avoid cnx leak or non relevant ERROR log message
             CqlSessionSupplier.closeQuietly(session);
             CqlSessionSupplier.closeQuietly(cluster); // also close cluster to free the connection that check the cluster state
@@ -252,7 +253,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
         return new Tuple2<>(cluster, session);
     }
 
-    private Cluster createClusterObject(final DataCenter dc, final Optional<CqlRole> optionalCqlRole) throws StrapkopException, ApiException, SSLException {
+    private Cluster createClusterObject(final DataCenter dc, final Optional<CqlRole> optionalCqlRole) throws StrapkopException, ApiException, SSLException, ExecutionException, InterruptedException {
         // check the number of available node to adapt the ConsistencyLevel otherwise creating a DC with more than 1 node (or park a DC) isn't possible
         // because licence can't be checked (UnavailableException: Not enough replicas available for query at consistency LOCAL_QUORUM (2 required but only 1 alive))
         final long availableNodes = dc.getStatus().getRackStatuses()
@@ -296,13 +297,14 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
         boolean hasSeedBootstrapped = dc.getStatus().getRackStatuses().values().stream().anyMatch(s -> s.getJoinedReplicas() > 0);
         if (hasSeedBootstrapped ||
                 ((dc.getSpec().getRemoteSeeds() == null || dc.getSpec().getRemoteSeeds().isEmpty()) && (dc.getSpec().getRemoteSeeders() == null || dc.getSpec().getRemoteSeeders().isEmpty()))) {
+            String contactPoint = OperatorNames.nodesService(dc) + "." + dc.getMetadata().getNamespace() + ".svc.cluster.local";
             try {
-                logger.debug("seed={} for datacenter={}", OperatorNames.nodesService(dc), dc.getMetadata().getName());
-                builder.addContactPoint(OperatorNames.nodesService(dc));
+                logger.debug("add local seed={} for datacenter={} in namespace={}", contactPoint, dc.getMetadata().getName(), dc.getMetadata().getNamespace());
+                builder.addContactPoint(contactPoint);
             } catch(IllegalArgumentException e) {
                 if (e.getCause() != null && e.getCause() instanceof  java.net.UnknownHostException) {
                     // ignore DNS resolution failure because dc removed....
-                    logger.debug("seed={} for datacenter={} can't be added due to UnknownHostException, DC removed", OperatorNames.nodesService(dc), dc.getMetadata().getName());
+                    logger.debug("seed={} for datacenter={} can't be added due to UnknownHostException, DC removed", contactPoint, dc.getMetadata().getName());
                 } else {
                     throw e;
                 }
@@ -310,7 +312,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
         }
 
         if (Objects.equals(dc.getSpec().getSsl(), Boolean.TRUE)) {
-            builder.withSSL(getSSLOptions());
+            builder.withSSL(getSSLOptions(dc.getMetadata().getNamespace()));
         }
 
         if (optionalCqlRole.isPresent()) {
@@ -325,13 +327,13 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
         return builder.build();
     }
 
-    private SSLOptions getSSLOptions() throws StrapkopException, ApiException, SSLException {
+    private SSLOptions getSSLOptions(String namespace) throws StrapkopException, ApiException, SSLException, ExecutionException, InterruptedException {
+        X509CertificateAndPrivateKey ca = authorityManager.get(namespace);
         SslContext sslContext = SslContextBuilder
                 .forClient()
                 .sslProvider(SslProvider.JDK)
-                .trustManager(new ByteArrayInputStream(authorityManager.loadPublicCaFromSecret().getBytes(StandardCharsets.UTF_8)))
+                .trustManager(new ByteArrayInputStream(ca.getCertificateChainAsString().getBytes(StandardCharsets.UTF_8)))
                 .build();
-
         return new RemoteEndpointAwareNettySSLOptions(sslContext);
     }
 }

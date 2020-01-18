@@ -377,7 +377,7 @@ public class DataCenterUpdateAction {
                     // create SSL keystore if not exists
                     return !dataCenterSpec.getSsl() ?
                             Single.just(passwords) :
-                            authorityManager.loadFromSecretSingle()
+                            authorityManager.getSingle(dataCenterMetadata.getNamespace())
                                     .flatMap(x509CertificateAndPrivateKey -> {
                                         V1ObjectMeta keystoreMeta = builder.dataCenterObjectMeta(OperatorNames.keystoreSecret(dataCenter));
                                         return k8sResourceUtils.readOrCreateNamespacedSecret(keystoreMeta,
@@ -1765,6 +1765,7 @@ public class DataCenterUpdateAction {
             // kubectl create serviceaccount --namespace default nodeinfo
             // kubectl create clusterrolebinding nodeinfo-cluster-rule --clusterrole=nodeinfo --serviceaccount=default:nodeinfo
             // kubectl get serviceaccount nodeinfo -o json | jq ".secrets[0].name"
+            /*
             if (!Strings.isNullOrEmpty(System.getenv("ELASSANDRA_OPERATOR_NAME"))) {
                 // lookup nodeinfo secret name (dash and underscore forbidden by GCP)
                 String name = System.getenv("ELASSANDRA_OPERATOR_NAME")+"nodeinfo";
@@ -1774,6 +1775,24 @@ public class DataCenterUpdateAction {
                 String nodeInfoSecretName = System.getenv("NODEINFO_SECRET");
                 podSpec.addInitContainersItem(buildInitContainerNodeInfo(nodeInfoSecretName));
             }
+            */
+
+            // mount the namespaced secret "nodeinfo" bound to the serviceaccount [release]nodeinfo having role to read node information
+            // see datacenter HELM chart
+            podSpec.addInitContainersItem(buildInitContainerNodeInfo("nodeinfo"));
+
+            /*
+            {
+
+                try {
+                    nodeInfoSecretName = k8sResourceUtils.readNamespacedServiceAccount(dataCenterMetadata.getNamespace(), serviceAccountName).getSecrets().get(0).getName();
+                    podSpec.addInitContainersItem(buildInitContainerNodeInfo(nodeInfoSecretName));
+                    logger.debug("Add nodeinfo secret={} to datacenter={} in namespace={}", nodeInfoSecretName, dataCenterMetadata.getName(), dataCenterMetadata.getNamespace());
+                } catch (Exception e) {
+                    logger.warn("Cannot read serviceAccount=" + serviceAccountName + " in namespace=" + dataCenterMetadata.getNamespace(), e);
+                }
+            }
+            */
 
             {
                 if (dataCenterSpec.getImagePullSecrets() != null) {

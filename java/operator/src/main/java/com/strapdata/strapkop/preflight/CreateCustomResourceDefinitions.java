@@ -17,7 +17,7 @@ import java.io.InputStreamReader;
  */
 public class CreateCustomResourceDefinitions implements Preflight<Void> {
 
-    static final Logger logger = LoggerFactory.getLogger(GenerateDefaultCA.class);
+    static final Logger logger = LoggerFactory.getLogger(CreateCustomResourceDefinitions.class);
 
     private final ApiextensionsV1beta1Api apiExtensionsApi;
 
