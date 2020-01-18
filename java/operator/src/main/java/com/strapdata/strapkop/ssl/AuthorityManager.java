@@ -1,8 +1,7 @@
 package com.strapdata.strapkop.ssl;
 
 
-import com.strapdata.strapkop.OperatorConfig;
-import com.strapdata.strapkop.StrapkopException;
+import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.ssl.utils.CertManager;
 import com.strapdata.strapkop.ssl.utils.X509CertificateAndPrivateKey;
@@ -10,7 +9,11 @@ import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.models.V1ObjectMeta;
 import io.kubernetes.client.models.V1Secret;
+import io.micronaut.cache.annotation.CacheConfig;
+import io.micronaut.caffeine.cache.AsyncLoadingCache;
+import io.micronaut.caffeine.cache.Caffeine;
 import io.reactivex.Single;
+import io.vavr.Tuple2;
 import io.vavr.control.Option;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.slf4j.Logger;
@@ -21,12 +24,10 @@ import javax.inject.Singleton;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.security.GeneralSecurityException;
-import java.security.NoSuchAlgorithmException;
-import java.security.SignatureException;
-import java.security.cert.CertificateException;
-import java.text.MessageFormat;
 import java.util.List;
-import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Read/Write the operator CA in a k8s secret.
@@ -34,6 +35,7 @@ import java.util.concurrent.Callable;
  */
 // TODO: move ca password in a secret
 @Singleton
+@CacheConfig("ca-cache")
 public class AuthorityManager {
     private static final Logger logger = LoggerFactory.getLogger(AuthorityManager.class);
 
@@ -55,10 +57,28 @@ public class AuthorityManager {
     private CertManager certManager;
 
     @Inject
-    private CoreV1Api coreApi;
+    K8sResourceUtils k8sResourceUtils;
 
     @Inject
-    private OperatorConfig config;
+    private CoreV1Api coreApi;
+
+    AsyncLoadingCache<String, X509CertificateAndPrivateKey> cache = Caffeine.newBuilder()
+            .maximumSize(100)
+            .expireAfterWrite(1, TimeUnit.MINUTES)
+            .buildAsync(ns -> loadOrGenerateCa(ns).blockingGet());
+
+    public X509CertificateAndPrivateKey get(String namespace) throws ExecutionException, InterruptedException {
+        return getAsync(namespace).get();
+    }
+
+    public CompletableFuture<X509CertificateAndPrivateKey> getAsync(String namespace)  {
+        logger.debug("Get CA for namespace={}", namespace);
+        return cache.get(namespace);
+    }
+
+    public Single<X509CertificateAndPrivateKey> getSingle(String namespace) {
+        return Single.fromFuture(getAsync(namespace));
+    }
 
     /**
      * CA secret with public certificate, mounted by all pods
@@ -105,71 +125,44 @@ public class AuthorityManager {
      * @throws IOException
      * @throws OperatorCreationException
      */
-    public void storeAsSecret(X509CertificateAndPrivateKey ca) throws ApiException, GeneralSecurityException, IOException, OperatorCreationException {
+    public Single<X509CertificateAndPrivateKey> storeAsSecret(String namespace, X509CertificateAndPrivateKey ca) throws ApiException, GeneralSecurityException, IOException, OperatorCreationException {
         final V1Secret publicSecret = new V1Secret()
                 .metadata(new V1ObjectMeta()
                         .name(getPublicCaSecretName())
-                        .namespace(config.getNamespace())
+                        .namespace(namespace)
                         .labels(OperatorLabels.MANAGED))
                 .putStringDataItem(SECRET_CACERT_PEM, ca.getCertificateChainAsString())
                 .putDataItem(SECRET_TRUSTSTORE_P12, certManager.generateTruststoreBytes(ca, getCaTrustPass()));
-        logger.info("Storing public CA in secret {} in namespace {} secret={}", getPublicCaSecretName(), config.getNamespace(), publicSecret);
-        coreApi.createNamespacedSecret(config.getNamespace(), publicSecret, null, null, null);
-
-        final V1Secret privateSecret = new V1Secret()
-                .metadata(new V1ObjectMeta()
-                        .name(getPrivateCaSecretName())
-                        .namespace(config.getNamespace())
-                        .labels(OperatorLabels.MANAGED))
-                .putStringDataItem(SECRET_CA_KEY, ca.getPrivateKeyAsString());
-        logger.info("Storing private CA in secret {} in namespace {}", getPrivateCaSecretName(), config.getNamespace());
-        coreApi.createNamespacedSecret(config.getNamespace(), privateSecret, null, null, null);
+        logger.info("Storing public CA in secret {} in namespace {} secret={}", getPublicCaSecretName(), namespace, publicSecret);
+        return k8sResourceUtils.createNamespacedSecret(publicSecret)
+                .flatMap(s -> {
+                    final V1Secret privateSecret = new V1Secret()
+                            .metadata(new V1ObjectMeta()
+                                    .name(getPrivateCaSecretName())
+                                    .namespace(namespace)
+                                    .labels(OperatorLabels.MANAGED))
+                            .putStringDataItem(SECRET_CA_KEY, ca.getPrivateKeyAsString());
+                    logger.info("Storing private CA in secret {} in namespace {}", getPrivateCaSecretName(), namespace);
+                    return k8sResourceUtils.createNamespacedSecret(privateSecret).map(s2 -> ca);
+                });
     }
 
-    /**
-     * Load a CA key and certs from a kubernetes secret
-     * @return the CA key and certs
-     * @throws ApiException 404 if it does not exists
-     */
-    public X509CertificateAndPrivateKey loadFromSecret() throws StrapkopException, ApiException {
-        final String certs = loadPublicCaFromSecret();
-        final String key = loadPrivateCaFromSecret();
     
-        return new X509CertificateAndPrivateKey(certs, key);
-    }
-
-    public Single<X509CertificateAndPrivateKey> loadFromSecretSingle() {
-        return Single.fromCallable(new Callable<X509CertificateAndPrivateKey>() {
-            @Override
-            public X509CertificateAndPrivateKey call() throws Exception {
-                return loadFromSecret();
-            }
-        });
-    }
-    
-    public String loadPrivateCaFromSecret() throws StrapkopException, ApiException {
-        return loadItemFromSecret(getPrivateCaSecretName(), SECRET_CA_KEY);
-    }
-    
-    public String loadPublicCaFromSecret() throws StrapkopException, ApiException {
-        return loadItemFromSecret(getPublicCaSecretName(), SECRET_CACERT_PEM);
-    }
-    
-    private String loadItemFromSecret(String publicCaSecretName, String secretCacertPem) throws StrapkopException, ApiException {
-        V1Secret publicSecret = coreApi.readNamespacedSecret(publicCaSecretName, config.getNamespace(), null, null, null);
-        final byte[] certsBytes = publicSecret.getData().get(secretCacertPem);
-        if (certsBytes == null) {
-            throw new StrapkopException(MessageFormat.format("missing file {} from secret {} in namespace {}", secretCacertPem, publicCaSecretName, config.getNamespace()));
-        }
-        return new String(certsBytes);
-    }
-    
-    /**
-     * Generate a new CA key and certs
-     */
-    public X509CertificateAndPrivateKey generate() throws OperatorCreationException, CertificateException, SignatureException, NoSuchAlgorithmException, IOException {
-        logger.info("Generating operator root ca");
-        return certManager.generateCa("AutoGeneratedRootCA", getCaKeyPass().toCharArray());
+    private Single<X509CertificateAndPrivateKey> loadOrGenerateCa(String namespace) {
+        return k8sResourceUtils.readNamespacedSecret(namespace, getPublicCaSecretName())
+                .flatMap(caPub -> k8sResourceUtils.readNamespacedSecret(namespace, getPrivateCaSecretName()).map(caKey -> new Tuple2<>(caPub, caKey)))
+                .flatMap(tuple -> {
+                    X509CertificateAndPrivateKey ca;
+                    final byte[] certsBytes = tuple._1.getData().get(SECRET_CACERT_PEM);
+                    final byte[] key = tuple._2.getData().get(SECRET_CA_KEY);
+                    if (certsBytes == null || key == null) {
+                        logger.info("Generating operator root ca for namespace={}", namespace);
+                        ca = certManager.generateCa("AutoGeneratedRootCA", getCaKeyPass().toCharArray());
+                        return storeAsSecret(namespace, ca);
+                    } else {
+                        return Single.just(new X509CertificateAndPrivateKey(new String(certsBytes), new String(key)));
+                    }
+                });
     }
 
     /**

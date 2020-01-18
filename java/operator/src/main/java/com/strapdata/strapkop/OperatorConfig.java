@@ -3,7 +3,7 @@ package com.strapdata.strapkop;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import lombok.Getter;
 
-import javax.validation.constraints.NotBlank;
+import javax.annotation.Nullable;
 
 /**
  * This class holds a type-safe representation of the configuration gathered from props file (application.yaml)
@@ -11,8 +11,8 @@ import javax.validation.constraints.NotBlank;
 @ConfigurationProperties("operator")
 @Getter
 public class OperatorConfig {
-    
-    @NotBlank
+
+    @Nullable
     String namespace;
 
     DnsConfig dns = new DnsConfig();

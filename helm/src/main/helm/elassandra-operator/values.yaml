@@ -27,6 +27,8 @@ dns:
   zone: "azure.strapcloud.com"
   azureSecretName: "dns-azure-spn"
 
+namespace:
+
 env:
 #  DNS_DOMAIN
 #  DNS_AZURE_CLIENT_ID:

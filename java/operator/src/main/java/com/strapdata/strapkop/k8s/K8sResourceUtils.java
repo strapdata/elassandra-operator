@@ -10,7 +10,6 @@ import com.strapdata.model.Key;
 import com.strapdata.model.backup.*;
 import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.model.k8s.cassandra.DataCenterList;
-import com.strapdata.model.k8s.cassandra.DataCenterPhase;
 import com.strapdata.model.k8s.task.Task;
 import com.strapdata.model.k8s.task.TaskList;
 import com.strapdata.model.k8s.task.TaskPhase;
@@ -24,13 +23,10 @@ import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.apis.CustomObjectsApi;
 import io.kubernetes.client.apis.ExtensionsV1beta1Api;
 import io.kubernetes.client.models.*;
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.scheduling.$DefaultTaskExceptionHandlerDefinitionClass;
 import io.reactivex.Completable;
 import io.reactivex.Single;
 import io.reactivex.functions.Action;
-import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,7 +35,10 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.lang.reflect.Type;
 import java.nio.charset.Charset;
-import java.util.*;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -230,6 +229,16 @@ public class K8sResourceUtils {
                     V1StatefulSet statefulSet2 = appsApi.createNamespacedStatefulSet(namespace, statefulset, null, null, null);
                     logger.debug("Created namespaced Deployment={} in namespace={}", statefulset.getMetadata().getName(), statefulset.getMetadata().getNamespace());
                     return statefulSet2;
+                });
+    }
+
+    public Single<V1Secret> createNamespacedSecret(final V1Secret secret) throws ApiException {
+        final String namespace = secret.getMetadata().getNamespace();
+        return Single.fromCallable(
+                () -> {
+                    V1Secret secret2 = coreApi.createNamespacedSecret(namespace, secret, null, null, null);
+                    logger.debug("Created namespaced Deployment={} in namespace={}", secret2.getMetadata().getName(), secret2.getMetadata().getNamespace());
+                    return secret2;
                 });
     }
 
