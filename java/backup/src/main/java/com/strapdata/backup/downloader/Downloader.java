@@ -21,8 +21,8 @@ import java.util.stream.Collectors;
 public abstract class Downloader extends StorageInteractor implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(Downloader.class);
 
-    public Downloader(final RestoreArguments arguments) {
-        super(arguments.clusterId, arguments.sourceNodeID, arguments.backupBucket);
+    public Downloader(final String rootBackupDir, final RestoreArguments arguments) {
+        super(rootBackupDir, arguments.clusterId, arguments.sourceNodeID, arguments.backupBucket);
     }
 
     public enum CompareFilesResult {

@@ -9,6 +9,7 @@ import com.amazonaws.services.s3.transfer.PersistableTransfer;
 import com.amazonaws.services.s3.transfer.TransferManager;
 import com.amazonaws.services.s3.transfer.internal.S3ProgressListener;
 import com.strapdata.backup.common.AWSRemoteObjectReference;
+import com.strapdata.backup.common.Constants;
 import com.strapdata.model.backup.RestoreArguments;
 import com.strapdata.backup.common.RemoteObjectReference;
 import org.slf4j.Logger;
@@ -26,8 +27,8 @@ public class AWSDownloader extends Downloader {
     private final AmazonS3 amazonS3;
     private final TransferManager transferManager;
 
-    public AWSDownloader(final TransferManager transferManager, final RestoreArguments arguments) {
-        super(arguments);
+    public AWSDownloader(final TransferManager transferManager, final RestoreArguments arguments, final String rootBackupDir) {
+        super(rootBackupDir, arguments);
         this.amazonS3 = transferManager.getAmazonS3Client();
         this.transferManager = transferManager;
     }
@@ -35,6 +36,11 @@ public class AWSDownloader extends Downloader {
     @Override
     public RemoteObjectReference objectKeyToRemoteReference(final Path objectKey) {
         return new AWSRemoteObjectReference(objectKey, resolveRemotePath(objectKey));
+    }
+
+    @Override
+    public RemoteObjectReference taskDescriptionRemoteReference(String taskName) throws Exception {
+        return new AWSRemoteObjectReference(Paths.get(Constants.TASK_DESCRIPTION_DOWNLOAD_DIR).resolve(taskName), resolveTaskDescriptionRemotePath(taskName));
     }
 
     @Override

@@ -3,6 +3,7 @@ package com.strapdata.backup.manifest;
 import com.google.cloud.Page;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.Storage;
+import com.strapdata.backup.common.Constants;
 import com.strapdata.backup.common.GCPRemoteObjectReference;
 import com.strapdata.backup.common.RemoteObjectReference;
 import com.strapdata.backup.downloader.GCPDownloader;
@@ -13,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Iterator;
 
 public class GCPManifestReader extends ManifestReader {
@@ -20,14 +22,20 @@ public class GCPManifestReader extends ManifestReader {
 
     private final Storage storage;
 
-    public GCPManifestReader(Storage storage, String restoreFromClusterId, String restoreFromBackupBucket) {
-        super(restoreFromClusterId, restoreFromBackupBucket);
+    public GCPManifestReader(Storage storage, final String rootBackupDir, String restoreFromClusterId, String restoreFromBackupBucket) {
+        super(rootBackupDir, restoreFromClusterId, restoreFromBackupBucket);
         this.storage = storage;
     }
 
     @Override
     public RemoteObjectReference objectKeyToRemoteReference(Path objectKey) throws Exception {
         return new GCPRemoteObjectReference(objectKey, resolveRemotePath(objectKey), restoreFromBackupBucket);
+    }
+
+    @Override
+    public RemoteObjectReference taskDescriptionRemoteReference(String taskName) throws Exception {
+        // objectKey is kept simple (e.g. "manifests/autosnap-123") so that it directly reflects the local path
+        return new GCPRemoteObjectReference(Paths.get(Constants.TASK_DESCRIPTION_DOWNLOAD_DIR).resolve(taskName), resolveTaskDescriptionRemotePath(taskName), restoreFromBackupBucket);
     }
 
     public GlobalManifest aggregateManifest(final String manifestName) {

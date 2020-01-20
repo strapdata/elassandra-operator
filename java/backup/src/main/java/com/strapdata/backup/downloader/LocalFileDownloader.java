@@ -1,5 +1,6 @@
 package com.strapdata.backup.downloader;
 
+import com.strapdata.backup.common.Constants;
 import com.strapdata.backup.common.LocalFileObjectReference;
 import com.strapdata.backup.common.RemoteObjectReference;
 import com.strapdata.model.backup.RestoreArguments;
@@ -15,14 +16,19 @@ import java.util.stream.Collectors;
 public class LocalFileDownloader extends Downloader {
     private final Path sourceDirectory;
 
-    public LocalFileDownloader(final RestoreArguments arguments) {
-        super(arguments);
+    public LocalFileDownloader(final RestoreArguments arguments, final String rootBackupDir) {
+        super(rootBackupDir, arguments);
         this.sourceDirectory = arguments.fileBackupDirectory;
     }
 
     @Override
     public RemoteObjectReference objectKeyToRemoteReference(final Path objectKey) throws Exception {
         return new LocalFileObjectReference(objectKey, resolveRemotePath(objectKey));
+    }
+
+    @Override
+    public RemoteObjectReference taskDescriptionRemoteReference(String taskName) throws Exception {
+        return new LocalFileObjectReference(Paths.get(Constants.TASK_DESCRIPTION_DOWNLOAD_DIR).resolve(taskName), resolveTaskDescriptionRemotePath(taskName));
     }
 
     @Override

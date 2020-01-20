@@ -91,37 +91,40 @@ public class CloudDownloadUploadFactory {
     }
 
     public static SnapshotUploader getUploader(final BackupArguments arguments) throws IOException, URISyntaxException, StorageException, ConfigurationException, InvalidKeyException {
+        final String rootBackupDir = System.getenv(Constants.ENV_ROOT_BACKUP_DIR);
         //final String backupID, final String clusterID, final String backupBucket,
         switch (arguments.storageProvider) {
             case AWS_S3:
                 //TODO: support encrypted backups via KMS
                 //AWS client set to auto detect credentials
-                return new AWSSnapshotUploader(getTransferManager(arguments.cloudCredentials), arguments);
+                return new AWSSnapshotUploader(getTransferManager(arguments.cloudCredentials), arguments, rootBackupDir);
             case AZURE_BLOB:
                 //TODO: use SAS token?
-                return new AzureSnapshotUploader(getCloudBlobClient(arguments.cloudCredentials), arguments);
+                return new AzureSnapshotUploader(getCloudBlobClient(arguments.cloudCredentials), arguments, rootBackupDir);
             case GCP_BLOB:
-                return new GCPSnapshotUploader(getGCPStorageClient(arguments.cloudCredentials), arguments);
+                return new GCPSnapshotUploader(getGCPStorageClient(arguments.cloudCredentials), arguments, rootBackupDir);
             case FILE:
-                return new LocalFileSnapShotUploader(arguments);
+                return new LocalFileSnapShotUploader(arguments, rootBackupDir);
         }
         throw new ConfigurationException("Could not create Snapshot Uploader");
     }
 
     public static Downloader getDownloader(final RestoreArguments arguments) throws IOException, URISyntaxException, StorageException, ConfigurationException, InvalidKeyException {
+        final String rootBackupDir = System.getenv(Constants.ENV_ROOT_BACKUP_DIR);
         switch (arguments.storageProvider) {
             case AWS_S3:
                 //TODO: support encrypted backups via KMS
                 //AWS client set to auto detect credentials
-                return new AWSDownloader(getTransferManager(arguments.cloudCredentials), arguments);
+                return new AWSDownloader(getTransferManager(arguments.cloudCredentials), arguments, rootBackupDir);
             case AZURE_BLOB:
                 //TODO: use SAS token?
-                return new AzureDownloader(getCloudBlobClient(arguments.cloudCredentials), arguments);
+                return new AzureDownloader(getCloudBlobClient(arguments.cloudCredentials), arguments, rootBackupDir);
             case GCP_BLOB:
-                return new GCPDownloader(getGCPStorageClient(arguments.cloudCredentials), arguments);
+                return new GCPDownloader(getGCPStorageClient(arguments.cloudCredentials), arguments, rootBackupDir);
             case FILE:
-                return new LocalFileDownloader(arguments);
+                return new LocalFileDownloader(arguments, rootBackupDir);
         }
         throw new ConfigurationException("Could not create Snapshot Uploader");
     }
+
 }

@@ -5,6 +5,7 @@ import com.google.cloud.ReadChannel;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.Storage;
+import com.strapdata.backup.common.Constants;
 import com.strapdata.model.backup.RestoreArguments;
 import com.strapdata.backup.common.GCPRemoteObjectReference;
 import com.strapdata.backup.common.RemoteObjectReference;
@@ -25,8 +26,8 @@ public class GCPDownloader extends Downloader {
     private final Storage storage;
 
     public GCPDownloader(final Storage storage,
-                         final RestoreArguments arguments) {
-        super(arguments);
+                         final RestoreArguments arguments, final String rootBackupDir) {
+        super(rootBackupDir, arguments);
         this.storage = storage;
 
     }
@@ -35,6 +36,12 @@ public class GCPDownloader extends Downloader {
     public RemoteObjectReference objectKeyToRemoteReference(final Path objectKey) {
         // objectKey is kept simple (e.g. "manifests/autosnap-123") so that it directly reflects the local path
         return new GCPRemoteObjectReference(objectKey, resolveRemotePath(objectKey), restoreFromBackupBucket);
+    }
+
+    @Override
+    public RemoteObjectReference taskDescriptionRemoteReference(String taskName) throws Exception {
+        // objectKey is kept simple (e.g. "manifests/autosnap-123") so that it directly reflects the local path
+        return new GCPRemoteObjectReference(Paths.get(Constants.TASK_DESCRIPTION_DOWNLOAD_DIR).resolve(taskName), resolveTaskDescriptionRemotePath(taskName), restoreFromBackupBucket);
     }
 
     @Override

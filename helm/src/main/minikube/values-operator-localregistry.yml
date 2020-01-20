@@ -7,8 +7,7 @@ replicaCount: 1
 apiVersion: stable.strapdata.com/v1
 
 dns:
-  azure:
-    secretName:
+  azureSecretName:
 
 image:
   repository: localhost:32000/strapdata/elassandra-operator-dev

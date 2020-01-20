@@ -9,6 +9,7 @@ import com.amazonaws.services.s3.model.*;
 import com.amazonaws.services.s3.transfer.TransferManager;
 import com.amazonaws.services.s3.transfer.Upload;
 import com.google.common.base.Optional;
+import com.strapdata.backup.common.Constants;
 import com.strapdata.backup.common.RemoteObjectReference;
 import com.strapdata.model.backup.BackupArguments;
 import org.slf4j.Logger;
@@ -16,6 +17,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 
@@ -27,8 +29,9 @@ public class AWSSnapshotUploader extends SnapshotUploader {
     private final Optional<String> kmsId;
 
     public AWSSnapshotUploader(final TransferManager transferManager,
-                               final BackupArguments arguments) {
-        super(arguments.clusterId, arguments.backupId, arguments.backupBucket);
+                               final BackupArguments arguments,
+                               final String rootBackupDir) {
+        super(rootBackupDir, arguments.clusterId, arguments.backupId, arguments.backupBucket);
 
         this.transferManager = transferManager;
         this.kmsId = Optional.absent();
@@ -50,6 +53,10 @@ public class AWSSnapshotUploader extends SnapshotUploader {
         return new AWSRemoteObjectReference(objectKey, resolveRemotePath(objectKey));
     }
 
+    @Override
+    public RemoteObjectReference taskDescriptionRemoteReference(String taskName) throws Exception {
+        return new com.strapdata.backup.common.AWSRemoteObjectReference(Paths.get(Constants.TASK_DESCRIPTION_DOWNLOAD_DIR).resolve(taskName), resolveTaskDescriptionRemotePath(taskName));
+    }
     @Override
     public FreshenResult freshenRemoteObject(final RemoteObjectReference object) throws InterruptedException {
         final String canonicalPath = ((AWSRemoteObjectReference) object).canonicalPath;

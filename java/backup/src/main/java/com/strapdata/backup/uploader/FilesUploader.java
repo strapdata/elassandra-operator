@@ -9,16 +9,20 @@ import com.strapdata.backup.common.CloudDownloadUploadFactory;
 import com.strapdata.backup.common.RemoteObjectReference;
 import com.strapdata.backup.task.ManifestEntry;
 import com.strapdata.backup.util.SeekableByteChannelInputStream;
+import com.strapdata.backup.util.TaskRequestDescription;
+import com.strapdata.model.GsonUtils;
 import com.strapdata.model.backup.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.naming.ConfigurationException;
+import java.io.ByteArrayInputStream;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.nio.channels.FileChannel;
+import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.security.InvalidKeyException;
@@ -75,6 +79,22 @@ public class FilesUploader {
         this.snapshotUploaderProvider = CloudDownloadUploadFactory.getUploader(arguments);
         this.arguments = arguments;
         this.executorService = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(arguments.concurrentConnections));
+    }
+
+    public void uploadTaskDescription(TaskRequestDescription taskRequest) throws Exception {
+        try (final SnapshotUploader fileUploader = snapshotUploaderProvider) {
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                try {
+                    fileUploader.close();
+                } catch (final Exception e) {
+                    logger.warn("Failed to close {}.", fileUploader.getClass().getSimpleName(), e);
+                }
+            }));
+
+            final String description = GsonUtils.toJson(taskRequest);
+            byte[] bytes = description.getBytes(Charset.forName("UTF-8"));
+            fileUploader.uploadSnapshotFile(bytes.length, new ByteArrayInputStream(bytes), fileUploader.taskDescriptionRemoteReference(taskRequest.getSnapshotTag()));
+        }
     }
 
     public void uploadOrFreshenFiles(final Collection<ManifestEntry> manifest) throws Exception {
