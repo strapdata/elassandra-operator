@@ -37,7 +37,7 @@ jackson:
     module-scan: false
 
 operator:
-    namespace: "${OPERATOR_NAMESPACE:default}"
+    namespace: "${OPERATOR_NAMESPACE:}"
     dns:
         zone: "${DNS_ZONE}"
         ttl: "${DNS_TTL:60}"
