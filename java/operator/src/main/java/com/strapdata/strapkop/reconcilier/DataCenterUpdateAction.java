@@ -4,6 +4,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.net.InetAddresses;
+import com.strapdata.backup.common.Constants;
 import com.strapdata.backup.manifest.GlobalManifest;
 import com.strapdata.backup.manifest.ManifestReader;
 import com.strapdata.cassandra.k8s.ElassandraOperatorSeedProviderAndNotifier;
@@ -1893,10 +1894,32 @@ public class DataCenterUpdateAction {
             final Restore restoreFromBackup = dataCenterSpec.getRestoreFromBackup();
             if (restoreFromBackup != null && StringUtils.isNotEmpty(restoreFromBackup.getSnapshotTag())) {
                 logger.debug("Restore requested.");
+
+                List<V1EnvVar> env = new ArrayList<>();
+                if (dataCenterSpec.getEnv() != null) {
+                    for (V1EnvVar evar : dataCenterSpec.getEnv()) {
+                        if (!Strings.isNullOrEmpty(restoreFromBackup.getBackupDir())
+                                && Constants.ENV_ROOT_BACKUP_DIR.equals(evar.getName())) {
+                            // backup root directory specified into the restore object, we use it in priority
+                            logger.debug("{} env variable set to '{}', but restore configuration specify '{}'.",
+                                    Constants.ENV_ROOT_BACKUP_DIR, evar.getValue(), restoreFromBackup.getBackupDir());
+                        } else {
+                            env.add(evar);
+                        }
+                    }
+                }
+
+                if (!Strings.isNullOrEmpty(restoreFromBackup.getBackupDir())) {
+                    V1EnvVar backupDir = new V1EnvVar()
+                            .name(Constants.ENV_ROOT_BACKUP_DIR)
+                            .value(restoreFromBackup.getBackupDir());
+                    env.add(backupDir);
+                }
+
                 V1Container restoreInitContainer = new V1Container()
                         .name("sidecar-restore")
                         .terminationMessagePolicy("FallbackToLogsOnError")
-                        .env(dataCenterSpec.getEnv())
+                        .env(env)
                         .image(dataCenterSpec.getSidecarImage())
                         .imagePullPolicy(dataCenterSpec.getImagePullPolicy())
                         .securityContext(new V1SecurityContext().runAsUser(CASSANDRA_USER_ID).runAsGroup(CASSANDRA_GROUP_ID))

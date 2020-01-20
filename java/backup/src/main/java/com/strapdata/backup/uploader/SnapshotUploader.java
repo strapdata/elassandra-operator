@@ -7,11 +7,13 @@ import java.io.InputStream;
 import java.nio.file.Path;
 
 public abstract class SnapshotUploader extends StorageInteractor implements AutoCloseable {
-    public SnapshotUploader(String restoreFromClusterId, String restoreFromNodeId, String restoreFromBackupBucket) {
-        super(restoreFromClusterId, restoreFromNodeId, restoreFromBackupBucket);
+    public SnapshotUploader(String rootBackupDir, String restoreFromClusterId, String restoreFromNodeId, String restoreFromBackupBucket) {
+        super(rootBackupDir, restoreFromClusterId, restoreFromNodeId, restoreFromBackupBucket);
     }
 
     public abstract RemoteObjectReference objectKeyToRemoteReference(final Path objectKey) throws Exception;
+
+    public abstract RemoteObjectReference taskDescriptionRemoteReference(final String taskFile) throws Exception;
 
     public enum FreshenResult {
         FRESHENED,

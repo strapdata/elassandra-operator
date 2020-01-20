@@ -9,6 +9,7 @@ import com.strapdata.backup.BackupException;
 import com.strapdata.backup.uploader.FilesUploader;
 import com.strapdata.backup.util.Directories;
 import com.strapdata.backup.util.GlobalLock;
+import com.strapdata.backup.util.TaskRequestDescription;
 import com.strapdata.model.backup.BackupArguments;
 import com.strapdata.model.backup.CloudStorageSecret;
 import jmx.org.apache.cassandra.service.StorageServiceMBean;
@@ -30,6 +31,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.InvalidKeyException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Predicate;
@@ -153,6 +156,7 @@ public class BackupTask {
         for (final KeyspaceColumnFamilySnapshot keyspaceColumnFamilySnapshot : keyspaceColumnFamilySnapshots) {
             final Path bucketKey = Paths.get(Directories.CASSANDRA_DATA).resolve(Paths.get(keyspaceColumnFamilySnapshot.keyspace, keyspaceColumnFamilySnapshot.columnFamily));
             Iterables.addAll(manifest, ssTableManifest(keyspaceColumnFamilySnapshot.snapshotDirectory, bucketKey));
+            // preserve schema file for each table
             final Path schemaBucketKey = Paths.get(Directories.CASSANDRA_SCHEMA).resolve(Paths.get(arguments.snapshotTag, keyspaceColumnFamilySnapshot.keyspace, keyspaceColumnFamilySnapshot.columnFamily));
             Iterables.addAll(manifest, schemaManifest(keyspaceColumnFamilySnapshot.snapshotDirectory, schemaBucketKey));
         }
@@ -175,7 +179,16 @@ public class BackupTask {
         
         filesUploader.uploadOrFreshenFiles(manifest);
     }
-    
+
+    public final void preserveBackupTask() throws Exception {
+        filesUploader.uploadTaskDescription(new TaskRequestDescription()
+                .setSnapshotTag(arguments.snapshotTag)
+                .setCreationDate(DateTimeFormatter.ISO_DATE_TIME.format(LocalDateTime.now()))
+                .setKeyspaces(arguments.keyspaces)
+                .setTable(arguments.columnFamily)
+        );
+    }
+
     public final void performBackup() throws Exception {
         if (arguments.offlineSnapshot) {
             List<String> tokens = new ArrayList<>();

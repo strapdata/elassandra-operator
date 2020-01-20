@@ -15,4 +15,7 @@ public class Restore extends BackupTaskSpec {
     @Expose
     private String snapshotTag;
 
+    @SerializedName("backupDir")
+    @Expose
+    private String backupDir;
 }

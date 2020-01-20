@@ -5,7 +5,8 @@ clusterName: Elassandra
 replicas: 1
 
 #restoreFromBackup:
-#  tag: backup-task-azure-test-cacert-002
+#  #backupDir: "test-ele-root-dir/backups"
+#  tag: test-ele-001
 #  provider: AZURE_BLOB
 #  bucket: test-kop-backup
 #  secretRef: test-cred-backup-azure
@@ -74,9 +75,9 @@ enterprise:
 #    value: "us-west-2"
 
 #Example authentication for AWS GCP based backups
-#env:
-#  - name: GOOGLE_APPLICATION_CREDENTIALS
-#    value: "/tmp/user-config/service_key.json"
+env:
+#  - name: BACKUP_DIR
+#    value: "test-ele-root-dir/backups"
 #  - name: GOOGLE_CLOUD_PROJECT
 #    value: "elassandra-operator"
 #  - name: BUCKET_NAME

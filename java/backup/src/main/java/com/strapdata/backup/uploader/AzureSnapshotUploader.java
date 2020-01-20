@@ -1,5 +1,6 @@
 package com.strapdata.backup.uploader;
 
+import com.strapdata.backup.common.Constants;
 import com.strapdata.model.backup.BackupArguments;
 import com.strapdata.backup.common.AzureRemoteObjectReference;
 import com.strapdata.backup.common.RemoteObjectReference;
@@ -11,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.Date;
@@ -24,14 +26,13 @@ public class AzureSnapshotUploader extends SnapshotUploader {
     private final CloudBlobContainer blobContainer;
 
     public AzureSnapshotUploader(final CloudBlobClient cloudBlobClient,
-                                 final BackupArguments arguments) throws URISyntaxException, StorageException {
-        super(arguments.clusterId, arguments.backupId, arguments.backupBucket);
+                                 final BackupArguments arguments,
+                                 final String rootBackupDir) throws URISyntaxException, StorageException {
+        super(rootBackupDir, arguments.clusterId, arguments.backupId, arguments.backupBucket);
 
         //Currently just use clusterId (name) as container reference
         this.blobContainer = cloudBlobClient.getContainerReference(restoreFromBackupBucket);
     }
-
-
 
     @Override
     public RemoteObjectReference objectKeyToRemoteReference(final Path objectKey) throws Exception {
@@ -39,6 +40,11 @@ public class AzureSnapshotUploader extends SnapshotUploader {
         return new AzureRemoteObjectReference(objectKey, canonicalPath, this.blobContainer.getBlockBlobReference(canonicalPath));
     }
 
+    @Override
+    public RemoteObjectReference taskDescriptionRemoteReference(String taskName) throws Exception {
+        final String path = resolveTaskDescriptionRemotePath(taskName);
+        return new AzureRemoteObjectReference(Paths.get(Constants.TASK_DESCRIPTION_DOWNLOAD_DIR).resolve(taskName), path, blobContainer.getBlockBlobReference(path));
+    }
     @Override
     public FreshenResult freshenRemoteObject(final RemoteObjectReference object) throws Exception {
         final CloudBlockBlob blob = ((AzureRemoteObjectReference) object).blob;

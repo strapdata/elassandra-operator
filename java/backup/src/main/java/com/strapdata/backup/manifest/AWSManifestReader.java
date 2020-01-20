@@ -4,6 +4,7 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.*;
 import com.amazonaws.services.s3.transfer.TransferManager;
 import com.strapdata.backup.common.AWSRemoteObjectReference;
+import com.strapdata.backup.common.Constants;
 import com.strapdata.backup.common.RemoteObjectReference;
 import io.reactivex.Observable;
 import io.reactivex.schedulers.Schedulers;
@@ -12,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 
 public class AWSManifestReader extends ManifestReader {
@@ -20,10 +22,15 @@ public class AWSManifestReader extends ManifestReader {
     private final AmazonS3 amazonS3;
     private final TransferManager transferManager;
 
-    public AWSManifestReader(final TransferManager transferManager, String restoreFromClusterId, String restoreFromBackupBucket) {
-        super(restoreFromClusterId, restoreFromBackupBucket);
+    public AWSManifestReader(final TransferManager transferManager, final String rootBackupDir, String restoreFromClusterId, String restoreFromBackupBucket) {
+        super(rootBackupDir, restoreFromClusterId, restoreFromBackupBucket);
         this.amazonS3 = transferManager.getAmazonS3Client();
         this.transferManager = transferManager;
+    }
+
+    @Override
+    public RemoteObjectReference taskDescriptionRemoteReference(String taskName) throws Exception {
+        return new AWSRemoteObjectReference(Paths.get(Constants.TASK_DESCRIPTION_DOWNLOAD_DIR).resolve(taskName), resolveTaskDescriptionRemotePath(taskName));
     }
 
     @Override

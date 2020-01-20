@@ -13,7 +13,7 @@ public class AzureTests {
     public void testUpdateRecord() throws IOException {
         DnsConfiguration dnsConfiguration = new DnsConfiguration();
         dnsConfiguration.enabled = true;
-        dnsConfiguration.domain = "941a7aa2-kube1-azure-northeurope.azure.strapcloud.com";
+        dnsConfiguration.zone = "azure.strapcloud.com";
         dnsConfiguration.ttl = 60;
 
         AzureDnsUpdater updater = new AzureDnsUpdater(dnsConfiguration,

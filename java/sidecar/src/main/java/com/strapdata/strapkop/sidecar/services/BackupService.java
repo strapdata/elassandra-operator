@@ -36,6 +36,13 @@ public class BackupService {
                     catch (Throwable throwable) {
                         logger.error("error while processing backup", throwable);
                     }
+                }).doOnNext(task -> {
+                    try {
+                        task.preserveBackupTask();
+                    }
+                    catch (Throwable throwable) {
+                        logger.error("error while preserve backup task definition", throwable);
+                    }
                 })
                 //.retry()
                 .subscribeOn(Schedulers.io())

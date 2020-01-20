@@ -1,5 +1,6 @@
 package com.strapdata.backup.downloader;
 
+import com.strapdata.backup.common.Constants;
 import com.strapdata.model.backup.RestoreArguments;
 import com.strapdata.backup.common.AzureRemoteObjectReference;
 import com.strapdata.backup.common.RemoteObjectReference;
@@ -24,8 +25,9 @@ public class AzureDownloader extends Downloader {
     private final CloudBlobContainer blobContainer;
 
     public AzureDownloader(final CloudBlobClient cloudBlobClient,
-                               final RestoreArguments arguments) throws StorageException, URISyntaxException {
-        super(arguments);
+                               final RestoreArguments arguments,
+                           final String rootBackupDir) throws StorageException, URISyntaxException {
+        super(rootBackupDir, arguments);
         this.blobContainer = cloudBlobClient.getContainerReference(restoreFromBackupBucket);
     }
     
@@ -33,6 +35,12 @@ public class AzureDownloader extends Downloader {
     public RemoteObjectReference objectKeyToRemoteReference(final Path objectKey) throws StorageException, URISyntaxException {
         final String path = resolveRemotePath(objectKey);
         return new AzureRemoteObjectReference(objectKey, path, blobContainer.getBlockBlobReference(path));
+    }
+
+    @Override
+    public RemoteObjectReference taskDescriptionRemoteReference(String taskName) throws Exception {
+        final String path = resolveTaskDescriptionRemotePath(taskName);
+        return new AzureRemoteObjectReference(Paths.get(Constants.TASK_DESCRIPTION_DOWNLOAD_DIR).resolve(taskName), path, blobContainer.getBlockBlobReference(path));
     }
 
     @Override

@@ -1,6 +1,7 @@
 package com.strapdata.backup.manifest;
 
 import com.strapdata.backup.common.AzureRemoteObjectReference;
+import com.strapdata.backup.common.Constants;
 import com.strapdata.backup.common.RemoteObjectReference;
 import com.microsoft.azure.storage.StorageException;
 import com.microsoft.azure.storage.blob.CloudBlobClient;
@@ -20,9 +21,9 @@ public class AzureManifestReader extends ManifestReader {
 
     private final CloudBlobContainer blobContainer;
 
-    public AzureManifestReader(final CloudBlobClient cloudBlobClient, String restoreFromClusterId, String restoreFromBackupBucket)
+    public AzureManifestReader(final CloudBlobClient cloudBlobClient, final String rootBackupDir, String restoreFromClusterId, String restoreFromBackupBucket)
             throws StorageException, URISyntaxException {
-        super(restoreFromClusterId, restoreFromBackupBucket);
+        super(rootBackupDir, restoreFromClusterId, restoreFromBackupBucket);
         this.blobContainer = cloudBlobClient.getContainerReference(restoreFromBackupBucket);
     }
 
@@ -30,6 +31,12 @@ public class AzureManifestReader extends ManifestReader {
     public RemoteObjectReference objectKeyToRemoteReference(Path objectKey) throws Exception {
         String path = resolveRemotePath(objectKey);
         return new AzureRemoteObjectReference(objectKey, path,  blobContainer.getBlockBlobReference(path));
+    }
+
+    @Override
+    public RemoteObjectReference taskDescriptionRemoteReference(String taskName) throws Exception {
+        final String path = resolveTaskDescriptionRemotePath(taskName);
+        return new AzureRemoteObjectReference(Paths.get(Constants.TASK_DESCRIPTION_DOWNLOAD_DIR).resolve(taskName), path, blobContainer.getBlockBlobReference(path));
     }
 
     public GlobalManifest aggregateManifest(final String manifestName) {

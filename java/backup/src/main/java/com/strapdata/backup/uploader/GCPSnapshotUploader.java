@@ -4,6 +4,7 @@ import com.google.cloud.WriteChannel;
 import com.google.cloud.storage.*;
 import com.google.common.io.ByteStreams;
 import com.google.inject.Inject;
+import com.strapdata.backup.common.Constants;
 import com.strapdata.model.backup.BackupArguments;
 import com.strapdata.backup.common.GCPRemoteObjectReference;
 import com.strapdata.backup.common.RemoteObjectReference;
@@ -14,6 +15,7 @@ import java.io.InputStream;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 
 
 public class GCPSnapshotUploader extends SnapshotUploader{
@@ -23,8 +25,9 @@ public class GCPSnapshotUploader extends SnapshotUploader{
 
     @Inject
     public GCPSnapshotUploader(final Storage storage,
-                               final BackupArguments arguments) {
-        super(arguments.clusterId, arguments.backupId, arguments.backupBucket);
+                               final BackupArguments arguments,
+                               final String rootBackupDir) {
+        super(rootBackupDir, arguments.clusterId, arguments.backupId, arguments.backupBucket);
         this.storage = storage;
 
     }
@@ -32,6 +35,12 @@ public class GCPSnapshotUploader extends SnapshotUploader{
     @Override
     public RemoteObjectReference objectKeyToRemoteReference(final Path objectKey) throws Exception {
         return new GCPRemoteObjectReference(objectKey, resolveRemotePath(objectKey), restoreFromBackupBucket);
+    }
+
+    @Override
+    public RemoteObjectReference taskDescriptionRemoteReference(String taskName) throws Exception {
+        // objectKey is kept simple (e.g. "manifests/autosnap-123") so that it directly reflects the local path
+        return new GCPRemoteObjectReference(Paths.get(Constants.TASK_DESCRIPTION_DOWNLOAD_DIR).resolve(taskName), resolveTaskDescriptionRemotePath(taskName), restoreFromBackupBucket);
     }
 
     @Override
