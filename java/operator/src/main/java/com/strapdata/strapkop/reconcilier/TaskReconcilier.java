@@ -37,7 +37,7 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
                     String taskType,
                     final K8sResourceUtils k8sResourceUtils,
                     final MeterRegistry meterRegistry
-    ) {
+                    ) {
         super(reconcilierObserver);
         this.k8sResourceUtils = k8sResourceUtils;
         this.taskType = taskType;

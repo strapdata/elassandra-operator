@@ -47,3 +47,6 @@ operator:
     test:
         enabled: "${TESTSUITE_ENABLE:false}"
         platform: "${TESTSUITE_PLATFORM:LOCAL}"
+
+    tasks:
+        retentionPeriod: "${TASKS_RETENTION:15D}"
