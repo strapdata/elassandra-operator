@@ -391,6 +391,25 @@ public class K8sResourceUtils {
         });
     }
 
+    public Single<Optional<V1Secret>> readOptionalNamespacedSecret(final String namespace, final String name) {
+        return Single.fromCallable(new Callable<Optional<V1Secret>>() {
+            @Override
+            public Optional<V1Secret> call() throws Exception {
+                try {
+                    V1Secret secret = coreApi.readNamespacedSecret(name, namespace, null, null, null);
+                    logger.debug("read namespaced secret={}", secret.getMetadata().getName());
+                    return Optional.ofNullable(secret);
+                } catch(ApiException e) {
+                    if (e.getCode() == 404) {
+                        logger.warn("secret namespace={} name={} not found", namespace, name);
+                        return Optional.empty();
+                    }
+                    throw e;
+                }
+            }
+        });
+    }
+
     public Completable deleteService(String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) {
         return Completable.fromAction(new Action() {
             @Override
