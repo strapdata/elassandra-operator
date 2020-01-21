@@ -1,11 +1,11 @@
 package com.strapdata.strapkop.plugins.test;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.google.protobuf.Api;
+import com.strapdata.model.Key;
 import com.strapdata.model.k8s.cassandra.*;
 import com.strapdata.model.k8s.task.Task;
 import com.strapdata.model.k8s.task.TaskPhase;
 import com.strapdata.model.sidecar.ElassandraNodeStatus;
+import com.strapdata.strapkop.cache.CheckPointCache;
 import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.k8s.K8sResourceTestUtils;
@@ -16,7 +16,6 @@ import com.strapdata.strapkop.plugins.test.step.Step;
 import com.strapdata.strapkop.plugins.test.step.StepFailedException;
 import com.strapdata.strapkop.plugins.test.util.ESRestClient;
 import com.strapdata.strapkop.ssl.AuthorityManager;
-import com.strapdata.strapkop.utils.RestorePointCache;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
@@ -31,7 +30,6 @@ import javax.inject.Inject;
 import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import static com.strapdata.strapkop.plugins.test.step.StepFailedException.failed;
@@ -61,6 +59,9 @@ public abstract class TestSuiteExecutor {
 
     @Inject
     private ElassandraNodeStatusCache elassandraNodeStatusCache;
+
+    @Inject
+    private CheckPointCache checkPointCache;
 
     private Timer timer = new Timer();
     protected Step currentStep;
@@ -204,7 +205,7 @@ public abstract class TestSuiteExecutor {
      * @param dc
      */
     protected void checkHistoryDataCenter(final DataCenter dc) {
-        Optional<RestorePointCache.RestorePoint> restorePoint = RestorePointCache.getRestorePoint();
+        Optional<CheckPointCache.CheckPoint> restorePoint = checkPointCache.getCheckPoint(new Key(dc.getMetadata()));
         if (restorePoint.isPresent()) {
             if (restorePoint.get().getSpec() == null) {
                 failed("ElassandraDataCenter should have a restore point");

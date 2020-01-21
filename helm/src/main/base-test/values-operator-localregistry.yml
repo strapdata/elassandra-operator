@@ -19,8 +19,7 @@ env:
   LOGBACK_com_strapdata_strapkop_test: DEBUG
 
 dns:
-  azure:
-    secretName:
+  azureSecretName:
 
 ingress:
   enabled: false

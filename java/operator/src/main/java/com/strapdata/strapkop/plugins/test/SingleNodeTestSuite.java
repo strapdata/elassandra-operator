@@ -1,24 +1,16 @@
 package com.strapdata.strapkop.plugins.test;
 
-import com.strapdata.model.Key;
-import com.strapdata.model.k8s.cassandra.*;
-import com.strapdata.model.sidecar.ElassandraNodeStatus;
+import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.model.k8s.cassandra.DataCenterStatus;
+import com.strapdata.model.k8s.cassandra.Workload;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.plugins.test.step.OnSuccessAction;
 import com.strapdata.strapkop.plugins.test.step.Step;
-import com.strapdata.strapkop.utils.RestorePointCache;
-import io.kubernetes.client.ApiException;
 import io.kubernetes.client.custom.Quantity;
-import io.kubernetes.client.models.V1ObjectMeta;
 import io.kubernetes.client.models.V1ResourceRequirements;
 import io.micronaut.context.annotation.Prototype;
 
 import java.util.HashMap;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
 
 import static com.strapdata.strapkop.plugins.test.step.StepFailedException.failed;
 

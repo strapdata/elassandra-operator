@@ -8,11 +8,13 @@ import com.strapdata.backup.common.Constants;
 import com.strapdata.backup.manifest.GlobalManifest;
 import com.strapdata.backup.manifest.ManifestReader;
 import com.strapdata.cassandra.k8s.ElassandraOperatorSeedProviderAndNotifier;
+import com.strapdata.model.Key;
 import com.strapdata.model.backup.CloudStorageSecret;
 import com.strapdata.model.k8s.cassandra.*;
 import com.strapdata.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
+import com.strapdata.strapkop.cache.CheckPointCache;
 import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.cql.*;
 import com.strapdata.strapkop.event.ElassandraPod;
@@ -25,8 +27,6 @@ import com.strapdata.strapkop.ssl.utils.X509CertificateAndPrivateKey;
 import com.strapdata.strapkop.utils.CloudStorageSecretsKeys;
 import com.strapdata.strapkop.utils.DnsUpdateSecretsKeys;
 import com.strapdata.strapkop.utils.ManifestReaderFactory;
-import com.strapdata.strapkop.utils.RestorePointCache;
-import com.strapdata.strapkop.utils.RestorePointCache.RestorePoint;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
@@ -99,6 +99,8 @@ public class DataCenterUpdateAction {
     private final CqlLicenseManager cqlLicenseManager;
     private final CqlKeyspaceManager cqlKeyspaceManager;
 
+    private final CheckPointCache checkPointCache;
+
     private final OperatorConfig operatorConfig;
 
     private final ManifestReaderFactory manifestReaderFactory;
@@ -119,7 +121,8 @@ public class DataCenterUpdateAction {
                                   @Parameter("dataCenter") com.strapdata.model.k8s.cassandra.DataCenter dataCenter,
                                   final CqlLicenseManager cqlLicenseManager,
                                   final ManifestReaderFactory factory,
-                                  final OperatorConfig operatorConfig) {
+                                  final OperatorConfig operatorConfig,
+                                  final CheckPointCache checkPointCache) {
         this.context = context;
         this.coreApi = coreApi;
         this.appsApi = appsApi;
@@ -131,6 +134,8 @@ public class DataCenterUpdateAction {
         this.dataCenter = dataCenter;
         this.dataCenterMetadata = dataCenter.getMetadata();
         this.dataCenterSpec = dataCenter.getSpec();
+
+        this.checkPointCache = checkPointCache;
 
         this.cqlRoleManager = cqlRoleManager;
         this.cqlLicenseManager = cqlLicenseManager;
@@ -258,7 +263,7 @@ public class DataCenterUpdateAction {
         });
     }
 
-    public Completable rollbackDataCenter(Optional<RestorePoint> restorePoint) throws Exception {
+    public Completable rollbackDataCenter(Key key) throws Exception {
         return fetchExistingStatefulSetsByZone()
                 .flatMapCompletable(existingStsMap -> {
                     Zones zones = new Zones(this.coreApi, existingStsMap);
@@ -280,10 +285,10 @@ public class DataCenterUpdateAction {
 
                     return Completable.fromSingle(
                             Single.fromCallable( () -> {
+                                Optional<CheckPointCache.CheckPoint> checkPoint = checkPointCache.getCheckPoint(key);
+                                if (checkPoint.isPresent()) {
 
-                                if (restorePoint.isPresent()) {
-
-                                    final RestorePoint previousStableState =restorePoint.get();
+                                    final CheckPointCache.CheckPoint previousStableState = checkPoint.get();
                                     logger.info("Try to restore DataCenter configuration with fingerprint '{}' and userConfigMap '{}'", previousStableState.getSpec().fingerprint(), previousStableState.getUserConfigMap());
 
                                     if (previousStableState.getUserConfigMap() != null) {
@@ -798,7 +803,7 @@ public class DataCenterUpdateAction {
     private void commitDataCenterSnapshot(Zones zones) throws ApiException {
         if (zones.totalReplicas() == dataCenterSpec.getReplicas() && zones.isReady() && zones.hasConsistentConfiguration() &&
                 zones.first().isPresent() && zones.first().get().getDataCenterFingerPrint().isPresent()) {
-            RestorePointCache.commitRestorePoint(dataCenterSpec);
+            checkPointCache.commitCheckPoint(new Key(dataCenterMetadata), dataCenterSpec);
         }
     }
 
@@ -824,7 +829,7 @@ public class DataCenterUpdateAction {
                 .map((sts) -> sts.getMetadata().getAnnotations().get(OperatorLabels.CONFIGMAP_FINGERPRINT))
                 .flatMap(this::extractUserConfigFingerPrint)
                 .map(fingerprint -> OperatorNames.configMapUniqueName(dataCenterSpec.getUserConfigMapVolumeSource().getName(), fingerprint));
-        RestorePointCache.prepareRestorePoint(dataCenterSpec, userConfigmap);
+        checkPointCache.prepareCheckPoint(new Key(dataCenterMetadata), dataCenterSpec, userConfigmap);
     }
 
     private Optional<String> extractUserConfigFingerPrint(final String statefulsetFingerPrint) {
@@ -839,7 +844,6 @@ public class DataCenterUpdateAction {
     private boolean restoreRequired(Zones zones, Restore restoreFromBackup) {
         return zones.totalReplicas() == 0 && restoreFromBackup != null && StringUtils.isNotEmpty(restoreFromBackup.getSnapshotTag());
     }
-
 
     public class ConfigMapVolumeMountBuilder {
         public final V1ConfigMap configMap;
