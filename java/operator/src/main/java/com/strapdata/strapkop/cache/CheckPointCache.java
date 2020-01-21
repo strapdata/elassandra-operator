@@ -24,7 +24,13 @@ public class CheckPointCache extends Cache<Key, Tuple2<CheckPointCache.CheckPoin
             CheckPointCache.CheckPoint ongoingCheckPoint = new CheckPointCache.CheckPoint()
                     .setSpec(spec)
                     .setUserConfigMap(userConfigMapRef.orElse(null));
-            put(key, new Tuple2<>(ongoingCheckPoint, null));
+            Tuple2<CheckPointCache.CheckPoint, CheckPointCache.CheckPoint> checkPoint = get(key);
+            if (checkPoint != null) {
+                checkPoint = checkPoint.update1(ongoingCheckPoint);
+            } else {
+                checkPoint = new Tuple2<>(ongoingCheckPoint, null);
+            }
+            put(key, checkPoint);
         }
     }
 
@@ -32,12 +38,11 @@ public class CheckPointCache extends Cache<Key, Tuple2<CheckPointCache.CheckPoin
         Tuple2<CheckPointCache.CheckPoint, CheckPointCache.CheckPoint> tuple = get(key);
         CheckPoint ongoingCheckPoint = tuple == null ? null : tuple._1;
         if ( ongoingCheckPoint != null && ongoingCheckPoint.spec != null && ongoingCheckPoint.spec.fingerprint().equals(spec.fingerprint())) {
-            tuple.update2(ongoingCheckPoint);
-            tuple.update1(null);
+            put(key, tuple.update2(ongoingCheckPoint).update1(null));
             LOGGER.debug("new stable RestorePoint with spec={}", spec == null ? "null" : spec.fingerprint());
         } else {
             // update only the ongoing restore point, to preserve the last committed successfully
-            tuple.update1(null);
+            put(key, tuple.update1(null));
             LOGGER.info("new stable RestorePoint with spec={} can't be committed", spec == null ? "null" : spec.fingerprint());
         }
     }
