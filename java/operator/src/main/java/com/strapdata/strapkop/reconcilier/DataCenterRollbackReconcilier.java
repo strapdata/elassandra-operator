@@ -5,7 +5,6 @@ import com.strapdata.model.k8s.cassandra.DataCenterPhase;
 import com.strapdata.model.k8s.cassandra.DataCenterStatus;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.plugins.PluginRegistry;
-import com.strapdata.strapkop.utils.RestorePointCache;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.micronaut.context.ApplicationContext;
@@ -54,7 +53,7 @@ public class DataCenterRollbackReconcilier extends Reconcilier<Key> {
                         logger.trace("processing a configuration rollback for {} in thread {}", dc.getMetadata().getName(), Thread.currentThread().getName());
 
                         return context.createBean(DataCenterUpdateAction.class, dc)
-                                .rollbackDataCenter(RestorePointCache.getRestorePoint());
+                                .rollbackDataCenter(key);
                         // do not perform updateDatacenterStatus here to avoid collision with the update performed in the rollback method
                     } catch (Exception e) {
                         logger.error("an error occurred while processing Rollback for {}", dc.getMetadata().getName(), e);

@@ -2,11 +2,10 @@ package com.strapdata.strapkop.controllers;
 
 import com.strapdata.model.ClusterKey;
 import com.strapdata.model.Key;
-import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
+import com.strapdata.strapkop.cache.CheckPointCache;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.pipeline.WorkQueue;
 import com.strapdata.strapkop.reconcilier.DataCenterRollbackReconcilier;
-import com.strapdata.strapkop.utils.RestorePointCache;
 import io.kubernetes.client.ApiException;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -26,13 +25,16 @@ public class DataCenterController {
     WorkQueue workQueue;
 
     @Inject
+    CheckPointCache checkPointCache;
+
+    @Inject
     DataCenterRollbackReconcilier dataCenterRollbackReconcilier;
 
     @Post(value = "/{namespace}/{cluster}/{datacenter}/rollback", produces = MediaType.APPLICATION_JSON)
     public HttpStatus rollback(String namespace, String cluster, String datacenter) throws ApiException {
-        if (RestorePointCache.getRestorePoint().isPresent()) {
+        Key dcKey = new Key(OperatorNames.dataCenterResource(cluster, datacenter), namespace);
+        if (checkPointCache.getCheckPoint(dcKey).isPresent()) {
             ClusterKey clusterKey = new ClusterKey(cluster, namespace);
-            Key dcKey = new Key(OperatorNames.dataCenterResource(cluster, datacenter), namespace);
             logger.info("Summit a configuration rollback for namespace={} cluster={} dc={}", namespace, cluster, datacenter);
             workQueue.submit(clusterKey, dataCenterRollbackReconcilier.reconcile(dcKey));
             return HttpStatus.ACCEPTED;
@@ -44,11 +46,11 @@ public class DataCenterController {
 
     @Post(value = "/{namespace}/{cluster}/{datacenter}/reconcile", produces = MediaType.APPLICATION_JSON)
     public HttpStatus reconcile(String namespace, String cluster, String datacenter) throws ApiException {
-            ClusterKey clusterKey = new ClusterKey(cluster, namespace);
-            Key dcKey = new Key(OperatorNames.dataCenterResource(cluster, datacenter), namespace);
-            logger.info("Force a configuration reconciliation for namespace={} cluster={} dc={}", namespace, cluster, datacenter);
-            RestorePointCache.clearRestorePoint(); // clear the restorePoint to take the current value of DC CRD
-            workQueue.submit(clusterKey, dataCenterRollbackReconcilier.reconcile(dcKey));
-            return HttpStatus.ACCEPTED;
+        ClusterKey clusterKey = new ClusterKey(cluster, namespace);
+        Key dcKey = new Key(OperatorNames.dataCenterResource(cluster, datacenter), namespace);
+        logger.info("Force a configuration reconciliation for namespace={} cluster={} dc={}", namespace, cluster, datacenter);
+        checkPointCache.clearCheckPoint(dcKey); // clear the restorePoint to take the current value of DC CRD
+        workQueue.submit(clusterKey, dataCenterRollbackReconcilier.reconcile(dcKey));
+        return HttpStatus.ACCEPTED;
     }
 }

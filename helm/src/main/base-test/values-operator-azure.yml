@@ -14,8 +14,7 @@ imagePullPolicy: Always
 imagePullSecrets:
 
 dns:
-  azure:
-    secretName:
+  azureSecretName:
 
 env:
   TESTSUITE_ENABLE: true
