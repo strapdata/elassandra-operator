@@ -8,4 +8,4 @@ spec:
   exclusive: false
   test:
     testSuite: "com.strapdata.strapkop.plugins.test.SingleNodeTestSuite"
-    timeOut: 180000
+    timeOut: 240000
