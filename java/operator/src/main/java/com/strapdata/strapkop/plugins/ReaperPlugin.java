@@ -365,8 +365,8 @@ public class ReaperPlugin extends AbstractPlugin {
         String ingressDomain = System.getenv("INGRESS_DOMAIN");
         final V1beta1Ingress ingress;
         if (!Strings.isNullOrEmpty(ingressDomain)) {
-            String reaperAppHost = "reaper-" + dataCenterSpec.getClusterName() + "-" + dataCenterSpec.getDatacenterName() + "-" + ingressDomain.replace("${namespace}", dataCenterMetadata.getNamespace());
-            String reaperAdminHost = "admin-reaper-" + dataCenterSpec.getClusterName() + "-" + dataCenterSpec.getDatacenterName() + "-" + ingressDomain.replace("${namespace}", dataCenterMetadata.getNamespace());
+            String reaperAppHost = "reaper-" + dataCenterSpec.getClusterName().toLowerCase(Locale.ROOT) + "-" + dataCenterSpec.getDatacenterName().toLowerCase(Locale.ROOT) + "-" + ingressDomain.replace("${namespace}", dataCenterMetadata.getNamespace());
+            String reaperAdminHost = "admin-reaper-" + dataCenterSpec.getClusterName().toLowerCase(Locale.ROOT) + "-" + dataCenterSpec.getDatacenterName().toLowerCase(Locale.ROOT) + "-" + ingressDomain.replace("${namespace}", dataCenterMetadata.getNamespace());
             logger.info("Creating reaper ingress for host={}", reaperAppHost);
             ingress = new V1beta1Ingress()
                     .metadata(meta)
