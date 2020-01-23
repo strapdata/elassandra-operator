@@ -23,7 +23,8 @@ jar {
 jib {
     from {
         // TODO make it configurable to allow bash exec ???
-        image = 'openjdk:alpine'
+        //image = 'openjdk:alpine'
+        image = 'openjdk:8-jre-alpine'  // smallest jre image
         //image = 'gcr.io/distroless/java:8'
     }
     to {

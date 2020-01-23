@@ -22,7 +22,9 @@ jib {
     from {
         // TODO make it configurable to allow bash exec ???
         //image = 'gcr.io/distroless/java:8'
-        image = 'openjdk:alpine'
+        //image = 'openjdk:alpine'
+        image = 'openjdk:8-jre-alpine'  // smallest jre image
+        //image = 'openjdk:8u212-jre-stretch'
     }
     to {
         image = dockerImagePrefix + "sidecar" + dockerImageSuffix
