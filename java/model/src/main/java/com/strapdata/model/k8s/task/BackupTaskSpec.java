@@ -6,6 +6,8 @@ import com.strapdata.model.backup.StorageProvider;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @NoArgsConstructor
 public class BackupTaskSpec  {
@@ -18,4 +20,10 @@ public class BackupTaskSpec  {
     @SerializedName("secretRef")
     @Expose
     private String secretRef;
+    @SerializedName("keyspaceRegex")
+    @Expose
+    private String keyspaceRegex;
+    @SerializedName("keyspaces")
+    @Expose
+    private List<String> keyspaces;
 }

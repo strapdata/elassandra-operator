@@ -2,6 +2,7 @@ package com.strapdata.backup.task;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.microsoft.azure.storage.StorageException;
@@ -97,7 +98,7 @@ public class BackupTask {
         this.snapshotTokensDirectory = arguments.sharedContainerPath.resolve(Paths.get("cassandra-operator/tokens"));
         this.globalLock = globalLock;
         this.storageServiceMBean = storageServiceMBean;
-        
+
         Files.createDirectories(snapshotManifestDirectory);
         Files.createDirectories(snapshotTokensDirectory);
         
@@ -107,9 +108,34 @@ public class BackupTask {
         this.backupTokensRootKey = Paths.get("tokens");
         
         this.filesUploader = new FilesUploader(arguments);
-        this.arguments = arguments;
+        this.arguments = processKeyspaceRegex(arguments);
     }
-    
+
+    private BackupArguments processKeyspaceRegex(BackupArguments backupArgs) {
+        String keyspaceRegex = backupArgs.getKeyspaceRegex();
+        if (Strings.isNullOrEmpty(keyspaceRegex)) {
+            logger.debug("Filtering Keyspaces based on '{}' regex", keyspaceRegex);
+
+            Pattern ksPattern = Pattern.compile(keyspaceRegex);
+            List<String> keyspacesTobackup = storageServiceMBean.getNonSystemKeyspaces()
+                    .stream()
+                    .filter(ks -> ksPattern.matcher(ks).matches())
+                    .collect(Collectors.toList());
+
+            if (!keyspacesTobackup.isEmpty()) {
+                if (backupArgs.keyspaces == null) {
+                    backupArgs.keyspaces = keyspacesTobackup;
+                }
+
+                logger.debug("Append '{}' keyspaces matching the regex to '{}' keyspaces", keyspacesTobackup.size(), backupArgs.keyspaces.size());
+                backupArgs.keyspaces.addAll(keyspacesTobackup);
+            } else {
+                logger.debug("No keyspace match the regex '{}'", keyspaceRegex);
+            }
+        }
+        return backupArgs;
+    }
+
     @VisibleForTesting
     public void takeCassandraSnapshot(final List<String> keyspaces, final String tag, final String columnFamily, final boolean drain) throws IOException, ExecutionException, InterruptedException {
         if (columnFamily != null) {

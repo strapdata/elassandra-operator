@@ -34,6 +34,14 @@ public class BackupArguments extends CommonBackupArguments {
         super();
     }
 
+    public String getKeyspaceRegex() {
+        return keyspaceRegex;
+    }
+
+    public void setKeyspaceRegex(String keyspaceRegex) {
+        this.keyspaceRegex = keyspaceRegex;
+    }
+
     @Override
     public void parseArguments(String[] args) {
         super.parseArguments(args);
@@ -68,4 +76,6 @@ public class BackupArguments extends CommonBackupArguments {
 
     @Argument(index = 0, metaVar = "keyspace")
     public List<String> keyspaces = new ArrayList<>();
+
+    public String keyspaceRegex;
 }
