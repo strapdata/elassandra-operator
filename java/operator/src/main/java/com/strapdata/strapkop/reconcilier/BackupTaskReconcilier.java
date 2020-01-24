@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -82,8 +83,7 @@ public class BackupTaskReconcilier extends TaskReconcilier {
                 .flatMapSingle(pod -> {
                     final BackupArguments backupArguments = generateBackupArguments(
                             task.getMetadata().getName(),
-                            backupSpec.getProvider(),
-                            backupSpec.getBucket(),
+                            backupSpec,
                             OperatorNames.dataCenterResource(task.getSpec().getCluster(), task.getSpec().getDatacenter()),
                             pod,
                             cloudSecret);
@@ -115,20 +115,23 @@ public class BackupTaskReconcilier extends TaskReconcilier {
     }
 
 
-    public static BackupArguments generateBackupArguments(final String tag, final StorageProvider provider,
-                                                          final String target, final String cluster,
+    public static BackupArguments generateBackupArguments(final String tag, BackupTaskSpec backupSpec, final String datacenter,
                                                           final String pod, final CloudStorageSecret cloudCredentials) {
         BackupArguments backupArguments = new BackupArguments();
         backupArguments.cassandraConfigDirectory = Paths.get("/etc/cassandra/");
         backupArguments.cassandraDirectory = Paths.get("/var/lib/cassandra/");
-        backupArguments.sharedContainerPath = Paths.get("/tmp"); // elassandra can't ran as root
+        backupArguments.sharedContainerPath = Paths.get("/tmp"); // elassandra can't run as root
         backupArguments.snapshotTag = tag;
-        backupArguments.storageProvider = provider;
-        backupArguments.backupBucket = target;
+        backupArguments.storageProvider = backupSpec.getProvider();
+        backupArguments.backupBucket = backupSpec.getBucket();
+        backupArguments.keyspaceRegex = backupSpec.getKeyspaceRegex();
+        if (backupSpec.getKeyspaces() != null) {
+            backupArguments.keyspaces = new ArrayList<>(backupSpec.getKeyspaces());
+        }
         backupArguments.offlineSnapshot = false;
         backupArguments.account = "";
         backupArguments.secret = "";
-        backupArguments.clusterId = cluster;
+        backupArguments.clusterId = datacenter;
         backupArguments.backupId = pod;
         backupArguments.speed = CommonBackupArguments.Speed.LUDICROUS;
         backupArguments.cloudCredentials = cloudCredentials;
