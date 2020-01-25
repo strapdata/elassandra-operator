@@ -93,6 +93,8 @@ To create a task, you have to provide:
 * the bucket name where the backup files will be uploaded
 * the secret containing cloud storage credentials
 
+In option, it is possible to define the keyspaces to backup using a list of keyspaces or a regex.
+
 The backup name is set using the task name, this name will be used as *tag* for the SSTable snapshots.
 
 Here is an example of Task manifest.
@@ -110,6 +112,8 @@ Here is an example of Task manifest.
         provider: AZURE_BLOB
         bucket: storage-bucket-name
         secretRef: elassandra-cl1-backup-azure
+        #keyspaces: ["ksa", "ksb"]
+        #keyspaceRegex: "(ksname.*|t.*)"
 
 Once the task applied, the Operator will send a backup request to each Sidecar container to perform a snaphost and then upload all relevant files on the specified cloud storage location.
 
@@ -119,6 +123,48 @@ Once the task applied, the Operator will send a backup request to each Sidecar c
 
    kubectl get secrets elassandra-cl1 -o yaml > elassandra-cl1-credentials.yaml
    # store this file in a safe place to apply it before a restore
+
+Schedule Backups
+----------------
+
+The Elassandra operator allows to schedule backups periodically by creating a list of backup definition in the DataCenter CRD.
+
+Each backup definition must contain :
+* a *tag* field to name the backup
+* a *cron* field to define the backup period using a `cron expression <https://docs.micronaut.io/latest/api/io/micronaut/scheduling/cron/CronExpression.html>`_
+* a *backup* specification using the same information as a backup task
+
+The name of scheduled backups is generated using the backup timestamp, a hashcode computed using the backup definition and the tag. (ex : 1579948980000-6111fdd-backuptag)
+
+When a scheduled backup is triggered, the operator create a backup task using the schedule backup definition. That allows you to check easily if a backup was executed by querying the list of ElassandraTask CRD.
+
+Here is an example of scheduled backups definition in a DataCenter CRD:
+
+.. code::
+
+    scheduledBackups:
+      - tag: all
+        cron: "0 * * * * ?"
+        backupDefinition:
+          provider: AZURE_BLOB
+          bucket: test-backup
+          secretRef: test-cred-backup-azure
+      - tag: someKS
+        cron: "0 * * * * ?"
+        backupDefinition:
+          provider: AZURE_BLOB
+          bucket: test-backup
+          secretRef: test-cred-backup-azure
+          keyspaces: ["elastic_admin"]
+      - tag: regexKS
+        cron: "0 * * * * ?"
+        backupDefinition:
+          provider: AZURE_BLOB
+          bucket: test-backup
+          secretRef: test-cred-backup-azure
+          keyspaceRegex: "(elastic.*|system_a.*)"
+
+
 
 Restore your cluster
 --------------------
