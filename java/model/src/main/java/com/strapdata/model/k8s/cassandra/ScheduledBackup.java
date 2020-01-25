@@ -48,6 +48,7 @@ public class ScheduledBackup {
     public String computeTaskName() {
         return  Optional.ofNullable(tagSuffix)
                 .map(suffix ->System.currentTimeMillis() + "-" + fingerprint() + "-" + suffix)
-                .orElse(System.currentTimeMillis() + "-" + fingerprint());
+                .orElse(System.currentTimeMillis() + "-" + fingerprint())
+                .toLowerCase();
     }
 }
