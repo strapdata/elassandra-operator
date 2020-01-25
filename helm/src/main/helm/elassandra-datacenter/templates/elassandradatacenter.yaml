@@ -34,7 +34,11 @@ spec:
   env:
 {{ toYaml .Values.env | indent 4 }}
 {{- end }}
-{{- if .Values.restoreFromBackup }}
+{{- if .Values.scheduledBackups }}
+  scheduledBackups:
+{{ toYaml .Values.scheduledBackups | indent 4 }}
+{{- end }}
+{{- if .Values.scheduledBackups }}
   restoreFromBackup:
 {{ toYaml .Values.restoreFromBackup | indent 4 }}
 {{- end }}

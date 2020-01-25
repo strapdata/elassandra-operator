@@ -92,6 +92,7 @@ public class CloudDownloadUploadFactory {
 
     public static SnapshotUploader getUploader(final BackupArguments arguments) throws IOException, URISyntaxException, StorageException, ConfigurationException, InvalidKeyException {
         final String rootBackupDir = System.getenv(Constants.ENV_ROOT_BACKUP_DIR);
+        // TODO [ELE] add here the datacenter namespace
         //final String backupID, final String clusterID, final String backupBucket,
         switch (arguments.storageProvider) {
             case AWS_S3:
@@ -111,6 +112,7 @@ public class CloudDownloadUploadFactory {
 
     public static Downloader getDownloader(final RestoreArguments arguments) throws IOException, URISyntaxException, StorageException, ConfigurationException, InvalidKeyException {
         final String rootBackupDir = System.getenv(Constants.ENV_ROOT_BACKUP_DIR);
+        // TODO [ELE] add here the datacenter namespace or the ns provided by restore bean
         switch (arguments.storageProvider) {
             case AWS_S3:
                 //TODO: support encrypted backups via KMS

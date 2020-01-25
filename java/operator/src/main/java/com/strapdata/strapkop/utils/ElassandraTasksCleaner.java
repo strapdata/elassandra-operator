@@ -39,8 +39,9 @@ public class ElassandraTasksCleaner {
     @EventListener
     @Async
     void onShutdown(ServiceShutdownEvent event) {
-        this.cleanerThread = new Timer("elassandra-tasks-cleaner", true);
-        cleanerThread.cancel();
+        if (cleanerThread != null){
+            cleanerThread.cancel();
+        }
     }
 
     private class Cleaner extends TimerTask {

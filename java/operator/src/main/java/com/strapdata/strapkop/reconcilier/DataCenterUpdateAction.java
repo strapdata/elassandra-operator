@@ -14,6 +14,7 @@ import com.strapdata.model.k8s.cassandra.*;
 import com.strapdata.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
+import com.strapdata.strapkop.backup.BackupScheduler;
 import com.strapdata.strapkop.cache.CheckPointCache;
 import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.cql.*;
@@ -106,6 +107,9 @@ public class DataCenterUpdateAction {
     private final ManifestReaderFactory manifestReaderFactory;
 
     private final ElassandraNodeStatusCache elassandraNodeStatusCache;
+
+    private final BackupScheduler backupScheduler;
+
     public final Builder builder = new Builder();
 
     public DataCenterUpdateAction(final ApplicationContext context,
@@ -122,7 +126,8 @@ public class DataCenterUpdateAction {
                                   final CqlLicenseManager cqlLicenseManager,
                                   final ManifestReaderFactory factory,
                                   final OperatorConfig operatorConfig,
-                                  final CheckPointCache checkPointCache) {
+                                  final CheckPointCache checkPointCache,
+                                  final BackupScheduler backupScheduler) {
         this.context = context;
         this.coreApi = coreApi;
         this.appsApi = appsApi;
@@ -157,6 +162,8 @@ public class DataCenterUpdateAction {
         this.dataCenterLabels = OperatorLabels.datacenter(dataCenter);
 
         this.manifestReaderFactory = factory;
+
+        this.backupScheduler = backupScheduler;
     }
 
     /**
@@ -783,6 +790,9 @@ public class DataCenterUpdateAction {
                             } else {
                                 logger.warn("Cannot scale down, no more replicas in datacenter={} in namespace={}", dataCenterMetadata.getName(), dataCenterMetadata.getNamespace());
                             }
+                        } else {
+                            // DC probably reconciled
+                            scheduleBackups(zones);
                         }
                     } else {
                         logger.debug("DataCenter PARKED, do not try to scale the cluster");
@@ -801,10 +811,23 @@ public class DataCenterUpdateAction {
      * @throws ApiException
      */
     private void commitDataCenterSnapshot(Zones zones) throws ApiException {
-        if (zones.totalReplicas() == dataCenterSpec.getReplicas() && zones.isReady() && zones.hasConsistentConfiguration() &&
-                zones.first().isPresent() && zones.first().get().getDataCenterFingerPrint().isPresent()) {
+        if (reconciled(zones)) {
             checkPointCache.commitCheckPoint(new Key(dataCenterMetadata), dataCenterSpec);
         }
+    }
+
+    private void scheduleBackups(Zones zones) {
+        if (reconciled(zones)) {
+            logger.debug("Datacenter '{}' reconciled, schedule backup definitions", dataCenterMetadata.getName());
+            backupScheduler.scheduleBackups(dataCenter);
+        } else {
+            logger.debug("Datacenter '{}' isn't reconciled, backups can't be scheduled", dataCenterMetadata.getName());
+        }
+    }
+
+    private boolean reconciled(Zones zones) {
+        return zones.totalReplicas() == dataCenterSpec.getReplicas() && zones.isReady() && zones.hasConsistentConfiguration() &&
+                zones.first().isPresent() && zones.first().get().getDataCenterFingerPrint().isPresent();
     }
 
     private Completable replaceNamespacedStatefulSet(V1StatefulSet sts) throws ApiException {
@@ -1918,6 +1941,7 @@ public class DataCenterUpdateAction {
                             .name(Constants.ENV_ROOT_BACKUP_DIR)
                             .value(restoreFromBackup.getBackupDir());
                     env.add(backupDir);
+                    // TODO [ELE] add here the datacenter namespace ??
                 }
 
                 V1Container restoreInitContainer = new V1Container()

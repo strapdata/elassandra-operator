@@ -22,6 +22,29 @@ image:
   pullPolicy: Always
   pullSecrets: []
 
+scheduledBackups:
+  - tag: all
+    cron: "0 * * * * ?"
+    backupDefinition:
+      provider: AZURE_BLOB
+      bucket: test-kop-backup
+      secretRef: test-cred-backup-azure
+  - tag: someKS
+    cron: "0 * * * * ?"
+    backupDefinition:
+      provider: AZURE_BLOB
+      bucket: test-kop-backup
+      secretRef: test-cred-backup-azure
+      keyspaces: ["elastic_admin"]
+  - tag: regexKS
+    cron: "0 * * * * ?"
+    backupDefinition:
+      provider: AZURE_BLOB
+      bucket: test-kop-backup
+      secretRef: test-cred-backup-azure
+      keyspaceRegex: "(elastic.*|system_a.*)"
+
+
 #kibanaImage: localhost:32000/kibana/kibana-oss:6.2.3
 # TODO: we do not support unprivileged setup yet
 privilegedSupported: true
