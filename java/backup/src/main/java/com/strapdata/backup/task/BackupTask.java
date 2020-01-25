@@ -117,7 +117,7 @@ public class BackupTask {
             logger.debug("Filtering Keyspaces based on '{}' regex", keyspaceRegex);
 
             Pattern ksPattern = Pattern.compile(keyspaceRegex);
-            List<String> keyspacesTobackup = storageServiceMBean.getNonSystemKeyspaces()
+            List<String> keyspacesTobackup = storageServiceMBean.getKeyspaces()
                     .stream()
                     .filter(ks -> ksPattern.matcher(ks).matches())
                     .collect(Collectors.toList());

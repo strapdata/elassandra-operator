@@ -1,7 +1,9 @@
 package com.strapdata.strapkop.reconcilier;
 
 import com.google.gson.JsonSyntaxException;
+import com.strapdata.model.Key;
 import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.backup.BackupScheduler;
 import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.cache.SidecarConnectionCache;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
@@ -33,6 +35,7 @@ public class DataCenterDeleteAction {
     private final SidecarConnectionCache sidecarConnectionCache;
     private final CqlKeyspaceManager cqlKeyspaceManager;
     private final CqlRoleManager cqlRoleManager;
+    private final BackupScheduler backupScheduler;
 
     public DataCenterDeleteAction(K8sResourceUtils k8sResourceUtils,
                                   CoreV1Api coreV1Api,
@@ -41,7 +44,8 @@ public class DataCenterDeleteAction {
                                   SidecarConnectionCache sidecarConnectionCache,
                                   CqlKeyspaceManager cqlKeyspaceManager,
                                   CqlRoleManager cqlRoleManager,
-                                  @Parameter("dataCenter") DataCenter dataCenter) {
+                                  @Parameter("dataCenter") DataCenter dataCenter,
+                                  BackupScheduler backupScheduler) {
         this.k8sResourceUtils = k8sResourceUtils;
         this.coreV1Api = coreV1Api;
         this.dataCenter = dataCenter;
@@ -49,6 +53,7 @@ public class DataCenterDeleteAction {
         this.sidecarConnectionCache = sidecarConnectionCache;
         this.cqlKeyspaceManager = cqlKeyspaceManager;
         this.cqlRoleManager = cqlRoleManager;
+        this.backupScheduler = backupScheduler;
     }
     
     Completable deleteDataCenter(final CqlSessionSupplier cqlSessionSupplier) throws Exception {
@@ -56,6 +61,8 @@ public class DataCenterDeleteAction {
         return Completable.fromAction(new Action() {
             @Override
             public void run() throws Exception {
+
+                backupScheduler.cancelBackups(new Key(dataCenter.getMetadata()));
 
                 cqlKeyspaceManager.removeDatacenter(dataCenter, cqlSessionSupplier);
 

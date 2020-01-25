@@ -271,6 +271,12 @@ public class DataCenterSpec {
     @Expose
     private String datacenterGroup = null;
 
+    /**
+     * Definition of Scheduled Backups.
+     */
+    @SerializedName("scheduledBackups")
+    @Expose
+    private List<ScheduledBackup> scheduledBackups = new ArrayList<>();
 
     public String fingerprint() {
         List<Object> acc = new ArrayList<>();
@@ -279,6 +285,7 @@ public class DataCenterSpec {
         // * Reaper config
         // * Kibana config
         // * parked attribute
+        // * scheduledBackups (DC reconciliation is useless in this case, we only want to update Scheduler)
 
         acc.add(workload);
         acc.add(podsAffinityPolicy);

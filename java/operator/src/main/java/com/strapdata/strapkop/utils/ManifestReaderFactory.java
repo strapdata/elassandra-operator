@@ -41,6 +41,7 @@ public class ManifestReaderFactory {
                 }
             }
         }
+        // TODO [ELE] add here the datacenter namespace or the ns provided by restore bean
         logger.debug("Load manifest from '{}' directory.", backupDir);
         switch (restore.getProvider()) {
             case AWS_S3:
