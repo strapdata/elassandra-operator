@@ -99,6 +99,10 @@ spec:
   datacenterGroup:
 {{ toYaml .Values.datacenterGroup | indent 4 }}
 {{- end }}
+{{- if .Values.managedKeyspaces }}
+  managedKeyspaces:
+{{ toYaml .Values.managedKeyspaces | indent 4 }}
+{{- end }}
 {{- if .Values.kibana }}
   kibana:
 {{- if .Values.kibana.image }}

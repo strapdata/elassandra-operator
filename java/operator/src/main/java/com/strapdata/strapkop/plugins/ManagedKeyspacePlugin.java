@@ -40,9 +40,9 @@ public class ManagedKeyspacePlugin extends AbstractPlugin {
     @Override
     public void syncKeyspaces(final CqlKeyspaceManager cqlKeyspaceManager, final DataCenter dataCenter) {
         for(ManagedKeyspace managedKeyspace : dataCenter.getSpec().getManagedKeyspaces()) {
-            if (!Strings.isNullOrEmpty(managedKeyspace.getName())) {
-                cqlKeyspaceManager.addIfAbsent(dataCenter, managedKeyspace.getName(), () -> new CqlKeyspace()
-                        .withName(managedKeyspace.getName())
+            if (!Strings.isNullOrEmpty(managedKeyspace.getKeyspace())) {
+                cqlKeyspaceManager.addIfAbsent(dataCenter, managedKeyspace.getKeyspace(), () -> new CqlKeyspace()
+                        .withName(managedKeyspace.getKeyspace())
                         .withRf(managedKeyspace.getRf())
                 );
             }
@@ -59,7 +59,7 @@ public class ManagedKeyspacePlugin extends AbstractPlugin {
                             return Strings.isNullOrEmpty(managedKeyspace.getSecretName()) ?
                                     OperatorNames.clusterChildObjectName("%s-keyspaces", dc) : managedKeyspace.getSecretName();
                         })
-                        .withSecretKey(managedKeyspace.getSecretKey())
+                        .withSecretKey(Strings.isNullOrEmpty(managedKeyspace.getSecretKey()) ? managedKeyspace.getRole() : managedKeyspace.getSecretKey())
                         .withApplied(false)
                         .withSuperUser(managedKeyspace.getSuperuser())
                         .withLogin(managedKeyspace.getLogin())

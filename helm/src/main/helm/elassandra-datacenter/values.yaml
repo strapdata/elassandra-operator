@@ -24,6 +24,16 @@ reaper:
   image: strapdata.azurecr.io/strapdata/cassandra-reaper:1.4.7.1
   enabled: true
 
+managedKeyspaces: {}
+#  - keyspace: gravitee
+#    rf: 3
+#    role: gravitee
+#    login: true
+#    superuser: false
+#    secretKey: gravitee
+#    grantStatements:
+#      - "GRANT gravitee TO gravitee"
+
 # TODO: we do not support unprivileged setup yet
 privilegedSupported: true
 

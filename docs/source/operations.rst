@@ -397,6 +397,55 @@ This feature isn't yet managed
 Enable/Disable search
 .....................
 
+Managed Keyspaces
+.................
+
+The Elassandra operator can manage user keyspaces and roles for you. It automatically creates a keyspace and adjust the keyspace replication factor
+to the desired value or less if the datacenter does not have enough nodes. On scale up or scale down, the operator automatically adjust
+the keyspace replication factor to remain lower or equals to the number of nodes in the datacenter.
+It also create a Cassandra role and execute grant statements after the keyspace creation.
+
+To create a cassandra role, the operator retreive its password in a Kubernetes secret named ``elassandra-[cluster_name]-keyspace`` by default, with
+a secret key equals to the role name or specified by the ``secretKey`` field, as shown below. Specify a ``secretName`` to use an alternate Kubernetes secret.
+
+.. code::
+
+    kubectl create secret generic elassandra-cluster1-keyspaces -n j5qmzjvkve --from-literal=gravitee='xxxxxxx'
+
+Specify a managed keyspace in your datacenter CRD as shown below:
+
+.. code::
+
+    ...
+    managedKeyspaces:
+      - keyspace: gravitee
+        rf: 3
+        role: gravitee
+        login: true
+        superuser: false
+        secretKey: gravitee
+        grantStatements:
+          - "GRANT gravitee TO gravitee"
+
+Check you keyspace is properly managed in the datacenter status:
+
+.. code::
+
+    status:
+      block:
+        locked: false
+        reasons: []
+      cqlStatus: ESTABLISHED
+      cqlStatusMessage: Connected to cluster=[cluster1] with role=[elassandra_operator]
+        secret=[elassandra-cluster1/cassandra.elassandra_operator_password]
+      elassandraNodeStatuses:
+        elassandra-cluster1-azurenortheurope-0-0: NORMAL
+      joinedReplicas: 1
+      keyspaceManagerStatus:
+        keyspaces:
+        - _kibana
+        - gravitee
+        replicas: 1
 
 
 Upgrade Elassandra
