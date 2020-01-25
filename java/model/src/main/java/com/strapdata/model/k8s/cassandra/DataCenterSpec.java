@@ -141,6 +141,13 @@ public class DataCenterSpec {
     private Kibana kibana = new Kibana();
 
     /**
+     * ManagedKeyspace configuration.
+     */
+    @SerializedName("managedKeyspaces")
+    @Expose
+    private List<ManagedKeyspace> managedKeyspaces = new ArrayList<>();
+
+    /**
      * Attempt to run privileged configuration options for better performance
      *
      */

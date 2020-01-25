@@ -20,8 +20,12 @@ public class PluginRegistry {
 
     final List<Plugin> plugins;
 
-    public PluginRegistry(final ReaperPlugin reaperPlugin, final KibanaPlugin kibanaPlugin, final TestSuitePlugin testPlugin, final AzureDnsPlugin azureDnsPlugin) {
-        this.plugins = ImmutableList.of(reaperPlugin, kibanaPlugin, testPlugin, azureDnsPlugin);
+    public PluginRegistry(final ReaperPlugin reaperPlugin,
+                          final KibanaPlugin kibanaPlugin,
+                          final TestSuitePlugin testPlugin,
+                          final AzureDnsPlugin azureDnsPlugin,
+                          final ManagedKeyspacePlugin managedKeyspacePlugin) {
+        this.plugins = ImmutableList.of(reaperPlugin, kibanaPlugin, testPlugin, azureDnsPlugin, managedKeyspacePlugin);
     }
 
     public List<Plugin> plugins() {

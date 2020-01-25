@@ -34,24 +34,28 @@ public class CqlRole implements Cloneable {
             .withUsername("cassandra")
             .withPassword("cassandra")
             .withSuperUser(true)
+            .withLogin(true)
             .withApplied(true);
 
     public static final CqlRole CASSANDRA_ROLE = new CqlRole()
             .withUsername("cassandra")
             .withSecretKey(KEY_CASSANDRA_PASSWORD)
             .withSuperUser(true)
+            .withLogin(true)
             .withApplied(false);
 
     public static final CqlRole ADMIN_ROLE = new CqlRole()
             .withUsername("admin")
             .withSecretKey(KEY_ADMIN_PASSWORD)
             .withSuperUser(true)
+            .withLogin(true)
             .withApplied(false);
 
     public static final CqlRole STRAPKOP_ROLE = new CqlRole()
             .withUsername("elassandra_operator")
             .withSecretKey(KEY_ELASSANDRA_OPERATOR_PASSWORD)
             .withSuperUser(true)
+            .withLogin(true)
             .withApplied(false);
 
 
@@ -78,6 +82,8 @@ public class CqlRole implements Cloneable {
     String secretKey;
 
     boolean superUser;
+
+    boolean login;
 
     boolean applied;
 
@@ -134,7 +140,7 @@ public class CqlRole implements Cloneable {
                         return sessionSupplier.getSession(dataCenter);
                     })
                     .flatMap(session -> {
-                        String q = String.format(Locale.ROOT, "CREATE ROLE IF NOT EXISTS %s with SUPERUSER = %b AND LOGIN = true and PASSWORD = '%s'", username, superUser, password);
+                        String q = String.format(Locale.ROOT, "CREATE ROLE IF NOT EXISTS %s with SUPERUSER = %b AND LOGIN = %b and PASSWORD = '%s'", username, superUser, login, password);
                         logger.debug(q);
                         return Single.fromFuture(session.executeAsync(q)).map(rs -> session);
                     })
