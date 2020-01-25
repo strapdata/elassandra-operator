@@ -19,9 +19,9 @@ public class ManagedKeyspace {
     /**
      * Keyspace name
      */
-    @SerializedName("name")
+    @SerializedName("keyspace")
     @Expose
-    private String name;
+    private String keyspace;
 
     /**
      * Target replication factor
