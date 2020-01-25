@@ -113,7 +113,7 @@ public class BackupTask {
 
     private BackupArguments processKeyspaceRegex(BackupArguments backupArgs) {
         String keyspaceRegex = backupArgs.getKeyspaceRegex();
-        if (Strings.isNullOrEmpty(keyspaceRegex)) {
+        if (!Strings.isNullOrEmpty(keyspaceRegex)) {
             logger.debug("Filtering Keyspaces based on '{}' regex", keyspaceRegex);
 
             Pattern ksPattern = Pattern.compile(keyspaceRegex);
