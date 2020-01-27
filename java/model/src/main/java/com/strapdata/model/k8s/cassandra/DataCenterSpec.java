@@ -141,11 +141,11 @@ public class DataCenterSpec {
     private Kibana kibana = new Kibana();
 
     /**
-     * ManagedKeyspace configuration.
+     * Managed keyspaces map.
      */
     @SerializedName("managedKeyspaces")
     @Expose
-    private List<ManagedKeyspace> managedKeyspaces = new ArrayList<>();
+    private Set<ManagedKeyspace> managedKeyspaces = new HashSet<>();
 
     /**
      * Attempt to run privileged configuration options for better performance
@@ -293,6 +293,7 @@ public class DataCenterSpec {
         acc.add(privilegedSupported);
         acc.add(hostNetworkEnabled);
         acc.add(hostPortEnabled);
+        acc.add(managedKeyspaces);
         acc.add(nativePort);
         acc.add(storagePort);
         acc.add(sslStoragePort);
