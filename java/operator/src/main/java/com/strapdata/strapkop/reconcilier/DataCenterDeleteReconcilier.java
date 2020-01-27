@@ -4,6 +4,7 @@ import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.cql.CqlSessionHandler;
 import com.strapdata.strapkop.plugins.PluginRegistry;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
 import io.reactivex.Completable;
 import io.reactivex.functions.Action;
@@ -20,20 +21,24 @@ public class DataCenterDeleteReconcilier extends Reconcilier<DataCenter> {
     private final ApplicationContext context;
     private final PluginRegistry pluginRegistry;
     private final CqlRoleManager cqlRoleManager;
+    private final MeterRegistry meterRegistry;
 
     public DataCenterDeleteReconcilier(final ReconcilierObserver reconcilierObserver,
                                        final ApplicationContext context,
                                        final CqlRoleManager cqlRoleManager,
-                                       final PluginRegistry pluginRegistry) {
+                                       final PluginRegistry pluginRegistry,
+                                       final MeterRegistry meterRegistry) {
         super(reconcilierObserver);
         this.context = context;
         this.pluginRegistry = pluginRegistry;
         this.cqlRoleManager = cqlRoleManager;
+        this.meterRegistry = meterRegistry;
     }
     
     @Override
     public Completable reconcile(final DataCenter dataCenter) throws Exception {
         final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
+        meterRegistry.counter("datacenter.delete").increment();
         return reconcilierObserver.onReconciliationBegin()
                 .andThen(context.createBean(DataCenterDeleteAction.class, dataCenter).deleteDataCenter(cqlSessionHandler))
                 .andThen(pluginRegistry.deleteAll(dataCenter))

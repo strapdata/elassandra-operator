@@ -20,6 +20,7 @@ import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.custom.IntOrString;
 import io.kubernetes.client.models.*;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
 import io.reactivex.Completable;
 import io.reactivex.Single;
@@ -43,8 +44,9 @@ public class KibanaPlugin extends AbstractPlugin {
                         CoreV1Api coreApi,
                         AppsV1Api appsApi,
                         OperatorConfig operatorConfig,
-                        DnsConfiguration dnsConfiguration) {
-        super(context, k8sResourceUtils, authorityManager, coreApi, appsApi, operatorConfig, dnsConfiguration);
+                        DnsConfiguration dnsConfiguration,
+                        MeterRegistry meterRegistry) {
+        super(context, k8sResourceUtils, authorityManager, coreApi, appsApi, operatorConfig, dnsConfiguration, meterRegistry);
     }
 
     @Override

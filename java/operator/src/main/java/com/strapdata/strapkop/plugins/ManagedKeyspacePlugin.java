@@ -15,6 +15,7 @@ import com.strapdata.strapkop.ssl.AuthorityManager;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
 import io.reactivex.Completable;
 import org.elasticsearch.common.Strings;
@@ -33,8 +34,9 @@ public class ManagedKeyspacePlugin extends AbstractPlugin {
                                  CoreV1Api coreApi,
                                  AppsV1Api appsApi,
                                  OperatorConfig operatorConfig,
-                                 DnsConfiguration dnsConfiguration) {
-        super(context, k8sResourceUtils, authorityManager, coreApi, appsApi, operatorConfig, dnsConfiguration);
+                                 DnsConfiguration dnsConfiguration,
+                                 MeterRegistry meterRegistry) {
+        super(context, k8sResourceUtils, authorityManager, coreApi, appsApi, operatorConfig, dnsConfiguration, meterRegistry);
     }
 
     @Override

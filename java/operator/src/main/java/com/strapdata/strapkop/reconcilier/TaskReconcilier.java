@@ -19,17 +19,14 @@ import io.vavr.Tuple2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Inject;
 import java.util.Map;
 
 public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier.Action, Task>> {
 
     private static final Logger logger = LoggerFactory.getLogger(TaskReconcilier.class);
     final K8sResourceUtils k8sResourceUtils;
-    private final String taskType;
-
-    @Inject
-    private MeterRegistry meterRegistry;
+    final String taskType;
+    final MeterRegistry meterRegistry;
 
     private volatile int runningTaskCount = 0;
 
