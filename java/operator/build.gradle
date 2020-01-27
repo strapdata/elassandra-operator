@@ -103,7 +103,6 @@ dependencies {
     compile "org.glassfish.main.external:jmxremote_optional-repackaged:5.0"
 
     compile "io.micronaut:micronaut-management"
-    compile "io.micronaut.configuration:micronaut-micrometer-core"
     compile 'io.micronaut.configuration:micronaut-micrometer-registry-prometheus'
 
     compile "io.micronaut.configuration:micronaut-cassandra"
