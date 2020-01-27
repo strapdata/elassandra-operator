@@ -3,6 +3,7 @@ package com.strapdata.model.k8s.cassandra;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
 import java.util.ArrayList;
@@ -14,6 +15,7 @@ import java.util.List;
  */
 @Data
 @NoArgsConstructor
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class ManagedKeyspace {
 
     /**
@@ -21,6 +23,7 @@ public class ManagedKeyspace {
      */
     @SerializedName("keyspace")
     @Expose
+    @EqualsAndHashCode.Include
     private String keyspace;
 
     /**
