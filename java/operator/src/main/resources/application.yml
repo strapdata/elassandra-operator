@@ -17,6 +17,17 @@ micronaut:
                 step: PT1M
                 descriptions: true
 endpoints:
+    all:
+        port: 8081
+    info:
+        enabled: true
+        sensitive: false
+    env:
+        enabled: true
+        sensitive: false
+    stop:
+        enabled: true
+        sensitive: false
     metrics:
         enabled: true
         sensitive: false
@@ -29,10 +40,8 @@ endpoints:
                 enabled: true
             processor:
                 enabled: true
-
     prometheus:
         sensitive: false
-
 jackson:
     module-scan: false
 
