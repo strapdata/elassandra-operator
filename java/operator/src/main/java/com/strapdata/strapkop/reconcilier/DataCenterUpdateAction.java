@@ -32,6 +32,7 @@ import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.apis.CustomObjectsApi;
+import io.kubernetes.client.custom.IntOrString;
 import io.kubernetes.client.models.*;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Parameter;
@@ -58,6 +59,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+
+import static com.strapdata.strapkop.k8s.ServicesConstants.*;
 
 /**
  * The NodePort service has a DNS name and redirect to STS seed pods
@@ -350,7 +353,17 @@ public class DataCenterUpdateAction {
 
         return Single.zip(
                 k8sResourceUtils.createOrReplaceNamespacedService(builder.buildServiceNodes()),
-                k8sResourceUtils.createOrReplaceNamespacedService(builder.buildServiceElasticsearch()),
+                k8sResourceUtils.createOrReplaceNamespacedService(builder.buildServiceElasticsearch())
+                        .flatMap((searchService) -> {
+                            Optional<V1beta1Ingress> optIngress = builder.buildIngressElasticsearch();
+                            if (optIngress.isPresent()) {
+                                // create ElasticSearch ingress if required
+                                return k8sResourceUtils.createOrReplaceNamespacedIngress(optIngress.get());
+                            } else {
+                                // otherwise, just return the elastic service
+                                return Single.just(searchService);
+                            }
+                        }),
                 k8sResourceUtils.createOrReplaceNamespacedService(builder.buildServiceExternalNodes()),
                 (s1, s2, s3) -> builder.clusterObjectMeta(OperatorNames.clusterSecret(dataCenter))
         )
@@ -1083,9 +1096,6 @@ public class DataCenterUpdateAction {
                             + "-" + rack);
         }
 
-
-
-
         public V1Service buildServiceExternalNodes() throws ApiException {
             return new V1Service()
                     .metadata(dataCenterObjectMeta(OperatorNames.externalService(dataCenter)))
@@ -1093,7 +1103,7 @@ public class DataCenterUpdateAction {
                             .type("NodePort")
                             .addPortsItem(new V1ServicePort().name("internode").port(dataCenterSpec.getSsl() ? dataCenterSpec.getSslStoragePort() : dataCenterSpec.getStoragePort()))
                             .addPortsItem(new V1ServicePort().name("cql").port(dataCenterSpec.getNativePort()))
-                            .addPortsItem(new V1ServicePort().name("elasticsearch").port(9200))
+                            .addPortsItem(new V1ServicePort().name(ELASTICSEARCH_PORT_NAME).port(ELASTICSEARCH_PORT_VALUE))
                             .addPortsItem(new V1ServicePort().name("jmx").port(dataCenterSpec.getJmxPort()))
                             // select any available pod in the DC, which is good only if internal seed service is good !
                             .selector(ImmutableMap.of(OperatorLabels.DATACENTER, dataCenter.getSpec().getDatacenterName()))
@@ -1141,11 +1151,11 @@ public class DataCenterUpdateAction {
                     );
 
             if (dataCenterSpec.getElasticsearchEnabled()) {
-                service.getSpec().addPortsItem(new V1ServicePort().name("elasticsearch").port(9200));
+                service.getSpec().addPortsItem(new V1ServicePort().name(ELASTICSEARCH_PORT_NAME).port(ELASTICSEARCH_PORT_VALUE));
             }
 
             if (dataCenterSpec.getPrometheusEnabled()) {
-                service.getSpec().addPortsItem(new V1ServicePort().name("prometheus").port(9500));
+                service.getSpec().addPortsItem(new V1ServicePort().name(PROMETHEUS_SERVICE_NAME).port(PROMETHEUS_SERVICE_PORT));
             }
             return service;
         }
@@ -1155,9 +1165,39 @@ public class DataCenterUpdateAction {
                     .metadata(dataCenterObjectMeta(OperatorNames.elasticsearchService(dataCenter)))
                     .spec(new V1ServiceSpec()
                             .type("ClusterIP")
-                            .addPortsItem(new V1ServicePort().name("elasticsearch").port(9200))
+                            .addPortsItem(new V1ServicePort().name(ELASTICSEARCH_PORT_NAME).port(ELASTICSEARCH_PORT_VALUE))
                             .selector(dataCenterLabels)
                     );
+        }
+
+        public Optional<V1beta1Ingress> buildIngressElasticsearch() {
+            Optional<V1beta1Ingress> ingress = Optional.empty();
+            String ingressDomain = System.getenv("INGRESS_DOMAIN");
+            if (!Strings.isNullOrEmpty(ingressDomain)) {
+                String serviceName = OperatorNames.elasticsearchService(dataCenter);
+                String elasticHost = serviceName + "-" + ingressDomain.replace("${namespace}", dataCenterMetadata.getNamespace());
+                logger.info("Creating elasticsearch ingress for host={}", elasticHost);
+                V1ObjectMeta meta = dataCenterObjectMeta(serviceName);
+                ingress = Optional.of(new V1beta1Ingress()
+                        .metadata(meta)
+                        .spec(new V1beta1IngressSpec()
+                                .addRulesItem(new V1beta1IngressRule()
+                                        .host(elasticHost)
+                                        .http(new V1beta1HTTPIngressRuleValue()
+                                                .addPathsItem(new V1beta1HTTPIngressPath()
+                                                        .path("/")
+                                                        .backend(new V1beta1IngressBackend()
+                                                                .serviceName(meta.getName())
+                                                                .servicePort(new IntOrString(ELASTICSEARCH_PORT_VALUE)))
+                                                )
+                                        )
+                                )
+                                .addTlsItem(new V1beta1IngressTLS()
+                                        .addHostsItem(elasticHost)
+                                )
+                        ));
+            }
+            return ingress;
         }
 
         /**
@@ -1622,7 +1662,7 @@ public class DataCenterUpdateAction {
             final V1Container commitlogInitContainer = buildInitContainerCommitlogReplayer(rack, rackStatus.getSeedHostId());
 
             if (dataCenterSpec.getPrometheusEnabled()) {
-                cassandraContainer.addPortsItem(new V1ContainerPort().name("prometheus").containerPort(9500));
+                cassandraContainer.addPortsItem(new V1ContainerPort().name(PROMETHEUS_SERVICE_NAME).containerPort(PROMETHEUS_SERVICE_PORT));
             }
 
             final V1Container sidecarContainer = new V1Container()
@@ -1986,7 +2026,7 @@ public class DataCenterUpdateAction {
 
             // add prometheus annotations to scrap nodes
             if (dataCenterSpec.getPrometheusEnabled()) {
-                String[] annotations = new String[]{"prometheus.io/scrape", "true", "prometheus.io/port", "9500"};
+                String[] annotations = new String[]{"prometheus.io/scrape", "true", "prometheus.io/port", Integer.toString(PROMETHEUS_SERVICE_PORT)};
                 for (int i = 0; i < annotations.length; i += 2)
                     templateMetadata.putAnnotationsItem(annotations[i], annotations[i + 1]);
             }
@@ -2218,7 +2258,7 @@ public class DataCenterUpdateAction {
             addPortsItem(cassandraContainer, dataCenterSpec.getJdbPort(), "jdb", false);
 
             if (dataCenterSpec.getElasticsearchEnabled()) {
-                cassandraContainer.addPortsItem(new V1ContainerPort().name("elasticsearch").containerPort(9200));
+                cassandraContainer.addPortsItem(new V1ContainerPort().name(ELASTICSEARCH_PORT_NAME).containerPort(ELASTICSEARCH_PORT_VALUE));
                 cassandraContainer.addPortsItem(new V1ContainerPort().name("transport").containerPort(9300));
                 cassandraContainer.addEnvItem(new V1EnvVar().name("CASSANDRA_DAEMON").value("org.apache.cassandra.service.ElassandraDaemon"));
             } else {
