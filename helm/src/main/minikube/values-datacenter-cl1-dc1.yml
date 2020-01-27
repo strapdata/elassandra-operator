@@ -5,11 +5,12 @@ clusterName: Elassandra
 replicas: 1
 
 #restoreFromBackup:
-#  #backupDir: "test-ele-root-dir/backups"
-#  tag: test-ele-001
-#  provider: AZURE_BLOB
-#  bucket: test-kop-backup
-#  secretRef: test-cred-backup-azure
+  #tag: test-ele-001
+  #provider: AZURE_BLOB
+  #bucket: test-kop-backup
+  #secretRef: test-cred-backup-azure
+  #namespace: default
+  #backupDir: "test-ele-root-dir/backups"
 
 # STRICT or SLACK
 nodeAffinityPolicy: STRICT
