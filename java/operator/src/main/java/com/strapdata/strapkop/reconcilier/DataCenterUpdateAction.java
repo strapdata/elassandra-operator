@@ -1941,7 +1941,6 @@ public class DataCenterUpdateAction {
                             .name(Constants.ENV_ROOT_BACKUP_DIR)
                             .value(restoreFromBackup.getBackupDir());
                     env.add(backupDir);
-                    // TODO [ELE] add here the datacenter namespace ??
                 }
 
                 V1Container restoreInitContainer = new V1Container()
@@ -1962,7 +1961,8 @@ public class DataCenterUpdateAction {
                                 "--bs", restoreFromBackup.getProvider().name(),
                                 "-rs",
                                 "--shared-path", "/tmp", // elassandra can't run as root,
-                                "--cd", "/tmp/sidecar-config-volume" // location where the restore task can write config fragments
+                                "--cd", "/tmp/sidecar-config-volume", // location where the restore task can write config fragments
+                                "-ns", restoreFromBackup.getNamespace() // namespace of the backuped datacenter
                         ))
                         .addVolumeMountsItem(new V1VolumeMount()
                                 .name("pod-info")

@@ -16,8 +16,8 @@ public class LocalFileSnapShotUploader extends SnapshotUploader {
 
     private final Path backupRoot;
 
-    public LocalFileSnapShotUploader (final BackupArguments backupArguments, final String rootBackupDir) {
-        super(rootBackupDir, backupArguments.clusterId, backupArguments.backupId, backupArguments.backupBucket);
+    public LocalFileSnapShotUploader (final BackupArguments backupArguments, final String rootBackupDir, final String namespace) {
+        super(rootBackupDir, namespace, backupArguments.clusterId, backupArguments.backupId, backupArguments.backupBucket);
         this.backupRoot = backupArguments.fileBackupDirectory;
     }
 

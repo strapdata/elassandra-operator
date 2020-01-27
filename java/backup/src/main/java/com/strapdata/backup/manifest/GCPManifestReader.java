@@ -22,8 +22,11 @@ public class GCPManifestReader extends ManifestReader {
 
     private final Storage storage;
 
-    public GCPManifestReader(Storage storage, final String rootBackupDir, String restoreFromClusterId, String restoreFromBackupBucket) {
-        super(rootBackupDir, restoreFromClusterId, restoreFromBackupBucket);
+    public GCPManifestReader(Storage storage, final String rootBackupDir,
+                             final String restoreFromNamespace,
+                             final String restoreFromClusterId,
+                             final String restoreFromBackupBucket) {
+        super(rootBackupDir, restoreFromNamespace, restoreFromClusterId, restoreFromBackupBucket);
         this.storage = storage;
     }
 

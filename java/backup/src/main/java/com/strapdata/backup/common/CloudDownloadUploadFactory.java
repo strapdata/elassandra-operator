@@ -21,6 +21,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.security.InvalidKeyException;
+import java.util.Optional;
 
 public class CloudDownloadUploadFactory {
 
@@ -92,39 +93,38 @@ public class CloudDownloadUploadFactory {
 
     public static SnapshotUploader getUploader(final BackupArguments arguments) throws IOException, URISyntaxException, StorageException, ConfigurationException, InvalidKeyException {
         final String rootBackupDir = System.getenv(Constants.ENV_ROOT_BACKUP_DIR);
-        // TODO [ELE] add here the datacenter namespace
+        final String namespace = Optional.ofNullable(System.getenv(Constants.ENV_NAMESPACE)).orElse("default");
         //final String backupID, final String clusterID, final String backupBucket,
         switch (arguments.storageProvider) {
             case AWS_S3:
                 //TODO: support encrypted backups via KMS
                 //AWS client set to auto detect credentials
-                return new AWSSnapshotUploader(getTransferManager(arguments.cloudCredentials), arguments, rootBackupDir);
+                return new AWSSnapshotUploader(getTransferManager(arguments.cloudCredentials), arguments, rootBackupDir, namespace);
             case AZURE_BLOB:
                 //TODO: use SAS token?
-                return new AzureSnapshotUploader(getCloudBlobClient(arguments.cloudCredentials), arguments, rootBackupDir);
+                return new AzureSnapshotUploader(getCloudBlobClient(arguments.cloudCredentials), arguments, rootBackupDir, namespace);
             case GCP_BLOB:
-                return new GCPSnapshotUploader(getGCPStorageClient(arguments.cloudCredentials), arguments, rootBackupDir);
+                return new GCPSnapshotUploader(getGCPStorageClient(arguments.cloudCredentials), arguments, rootBackupDir, namespace);
             case FILE:
-                return new LocalFileSnapShotUploader(arguments, rootBackupDir);
+                return new LocalFileSnapShotUploader(arguments, rootBackupDir, namespace);
         }
         throw new ConfigurationException("Could not create Snapshot Uploader");
     }
 
     public static Downloader getDownloader(final RestoreArguments arguments) throws IOException, URISyntaxException, StorageException, ConfigurationException, InvalidKeyException {
         final String rootBackupDir = System.getenv(Constants.ENV_ROOT_BACKUP_DIR);
-        // TODO [ELE] add here the datacenter namespace or the ns provided by restore bean
         switch (arguments.storageProvider) {
             case AWS_S3:
                 //TODO: support encrypted backups via KMS
                 //AWS client set to auto detect credentials
-                return new AWSDownloader(getTransferManager(arguments.cloudCredentials), arguments, rootBackupDir);
+                return new AWSDownloader(getTransferManager(arguments.cloudCredentials), arguments, rootBackupDir, arguments.namespace);
             case AZURE_BLOB:
                 //TODO: use SAS token?
-                return new AzureDownloader(getCloudBlobClient(arguments.cloudCredentials), arguments, rootBackupDir);
+                return new AzureDownloader(getCloudBlobClient(arguments.cloudCredentials), arguments, rootBackupDir, arguments.namespace);
             case GCP_BLOB:
-                return new GCPDownloader(getGCPStorageClient(arguments.cloudCredentials), arguments, rootBackupDir);
+                return new GCPDownloader(getGCPStorageClient(arguments.cloudCredentials), arguments, rootBackupDir, arguments.namespace);
             case FILE:
-                return new LocalFileDownloader(arguments, rootBackupDir);
+                return new LocalFileDownloader(arguments, rootBackupDir, arguments.namespace);
         }
         throw new ConfigurationException("Could not create Snapshot Uploader");
     }

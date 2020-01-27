@@ -41,15 +41,15 @@ public class ManifestReaderFactory {
                 }
             }
         }
-        // TODO [ELE] add here the datacenter namespace or the ns provided by restore bean
+
         logger.debug("Load manifest from '{}' directory.", backupDir);
         switch (restore.getProvider()) {
             case AWS_S3:
-                return new AWSManifestReader(getTransferManager(secret), backupDir, operatorDCName, restore.getBucket());
+                return new AWSManifestReader(getTransferManager(secret), backupDir, restore.getNamespace(), operatorDCName, restore.getBucket());
             case AZURE_BLOB:
-                return new AzureManifestReader(getCloudBlobClient(secret), backupDir, operatorDCName, restore.getBucket());
+                return new AzureManifestReader(getCloudBlobClient(secret), backupDir, restore.getNamespace(), operatorDCName, restore.getBucket());
             case GCP_BLOB:
-                return new GCPManifestReader(getGCPStorageClient(secret), backupDir, operatorDCName, restore.getBucket());
+                return new GCPManifestReader(getGCPStorageClient(secret), backupDir, restore.getNamespace(), operatorDCName, restore.getBucket());
             default:
         }
         throw new ConfigurationException("Could not create Manifest Reader");

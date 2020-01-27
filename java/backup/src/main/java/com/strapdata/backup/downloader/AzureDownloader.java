@@ -26,8 +26,9 @@ public class AzureDownloader extends Downloader {
 
     public AzureDownloader(final CloudBlobClient cloudBlobClient,
                                final RestoreArguments arguments,
-                           final String rootBackupDir) throws StorageException, URISyntaxException {
-        super(rootBackupDir, arguments);
+                           final String rootBackupDir,
+                           final String namespace) throws StorageException, URISyntaxException {
+        super(rootBackupDir, namespace, arguments);
         this.blobContainer = cloudBlobClient.getContainerReference(restoreFromBackupBucket);
     }
     

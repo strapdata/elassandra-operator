@@ -7,8 +7,8 @@ import java.io.InputStream;
 import java.nio.file.Path;
 
 public abstract class SnapshotUploader extends StorageInteractor implements AutoCloseable {
-    public SnapshotUploader(String rootBackupDir, String restoreFromClusterId, String restoreFromNodeId, String restoreFromBackupBucket) {
-        super(rootBackupDir, restoreFromClusterId, restoreFromNodeId, restoreFromBackupBucket);
+    public SnapshotUploader(String rootBackupDir, String restoreFromNamespace, String restoreFromClusterId, String restoreFromNodeId, String restoreFromBackupBucket) {
+        super(rootBackupDir, restoreFromNamespace, restoreFromClusterId, restoreFromNodeId, restoreFromBackupBucket);
     }
 
     public abstract RemoteObjectReference objectKeyToRemoteReference(final Path objectKey) throws Exception;

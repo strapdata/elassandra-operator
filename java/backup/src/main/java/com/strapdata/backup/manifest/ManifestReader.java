@@ -9,8 +9,8 @@ import java.nio.file.Paths;
 public abstract class ManifestReader extends StorageInteractor {
     protected static final String NOMANIFEST = "#noman#";
 
-    public ManifestReader(String rootBackupDir, String restoreFromClusterId, String restoreFromBackupBucket) {
-        super(rootBackupDir, restoreFromClusterId, null, restoreFromBackupBucket);
+    public ManifestReader(String rootBackupDir, String restoreFromNamespace, String restoreFromClusterId, String restoreFromBackupBucket) {
+        super(rootBackupDir, restoreFromNamespace, restoreFromClusterId, null, restoreFromBackupBucket);
     }
 
     @Override

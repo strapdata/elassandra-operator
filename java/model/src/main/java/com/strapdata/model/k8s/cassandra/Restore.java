@@ -18,4 +18,8 @@ public class Restore extends BackupTaskSpec {
     @SerializedName("backupDir")
     @Expose
     private String backupDir;
+
+    @SerializedName("namespace")
+    @Expose
+    private String namespace;
 }
