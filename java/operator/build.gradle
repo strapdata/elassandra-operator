@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'application'
     id 'com.google.cloud.tools.jib'
+    id "com.gorylenko.gradle-git-properties"
     id 'org.hidetake.swagger.generator' version '2.18.1'
     id "de.undercouch.download" version "4.0.2"
 }
