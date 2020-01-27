@@ -83,7 +83,7 @@ Backups your cluster
 --------------------
 
 The Elassandra Operator allows you to trigger a backup of your cluster by creating a backup task though the Task CRD.
-Currently, the Elassandra operator manage a single backup mode by preserving the SSTable of the Elassandra nodes after a Snapshot.
+Currently, the Elassandra operator manages a single backup mode by preserving the SSTable of the Elassandra nodes after a Snapshot.
 
 To create a task, you have to provide:
 
@@ -134,9 +134,9 @@ Each backup definition must contain :
 * a *cron* field to define the backup period using a `cron expression <https://docs.micronaut.io/latest/api/io/micronaut/scheduling/cron/CronExpression.html>`_
 * a *backup* specification using the same information as a backup task
 
-The name of scheduled backups is generated using the backup timestamp, a hashcode computed using the backup definition and the tag. (ex : 1579948980000-6111fdd-backuptag)
+The name of scheduled backups is generated using the execution timestamp, a hashcode computed using the backup definition and the tag. (ex : 1579948980000-6111fdd-backuptag)
 
-When a scheduled backup is triggered, the operator create a backup task using the schedule backup definition. That allows you to check easily if a backup was executed by querying the list of ElassandraTask CRD.
+When a scheduled backup is triggered, the operator creates a backup task using the schedule backup definition. That allows you to check easily if a backup was executed by querying the list of ElassandraTask CRD.
 
 Here is an example of scheduled backups definition in a DataCenter CRD:
 
@@ -199,7 +199,7 @@ Follow theses steps to restore an elassandra datacenter on a new Kubernetes clus
    kubectl apply -f elassandra-cl1-credentials.yaml
    kubectal get elassandra-cl1
 
-* Apply the DataCenter CRD you want to restore with the 'restoreFromBackup' entry containing the name of the snapshot tag, the cloud provider and the bucket.
+* Apply the DataCenter CRD you want to restore with the 'restoreFromBackup' entry containing the name of the snapshot tag, the cloud provider, the namespace of the datacenter to restore and the bucket.
 
 .. code-block:: bash
 
@@ -212,9 +212,13 @@ Follow theses steps to restore an elassandra datacenter on a new Kubernetes clus
      provider: "AZURE_BLOB"
      bucket: "storage-bucket-name"
      secretRef: "elassandra-cl1-backup-azure"
+     namespace: default
 
    EOF
    helm install --name cl1-dc1 -f datacenter-values.yaml elassandra-datacenter-0.2.0.tgz
+
+.. note::
+   The namespace initialized in the 'restoreFromBackup' section must be the namespace where the backed datacenter up was deployed.
 
 .. Restore with different cluster configuration
 .. .............................................
