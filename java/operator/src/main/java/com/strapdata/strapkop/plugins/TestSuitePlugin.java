@@ -17,6 +17,7 @@ import com.strapdata.strapkop.ssl.AuthorityManager;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
 import io.reactivex.Completable;
 import org.slf4j.Logger;
@@ -41,8 +42,9 @@ public class TestSuitePlugin extends AbstractPlugin implements TestSuiteHandler 
                            CoreV1Api coreApi,
                            AppsV1Api appsApi,
                            OperatorConfig config,
-                           DnsConfiguration dnsConfiguration) {
-        super(context, k8sResourceUtils, authorityManager, coreApi, appsApi, config, dnsConfiguration);
+                           DnsConfiguration dnsConfiguration,
+                           MeterRegistry meterRegistry) {
+        super(context, k8sResourceUtils, authorityManager, coreApi, appsApi, config, dnsConfiguration, meterRegistry);
     }
 
     public TestSuiteExecutor getTestSuite(Platform platform, String testSuiteClass) {

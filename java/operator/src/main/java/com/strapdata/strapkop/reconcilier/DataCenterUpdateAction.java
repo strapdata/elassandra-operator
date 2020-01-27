@@ -36,6 +36,7 @@ import io.kubernetes.client.apis.CustomObjectsApi;
 import io.kubernetes.client.custom.IntOrString;
 import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.models.*;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
@@ -110,6 +111,8 @@ public class DataCenterUpdateAction {
 
     private final OperatorConfig operatorConfig;
 
+    private final MeterRegistry meterRegistry;
+
     private final ManifestReaderFactory manifestReaderFactory;
 
     private final ElassandraNodeStatusCache elassandraNodeStatusCache;
@@ -133,7 +136,8 @@ public class DataCenterUpdateAction {
                                   final ManifestReaderFactory factory,
                                   final OperatorConfig operatorConfig,
                                   final CheckPointCache checkPointCache,
-                                  final BackupScheduler backupScheduler) {
+                                  final BackupScheduler backupScheduler,
+                                  final MeterRegistry meterRegistry) {
         this.context = context;
         this.coreApi = coreApi;
         this.appsApi = appsApi;
@@ -166,10 +170,9 @@ public class DataCenterUpdateAction {
         }
 
         this.dataCenterLabels = OperatorLabels.datacenter(dataCenter);
-
         this.manifestReaderFactory = factory;
-
         this.backupScheduler = backupScheduler;
+        this.meterRegistry = meterRegistry;
     }
 
     /**
@@ -349,8 +352,10 @@ public class DataCenterUpdateAction {
      */
     public Completable reconcileDataCenter() throws Exception {
         logger.info("Reconciling DataCenter {} in namespace={}, phase={}", dataCenterMetadata.getName(), dataCenterMetadata.getNamespace(), dataCenterStatus.getPhase());
+        meterRegistry.counter("datacenter.reconciliation").increment();
 
         if (dataCenterSpec.getReplicas() <= 0) {
+            meterRegistry.counter("datacenter.reconciliation.error").increment();
             throw new StrapkopException(String.format("dc=%s has an invalid number of replicas", dataCenterMetadata.getName()));
         }
 

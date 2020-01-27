@@ -14,6 +14,7 @@ import com.strapdata.strapkop.k8s.OperatorLabels;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
 import io.reactivex.Completable;
@@ -36,6 +37,7 @@ public class DataCenterDeleteAction {
     private final CqlKeyspaceManager cqlKeyspaceManager;
     private final CqlRoleManager cqlRoleManager;
     private final BackupScheduler backupScheduler;
+    private final MeterRegistry meterRegistry;
 
     public DataCenterDeleteAction(K8sResourceUtils k8sResourceUtils,
                                   CoreV1Api coreV1Api,
@@ -45,7 +47,8 @@ public class DataCenterDeleteAction {
                                   CqlKeyspaceManager cqlKeyspaceManager,
                                   CqlRoleManager cqlRoleManager,
                                   @Parameter("dataCenter") DataCenter dataCenter,
-                                  BackupScheduler backupScheduler) {
+                                  BackupScheduler backupScheduler,
+                                  final MeterRegistry meterRegistry) {
         this.k8sResourceUtils = k8sResourceUtils;
         this.coreV1Api = coreV1Api;
         this.dataCenter = dataCenter;
@@ -54,6 +57,7 @@ public class DataCenterDeleteAction {
         this.cqlKeyspaceManager = cqlKeyspaceManager;
         this.cqlRoleManager = cqlRoleManager;
         this.backupScheduler = backupScheduler;
+        this.meterRegistry = meterRegistry;
     }
     
     Completable deleteDataCenter(final CqlSessionSupplier cqlSessionSupplier) throws Exception {
