@@ -47,4 +47,7 @@ public class RestoreArguments extends BaseArguments {
     @Option(name="-ast", aliases = "--azure-sas-token", metaVar = "token", usage = "Azure SAS token granting access to the Storage Account container to download from.")
     @Nullable
     public String azureSasToken;
+
+    @Option(name = "-ns", aliases = {"--restore-namespace"}, usage = "Namespace of the backup to restore.")
+    public String namespace;
 }

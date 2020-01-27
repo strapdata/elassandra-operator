@@ -26,8 +26,10 @@ public class GCPDownloader extends Downloader {
     private final Storage storage;
 
     public GCPDownloader(final Storage storage,
-                         final RestoreArguments arguments, final String rootBackupDir) {
-        super(rootBackupDir, arguments);
+                         final RestoreArguments arguments,
+                         final String rootBackupDir,
+                         final String namespace) {
+        super(rootBackupDir, namespace, arguments);
         this.storage = storage;
 
     }

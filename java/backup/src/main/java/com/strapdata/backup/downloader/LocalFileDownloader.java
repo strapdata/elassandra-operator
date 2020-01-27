@@ -16,8 +16,8 @@ import java.util.stream.Collectors;
 public class LocalFileDownloader extends Downloader {
     private final Path sourceDirectory;
 
-    public LocalFileDownloader(final RestoreArguments arguments, final String rootBackupDir) {
-        super(rootBackupDir, arguments);
+    public LocalFileDownloader(final RestoreArguments arguments, final String rootBackupDir, final String namespace) {
+        super(rootBackupDir, namespace, arguments);
         this.sourceDirectory = arguments.fileBackupDirectory;
     }
 

@@ -22,8 +22,11 @@ public class AWSManifestReader extends ManifestReader {
     private final AmazonS3 amazonS3;
     private final TransferManager transferManager;
 
-    public AWSManifestReader(final TransferManager transferManager, final String rootBackupDir, String restoreFromClusterId, String restoreFromBackupBucket) {
-        super(rootBackupDir, restoreFromClusterId, restoreFromBackupBucket);
+    public AWSManifestReader(final TransferManager transferManager, final String rootBackupDir,
+                             final String restoreFromNamespace,
+                             final String restoreFromClusterId,
+                             final String restoreFromBackupBucket) {
+        super(rootBackupDir, restoreFromNamespace, restoreFromClusterId, restoreFromBackupBucket);
         this.amazonS3 = transferManager.getAmazonS3Client();
         this.transferManager = transferManager;
     }

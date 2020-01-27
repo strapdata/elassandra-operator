@@ -27,8 +27,8 @@ public class AWSDownloader extends Downloader {
     private final AmazonS3 amazonS3;
     private final TransferManager transferManager;
 
-    public AWSDownloader(final TransferManager transferManager, final RestoreArguments arguments, final String rootBackupDir) {
-        super(rootBackupDir, arguments);
+    public AWSDownloader(final TransferManager transferManager, final RestoreArguments arguments, final String rootBackupDir, final String namespace) {
+        super(rootBackupDir, namespace, arguments);
         this.amazonS3 = transferManager.getAmazonS3Client();
         this.transferManager = transferManager;
     }

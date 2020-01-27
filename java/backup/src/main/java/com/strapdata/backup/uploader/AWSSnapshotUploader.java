@@ -30,8 +30,9 @@ public class AWSSnapshotUploader extends SnapshotUploader {
 
     public AWSSnapshotUploader(final TransferManager transferManager,
                                final BackupArguments arguments,
-                               final String rootBackupDir) {
-        super(rootBackupDir, arguments.clusterId, arguments.backupId, arguments.backupBucket);
+                               final String rootBackupDir,
+                               final String namespace) {
+        super(rootBackupDir, namespace, arguments.clusterId, arguments.backupId, arguments.backupBucket);
 
         this.transferManager = transferManager;
         this.kmsId = Optional.absent();

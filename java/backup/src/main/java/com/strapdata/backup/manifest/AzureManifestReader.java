@@ -21,9 +21,13 @@ public class AzureManifestReader extends ManifestReader {
 
     private final CloudBlobContainer blobContainer;
 
-    public AzureManifestReader(final CloudBlobClient cloudBlobClient, final String rootBackupDir, String restoreFromClusterId, String restoreFromBackupBucket)
+    public AzureManifestReader(final CloudBlobClient cloudBlobClient,
+                               final String rootBackupDir,
+                               final String restoreFromNamespace,
+                               final String restoreFromClusterId,
+                               final String restoreFromBackupBucket)
             throws StorageException, URISyntaxException {
-        super(rootBackupDir, restoreFromClusterId, restoreFromBackupBucket);
+        super(rootBackupDir, restoreFromNamespace, restoreFromClusterId, restoreFromBackupBucket);
         this.blobContainer = cloudBlobClient.getContainerReference(restoreFromBackupBucket);
     }
 

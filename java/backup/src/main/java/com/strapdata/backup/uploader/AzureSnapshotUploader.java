@@ -27,8 +27,9 @@ public class AzureSnapshotUploader extends SnapshotUploader {
 
     public AzureSnapshotUploader(final CloudBlobClient cloudBlobClient,
                                  final BackupArguments arguments,
-                                 final String rootBackupDir) throws URISyntaxException, StorageException {
-        super(rootBackupDir, arguments.clusterId, arguments.backupId, arguments.backupBucket);
+                                 final String rootBackupDir,
+                                 final String namespace) throws URISyntaxException, StorageException {
+        super(rootBackupDir, namespace, arguments.clusterId, arguments.backupId, arguments.backupBucket);
 
         //Currently just use clusterId (name) as container reference
         this.blobContainer = cloudBlobClient.getContainerReference(restoreFromBackupBucket);

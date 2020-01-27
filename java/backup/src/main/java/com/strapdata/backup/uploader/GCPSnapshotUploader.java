@@ -26,8 +26,9 @@ public class GCPSnapshotUploader extends SnapshotUploader{
     @Inject
     public GCPSnapshotUploader(final Storage storage,
                                final BackupArguments arguments,
-                               final String rootBackupDir) {
-        super(rootBackupDir, arguments.clusterId, arguments.backupId, arguments.backupBucket);
+                               final String rootBackupDir,
+                               final String namespace) {
+        super(rootBackupDir, namespace, arguments.clusterId, arguments.backupId, arguments.backupBucket);
         this.storage = storage;
 
     }
