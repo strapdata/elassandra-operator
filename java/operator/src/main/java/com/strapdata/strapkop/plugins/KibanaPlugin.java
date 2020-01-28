@@ -68,6 +68,7 @@ public class KibanaPlugin extends AbstractPlugin {
                         .withSecretNameProvider( dc -> OperatorNames.clusterChildObjectName("%s-"+kibana.role(), dc))
                         .withApplied(false)
                         .withSuperUser(true)
+                        .withLogin(true)
                         .withGrantStatements(
                                 ImmutableList.of(
                                         String.format(Locale.ROOT,"GRANT ALL PERMISSIONS ON KEYSPACE \"%s\" TO %s", kibana.keyspace(), kibana.role()),

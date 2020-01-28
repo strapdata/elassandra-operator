@@ -72,6 +72,7 @@ public class ReaperPlugin extends AbstractPlugin {
             .withUsername("reaper")
             .withSecretKey(DataCenterUpdateAction.KEY_REAPER_PASSWORD)
             .withSuperUser(false)
+            .withLogin(true)
             .withApplied(false)
             .withGrantStatements(ImmutableList.of("GRANT ALL PERMISSIONS ON KEYSPACE reaper_db TO reaper"))
             .withPostCreateHandler(ReaperPlugin::postCreateReaper);
