@@ -27,6 +27,11 @@ spec:
   {{- end }}
   {{- end }}
   computeJvmMemorySettings:  {{ default "true" .Values.computeJvmMemorySettings }}
+  {{- if .Values.appServiceAccount }}
+  appServiceAccount: {{ .Values.appServiceAccount  }}
+  {{ else }}
+  appServiceAccount: {{ template "elassandra.serviceAccount" . }}
+  {{- end }}
   resources:
 {{ toYaml .Values.resources | indent 4 }}
   dataVolumeClaim:

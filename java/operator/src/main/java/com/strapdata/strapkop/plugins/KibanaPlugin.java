@@ -166,6 +166,7 @@ public class KibanaPlugin extends AbstractPlugin {
         final V1Container container = new V1Container();
 
         final V1PodSpec podSpec = new V1PodSpec()
+                .serviceAccountName(dataCenterSpec.getAppServiceAccount())
                 .addContainersItem(container);
 
         final V1Deployment deployment = new V1Deployment()
