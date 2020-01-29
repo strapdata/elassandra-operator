@@ -31,6 +31,7 @@ COPY cassandra /usr/sbin/cassandra
 COPY cassandra.in.sh /usr/share/cassandra/
 COPY nodetool /usr/bin/
 COPY 001-cassandra-hostid.sh /etc/cassandra/cassandra-env.sh.d/
+COPY jvm.options /etc/cassandra/
 
 # this file is sourced from the entrypoint.sh
 COPY systune.sh /
