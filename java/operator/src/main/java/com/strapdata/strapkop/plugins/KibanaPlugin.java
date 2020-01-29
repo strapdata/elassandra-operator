@@ -187,9 +187,13 @@ public class KibanaPlugin extends AbstractPlugin {
             }
         }
 
+        final String tag = dataCenterSpec.getElassandraImage().substring(dataCenterSpec.getElassandraImage().lastIndexOf(":") + 1 );
+        final int indexOfMinorRelease = tag.lastIndexOf(".");
+        final String elasticTag = tag.substring(0, indexOfMinorRelease == -1 ? tag.length() : indexOfMinorRelease);
+
         container
                 .name("kibana")
-                .image(dataCenter.getSpec().getKibana().getImage())
+                .image(dataCenter.getSpec().getKibana().getImage().replace("${apply_elastic_tag}", elasticTag))
                 .terminationMessagePolicy("FallbackToLogsOnError")
                 .addPortsItem(new V1ContainerPort()
                         .name("kibana")

@@ -10,12 +10,12 @@ nodeAffinityPolicy: STRICT
 image:
   elassandraRepository: strapdata.azurecr.io/strapdata/elassandra-node-dev
   sidecarRepository: strapdata.azurecr.io/strapdata/elassandra-sidecar-dev
-  tag: 6.2.3.22
+  tag: 6.8.4.1
   pullPolicy: Always
   pullSecrets: []
 
 kibana:
-  image: docker.elastic.co/kibana/kibana-oss:6.8.4
+  image: "docker.elastic.co/kibana/kibana-oss:${apply_elastic_tag}"
   spaces:
     - name: ""
       keyspaces: []

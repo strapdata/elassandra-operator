@@ -82,13 +82,6 @@ jmxPort: 7199
 jdbPort: 4242
 remoteSeeds: []
 
-kibana:
-  image: docker.elastic.co/kibana/kibana-oss:6.2.3
-  spaces:
-    - name: ""
-      keyspaces: []
-
-
 # Override some config files in /etc/cassandra
 configs:
   logback.xml: |-
