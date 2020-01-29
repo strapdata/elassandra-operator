@@ -1747,6 +1747,7 @@ public class DataCenterUpdateAction {
 
             final V1PodSpec podSpec = new V1PodSpec()
                     .securityContext(new V1PodSecurityContext().fsGroup(CASSANDRA_GROUP_ID))
+                    .serviceAccountName(dataCenterSpec.getAppServiceAccount())
                     .hostNetwork(dataCenterSpec.getHostNetworkEnabled())
                     .addInitContainersItem(buildInitContainerVmMaxMapCount())
                     .addContainersItem(cassandraContainer)

@@ -172,6 +172,7 @@ public class ReaperPlugin extends AbstractPlugin {
         }
 
         final V1PodSpec podSpec = new V1PodSpec()
+                .serviceAccountName(dataCenterSpec.getAppServiceAccount())
                 .addContainersItem(container);
 
         if (dataCenterSpec.getImagePullSecrets() != null) {

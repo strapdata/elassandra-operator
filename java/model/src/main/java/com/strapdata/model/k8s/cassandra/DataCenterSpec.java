@@ -72,6 +72,12 @@ public class DataCenterSpec {
     private List<java.lang.String> imagePullSecrets;
 
     /**
+     * ServiceAccount used by the operator to deploy pods (Elassandra, Reaper, kibana...)
+     */
+    @SerializedName("appServiceAccount")
+    @Expose
+    private String appServiceAccount;
+    /**
      * List of environment variables to inject in the Cassandra & Sidecar container.
      *
      */
