@@ -18,7 +18,7 @@ workload: "READ"
 image:
   elassandraRepository: localhost:32000/strapdata/elassandra-node-dev
   sidecarRepository: localhost:32000/strapdata/elassandra-sidecar-dev
-  tag: latest
+  tag: 6.8.4.1
   pullPolicy: Always
   pullSecrets: []
 
@@ -118,8 +118,6 @@ enterprise:
 #data:
 #  service_key.json: "XXXXXXXXX"
 
-
-
 # Cassandra reaper
 reaper:
   image: localhost:32000/strapdata/cassandra-reaper
@@ -146,10 +144,10 @@ jdbPort: 4242
 remoteSeeds: []
 
 kibana:
+  image: docker.elastic.co/kibana/kibana-oss:6.8.4
   spaces:
     - name: ""
       keyspaces: []
-
 
 # Override some config files in /etc/cassandra
 configs:

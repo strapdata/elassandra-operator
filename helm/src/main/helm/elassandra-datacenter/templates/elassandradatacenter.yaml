@@ -26,6 +26,7 @@ spec:
     - {{ $pullSecret }}
   {{- end }}
   {{- end }}
+  computeJvmMemorySettings:  {{ default "true" .Values.computeJvmMemorySettings }}
   resources:
 {{ toYaml .Values.resources | indent 4 }}
   dataVolumeClaim:
