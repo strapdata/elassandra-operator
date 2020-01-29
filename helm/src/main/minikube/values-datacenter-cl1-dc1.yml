@@ -130,7 +130,6 @@ remoteSeeds: []
 kibanaSpaces:
   - name: ""
 
-
 # Override some config files in /etc/cassandra
 configs:
   logback.xml: |-
