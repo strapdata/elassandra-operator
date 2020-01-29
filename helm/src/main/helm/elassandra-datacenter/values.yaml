@@ -15,7 +15,7 @@ image:
   pullSecrets: []
 
 kibana:
-  image: docker.elastic.co/kibana/kibana-oss:6.2.3
+  image: docker.elastic.co/kibana/kibana-oss:6.8.4
   spaces:
     - name: ""
       keyspaces: []
@@ -40,6 +40,7 @@ privilegedSupported: true
 # PVC delete policy, KEEP_PVC or DELETE_PVC
 decommissionPolicy: "DELETE_PVC"
 
+computeJvmMemorySettings: true
 resources:
   requests:
     cpu: 500m

@@ -28,11 +28,13 @@ import com.strapdata.strapkop.ssl.utils.X509CertificateAndPrivateKey;
 import com.strapdata.strapkop.utils.CloudStorageSecretsKeys;
 import com.strapdata.strapkop.utils.DnsUpdateSecretsKeys;
 import com.strapdata.strapkop.utils.ManifestReaderFactory;
+import com.strapdata.strapkop.utils.QuantityConverter;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.apis.CustomObjectsApi;
 import io.kubernetes.client.custom.IntOrString;
+import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.models.*;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Parameter;
@@ -52,6 +54,7 @@ import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.security.GeneralSecurityException;
 import java.util.*;
@@ -377,11 +380,11 @@ public class DataCenterUpdateAction {
                     passwords.put(KEY_SHARED_SECRET, "aaa.shared_secret: " + UUID.randomUUID().toString());
                     passwords.put(KEY_REAPER_PASSWORD, UUID.randomUUID().toString());
                     return k8sResourceUtils.readOrCreateNamespacedSecret(clusterSecretMeta, () -> {
-                                V1Secret secret = new V1Secret().metadata(clusterSecretMeta);
-                                for(Map.Entry<String,String> entry : passwords.entrySet())
-                                    secret.putStringDataItem(entry.getKey(), entry.getValue());
-                                return secret;
-                            });
+                        V1Secret secret = new V1Secret().metadata(clusterSecretMeta);
+                        for(Map.Entry<String,String> entry : passwords.entrySet())
+                            secret.putStringDataItem(entry.getKey(), entry.getValue());
+                        return secret;
+                    });
                 })
                 .map(s -> {
                     Map<String, String> passwords = s.getData().entrySet().stream().collect(Collectors.toMap(e -> e.getKey(), e -> new String(e.getValue())));
@@ -492,7 +495,7 @@ public class DataCenterUpdateAction {
                                         V1StatefulSet sts = movingZone.getSts().get();
                                         // decrease the number of replicas only once... by testing the STS status
                                         if (sts.getStatus().getUpdatedReplicas() == sts.getStatus().getCurrentReplicas()
-                                        && sts.getStatus().getUpdatedReplicas() == sts.getStatus().getReadyReplicas()) {
+                                                && sts.getStatus().getUpdatedReplicas() == sts.getStatus().getReadyReplicas()) {
 
                                             sts.getSpec().setReplicas(sts.getSpec().getReplicas() - 1);
                                             logger.info("Scaling down sts={} to {}, removing pod={}",
@@ -1326,11 +1329,6 @@ public class DataCenterUpdateAction {
 
             // prometheus support (see prometheus annotations)
             if (dataCenterSpec.getPrometheusEnabled()) {
-            /*
-            configMapVolumeAddFile(configMap, volumeSource, "cassandra-env.sh.d/001-cassandra-exporter.sh",
-                "JVM_OPTS=\"${JVM_OPTS} -javaagent:${CASSANDRA_HOME}/agents/cassandra-exporter-agent.jar=@${CASSANDRA_CONF}/cassandra-exporter.conf\"");
-            */
-
                 // jmx-promtheus exporter
                 // TODO: use version less symlink to avoid issues when upgrading the image
                 configMapVolumeMountBuilder.addFile( "cassandra-env.sh.d/001-cassandra-exporter.sh",
@@ -1383,75 +1381,71 @@ public class DataCenterUpdateAction {
             //);
 
             // heap size and GC settings
-        /*
-        {
-            final long memoryLimit = dataCenterSpec.getResources().getLimits().get("memory").getNumber().longValue();
-            if (memoryLimit < 3.5 * GB) {
-                throw new IllegalArgumentException("Cannot deploy elassandra with less than 3.5Gb Memory limits, please increase your kubernetes memory limits");
-            }
+            if (dataCenterSpec.isComputeJvmMemorySettings() && dataCenterSpec.getResources() != null) {
+                Map<String, Quantity> resourceQuantity = Optional.ofNullable(dataCenterSpec.getResources().getRequests()).orElse(dataCenterSpec.getResources().getLimits());
+                final long memoryLimit = QuantityConverter.toMegaBytes(resourceQuantity.get("memory"));
+                final long coreCount =  QuantityConverter.toCpu(resourceQuantity.get("cpu"));
 
-            final long cpuLimit =  dataCenterSpec.getResources().getLimits().get("cpu").getNumber().longValue();
-            final int coreCount = (int) cpuLimit/1000;
+                // same as stock cassandra-env.sh
+                final double jvmHeapSizeInMb = Math.max(
+                        Math.min(memoryLimit / 2, 1.5 * 1024),
+                        Math.min(memoryLimit / 4, 8 * 1024)
+                );
 
-            // same as stock cassandra-env.sh
-            final double jvmHeapSizeInGb = Math.max(
-                    Math.min(memoryLimit / 2, 1.5 * GB),
-                    Math.min(memoryLimit / 4, 8 * GB)
-            );
+                final double youngGenSizeInMb = Math.min(
+                        100 * coreCount,
+                        jvmHeapSizeInMb / 4
+                );
 
-            final double youngGenSizeInMb = Math.min(
-                    100 * MB * coreCount,
-                    jvmHeapSizeInGb * 1024 / 4
-            );
+                logger.debug("cluster={} dc={} namespace={} memoryLimit={} cpuLimit={} coreCount={} jvmHeapSizeInMb={} youngGenSizeInMb={}",
+                        dataCenterSpec.getClusterName(), dataCenterSpec.getDatacenterName(), dataCenterMetadata.getNamespace(),
+                        memoryLimit, resourceQuantity.get("cpu").getNumber(), coreCount, jvmHeapSizeInMb, youngGenSizeInMb);
 
-            logger.debug("cluster={} dc={} namespace={} memoryLimit={} cpuLimit={} coreCount={} jvmHeapSizeInGb={} youngGenSizeInMb={}",
-                    dataCenterSpec.getClusterName(), dataCenterSpec.getDatacenterName(), dataCenterMetadata.getNamespace(),
-                    memoryLimit, cpuLimit, coreCount, jvmHeapSizeInGb, youngGenSizeInMb);
-            if (jvmHeapSizeInGb < 1.2 * GB) {
-                throw new IllegalArgumentException("Cannot deploy elassandra with less than 1.2Gb heap, please increase your kubernetes memory limits");
-            }
+                if (jvmHeapSizeInMb < 1.2 * 1024) {
+                    logger.warn("Cannot deploy elassandra with less than 1.2Gb heap, please increase your kubernetes memory limits if you are in production environment");
+                }
 
-            final boolean useG1GC = (jvmHeapSizeInGb > 16 * GB);
-            final StringWriter writer = new StringWriter();
-            try (final PrintWriter printer = new PrintWriter(writer)) {
-                printer.format("-Xms%d%n", (long) jvmHeapSizeInGb); // min heap size
-                printer.format("-Xmx%d%n", (long) jvmHeapSizeInGb); // max heap size
+                final boolean useG1GC = (jvmHeapSizeInMb > 16 * 1024);
+                //final StringWriter writer = new StringWriter();
+                StringBuilder jvmGCOptions = new StringBuilder(500);
+
+                jvmGCOptions.append( String.format("-Xms%dm", (long) jvmHeapSizeInMb)+"\n"); // min heap size
+                jvmGCOptions.append(String.format("-Xmx%dm", (long) jvmHeapSizeInMb)+"\n"); // max heap size
 
                 // copied from stock jvm.options
                 if (useG1GC) {
-                    printer.println("-XX:+UseG1GC");
-                    printer.println("-XX:G1RSetUpdatingPauseTimePercent=5");
-                    printer.println("-XX:MaxGCPauseMillis=500");
+                    jvmGCOptions.append("-XX:+UseG1GC\n");
+                    jvmGCOptions.append("-XX:G1RSetUpdatingPauseTimePercent=5\n");
+                    jvmGCOptions.append("-XX:MaxGCPauseMillis=500\n");
 
-                    if (jvmHeapSizeInGb > 12 * GB) {
-                        printer.println("-XX:InitiatingHeapOccupancyPercent=70");
+                    if (jvmHeapSizeInMb > 12 * 1024) {
+                        jvmGCOptions.append("-XX:InitiatingHeapOccupancyPercent=70\n");
                     }
 
                     // TODO: tune -XX:ParallelGCThreads, -XX:ConcGCThreads
                 } else {
-                    printer.format("-Xmn%d%n", (long)youngGenSizeInMb); // young gen size
+                    jvmGCOptions.append(String.format("-Xmn%dm", (long)youngGenSizeInMb)+"\n"); // young gen size
 
-                    printer.println("-XX:+UseParNewGC");
-                    printer.println("-XX:+UseConcMarkSweepGC");
-                    printer.println("-XX:+CMSParallelRemarkEnabled");
-                    printer.println("-XX:SurvivorRatio=8");
-                    printer.println("-XX:MaxTenuringThreshold=1");
-                    printer.println("-XX:CMSInitiatingOccupancyFraction=75");
-                    printer.println("-XX:+UseCMSInitiatingOccupancyOnly");
-                    printer.println("-XX:CMSWaitDuration=10000");
-                    printer.println("-XX:+CMSParallelInitialMarkEnabled");
-                    printer.println("-XX:+CMSEdenChunksRecordAlways");
-                    printer.println("-XX:+CMSClassUnloadingEnabled");
+                    jvmGCOptions.append("-XX:+UseParNewGC\n");
+                    jvmGCOptions.append("-XX:+UseConcMarkSweepGC\n");
+                    jvmGCOptions.append("-XX:+CMSParallelRemarkEnabled\n");
+                    jvmGCOptions.append("-XX:SurvivorRatio=8\n");
+                    jvmGCOptions.append("-XX:MaxTenuringThreshold=1\n");
+                    jvmGCOptions.append("-XX:CMSInitiatingOccupancyFraction=75\n");
+                    jvmGCOptions.append("-XX:+UseCMSInitiatingOccupancyOnly\n");
+                    jvmGCOptions.append("-XX:CMSWaitDuration=10000\n");
+                    jvmGCOptions.append("-XX:+CMSParallelInitialMarkEnabled\n");
+                    jvmGCOptions.append("-XX:+CMSEdenChunksRecordAlways\n");
+                    jvmGCOptions.append("-XX:+CMSClassUnloadingEnabled\n");
                 }
 
                 // OOM Error handling
-                printer.println("-XX:+HeapDumpOnOutOfMemoryError");
-                printer.println("-XX:+CrashOnOutOfMemoryError");
+                jvmGCOptions.append("-XX:+HeapDumpOnOutOfMemoryError\n");
+                jvmGCOptions.append("-XX:+CrashOnOutOfMemoryError\n");
+
+                configMapVolumeMountBuilder.addFile("jvm.options.d/001-jvm-memory-gc.options", jvmGCOptions.toString());
             }
 
-            configMapVolumeAddFile(configMap, volumeSource, "jvm.options.d/001-jvm-memory-gc.options", writer.toString());
-        }
-        */
 
             // TODO: maybe tune -Dcassandra.available_processors=number_of_processors - Wait till we build C* for Java 11
             // not sure if k8s exposes the right number of CPU cores inside the container
@@ -1742,9 +1736,9 @@ public class DataCenterUpdateAction {
                 javaToolOptions += dataCenterSpec.getJmxmpEnabled() ? " -Dcassandra.jmxmp " : "";
                 javaToolOptions += (useJmxOverSSL() ?
                         "-Dssl.enable=true " +
-                        "-Dcom.sun.management.jmxremote.registry.ssl=true " +
-                        "-Djavax.net.ssl.trustStore=/tmp/sidecar-truststore/cacerts " +
-                        "-Djavax.net.ssl.trustStorePassword=changeit " :
+                                "-Dcom.sun.management.jmxremote.registry.ssl=true " +
+                                "-Djavax.net.ssl.trustStore=/tmp/sidecar-truststore/cacerts " +
+                                "-Djavax.net.ssl.trustStorePassword=changeit " :
                         "");
                 if (javaToolOptions.length() > 0) {
                     sidecarContainer.addEnvItem(new V1EnvVar().name("JAVA_TOOL_OPTIONS").value(javaToolOptions));
@@ -2286,7 +2280,7 @@ public class DataCenterUpdateAction {
                     .imagePullPolicy("IfNotPresent")
                     .terminationMessagePolicy("FallbackToLogsOnError")
                     .command(ImmutableList.of("sh","-c",
-                                    "cp $JAVA_HOME/jre/lib/security/cacerts /tmp/sidecar-truststore/ && " +
+                            "cp $JAVA_HOME/jre/lib/security/cacerts /tmp/sidecar-truststore/ && " +
                                     String.format(Locale.ROOT, "keytool -import -trustcacerts -keystore /tmp/sidecar-truststore/cacerts -storepass changeit -alias strapkop -noprompt -file %s/cacert.pem",
                                             authorityManager.getPublicCaMountPath())
                     ))

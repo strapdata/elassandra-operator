@@ -87,6 +87,10 @@ public class DataCenterSpec {
     @Expose
     private V1ResourceRequirements resources = null;
 
+    @SerializedName("computeJvmMemorySettings")
+    @Expose
+    private boolean computeJvmMemorySettings = true;
+
     @SerializedName("dataVolumeClaim")
     @Expose
     private V1PersistentVolumeClaimSpec dataVolumeClaim;
