@@ -94,7 +94,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                     // monitor elastic_admin keyspace to reduce RF when scaling down the DC.
                     String elasticAdminKeyspace = (dataCenter.getSpec().getDatacenterGroup() != null) ? "elastic_admin_" + dataCenter.getSpec().getDatacenterGroup() : "elastic_admin";
                     try {
-                        updateKeyspaceReplicationMap(dataCenter, elasticAdminKeyspace, dataCenter.getSpec().getReplicas(), sessionSupplier).blockingGet();
+                        updateKeyspaceReplicationMap(dataCenter, elasticAdminKeyspace, effectiveRF(dataCenter, dataCenter.getSpec().getReplicas()), sessionSupplier).blockingGet();
                     } catch (Exception e) {
                         logger.warn("Failed to adjust RF for keyspace="+elasticAdminKeyspace, e);
                     }
@@ -124,7 +124,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
      * @return
      */
     int effectiveRF(DataCenter dataCenter, int targetRf) {
-        return Math.max(1, Math.min(targetRf, Math.min(dataCenter.getStatus().getReadyReplicas() + 1, dataCenter.getSpec().getReplicas())));
+        return Math.max(1, Math.min(targetRf, Math.min(dataCenter.getStatus().getReadyReplicas(), dataCenter.getSpec().getReplicas())));
     }
 
     public void removeDatacenter(final DataCenter dataCenter, CqlSessionSupplier sessionSupplier) throws Exception {
