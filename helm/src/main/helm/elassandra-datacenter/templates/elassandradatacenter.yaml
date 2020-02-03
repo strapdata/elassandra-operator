@@ -116,7 +116,11 @@ spec:
 {{- if .Values.kibana }}
   kibana:
 {{- if .Values.kibana.image }}
-    image: {{ .Values.kibana.image }}
+  {{- if .Values.kibana.tag }}
+    image:  "{{ .Values.kibana.image }}:{{ .Values.kibana.tag }}"
+  {{- else }}
+    image:  "{{ .Values.kibana.image }}:{{ template "kibana.version" . }}"
+  {{- end }}
 {{- end }}
 {{- if .Values.kibana.spaces }}
     spaces:

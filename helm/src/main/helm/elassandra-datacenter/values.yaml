@@ -15,7 +15,8 @@ image:
   pullSecrets: []
 
 kibana:
-  image: "docker.elastic.co/kibana/kibana-oss:${apply_elastic_tag}"
+  image: "docker.elastic.co/kibana/kibana-oss"
+  #tag: 6.8.4
   spaces:
     - name: ""
       keyspaces: []

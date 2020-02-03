@@ -2,7 +2,7 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 clusterName: Elassandra
-replicas: 2
+replicas: 4
 
 # STRICT or SLACK
 nodeAffinityPolicy: STRICT
@@ -13,7 +13,7 @@ workload: "READ"
 image:
   elassandraRepository: strapdata.azurecr.io/strapdata/elassandra-node-dev
   sidecarRepository: strapdata.azurecr.io/strapdata/elassandra-sidecar-dev
-  tag: 6.2.3.24-rc1
+  tag: 6.2.3.24
   pullPolicy: Always
   pullSecrets: []
 
@@ -23,11 +23,11 @@ privilegedSupported: true
 
 resources:
   requests:
-    cpu: 1000m
-    memory: 1Gi
+    cpu: 1500m
+    memory: 4Gi
   limits:
     cpu: 2000m
-    memory: 2Gi
+    memory: 6Gi
 
 dataVolumeClaim:
   accessModes:

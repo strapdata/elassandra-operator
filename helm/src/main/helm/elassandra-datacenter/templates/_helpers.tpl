@@ -59,3 +59,18 @@ elassandra-{{ .Release.Name | lower }}
 {{- define "elassandra.serviceAccount" -}}
 {{ .Release.Namespace }}-{{ template "elassandra.clusterName" . }}-{{ template "elassandra.datacenterName" . }}
 {{- end -}}
+
+{{/*
+Compute the kibana version according to Elassandra image tag.
+* elassandra datacenter template use the .Value.kibana.tag if define
+* otherwise, we extract the tag from the .Values.image.tag field, if the tag format
+  doesn't match d+\.d+\.d+, the default value 6.8.4 is defined.
+*/}}
+{{- define "kibana.version" -}}
+{{ $etag := len (regexFind "\\d+\\.\\d+\\.\\d+" .Values.image.tag ) }}
+{{- if eq $etag 0 -}}
+6.8.4
+{{- else -}}
+{{ regexFind "\\d+\\.\\d+\\.\\d+" .Values.image.tag }}
+{{- end -}}
+{{- end -}}
