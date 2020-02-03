@@ -9,8 +9,7 @@ nodeAffinityPolicy: STRICT
 image:
   elassandraRepository: docker.repo.strapdata.com/strapdata/elassandra-node-dev
   sidecarRepository: docker.repo.strapdata.com/strapdata/elassandra-sidecar-dev
-  elassandraTag: latest
-  sidecarTag: latest
+  tag: latest
 
 imagePullPolicy: Always
 imagePullSecret: "strapdata-cr"
@@ -58,6 +57,10 @@ sslStoragePort: 37001
 nativePort: 39042
 jmxPort: 7199
 # jdbPort: 4242
+
+
+kibana:
+  tag: 6.8.4
 
 remoteSeeds: []
 remoteSeeders:
