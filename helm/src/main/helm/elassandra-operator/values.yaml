@@ -39,13 +39,12 @@ env:
 #  K8S_API_DEBUG: true
 
 ingress:
-  enabled: true
-  domain: strapkop.941a7aa2-kube1-azure-northeurope.azure.strapcloud.com
-  annotations:
-    kubernetes.io/ingress.class: traefik
+  enabled: false
+  hosts: []
+  annotations: {}
+#    kubernetes.io/ingress.class: traefik
 #  tls:
-#  - hosts:
-#    - strapkop.941a7aa2-kube1-azure-northeurope.azure.strapcloud.com
+#  - hosts: []
 
 nodeSelector: {}
 
