@@ -16,11 +16,13 @@ metadata:
     {{- end }}
 spec:
   rules:
-  - host: {{ .Values.ingress.domain }}
+  {{- range $host := .Values.ingress.hosts }}
+  - host: {{ $host }}
     http:
       paths:
       - path: /seeds
         backend:
           serviceName: {{ $serviceAPIName }}
           servicePort: http
+  {{- end }}
 {{- end -}}
