@@ -16,10 +16,11 @@ metadata:
     {{- end }}
 spec:
   rules:
-  - http:
+  - host: {{ .Values.ingress.domain }}
+    http:
       paths:
       - path: /seeds
         backend:
           serviceName: {{ $serviceAPIName }}
-          servicePort: 8080
+          servicePort: http
 {{- end -}}
