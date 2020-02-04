@@ -14,7 +14,7 @@ spec:
     - port: 8080
       targetPort: 8080
       protocol: TCP
-      name: strapkop
+      name: http
     - port: 5005
       targetPort: 5005
       protocol: TCP

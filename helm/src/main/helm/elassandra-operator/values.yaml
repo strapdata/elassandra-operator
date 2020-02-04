@@ -40,8 +40,7 @@ env:
 
 ingress:
   enabled: true
-  hosts:
-  - strapkop.941a7aa2-kube1-azure-northeurope.azure.strapcloud.com
+  domain: strapkop.941a7aa2-kube1-azure-northeurope.azure.strapcloud.com
   annotations:
     kubernetes.io/ingress.class: traefik
 #  tls:
