@@ -17,6 +17,12 @@ public class OperatorConfig {
     @Nullable
     String namespace;
 
+    @Nullable
+    int k8sWatchPeriodInSec = 180;
+
+    @Nullable
+    int elassandraNodeWatchPeriodInSec = 60;
+
     DnsConfig dns = new DnsConfig();
 
     TestSuiteConfig test = new TestSuiteConfig();

@@ -1,6 +1,7 @@
 package com.strapdata.strapkop.event;
 
 import com.strapdata.model.sidecar.ElassandraNodeStatus;
+import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
@@ -23,16 +24,18 @@ public class ElassandraPodStatusSource implements EventSource<NodeStatusEvent> {
     private final ElassandraNodeStatusCache elassandraNodeStatusCache;
     private final DataCenterCache dataCenterCache;
     private final SidecarClientFactory sidecarClientFactory;
-    
-    public ElassandraPodStatusSource(ElassandraNodeStatusCache elassandraNodeStatusCache, DataCenterCache dataCenterCache, SidecarClientFactory sidecarClientFactory) {
+    private OperatorConfig config;
+
+    public ElassandraPodStatusSource(ElassandraNodeStatusCache elassandraNodeStatusCache, DataCenterCache dataCenterCache, SidecarClientFactory sidecarClientFactory, OperatorConfig config) {
         this.elassandraNodeStatusCache = elassandraNodeStatusCache;
         this.dataCenterCache = dataCenterCache;
         this.sidecarClientFactory = sidecarClientFactory;
+        this.config = config;
     }
     
     @Override
     public Observable<NodeStatusEvent> createObservable() {
-        return Observable.interval(10, TimeUnit.SECONDS)
+        return Observable.interval(config.getElassandraNodeWatchPeriodInSec(), TimeUnit.SECONDS)
                 .observeOn(Schedulers.io())
                 .map(i -> { logger.debug("run node status health check on thread {}", Thread.currentThread().getName()); return i; })
                 .flatMap(i -> Observable.fromIterable(dataCenterCache.listPods()))

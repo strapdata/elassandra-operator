@@ -46,6 +46,8 @@ jackson:
     module-scan: false
 
 operator:
+    k8sWatchPeriodInSec: ${K8S_WATCH_PERIOD:180}
+    elassandraNodeWatchPeriodInSec: ${ELASSANDRA_NODE_WATCH_PERIOD:60}
     namespace: "${OPERATOR_NAMESPACE:}"
     dns:
         zone: "${DNS_ZONE:}"

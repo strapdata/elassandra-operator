@@ -1,6 +1,7 @@
 package com.strapdata.strapkop.pipeline;
 
 import com.strapdata.model.Key;
+import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.Cache;
 import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.event.K8sWatchEventSource;
@@ -9,6 +10,7 @@ import io.reactivex.Observable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.inject.Inject;
 import javax.inject.Named;
 
 public abstract class K8sWatchPipeline<ResourceT, ResourceListT> extends EventPipeline<K8sWatchEvent<ResourceT>> {
@@ -17,9 +19,12 @@ public abstract class K8sWatchPipeline<ResourceT, ResourceListT> extends EventPi
     
     private final Cache<Key, ResourceT> cache;
     private final K8sWatchResourceAdapter<ResourceT, ResourceListT> adapter;
-    
-    public K8sWatchPipeline(@Named("apiClient") ApiClient apiClient, K8sWatchResourceAdapter<ResourceT, ResourceListT> adapter, Cache<Key, ResourceT> cache) {
-        super(new K8sWatchEventSource<>(apiClient, adapter));
+
+    public K8sWatchPipeline(@Named("apiClient") ApiClient apiClient,
+                            K8sWatchResourceAdapter<ResourceT, ResourceListT> adapter,
+                            Cache<Key, ResourceT> cache,
+                            OperatorConfig operatorConfig) {
+        super(new K8sWatchEventSource<>(apiClient, adapter, operatorConfig));
         this.cache = cache;
         this.adapter = adapter;
     }

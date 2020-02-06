@@ -4,6 +4,7 @@ import com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
+import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.pipeline.K8sWatchResourceAdapter;
 import io.kubernetes.client.ApiClient;
 import io.kubernetes.client.ApiException;
@@ -14,6 +15,7 @@ import io.reactivex.schedulers.Schedulers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.inject.Inject;
 import javax.inject.Named;
 import java.util.concurrent.TimeUnit;
 
@@ -34,12 +36,12 @@ public class K8sWatchEventSource<ResourceT, ResourceListT> implements EventSourc
     private final ApiClient watchClient;
     private final K8sWatchResourceAdapter<ResourceT, ResourceListT> adapter;
     private final Gson gson;
-    
+
     private String lastResourceVersion = null;
-    
-    public K8sWatchEventSource(final @Named("watchClient") ApiClient watchClient, final K8sWatchResourceAdapter<ResourceT, ResourceListT> adapter) {
+
+    public K8sWatchEventSource(final @Named("watchClient") ApiClient watchClient, final K8sWatchResourceAdapter<ResourceT, ResourceListT> adapter, OperatorConfig config) {
         this.watchClient = watchClient;
-        watchClient.getHttpClient().setReadTimeout(180, TimeUnit.SECONDS);
+        watchClient.getHttpClient().setReadTimeout(config.getK8sWatchPeriodInSec(), TimeUnit.SECONDS);
         logger.debug("watchClient read timeout={}", watchClient.getHttpClient().getReadTimeout());
 
         this.adapter = adapter;
