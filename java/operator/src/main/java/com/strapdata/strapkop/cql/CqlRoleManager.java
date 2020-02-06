@@ -3,8 +3,7 @@ package com.strapdata.strapkop.cql;
 import com.datastax.driver.core.*;
 import com.datastax.driver.core.exceptions.AuthenticationException;
 import com.datastax.driver.core.exceptions.DriverException;
-import com.datastax.driver.core.policies.DCAwareRoundRobinPolicy;
-import com.datastax.driver.core.policies.TokenAwarePolicy;
+import com.datastax.driver.core.policies.*;
 import com.google.common.collect.ImmutableList;
 import com.strapdata.cassandra.k8s.ElassandraOperatorSeedProvider;
 import com.strapdata.model.k8s.cassandra.Authentication;
@@ -269,7 +268,8 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                 .withLoadBalancingPolicy(new TokenAwarePolicy(
                         DCAwareRoundRobinPolicy.builder()
                                 .withLocalDc(dc.getSpec().getDatacenterName())
-                                .build()));
+                                .build()))
+                .withRetryPolicy(new LoggingRetryPolicy(StrapkopRetryPolicy.INSTANCE));
 
         // add remote seeds to contact points to be able to adjust RF of system keyspace before starting the first local node.
         if (dc.getSpec().getRemoteSeeds() != null)
