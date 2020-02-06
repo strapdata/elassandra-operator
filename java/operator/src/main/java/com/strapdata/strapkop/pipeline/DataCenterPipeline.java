@@ -27,7 +27,7 @@ public class DataCenterPipeline extends K8sWatchPipeline<DataCenter, DataCenterL
     private final Logger logger = LoggerFactory.getLogger(DataCenterPipeline.class);
     
     public DataCenterPipeline(@Named("apiClient") ApiClient apiClient, DataCenterCache cache, CustomObjectsApi customObjectsApi, OperatorConfig config) {
-        super(apiClient, new DataCenterAdapter(customObjectsApi, config), cache);
+        super(apiClient, new DataCenterAdapter(customObjectsApi, config), cache, config);
     }
     
     public static class DataCenterAdapter extends K8sWatchResourceAdapter<DataCenter, DataCenterList> {

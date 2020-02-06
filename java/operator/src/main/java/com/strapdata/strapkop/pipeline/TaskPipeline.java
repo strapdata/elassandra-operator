@@ -27,7 +27,7 @@ public class TaskPipeline extends K8sWatchPipeline<Task, TaskList> {
     private final Logger logger = LoggerFactory.getLogger(TaskPipeline.class);
     
     public TaskPipeline(@Named("apiClient") ApiClient apiClient, TaskCache cache, CustomObjectsApi customObjectsApi, OperatorConfig config) {
-        super(apiClient, new TaskAdapter(customObjectsApi, config), cache);
+        super(apiClient, new TaskAdapter(customObjectsApi, config), cache, config);
     }
     
     public static class TaskAdapter extends K8sWatchResourceAdapter<Task, TaskList> {

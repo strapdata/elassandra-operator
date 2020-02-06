@@ -28,7 +28,7 @@ public class StatefulsetPipeline extends K8sWatchPipeline<V1StatefulSet, V1State
     private final Logger logger = LoggerFactory.getLogger(StatefulsetPipeline.class);
     
     public StatefulsetPipeline(@Named("apiClient")  ApiClient apiClient, StatefulsetCache cache, AppsV1Api appsV1Api, OperatorConfig config) {
-        super(apiClient, new StatefulsetAdapter(appsV1Api, config), cache);
+        super(apiClient, new StatefulsetAdapter(appsV1Api, config), cache, config);
     }
     
     private static class StatefulsetAdapter extends K8sWatchResourceAdapter<V1StatefulSet, V1StatefulSetList> {

@@ -2,6 +2,7 @@ package com.strapdata.strapkop.pipeline;
 
 import com.squareup.okhttp.Call;
 import com.strapdata.model.Key;
+import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.NodeCache;
 import io.kubernetes.client.ApiClient;
 import io.kubernetes.client.ApiException;
@@ -23,8 +24,8 @@ public class NodePipeline extends K8sWatchPipeline<V1Node, V1NodeList> {
 
     private final Logger logger = LoggerFactory.getLogger(NodePipeline.class);
 
-    public NodePipeline(ApiClient apiClient, CoreV1Api coreV1Api, NodeCache cache) {
-        super(apiClient, new NodeAdapter(coreV1Api), cache);
+    public NodePipeline(ApiClient apiClient, CoreV1Api coreV1Api, NodeCache cache, OperatorConfig config) {
+        super(apiClient, new NodeAdapter(coreV1Api), cache, config);
     }
     
     private static class NodeAdapter extends K8sWatchResourceAdapter<V1Node, V1NodeList> {

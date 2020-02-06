@@ -25,7 +25,7 @@ import java.util.Collection;
 public class ElassandraPodsPipeline extends K8sWatchPipeline<V1Pod, V1PodList>  {
 
     public ElassandraPodsPipeline(@Named("apiClient") ApiClient apiClient, CoreV1Api coreV1Api, OperatorConfig config, PodCache cache) {
-        super(apiClient, new ElassandraPodsAdapter(coreV1Api, config), cache);
+        super(apiClient, new ElassandraPodsAdapter(coreV1Api, config), cache, config);
     }
 
     public static class ElassandraPodsAdapter extends K8sWatchResourceAdapter<V1Pod, V1PodList> {
