@@ -1,14 +1,18 @@
 package com.strapdata.strapkop.plugins;
 
 import com.strapdata.dns.DnsConfiguration;
+import com.strapdata.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.OperatorConfig;
+import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.reconcilier.DataCenterUpdateReconcilier;
 import com.strapdata.strapkop.ssl.AuthorityManager;
+import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
+import io.reactivex.Completable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,5 +44,15 @@ public abstract class AbstractPlugin implements Plugin {
         this.operatorConfig = operatorConfig;
         this.dnsConfiguration = dnsConfiguration;
         this.meterRegistry = meterRegistry;
+    }
+
+    /**
+     * Call when the datacenter is reconcilied after a start or scale up/downn
+     *
+     * @param dataCenter
+     */
+    @Override
+    public Completable reconciled(DataCenter dataCenter) throws ApiException, StrapkopException {
+        return Completable.complete();
     }
 }

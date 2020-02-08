@@ -22,6 +22,7 @@ import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.k8s.OperatorNames;
+import com.strapdata.strapkop.plugins.PluginRegistry;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import com.strapdata.strapkop.ssl.utils.X509CertificateAndPrivateKey;
@@ -55,7 +56,6 @@ import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.security.GeneralSecurityException;
 import java.util.*;
@@ -106,6 +106,7 @@ public class DataCenterUpdateAction {
     private final CqlRoleManager cqlRoleManager;
     private final CqlLicenseManager cqlLicenseManager;
     private final CqlKeyspaceManager cqlKeyspaceManager;
+    private final PluginRegistry pluginRegistry;
 
     private final CheckPointCache checkPointCache;
 
@@ -137,7 +138,8 @@ public class DataCenterUpdateAction {
                                   final OperatorConfig operatorConfig,
                                   final CheckPointCache checkPointCache,
                                   final BackupScheduler backupScheduler,
-                                  final MeterRegistry meterRegistry) {
+                                  final MeterRegistry meterRegistry,
+                                  final PluginRegistry pluginRegistry) {
         this.context = context;
         this.coreApi = coreApi;
         this.appsApi = appsApi;
@@ -173,6 +175,7 @@ public class DataCenterUpdateAction {
         this.manifestReaderFactory = factory;
         this.backupScheduler = backupScheduler;
         this.meterRegistry = meterRegistry;
+        this.pluginRegistry = pluginRegistry;
     }
 
     /**
@@ -518,7 +521,7 @@ public class DataCenterUpdateAction {
 
                                 break;
                             case SCHEDULING_PENDING:
-                                logger.warn("rack='{}' in phase SCHEDULING_ERROR", movingZone.name);
+                                logger.warn("rack='{}' in phase SCHEDULING_PENDING", movingZone.name);
                                 if (movingZone.isReady() && allReplicasRunnning(movingZone)) {
                                     logger.info("All replicas are running in rack={}, Scheduling issue was resolved, Datacenter is back to stable state",  movingZone.name);
                                     movingRack.setPhase(RackPhase.RUNNING);
@@ -550,7 +553,6 @@ public class DataCenterUpdateAction {
                                 }
                                 break;
                             case PARKING:
-
                                 if (movingZone.isParked()) {
                                     movingRack.setPhase(RackPhase.PARKED);
                                     updateDatacenterStatus(zones.parkedDatacenter() ?  DataCenterPhase.PARKED : DataCenterPhase.PARKING, zones, rackStatusByName);
@@ -779,7 +781,6 @@ public class DataCenterUpdateAction {
                                         case DECOMMISSIONED:
                                         case DRAINED:
                                         case DOWN:
-
                                             // decrease the number of replicas only once... by testing the STS status
                                             if (sts.getStatus().getUpdatedReplicas() == sts.getStatus().getCurrentReplicas()
                                                     && sts.getStatus().getUpdatedReplicas() == sts.getStatus().getReadyReplicas()) {
@@ -793,13 +794,11 @@ public class DataCenterUpdateAction {
                                                 logger.debug("SCALE_DOWN started in rack={} size={}, removing pod={} status={}",
                                                         zone.name, zone.size, elassandraPod, elassandraNodeStatus);
                                                 return todo.andThen(replaceNamespacedStatefulSet(sts));
-
                                             } else {
                                                 logger.debug("SCALE_DOWN ongoing in rack={} size={}, removing pod={} status={}",
                                                         zone.name, zone.size, elassandraPod, elassandraNodeStatus);
                                                 return todo;
                                             }
-
                                         default:
                                             logger.info("Waiting a valid status to remove pod={} from sts={} in namespace={}",
                                                     elassandraPod, sts.getMetadata().getName(), dataCenterMetadata.getNamespace());
@@ -813,6 +812,7 @@ public class DataCenterUpdateAction {
                             }
                         } else {
                             // DC probably reconciled
+                            todo.andThen(Completable.mergeArray(pluginRegistry.reconciledAll(dataCenter)));
                             scheduleBackups(zones);
                         }
                     } else {

@@ -16,7 +16,7 @@ public interface Plugin {
      */
     boolean isActive(final DataCenter dataCenter);
 
-    default boolean reconsileOnParkState(){
+    default boolean reconcileOnParkState(){
         return false;
     };
 
@@ -38,6 +38,12 @@ public interface Plugin {
      * Call on each reconciliation
      */
     Completable reconcile(final DataCenter dataCenter) throws ApiException, StrapkopException;
+
+    /**
+     * Call when datacenter is reconcilied after a start or scale up/down
+     */
+    Completable reconciled(final DataCenter dataCenter) throws ApiException, StrapkopException;
+
 
     /**
      * Call when deleting the elassandra datacenter

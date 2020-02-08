@@ -38,6 +38,16 @@ public abstract class DnsPlugin implements Plugin {
     }
 
     /**
+     * Call when dc is reconcilied
+     *
+     * @param dataCenter
+     */
+    @Override
+    public Completable reconciled(DataCenter dataCenter) throws ApiException, StrapkopException {
+        return Completable.complete();
+    }
+
+    /**
      * Call when deleting the elassandra datacenter to remove seed DNS records of all racks.
      *
      * @param dataCenter

@@ -102,7 +102,7 @@ public class KibanaPlugin extends AbstractPlugin {
 
     @Override
     public boolean isActive(final DataCenter dataCenter) {
-        return dataCenter.getSpec().getElasticsearchEnabled();
+        return dataCenter.getSpec().getElasticsearchEnabled() && dataCenter.getSpec().getKibana().getEnabled();
     }
 
     @Override

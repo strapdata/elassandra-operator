@@ -121,7 +121,7 @@ public class TestSuitePlugin extends AbstractPlugin implements TestSuiteHandler 
     }
 
     @Override
-    public boolean reconsileOnParkState() {
+    public boolean reconcileOnParkState() {
         return true;
     }
 

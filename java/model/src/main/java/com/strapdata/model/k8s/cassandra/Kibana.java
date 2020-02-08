@@ -23,6 +23,14 @@ public class Kibana {
     private String image  = "docker.elastic.co/kibana/kibana-oss:6.2.3";
 
     /**
+     * Enable Kibana support.
+     *
+     */
+    @SerializedName("enabled")
+    @Expose
+    private Boolean enabled = true;
+
+    /**
      * Kibana user spaces (key = space name)
      */
     @SerializedName("spaces")
