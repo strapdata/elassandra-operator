@@ -19,6 +19,9 @@ spec:
   autoScaleMode: {{ default "MANUAL" .Values.autoScaleMode }}
   elassandraImage: "{{ .Values.image.elassandraRepository }}:{{ .Values.image.tag }}"
   sidecarImage: "{{ .Values.image.sidecarRepository }}:{{ .Values.image.tag }}"
+  {{- if .Values.webhook }}
+  webhook: {{ .Values.webhook }}
+  {{- end }}
   imagePullPolicy: {{ .Values.image.pullPolicy }}
   {{- if .Values.image.pullSecrets }}
   imagePullSecrets:
@@ -115,6 +118,7 @@ spec:
 {{- end }}
 {{- if .Values.kibana }}
   kibana:
+    enabled: {{ default "true" .Values.kibana.enabled }}
 {{- if .Values.kibana.image }}
   {{- if .Values.kibana.tag }}
     image:  "{{ .Values.kibana.image }}:{{ .Values.kibana.tag }}"

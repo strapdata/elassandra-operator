@@ -24,8 +24,9 @@ public class PluginRegistry {
                           final KibanaPlugin kibanaPlugin,
                           final TestSuitePlugin testPlugin,
                           final AzureDnsPlugin azureDnsPlugin,
-                          final ManagedKeyspacePlugin managedKeyspacePlugin) {
-        this.plugins = ImmutableList.of(reaperPlugin, kibanaPlugin, testPlugin, azureDnsPlugin, managedKeyspacePlugin);
+                          final ManagedKeyspacePlugin managedKeyspacePlugin,
+                          final WebHookPlugin webHookPlugin) {
+        this.plugins = ImmutableList.of(reaperPlugin, kibanaPlugin, testPlugin, azureDnsPlugin, managedKeyspacePlugin, webHookPlugin);
     }
 
     public List<Plugin> plugins() {
@@ -47,7 +48,7 @@ public class PluginRegistry {
     public Completable[] reconcileAll(DataCenter dc) {
         List<Completable> pluginCompletables = new ArrayList<>();
         for (Plugin plugin : plugins) {
-            if (!dc.getSpec().isParked() || plugin.reconsileOnParkState()) {
+            if (!dc.getSpec().isParked() || plugin.reconcileOnParkState()) {
                 try {
                     if (plugin.isActive(dc))
                         pluginCompletables.add(plugin.reconcile(dc));
@@ -61,4 +62,18 @@ public class PluginRegistry {
         return pluginCompletables.toArray(new Completable[pluginCompletables.size()]);
     }
 
+    public Completable[] reconciledAll(DataCenter dc) {
+        List<Completable> pluginCompletables = new ArrayList<>();
+        for (Plugin plugin : plugins) {
+            if (!dc.getSpec().isParked() || plugin.reconcileOnParkState()) {
+                try {
+                    if (plugin.isActive(dc))
+                        pluginCompletables.add(plugin.reconciled(dc));
+                } catch (Exception e) {
+                    logger.error("Plugin class=" + plugin.getClass().getSimpleName() + " reconciled failed:", e);
+                }
+            }
+        }
+        return pluginCompletables.toArray(new Completable[pluginCompletables.size()]);
+    }
 }

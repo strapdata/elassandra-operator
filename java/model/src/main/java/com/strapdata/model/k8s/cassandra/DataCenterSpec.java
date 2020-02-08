@@ -282,6 +282,13 @@ public class DataCenterSpec {
     private String datacenterGroup = null;
 
     /**
+     * Elassandra web hook URL called when the datacenter is reconcilied.
+     */
+    @SerializedName("webHookUrl")
+    @Expose
+    private String webHookUrl = null;
+
+    /**
      * Definition of Scheduled Backups.
      */
     @SerializedName("scheduledBackups")

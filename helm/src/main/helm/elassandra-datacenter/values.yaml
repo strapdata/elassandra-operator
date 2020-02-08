@@ -15,6 +15,7 @@ image:
   pullSecrets: []
 
 kibana:
+  enabled: true
   image: "docker.elastic.co/kibana/kibana-oss"
   #tag: 6.8.4
   spaces:
@@ -34,6 +35,10 @@ managedKeyspaces: {}
 #    secretKey: gravitee
 #    grantStatements:
 #      - "GRANT gravitee TO gravitee"
+
+# WebHook URL called when datacenter is reconcilied or deleted.
+# URL template support {namespace}, {clusterName}, {datacenterName}, {phase}, {replicas}, {readyReplicas}
+webhook:
 
 # TODO: we do not support unprivileged setup yet
 privilegedSupported: true
