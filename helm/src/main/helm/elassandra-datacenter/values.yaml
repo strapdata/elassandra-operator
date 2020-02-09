@@ -38,7 +38,11 @@ managedKeyspaces: {}
 
 # WebHook URL called when datacenter is reconcilied or deleted.
 # URL template support {namespace}, {clusterName}, {datacenterName}, {phase}, {replicas}, {readyReplicas}
-webhook:
+webHookUrl:
+
+loadBalancerIp:
+publicDnsFqdn:
+publicDnsTtl:
 
 # TODO: we do not support unprivileged setup yet
 privilegedSupported: true

@@ -187,6 +187,13 @@ public class DataCenterSpec {
     private Boolean hostNetworkEnabled = false;
 
     /**
+     * Elasticsearch HTTP port
+     */
+    @SerializedName("elasticsearchPort")
+    @Expose
+    private Integer elasticsearchPort = 9200;
+
+    /**
      * CQL native port (also hostPort)
      */
     @SerializedName("nativePort")
@@ -273,6 +280,27 @@ public class DataCenterSpec {
     @SerializedName("remoteSeeders")
     @Expose
     private List<String> remoteSeeders = new ArrayList<>();
+
+    /**
+     * The LoadBalancer exposing cql + elasticsearch nodePorts
+     */
+    @SerializedName("loadBalancerIp")
+    @Expose
+    private String loadBalancerIp;
+
+    /**
+     * Public DNS FQDN associated to the public Loadbalancer IP.
+     */
+    @SerializedName("publicDnsFqdn")
+    @Expose
+    private String publicDnsFqdn;
+
+    /**
+     * Public DNS TTL.
+     */
+    @SerializedName("publicDnsTtl")
+    @Expose
+    private Integer publicDnsTtl = 300;
 
     /**
      * Elassandra datacenter group
