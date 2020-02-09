@@ -1198,7 +1198,7 @@ public class DataCenterUpdateAction {
         public Optional<V1beta1Ingress> buildIngressElasticsearch() {
             Optional<V1beta1Ingress> ingress = Optional.empty();
             String ingressDomain = System.getenv("INGRESS_DOMAIN");
-            if (!Strings.isNullOrEmpty(ingressDomain)) {
+            if (dataCenterSpec.getElasticsearchIngressEnabled() && !Strings.isNullOrEmpty(ingressDomain)) {
                 String serviceName = OperatorNames.elasticsearchService(dataCenter);
                 String elasticHost = serviceName + "-" + ingressDomain.replace("${namespace}", dataCenterMetadata.getNamespace());
                 logger.info("Creating elasticsearch ingress for host={}", elasticHost);

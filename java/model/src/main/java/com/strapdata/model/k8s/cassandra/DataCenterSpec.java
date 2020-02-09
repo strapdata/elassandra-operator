@@ -303,6 +303,13 @@ public class DataCenterSpec {
     private Integer publicDnsTtl = 300;
 
     /**
+     * Enable Elasticsearch service ingress
+     */
+    @SerializedName("elasticsearchIngressEnabled")
+    @Expose
+    private Boolean elasticsearchIngressEnabled = false;
+
+    /**
      * Elassandra datacenter group
      */
     @SerializedName("datacenterGroup")
