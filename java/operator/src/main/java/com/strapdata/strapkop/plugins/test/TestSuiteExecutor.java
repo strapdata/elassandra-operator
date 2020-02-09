@@ -304,7 +304,7 @@ public abstract class TestSuiteExecutor {
             eslogin = "cassandra";
             esPwd =  retrieveCassandraPassword(dc);
         }
-        try (ESRestClient client = new ESRestClient(podFqdn, 9200, dc.getSpec().getEnterprise().getHttps(), eslogin, esPwd)) {
+        try (ESRestClient client = new ESRestClient(podFqdn, dc.getSpec().getElasticsearchPort(), dc.getSpec().getEnterprise().getHttps(), eslogin, esPwd)) {
             processor.execute(dc, client);
         } catch (IOException e) {
             failed("ESRequest processor failure : " + e.getMessage());

@@ -19,8 +19,8 @@ spec:
   autoScaleMode: {{ default "MANUAL" .Values.autoScaleMode }}
   elassandraImage: "{{ .Values.image.elassandraRepository }}:{{ .Values.image.tag }}"
   sidecarImage: "{{ .Values.image.sidecarRepository }}:{{ .Values.image.tag }}"
-  {{- if .Values.webhook }}
-  webhook: {{ .Values.webhook }}
+  {{- if .Values.webHookUrl }}
+  webHookUrl: {{ .Values.webHookUrl }}
   {{- end }}
   imagePullPolicy: {{ .Values.image.pullPolicy }}
   {{- if .Values.image.pullSecrets }}
@@ -42,6 +42,15 @@ spec:
 {{- if .Values.env }}
   env:
 {{ toYaml .Values.env | indent 4 }}
+{{- end }}
+{{- if .Values.loadBalancerIp }}
+  loadBalancerIp: {{  .Values.loadBalancerIp }}
+{{- end }}
+{{- if .Values.publicDnsFqdn }}
+  publicDnsFqdn: {{  .Values.publicDnsFqdn }}
+{{- end }}
+{{- if .Values.publicDnsTtl }}
+  publicDnsTtl: {{  .Values.publicDnsTtl }}
 {{- end }}
 {{- if .Values.scheduledBackups }}
   scheduledBackups:
@@ -77,6 +86,7 @@ spec:
   privilegedSupported: {{ default "false" .Values.privilegedSupported }}
   hostPortEnabled: {{ default "false" .Values.hostPortEnabled }}
   hostNetworkEnabled: {{ default "false" .Values.hostNetworkEnabled }}
+  elasticsearchPort: {{ default "9200" .Values.elasticsearchPort | quote }}
   nativePort: {{ default "9042" .Values.nativePort | quote }}
   storagePort: {{ default "7000" .Values.storagePort | quote }}
   sslStoragePort: {{ default "7001" .Values.sslStoragePort | quote }}

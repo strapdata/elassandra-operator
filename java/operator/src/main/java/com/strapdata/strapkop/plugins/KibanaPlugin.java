@@ -228,7 +228,7 @@ public class KibanaPlugin extends AbstractPlugin {
                 .addEnvItem(new V1EnvVar()
                         .name("ELASTICSEARCH_URL")
                         .value( (Boolean.TRUE.equals(dataCenterSpec.getEnterprise().getHttps()) ? "https://" : "http://") +
-                                OperatorNames.elasticsearchService(dataCenter) + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local:9200")
+                                OperatorNames.elasticsearchService(dataCenter) + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local:"+ dataCenterSpec.getElasticsearchPort())
                 )
                 .addEnvItem(new V1EnvVar()
                         .name("KIBANA_INDEX")

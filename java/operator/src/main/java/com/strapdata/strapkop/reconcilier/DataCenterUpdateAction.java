@@ -100,7 +100,6 @@ public class DataCenterUpdateAction {
     private final V1ObjectMeta dataCenterMetadata;
     private final DataCenterSpec dataCenterSpec;
     private final DataCenterStatus dataCenterStatus;
-    private final Map<String, String> dataCenterLabels;
     private final SidecarClientFactory sidecarClientFactory;
 
     private final CqlRoleManager cqlRoleManager;
@@ -171,7 +170,6 @@ public class DataCenterUpdateAction {
             this.dataCenterSpec.setEnterprise(new Enterprise());
         }
 
-        this.dataCenterLabels = OperatorLabels.datacenter(dataCenter);
         this.manifestReaderFactory = factory;
         this.backupScheduler = backupScheduler;
         this.meterRegistry = meterRegistry;
@@ -1070,7 +1068,7 @@ public class DataCenterUpdateAction {
             return new V1ObjectMeta()
                     .name(name)
                     .namespace(dataCenterMetadata.getNamespace())
-                    .labels(dataCenterLabels)
+                    .labels(OperatorLabels.datacenter(dataCenter))
                     .addOwnerReferencesItem(OperatorNames.ownerReference(dataCenter))
                     .putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, dataCenter.getMetadata().getGeneration().toString());
         }
@@ -1104,18 +1102,37 @@ public class DataCenterUpdateAction {
                             + "-" + rack);
         }
 
+        // see https://github.com/kubernetes-sigs/cloud-provider-azure/blob/master/docs/services/README.md
+        // see https://github.com/kubernetes-sigs/external-dns
+        // Unfortunately, AKS does not allow to reuse a public IP for multiple LB.
         public V1Service buildServiceExternalNodes() throws ApiException {
+            V1ServiceSpec v1ServiceSpec = new V1ServiceSpec()
+                    .type("LoadBalancer")
+                    .externalTrafficPolicy("Local")
+                    //.addPortsItem(new V1ServicePort().name("internode").port(dataCenterSpec.getSsl() ? dataCenterSpec.getSslStoragePort() : dataCenterSpec.getStoragePort()))
+                    .addPortsItem(new V1ServicePort().name("cql").port(dataCenterSpec.getNativePort()))
+                    .addPortsItem(new V1ServicePort().name("elasticsearch").port(dataCenterSpec.getElasticsearchPort()))
+                    //.addPortsItem(new V1ServicePort().name("jmx").port(dataCenterSpec.getJmxPort()))
+                    // select any available pod in the DC, which is good only if internal seed service is good !
+                    .selector(ImmutableMap.of(
+                            OperatorLabels.CLUSTER, dataCenterSpec.getClusterName(),
+                            OperatorLabels.DATACENTER, dataCenter.getSpec().getDatacenterName(),
+                            OperatorLabels.APP, "elassandra"));
+
+            // set loadbalancer public ip if available
+            if (!Strings.isNullOrEmpty(dataCenterSpec.getLoadBalancerIp()))
+                v1ServiceSpec.setLoadBalancerIP(dataCenterSpec.getLoadBalancerIp());
+
+            // Add external-dns annotation to update public DNS
+            V1ObjectMeta v1ObjectMeta = dataCenterObjectMeta(OperatorNames.externalService(dataCenter));
+            if (!Strings.isNullOrEmpty(dataCenterSpec.getPublicDnsFqdn())) {
+                v1ObjectMeta.putAnnotationsItem("external-dns.alpha.kubernetes.io/hostname", dataCenterSpec.getPublicDnsFqdn());
+                if (dataCenterSpec.getPublicDnsTtl() != null)
+                    v1ObjectMeta.putAnnotationsItem("external-dns.alpha.kubernetes.io/ttl", Integer.toString(dataCenterSpec.getPublicDnsTtl()));
+            }
             return new V1Service()
-                    .metadata(dataCenterObjectMeta(OperatorNames.externalService(dataCenter)))
-                    .spec(new V1ServiceSpec()
-                            .type("NodePort")
-                            .addPortsItem(new V1ServicePort().name("internode").port(dataCenterSpec.getSsl() ? dataCenterSpec.getSslStoragePort() : dataCenterSpec.getStoragePort()))
-                            .addPortsItem(new V1ServicePort().name("cql").port(dataCenterSpec.getNativePort()))
-                            .addPortsItem(new V1ServicePort().name(ELASTICSEARCH_PORT_NAME).port(ELASTICSEARCH_PORT_VALUE))
-                            .addPortsItem(new V1ServicePort().name("jmx").port(dataCenterSpec.getJmxPort()))
-                            // select any available pod in the DC, which is good only if internal seed service is good !
-                            .selector(ImmutableMap.of(OperatorLabels.DATACENTER, dataCenter.getSpec().getDatacenterName()))
-                    );
+                    .metadata(v1ObjectMeta)
+                    .spec(v1ServiceSpec);
         }
 
         /**
@@ -1155,15 +1172,15 @@ public class DataCenterUpdateAction {
                             .addPortsItem(new V1ServicePort().name("cql").port(dataCenterSpec.getNativePort()))
                             .addPortsItem(new V1ServicePort().name("jmx").port(dataCenterSpec.getJmxPort()))
                             .addPortsItem(new V1ServicePort().name("internode").port(dataCenterSpec.getSsl() ? dataCenterSpec.getSslStoragePort() : dataCenterSpec.getStoragePort()))
-                            .selector(dataCenterLabels)
+                            .selector(OperatorLabels.datacenter(dataCenter))
                     );
 
             if (dataCenterSpec.getElasticsearchEnabled()) {
-                service.getSpec().addPortsItem(new V1ServicePort().name(ELASTICSEARCH_PORT_NAME).port(ELASTICSEARCH_PORT_VALUE));
+                service.getSpec().addPortsItem(new V1ServicePort().name(ELASTICSEARCH_PORT_NAME).port(dataCenterSpec.getElasticsearchPort()));
             }
 
             if (dataCenterSpec.getPrometheusEnabled()) {
-                service.getSpec().addPortsItem(new V1ServicePort().name(PROMETHEUS_SERVICE_NAME).port(PROMETHEUS_SERVICE_PORT));
+                service.getSpec().addPortsItem(new V1ServicePort().name(PROMETHEUS_PORT_NAME).port(PROMETHEUS_PORT_VALUE));
             }
             return service;
         }
@@ -1173,8 +1190,8 @@ public class DataCenterUpdateAction {
                     .metadata(dataCenterObjectMeta(OperatorNames.elasticsearchService(dataCenter)))
                     .spec(new V1ServiceSpec()
                             .type("ClusterIP")
-                            .addPortsItem(new V1ServicePort().name(ELASTICSEARCH_PORT_NAME).port(ELASTICSEARCH_PORT_VALUE))
-                            .selector(dataCenterLabels)
+                            .addPortsItem(new V1ServicePort().name(ELASTICSEARCH_PORT_NAME).port(dataCenterSpec.getElasticsearchPort()))
+                            .selector(OperatorLabels.datacenter(dataCenter))
                     );
         }
 
@@ -1186,6 +1203,15 @@ public class DataCenterUpdateAction {
                 String elasticHost = serviceName + "-" + ingressDomain.replace("${namespace}", dataCenterMetadata.getNamespace());
                 logger.info("Creating elasticsearch ingress for host={}", elasticHost);
                 V1ObjectMeta meta = dataCenterObjectMeta(serviceName);
+
+                Map<String, String> annotations = new HashMap<>();
+                // preserve client host for elasticsearch audit, see https://docs.traefik.io/v1.7/configuration/backends/kubernetes/#annotations
+                annotations.put("traefik.ingress.kubernetes.io/preserve-host", "true");
+                // Add annotation to connect in https, see https://docs.traefik.io/v1.7/configuration/backends/kubernetes/
+                if (dataCenterSpec.getEnterprise().getHttps())
+                    annotations.put("ingress.kubernetes.io/protocol", "https");
+                meta.setAnnotations(annotations);
+
                 ingress = Optional.of(new V1beta1Ingress()
                         .metadata(meta)
                         .spec(new V1beta1IngressSpec()
@@ -1196,7 +1222,7 @@ public class DataCenterUpdateAction {
                                                         .path("/")
                                                         .backend(new V1beta1IngressBackend()
                                                                 .serviceName(meta.getName())
-                                                                .servicePort(new IntOrString(ELASTICSEARCH_PORT_VALUE)))
+                                                                .servicePort(new IntOrString(dataCenterSpec.getElasticsearchPort())))
                                                 )
                                         )
                                 )
@@ -1513,6 +1539,7 @@ public class DataCenterUpdateAction {
             final Enterprise enterprise = dataCenterSpec.getEnterprise();
             if (enterprise.getEnabled()) {
                 final Map<String, Object> esConfig = new HashMap<>();
+                esConfig.put("http.port", dataCenterSpec.getElasticsearchPort());
 
                 esConfig.put("jmx", ImmutableMap.of("enabled", enterprise.getJmx()));
                 esConfig.put("https", ImmutableMap.of("enabled", enterprise.getHttps()));
@@ -1661,7 +1688,7 @@ public class DataCenterUpdateAction {
             final V1Container commitlogInitContainer = buildInitContainerCommitlogReplayer(rack, rackStatus.getSeedHostId());
 
             if (dataCenterSpec.getPrometheusEnabled()) {
-                cassandraContainer.addPortsItem(new V1ContainerPort().name(PROMETHEUS_SERVICE_NAME).containerPort(PROMETHEUS_SERVICE_PORT));
+                cassandraContainer.addPortsItem(new V1ContainerPort().name(PROMETHEUS_PORT_NAME).containerPort(PROMETHEUS_PORT_VALUE));
             }
 
             final V1Container sidecarContainer = new V1Container()
@@ -2026,7 +2053,7 @@ public class DataCenterUpdateAction {
 
             // add prometheus annotations to scrap nodes
             if (dataCenterSpec.getPrometheusEnabled()) {
-                String[] annotations = new String[]{"prometheus.io/scrape", "true", "prometheus.io/port", Integer.toString(PROMETHEUS_SERVICE_PORT)};
+                String[] annotations = new String[]{"prometheus.io/scrape", "true", "prometheus.io/port", Integer.toString(PROMETHEUS_PORT_VALUE)};
                 for (int i = 0; i < annotations.length; i += 2)
                     templateMetadata.putAnnotationsItem(annotations[i], annotations[i + 1]);
             }
@@ -2149,7 +2176,7 @@ public class DataCenterUpdateAction {
                             .exec(new V1ExecAction()
                                     .addCommandItem("/ready-probe.sh")
                                     .addCommandItem(dataCenterSpec.getNativePort().toString())
-                                    .addCommandItem("9200")
+                                    .addCommandItem(dataCenterSpec.getElasticsearchPort().toString())
                             )
                             .initialDelaySeconds(15)
                             .timeoutSeconds(5)
@@ -2258,7 +2285,7 @@ public class DataCenterUpdateAction {
             addPortsItem(cassandraContainer, dataCenterSpec.getJdbPort(), "jdb", false);
 
             if (dataCenterSpec.getElasticsearchEnabled()) {
-                cassandraContainer.addPortsItem(new V1ContainerPort().name(ELASTICSEARCH_PORT_NAME).containerPort(ELASTICSEARCH_PORT_VALUE));
+                cassandraContainer.addPortsItem(new V1ContainerPort().name(ELASTICSEARCH_PORT_NAME).containerPort(dataCenterSpec.getElasticsearchPort()));
                 cassandraContainer.addPortsItem(new V1ContainerPort().name("transport").containerPort(9300));
                 cassandraContainer.addEnvItem(new V1EnvVar().name("CASSANDRA_DAEMON").value("org.apache.cassandra.service.ElassandraDaemon"));
             } else {
