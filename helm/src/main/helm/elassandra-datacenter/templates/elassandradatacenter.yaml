@@ -74,6 +74,7 @@ spec:
   userSecretVolumeSource:
 {{ toYaml .Values.userSecretVolumeSource | indent 4 }}
 {{- end }}
+  elasticsearchIngressEnabled: {{ default "false" .Values.elasticsearchIngressEnabled }}
   elasticsearchEnabled: {{ default "true" .Values.elasticsearchEnabled }}
   prometheusEnabled: {{ default "false" .Values.prometheusEnabled }}
 {{- if .Values.reaper }}
