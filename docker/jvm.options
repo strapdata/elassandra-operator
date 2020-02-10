@@ -321,3 +321,8 @@
 # due to internationalization enhancements in JDK 9 Elasticsearch need to set the provider to COMPAT otherwise
 # time/date parsing will break in an incompatible way for some date patterns and locals
 #9-:-Djava.locale.providers=COMPAT
+
+# Enable compression of gossip state ELASTIC_SHARDS_STATES
+# this is important when the number of indexes is huge to avoid gossip issue.
+# (a gossip field is limited to 65535 bytes)
+-Des.compress_x1=true
