@@ -44,6 +44,7 @@ loadBalancerIp:
 publicDnsFqdn:
 publicDnsTtl:
 
+
 # TODO: we do not support unprivileged setup yet
 privilegedSupported: true
 
@@ -124,16 +125,24 @@ enterprise:
 #restoreFromBackup: backup-hostname
 
 prometheusEnabled: true
+
 elasticsearchEnabled: true
+elasticsearchIngressEnabled: false
+
 ssl: true
 authentication: CASSANDRA
 
 hostPortEnabled: true
+
+nativePort: 39042
 storagePort: 37000
 sslStoragePort: 37001
-nativePort: 39042
+
+elasticsearchPort: 9200
+
 jmxPort: 7199
 jdbPort: 4242
+
 jmxmpEnabled: false
 jmxmpOverSSL: false
 
