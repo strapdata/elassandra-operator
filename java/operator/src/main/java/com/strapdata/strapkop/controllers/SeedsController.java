@@ -66,8 +66,13 @@ public class SeedsController {
                                             String nodeName = pod.getSpec().getNodeName();
                                             logger.debug("found node={}", nodeName);
                                             if (pod.getStatus() != null && pod.getStatus().getHostIP() != null) {
-                                                logger.debug("add hostIp={}", pod.getStatus().getHostIP());
-                                                seeds.add(pod.getStatus().getHostIP());
+                                                if (dataCenter.getSpec().getHostPortEnabled() == true || dataCenter.getSpec().getHostNetworkEnabled() == true) {
+                                                    logger.debug("add hostIp={}", pod.getStatus().getHostIP());
+                                                    seeds.add(pod.getStatus().getHostIP());
+                                                } else {
+                                                    logger.debug("add podIp={}", pod.getStatus().getPodIP());
+                                                    seeds.add(pod.getStatus().getPodIP());
+                                                }
                                             }
                                         });
                                     } catch (ApiException e) {

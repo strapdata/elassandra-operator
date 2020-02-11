@@ -30,6 +30,12 @@ public class DataCenterStatus {
     @Expose
     private Boolean needCleanup = false;
 
+    /**
+     * A datacenter is bootstrapped when at least one node has joined the datacenter.
+     */
+    @SerializedName("bootstrapped")
+    @Expose
+    private Boolean bootstrapped = false;
 
     @SerializedName("lastMessage")
     @Expose
