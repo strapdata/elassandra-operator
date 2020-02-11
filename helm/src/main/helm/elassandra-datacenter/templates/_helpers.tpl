@@ -52,7 +52,7 @@ Create chart name and version as used by the chart label.
 {{- end -}}
 
 {{- define "elassandra.resourceName" -}}
-elassandra-{{ .Release.Name | lower }}
+elassandra-{{ template "elassandra.clusterName" . }}-{{ template "elassandra.datacenterName" . }}
 {{- end -}}
 
 
