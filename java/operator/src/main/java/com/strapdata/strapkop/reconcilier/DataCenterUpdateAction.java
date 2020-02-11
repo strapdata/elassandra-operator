@@ -1272,14 +1272,19 @@ public class DataCenterUpdateAction {
                 parameters.put("seeds", String.join(", ", seeds));
             if (!remoteSeeds.isEmpty())
                 parameters.put("remote_seeds", String.join(", ", seeds));
-            if (!remoteSeeders.isEmpty())
-                parameters.put("seeders", String.join(", ", remoteSeeders));
+            if (!remoteSeeders.isEmpty()) {
+                parameters.put("remote_seeders", String.join(", ", remoteSeeders));
+            }
             logger.debug("seed parameters={}", parameters);
             final Map<String, Object> config = new HashMap<>(); // can't use ImmutableMap as some values are null
             config.put("seed_provider", ImmutableList.of(ImmutableMap.of(
                     "class_name", ElassandraOperatorSeedProviderAndNotifier.class.getName(),
                     "parameters", ImmutableList.of(parameters))
             ));
+            // if datacenter is not boostrapped, add nodes with auto_bootstrap = false
+            if ((!remoteSeeds.isEmpty() || !remoteSeeders.isEmpty()) && dataCenterStatus.getBootstrapped() == false) {
+                config.put("auto_bootstrap", false);
+            }
             return new ConfigMapVolumeMountBuilder(configMap, volumeSource, "operator-config-volume-seeds", "/tmp/operator-config-seeds")
                     .addFile("cassandra.yaml.d/003-cassandra-seeds.yaml", toYamlString(config));
         }
