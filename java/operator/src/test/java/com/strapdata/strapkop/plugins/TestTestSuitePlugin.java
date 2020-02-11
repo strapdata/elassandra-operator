@@ -42,7 +42,7 @@ public class TestTestSuitePlugin {
 
     @BeforeEach
     public void initTest() throws Exception {
-        plugin = new TestSuitePlugin(contextMock, k8sResourceUtilsMock, authorityManagerMock, coreApiMock, appsApiMock, opConfigMock, dnsConfigMock);
+        plugin = new TestSuitePlugin(contextMock, k8sResourceUtilsMock, authorityManagerMock, coreApiMock, appsApiMock, opConfigMock, dnsConfigMock, null);
         when(k8sResourceUtilsMock.updateTaskStatus(any())).thenReturn(Completable.complete());
         when(contextMock.getBean(FakeExecutor.class)).thenReturn(new FakeExecutor());
     }
