@@ -1,7 +1,7 @@
 package com.strapdata.strapkop.cache;
 
-import com.strapdata.model.k8s.cassandra.DataCenter;
-import com.strapdata.model.sidecar.ElassandraNodeStatus;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.event.ElassandraPod;
 
 import javax.inject.Singleton;

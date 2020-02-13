@@ -1,15 +1,13 @@
 package com.strapdata.strapkop.plugins.test;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.strapdata.model.k8s.cassandra.DataCenter;
-import com.strapdata.model.k8s.cassandra.DataCenterStatus;
-import com.strapdata.model.sidecar.ElassandraNodeStatus;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
+import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.plugins.test.step.OnSuccessAction;
 import com.strapdata.strapkop.plugins.test.step.Step;
 import io.kubernetes.client.ApiException;
 import io.micronaut.context.annotation.Prototype;
-import io.reactivex.Observable;
-import io.reactivex.schedulers.Schedulers;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -19,8 +17,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import static com.strapdata.strapkop.plugins.test.step.StepFailedException.failed;
 

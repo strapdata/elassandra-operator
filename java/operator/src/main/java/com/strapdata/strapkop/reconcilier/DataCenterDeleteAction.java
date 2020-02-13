@@ -1,8 +1,8 @@
 package com.strapdata.strapkop.reconcilier;
 
 import com.google.gson.JsonSyntaxException;
-import com.strapdata.model.Key;
-import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.backup.BackupScheduler;
 import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.cache.SidecarConnectionCache;

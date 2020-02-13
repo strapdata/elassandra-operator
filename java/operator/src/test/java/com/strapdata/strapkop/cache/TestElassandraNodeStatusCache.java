@@ -1,11 +1,10 @@
 package com.strapdata.strapkop.cache;
 
-import com.strapdata.model.k8s.cassandra.DataCenter;
-import com.strapdata.model.k8s.cassandra.DataCenterSpec;
-import com.strapdata.model.sidecar.ElassandraNodeStatus;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenterSpec;
+import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.event.ElassandraPod;
 import io.kubernetes.client.models.V1ObjectMeta;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

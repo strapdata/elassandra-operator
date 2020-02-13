@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableMap;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.k8s.OperatorNames;
+import com.strapdata.strapkop.model.Key;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.micronaut.http.HttpStatus;
@@ -52,7 +53,7 @@ public class SeedsController {
      */
     @Get(value = "/{namespace}/{clusterName}/{datacenterName}", produces = MediaType.APPLICATION_JSON)
     public Single<List<String>> seeds(String namespace, String clusterName, String datacenterName) throws ApiException {
-        return k8sResourceUtils.readDatacenter(new com.strapdata.model.Key(OperatorNames.dataCenterResource(clusterName, datacenterName), namespace))
+        return k8sResourceUtils.readDatacenter(new Key(OperatorNames.dataCenterResource(clusterName, datacenterName), namespace))
                 .map(dataCenter -> {
                 List<String> seeds = new ArrayList<>();
                 k8sResourceUtils.listNamespacedStatefulSets(namespace, null, OperatorLabels.toSelector(OperatorLabels.datacenter(dataCenter)))

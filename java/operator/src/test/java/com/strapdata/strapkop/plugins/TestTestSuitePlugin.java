@@ -1,11 +1,11 @@
 package com.strapdata.strapkop.plugins;
 
-import com.strapdata.dns.DnsConfiguration;
-import com.strapdata.model.k8s.cassandra.DataCenter;
-import com.strapdata.model.k8s.cassandra.DataCenterPhase;
-import com.strapdata.model.k8s.task.*;
+import com.strapdata.strapkop.dns.DnsConfiguration;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenterPhase;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
+import com.strapdata.strapkop.model.k8s.task.*;
 import com.strapdata.strapkop.plugins.test.TestSuiteExecutor;
 import com.strapdata.strapkop.plugins.test.step.Step;
 import com.strapdata.strapkop.plugins.test.step.StepFailedException;
@@ -14,6 +14,7 @@ import com.strapdata.strapkop.ssl.AuthorityManager;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.models.V1ObjectMeta;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
 import io.reactivex.Completable;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,10 +40,11 @@ public class TestTestSuitePlugin {
     private AuthorityManager authorityManagerMock = mock(AuthorityManager.class);
     private CoreV1Api coreApiMock = mock(CoreV1Api.class);
     private AppsV1Api appsApiMock = mock(AppsV1Api.class);
+    private MeterRegistry meterRegistry = mock(MeterRegistry.class);
 
     @BeforeEach
     public void initTest() throws Exception {
-        plugin = new TestSuitePlugin(contextMock, k8sResourceUtilsMock, authorityManagerMock, coreApiMock, appsApiMock, opConfigMock, dnsConfigMock, null);
+        plugin = new TestSuitePlugin(contextMock, k8sResourceUtilsMock, authorityManagerMock, coreApiMock, appsApiMock, opConfigMock, dnsConfigMock, meterRegistry);
         when(k8sResourceUtilsMock.updateTaskStatus(any())).thenReturn(Completable.complete());
         when(contextMock.getBean(FakeExecutor.class)).thenReturn(new FakeExecutor());
     }

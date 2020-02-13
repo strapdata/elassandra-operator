@@ -1,6 +1,6 @@
 package com.strapdata.strapkop.pipeline;
 
-import com.strapdata.model.ClusterKey;
+import com.strapdata.strapkop.model.ClusterKey;
 import io.micronaut.context.annotation.Infrastructure;
 import io.reactivex.Completable;
 import io.reactivex.disposables.Disposable;

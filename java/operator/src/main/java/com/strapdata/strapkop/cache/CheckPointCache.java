@@ -1,9 +1,7 @@
 package com.strapdata.strapkop.cache;
 
-import com.strapdata.model.Key;
-import com.strapdata.model.k8s.cassandra.DataCenter;
-import com.strapdata.model.k8s.cassandra.DataCenterSpec;
-import io.vavr.Tuple;
+import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenterSpec;
 import io.vavr.Tuple2;
 import lombok.Data;
 import org.slf4j.Logger;

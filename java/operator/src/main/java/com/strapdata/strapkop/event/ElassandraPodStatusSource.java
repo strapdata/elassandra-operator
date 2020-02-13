@@ -2,6 +2,7 @@ package com.strapdata.strapkop.event;
 
 import com.strapdata.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.OperatorConfig;
+import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;

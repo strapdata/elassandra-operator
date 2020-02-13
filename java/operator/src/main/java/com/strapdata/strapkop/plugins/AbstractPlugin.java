@@ -1,7 +1,7 @@
 package com.strapdata.strapkop.plugins;
 
-import com.strapdata.dns.DnsConfiguration;
-import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.dns.DnsConfiguration;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;

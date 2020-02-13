@@ -1,8 +1,8 @@
 package com.strapdata.strapkop.controllers;
 
-import com.strapdata.model.ClusterKey;
-import com.strapdata.model.Key;
-import com.strapdata.model.sidecar.ElassandraNodeStatus;
+import com.strapdata.strapkop.model.ClusterKey;
+import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.OperatorNames;

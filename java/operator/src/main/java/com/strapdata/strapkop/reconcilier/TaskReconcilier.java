@@ -1,15 +1,15 @@
 package com.strapdata.strapkop.reconcilier;
 
-import com.strapdata.model.Key;
-import com.strapdata.model.k8s.cassandra.Block;
-import com.strapdata.model.k8s.cassandra.BlockReason;
-import com.strapdata.model.k8s.cassandra.DataCenter;
-import com.strapdata.model.k8s.task.Task;
-import com.strapdata.model.k8s.task.TaskPhase;
-import com.strapdata.model.k8s.task.TaskStatus;
-import com.strapdata.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
+import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.k8s.cassandra.Block;
+import com.strapdata.strapkop.model.k8s.cassandra.BlockReason;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.task.Task;
+import com.strapdata.strapkop.model.k8s.task.TaskPhase;
+import com.strapdata.strapkop.model.k8s.task.TaskStatus;
+import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
 import io.kubernetes.client.ApiException;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.reactivex.Completable;
@@ -125,6 +125,11 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
                             // nothing to do
                             return Completable.complete();
                     }
+                })
+                // failed when datacenter not found => task failed
+                .onErrorResumeNext(t -> {
+                    taskWrapper.getTask().setStatus(new TaskStatus().setPhase(TaskPhase.IGNORED).setLastMessage(t.getMessage()));
+                    return k8sResourceUtils.updateTaskStatus(taskWrapper);
                 });
     }
 

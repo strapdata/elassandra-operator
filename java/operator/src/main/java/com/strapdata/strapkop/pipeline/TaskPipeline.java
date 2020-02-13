@@ -1,9 +1,9 @@
 package com.strapdata.strapkop.pipeline;
 
 import com.squareup.okhttp.Call;
-import com.strapdata.model.Key;
-import com.strapdata.model.k8s.task.Task;
-import com.strapdata.model.k8s.task.TaskList;
+import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.k8s.task.Task;
+import com.strapdata.strapkop.model.k8s.task.TaskList;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.TaskCache;
 import io.kubernetes.client.ApiClient;

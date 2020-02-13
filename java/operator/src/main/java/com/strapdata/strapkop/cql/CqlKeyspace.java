@@ -1,6 +1,6 @@
 package com.strapdata.strapkop.cql;
 
-import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import io.reactivex.Single;
 import lombok.AllArgsConstructor;
 import lombok.Data;

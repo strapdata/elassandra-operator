@@ -1,9 +1,9 @@
 package com.strapdata.strapkop.sidecar;
 
 
-import com.strapdata.backup.task.RestoreTask;
-import com.strapdata.backup.util.GlobalLock;
-import com.strapdata.model.backup.RestoreArguments;
+import com.strapdata.strapkop.backup.task.RestoreTask;
+import com.strapdata.strapkop.backup.util.GlobalLock;
+import com.strapdata.strapkop.model.backup.RestoreArguments;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -1,26 +1,19 @@
 package com.strapdata.strapkop.backup;
 
-import com.strapdata.model.Key;
-import com.strapdata.model.k8s.cassandra.DataCenter;
-import com.strapdata.model.k8s.cassandra.DataCenterSpec;
-import com.strapdata.model.k8s.cassandra.ScheduledBackup;
-import com.strapdata.model.k8s.task.BackupTaskSpec;
-import com.strapdata.model.k8s.task.Task;
+import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenterSpec;
+import com.strapdata.strapkop.model.k8s.cassandra.ScheduledBackup;
+import com.strapdata.strapkop.model.k8s.task.BackupTaskSpec;
+import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import io.kubernetes.client.models.V1ObjectMeta;
 import io.micronaut.scheduling.ScheduledExecutorTaskScheduler;
-import io.micronaut.scheduling.TaskScheduler;
-import io.micronaut.scheduling.cron.CronExpression;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import static org.mockito.Mockito.*;
 
-import java.time.Duration;
-import java.time.ZonedDateTime;
-import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalUnit;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 

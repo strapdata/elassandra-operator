@@ -3,17 +3,18 @@ package com.strapdata.strapkop.cql;
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.Session;
 import com.google.common.collect.ImmutableSet;
-import com.strapdata.model.k8s.cassandra.CqlStatus;
-import com.strapdata.model.k8s.cassandra.DataCenter;
-import com.strapdata.model.k8s.cassandra.DataCenterPhase;
-import com.strapdata.model.k8s.task.CleanupTaskSpec;
-import com.strapdata.model.k8s.task.RepairTaskSpec;
-import com.strapdata.model.k8s.task.TaskSpec;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
+import com.strapdata.strapkop.model.k8s.cassandra.CqlStatus;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenterPhase;
+import com.strapdata.strapkop.model.k8s.task.CleanupTaskSpec;
+import com.strapdata.strapkop.model.k8s.task.RepairTaskSpec;
+import com.strapdata.strapkop.model.k8s.task.TaskSpec;
 import com.strapdata.strapkop.plugins.Plugin;
 import com.strapdata.strapkop.plugins.PluginRegistry;
 import io.reactivex.Completable;
+import io.reactivex.CompletableSource;
 import io.reactivex.Single;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,7 +33,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
 
     private static final Logger logger = LoggerFactory.getLogger(CqlKeyspaceManager.class);
 
-    private static final Set<CqlKeyspace> SYSTEM_KEYSPACES = ImmutableSet.of(
+    public static final Set<CqlKeyspace> SYSTEM_KEYSPACES = ImmutableSet.of(
             new CqlKeyspace().withName("system_auth").withRf(3),
             new CqlKeyspace().withName("system_distributed").withRf(3),
             new CqlKeyspace().withName("system_traces").withRf(3));
@@ -167,12 +168,46 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
         return Completable.complete();
     }
 
+    private Completable updateKeyspaceReplicationMap(final DataCenter dc, final String keyspace, int targetRf, final CqlSessionSupplier sessionSupplier) throws Exception {
+        return updateKeyspaceReplicationMap(dc, dc.getSpec().getDatacenterName(), keyspace, targetRf, sessionSupplier, true);
+    }
+
+    /**
+     * Remove the DC from replication map of all keyspaces.
+     * @param dc
+     * @param sessionSupplier
+     * @return
+     * @throws Exception
+     */
+    public Completable removeDcFromReplicationMap(final DataCenter dc, final CqlSessionSupplier sessionSupplier) throws Exception {
+        return sessionSupplier.getSession(dc)
+                .flatMap(session -> Single.fromFuture(session.executeAsync("SELECT keyspace_name, replication FROM system_schema.keyspaces")))
+                .flatMapCompletable(rs -> {
+                    final Map<String, Integer> currentRfMap = new HashMap<>();
+                    List<Completable> todoList = new ArrayList<>();
+                    for (Row row : rs) {
+                        final Map<String, String> replication = row.getMap("replication", String.class, String.class);
+                        final Map<String, Integer> keyspaceReplicationMap = replication.entrySet().stream()
+                                .filter(e -> !e.getKey().equals("class") && !e.getKey().equals("replication_factor"))
+                                .collect(Collectors.toMap(
+                                        Map.Entry::getKey,
+                                        e -> Integer.parseInt(e.getValue())
+                                ));
+                        if (keyspaceReplicationMap.containsKey(dc.getSpec().getDatacenterName())) {
+                            keyspaceReplicationMap.remove(dc.getSpec().getDatacenterName());
+                            todoList.add(alterKeyspace(dc, sessionSupplier, row.getString("keyspace_name"), keyspaceReplicationMap).ignoreElement());
+                        }
+                    }
+                    return Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()]));
+                });
+    }
+
     /**
      * Alter rf map but keep other dc replication factor
      *
      * @throws StrapkopException
      */
-    private Completable updateKeyspaceReplicationMap(final DataCenter dc, final String keyspace, int targetRf, final CqlSessionSupplier sessionSupplier) throws Exception {
+    public Completable updateKeyspaceReplicationMap(final DataCenter dc, String dcName, final String keyspace, int targetRf, final CqlSessionSupplier sessionSupplier, boolean triggerRepairOrCleanup) throws Exception {
         return sessionSupplier.getSession(dc)
                 .flatMap(session ->
                         Single.fromFuture(session.executeAsync("SELECT keyspace_name, replication FROM system_schema.keyspaces WHERE keyspace_name = ?", keyspace))
@@ -193,13 +228,16 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                                     Map.Entry::getKey,
                                     e -> Integer.parseInt(e.getValue())
                             ));
-                    final int currentRf = currentRfMap.getOrDefault(dc.getSpec().getDatacenterName(), 0);
+                    final int currentRf = currentRfMap.getOrDefault(dcName, 0);
                     logger.debug("keyspace={} currentRf={} targetRf={}", keyspace, currentRf, targetRf);
                     if (currentRf != targetRf) {
-                        currentRfMap.put(dc.getSpec().getDatacenterName(), targetRf);
+                        currentRfMap.put(dcName, targetRf);
                         if (currentRfMap.entrySet().stream().filter(e -> e.getValue() > 0).count() > 0) {
                             return alterKeyspace(dc, sessionSupplier, keyspace, currentRfMap)
                                     .flatMapCompletable(s -> {
+                                        if (!triggerRepairOrCleanup)
+                                            return Completable.complete();
+
                                         if (targetRf > currentRf) {
                                             // RF increased
                                             if (targetRf > 1) {

@@ -1,8 +1,6 @@
 package com.strapdata.strapkop.event;
 
 
-import com.strapdata.model.k8s.cassandra.DataCenter;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.regex.Matcher;

@@ -1,10 +1,10 @@
 package com.strapdata.strapkop.plugins.test;
 
-import com.strapdata.model.Key;
-import com.strapdata.model.k8s.cassandra.*;
-import com.strapdata.model.k8s.task.Task;
-import com.strapdata.model.k8s.task.TaskPhase;
-import com.strapdata.model.sidecar.ElassandraNodeStatus;
+import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.k8s.cassandra.*;
+import com.strapdata.strapkop.model.k8s.task.Task;
+import com.strapdata.strapkop.model.k8s.task.TaskPhase;
+import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.cache.CheckPointCache;
 import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.cql.CqlRoleManager;

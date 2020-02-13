@@ -1,6 +1,6 @@
 package com.strapdata.strapkop.k8s;
 
-import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import io.kubernetes.client.models.V1OwnerReference;
 
 import java.util.UUID;

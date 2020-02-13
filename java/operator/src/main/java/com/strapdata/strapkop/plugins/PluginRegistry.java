@@ -1,7 +1,7 @@
 package com.strapdata.strapkop.plugins;
 
 import com.google.common.collect.ImmutableList;
-import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import io.reactivex.Completable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

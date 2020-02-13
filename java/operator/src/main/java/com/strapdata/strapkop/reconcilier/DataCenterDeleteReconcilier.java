@@ -1,6 +1,6 @@
 package com.strapdata.strapkop.reconcilier;
 
-import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.cql.CqlSessionHandler;
 import com.strapdata.strapkop.plugins.PluginRegistry;

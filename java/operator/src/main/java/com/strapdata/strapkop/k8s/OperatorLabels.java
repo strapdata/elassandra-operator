@@ -2,7 +2,7 @@ package com.strapdata.strapkop.k8s;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
-import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 
 import java.util.Map;
 

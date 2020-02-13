@@ -1,9 +1,9 @@
 package com.strapdata.strapkop.reconcilier;
 
-import com.strapdata.model.k8s.cassandra.BlockReason;
-import com.strapdata.model.k8s.cassandra.DataCenter;
-import com.strapdata.model.k8s.task.Task;
-import com.strapdata.model.k8s.task.TaskPhase;
+import com.strapdata.strapkop.model.k8s.cassandra.BlockReason;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.task.Task;
+import com.strapdata.strapkop.model.k8s.task.TaskPhase;
 import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;

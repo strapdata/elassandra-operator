@@ -4,7 +4,7 @@ import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Session;
 import com.strapdata.elasticsearch.plugin.license.License;
 import com.strapdata.elasticsearch.plugin.license.LicenseVerifierService;
-import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.exception.InvalidLicenseException;
 import io.reactivex.Completable;
 import org.slf4j.Logger;

@@ -1,7 +1,7 @@
 package com.strapdata.strapkop.plugins;
 
-import com.strapdata.dns.AzureDnsUpdater;
-import com.strapdata.dns.DnsConfiguration;
+import com.strapdata.strapkop.dns.AzureDnsUpdater;
+import com.strapdata.strapkop.dns.DnsConfiguration;
 
 import javax.inject.Singleton;
 import java.io.IOException;

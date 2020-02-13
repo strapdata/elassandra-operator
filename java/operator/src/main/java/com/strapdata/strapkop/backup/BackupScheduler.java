@@ -1,25 +1,21 @@
 package com.strapdata.strapkop.backup;
 
 import com.google.common.base.Strings;
-import com.strapdata.model.Key;
-import com.strapdata.model.k8s.cassandra.DataCenter;
-import com.strapdata.model.k8s.cassandra.ScheduledBackup;
-import com.strapdata.model.k8s.task.Task;
+import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.ScheduledBackup;
+import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.cache.Cache;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import io.kubernetes.client.ApiException;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.scheduling.ScheduledExecutorTaskScheduler;
 import io.micronaut.scheduling.TaskExecutors;
-import io.micronaut.scheduling.TaskScheduler;
-import io.micronaut.scheduling.cron.CronExpression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
-import java.time.Duration;
-import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ScheduledFuture;

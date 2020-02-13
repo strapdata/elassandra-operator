@@ -1,10 +1,10 @@
 package com.strapdata.strapkop.handler;
 
 import com.google.common.collect.ImmutableList;
-import com.strapdata.model.ClusterKey;
-import com.strapdata.model.k8s.task.Task;
-import com.strapdata.model.k8s.task.TaskSpec;
 import com.strapdata.strapkop.event.K8sWatchEvent;
+import com.strapdata.strapkop.model.ClusterKey;
+import com.strapdata.strapkop.model.k8s.task.Task;
+import com.strapdata.strapkop.model.k8s.task.TaskSpec;
 import com.strapdata.strapkop.pipeline.WorkQueue;
 import com.strapdata.strapkop.reconcilier.*;
 import io.vavr.Tuple;
@@ -35,16 +35,19 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
                        BackupTaskReconcilier backupTaskReconcilier,
                        CleanupTaskReconcilier cleanupTaskReconcilier,
                        TestTaskReconcilier testTaskReconcilier,
-                       RepairTaskReconcilier repairTaskReconcilier) {
+                       RepairTaskReconcilier repairTaskReconcilier,
+                       RebuildTaskReconcilier rebuildTaskReconcilier,
+                       DecommissionTaskReconcilier decommissionTaskSpec) {
      
         this.workQueue = workQueue;
-    
+
         taskFamily = ImmutableList.of(
                 Tuple.of(backupTaskReconcilier, TaskSpec::getBackup),
                 Tuple.of(cleanupTaskReconcilier, TaskSpec::getCleanup),
                 Tuple.of(repairTaskReconcilier, TaskSpec::getRepair),
-                Tuple.of(testTaskReconcilier, TaskSpec::getTest)
-        );
+                Tuple.of(testTaskReconcilier, TaskSpec::getTest),
+                Tuple.of(rebuildTaskReconcilier, TaskSpec::getRebuild),
+                Tuple.of(decommissionTaskSpec, TaskSpec::getDecommission));
     }
     
     @Override

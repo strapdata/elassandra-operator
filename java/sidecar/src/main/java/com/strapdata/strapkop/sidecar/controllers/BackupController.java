@@ -1,7 +1,7 @@
 package com.strapdata.strapkop.sidecar.controllers;
 
-import com.strapdata.model.backup.BackupArguments;
-import com.strapdata.model.sidecar.BackupResponse;
+import com.strapdata.strapkop.model.backup.BackupArguments;
+import com.strapdata.strapkop.model.sidecar.BackupResponse;
 import com.strapdata.strapkop.sidecar.services.BackupService;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;

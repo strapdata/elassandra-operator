@@ -2,14 +2,14 @@ package com.strapdata.strapkop.plugins;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
-import com.strapdata.dns.DnsConfiguration;
-import com.strapdata.model.k8s.cassandra.*;
+import com.strapdata.strapkop.dns.DnsConfiguration;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.cql.*;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.k8s.OperatorNames;
+import com.strapdata.strapkop.model.k8s.cassandra.*;
 import com.strapdata.strapkop.reconcilier.DataCenterUpdateAction;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import io.kubernetes.client.ApiException;

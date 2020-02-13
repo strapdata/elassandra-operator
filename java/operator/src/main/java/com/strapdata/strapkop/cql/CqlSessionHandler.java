@@ -2,14 +2,11 @@ package com.strapdata.strapkop.cql;
 
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.Session;
-import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import io.micronaut.context.annotation.Prototype;
 import io.reactivex.Single;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Manage CQL session during a reconciliation
