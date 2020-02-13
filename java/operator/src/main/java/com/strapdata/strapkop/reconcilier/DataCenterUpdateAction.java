@@ -4,14 +4,14 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.net.InetAddresses;
-import com.strapdata.backup.common.Constants;
-import com.strapdata.backup.manifest.GlobalManifest;
-import com.strapdata.backup.manifest.ManifestReader;
+import com.strapdata.strapkop.backup.common.Constants;
+import com.strapdata.strapkop.backup.manifest.GlobalManifest;
+import com.strapdata.strapkop.backup.manifest.ManifestReader;
 import com.strapdata.cassandra.k8s.ElassandraOperatorSeedProviderAndNotifier;
-import com.strapdata.model.Key;
-import com.strapdata.model.backup.CloudStorageSecret;
-import com.strapdata.model.k8s.cassandra.*;
-import com.strapdata.model.sidecar.ElassandraNodeStatus;
+import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.backup.CloudStorageSecret;
+import com.strapdata.strapkop.model.k8s.cassandra.*;
+import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.backup.BackupScheduler;
@@ -96,7 +96,7 @@ public class DataCenterUpdateAction {
     private final K8sResourceUtils k8sResourceUtils;
     private final AuthorityManager authorityManager;
 
-    private final com.strapdata.model.k8s.cassandra.DataCenter dataCenter;
+    private final DataCenter dataCenter;
     private final V1ObjectMeta dataCenterMetadata;
     private final DataCenterSpec dataCenterSpec;
     private final DataCenterStatus dataCenterStatus;
@@ -131,7 +131,7 @@ public class DataCenterUpdateAction {
                                   final CqlKeyspaceManager cqlKeyspaceManager,
                                   final ElassandraNodeStatusCache elassandraNodeStatusCache,
                                   final SidecarClientFactory sidecarClientFactory,
-                                  @Parameter("dataCenter") com.strapdata.model.k8s.cassandra.DataCenter dataCenter,
+                                  @Parameter("dataCenter") DataCenter dataCenter,
                                   final CqlLicenseManager cqlLicenseManager,
                                   final ManifestReaderFactory factory,
                                   final OperatorConfig operatorConfig,

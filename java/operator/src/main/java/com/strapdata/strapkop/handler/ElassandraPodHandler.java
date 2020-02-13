@@ -1,13 +1,12 @@
 package com.strapdata.strapkop.handler;
 
-import com.strapdata.model.ClusterKey;
-import com.strapdata.model.Key;
+import com.strapdata.strapkop.model.ClusterKey;
+import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.pipeline.WorkQueue;
 import com.strapdata.strapkop.reconcilier.DataCenterPodDeletedReconcilier;
 import com.strapdata.strapkop.reconcilier.DataCenterUnscheduledReconcilier;
-import com.strapdata.strapkop.reconcilier.DataCenterUpdateReconcilier;
 import io.kubernetes.client.models.V1Pod;
 import io.kubernetes.client.models.V1PodCondition;
 import io.vavr.Tuple2;

@@ -2,6 +2,7 @@ package com.strapdata.strapkop.pipeline;
 
 import com.strapdata.model.Key;
 import com.strapdata.strapkop.OperatorConfig;
+import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.cache.Cache;
 import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.event.K8sWatchEventSource;

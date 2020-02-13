@@ -1,9 +1,8 @@
 package com.strapdata.strapkop.pipeline;
 
 import com.squareup.okhttp.Call;
-import com.strapdata.model.Key;
+import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.OperatorConfig;
-import com.strapdata.strapkop.cache.Cache;
 import com.strapdata.strapkop.cache.PodCache;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.k8s.ReaperLabels;

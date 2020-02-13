@@ -1,6 +1,6 @@
 package com.strapdata.strapkop.utils;
 
-import com.strapdata.model.k8s.task.Task;
+import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import io.kubernetes.client.ApiException;

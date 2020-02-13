@@ -1,5 +1,7 @@
 plugins {
-      id 'java'
+    id 'java'
+    id 'java-library'
+    id 'maven-publish'
 }
 
 tasks.withType(JavaCompile) {
@@ -9,4 +11,25 @@ tasks.withType(JavaCompile) {
 dependencies {
     compile 'org.projectlombok:lombok:1.18.4'
     annotationProcessor "org.projectlombok:lombok:1.18.4"
+}
+
+jar {
+}
+
+repositories {
+    mavenLocal()
+}
+
+artifacts {
+    archives jar
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            groupId 'com.strapdata.strapkop'
+            artifactId 'model'
+            from components.java
+        }
+    }
 }

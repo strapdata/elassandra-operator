@@ -1,6 +1,6 @@
 package com.strapdata.strapkop.cache;
 
-import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.sidecar.SidecarClient;
 import org.slf4j.Logger;

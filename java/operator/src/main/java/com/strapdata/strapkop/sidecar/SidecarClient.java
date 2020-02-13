@@ -1,8 +1,8 @@
 package com.strapdata.strapkop.sidecar;
 
-import com.strapdata.model.backup.BackupArguments;
-import com.strapdata.model.sidecar.BackupResponse;
-import com.strapdata.model.sidecar.ElassandraNodeStatus;
+import com.strapdata.strapkop.model.backup.BackupArguments;
+import com.strapdata.strapkop.model.sidecar.BackupResponse;
+import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
 import io.micronaut.http.client.RxHttpClient;
 import io.reactivex.Completable;
 import io.reactivex.Single;
@@ -35,11 +35,23 @@ public class SidecarClient {
     }
     
     public Completable cleanup(String keyspace) throws UnsupportedEncodingException {
-        return httpClient.exchange(POST("/operations/cleanup?keyspace=" + URLEncoder.encode(keyspace,"UTF-8"), "")).ignoreElements();
+        String qs = (keyspace == null) ? "" : "?keyspace=" + URLEncoder.encode(keyspace,"UTF-8");
+        return httpClient.exchange(POST("/operations/cleanup" +qs, "")).ignoreElements();
+    }
+
+    public Completable rebuild(String sourceDcName, String keyspace) throws UnsupportedEncodingException {
+        String qs = (keyspace == null) ? "" : "?keyspace=" + URLEncoder.encode(keyspace,"UTF-8");
+        return httpClient.exchange(POST("/rebuild/"+sourceDcName+ qs, "")).ignoreElements();
+    }
+
+    public Completable flush(String keyspace) throws UnsupportedEncodingException {
+        String qs = (keyspace == null) ? "" : "?keyspace=" + URLEncoder.encode(keyspace,"UTF-8");
+        return httpClient.exchange(POST("/flush" + qs, "")).ignoreElements();
     }
 
     public Completable repairPrimaryRange(String keyspace) throws UnsupportedEncodingException {
-        return httpClient.exchange(POST("/operations/repair?keyspace=" + URLEncoder.encode(keyspace,"UTF-8"), "")).ignoreElements();
+        String qs = (keyspace == null) ? "" : "?keyspace=" + URLEncoder.encode(keyspace,"UTF-8");
+        return httpClient.exchange(POST("/operations/repair" + qs, "")).ignoreElements();
     }
 
     public Single<BackupResponse> backup(BackupArguments backupArguments) {

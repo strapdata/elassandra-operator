@@ -1,8 +1,8 @@
 package com.strapdata.strapkop.sidecar.services;
 
-import com.strapdata.backup.task.BackupTask;
-import com.strapdata.backup.util.GlobalLock;
-import com.strapdata.model.backup.BackupArguments;
+import com.strapdata.strapkop.backup.task.BackupTask;
+import com.strapdata.strapkop.backup.util.GlobalLock;
+import com.strapdata.strapkop.model.backup.BackupArguments;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Infrastructure;
 import io.reactivex.disposables.Disposable;

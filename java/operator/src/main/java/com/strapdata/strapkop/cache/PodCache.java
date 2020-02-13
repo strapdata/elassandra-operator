@@ -1,6 +1,6 @@
 package com.strapdata.strapkop.cache;
 
-import com.strapdata.model.Key;
+import com.strapdata.strapkop.model.Key;
 import io.kubernetes.client.models.V1Pod;
 
 import javax.inject.Singleton;

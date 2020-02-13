@@ -1,8 +1,8 @@
 package com.strapdata.strapkop.reconcilier;
 
-import com.strapdata.model.Key;
-import com.strapdata.model.k8s.cassandra.DataCenterPhase;
-import com.strapdata.model.k8s.cassandra.DataCenterStatus;
+import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenterPhase;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
 import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import io.kubernetes.client.ApiException;

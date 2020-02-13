@@ -1,9 +1,9 @@
 package com.strapdata.strapkop.handler;
 
 import com.google.common.collect.Sets;
-import com.strapdata.model.ClusterKey;
-import com.strapdata.model.Key;
-import com.strapdata.model.sidecar.ElassandraNodeStatus;
+import com.strapdata.strapkop.model.ClusterKey;
+import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.event.NodeStatusEvent;
 import com.strapdata.strapkop.pipeline.WorkQueue;
 import com.strapdata.strapkop.reconcilier.DataCenterUpdateReconcilier;

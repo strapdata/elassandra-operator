@@ -1,8 +1,8 @@
 package com.strapdata.strapkop.sidecar.services;
 
 
-import com.strapdata.dns.AzureDnsUpdater;
-import com.strapdata.dns.DnsConfiguration;
+import com.strapdata.strapkop.dns.AzureDnsUpdater;
+import com.strapdata.strapkop.dns.DnsConfiguration;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.discovery.event.ServiceStartedEvent;
 

@@ -1,16 +1,14 @@
 package com.strapdata.strapkop.plugins.test;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.strapdata.model.k8s.cassandra.*;
-import com.strapdata.model.sidecar.ElassandraNodeStatus;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
+import com.strapdata.strapkop.model.k8s.cassandra.Workload;
 import com.strapdata.strapkop.k8s.OperatorLabels;
-import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.plugins.test.step.OnSuccessAction;
 import com.strapdata.strapkop.plugins.test.step.Step;
-import com.strapdata.strapkop.plugins.test.util.ESRestClient;
 import io.micronaut.context.annotation.Prototype;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 

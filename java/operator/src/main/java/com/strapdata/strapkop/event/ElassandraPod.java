@@ -1,6 +1,6 @@
 package com.strapdata.strapkop.event;
 
-import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import io.kubernetes.client.models.V1ObjectMeta;

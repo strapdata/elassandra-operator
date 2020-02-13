@@ -1,8 +1,8 @@
 package com.strapdata.strapkop.handler;
 
-import com.strapdata.model.ClusterKey;
-import com.strapdata.model.Key;
-import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.ClusterKey;
+import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.pipeline.WorkQueue;
 import com.strapdata.strapkop.reconcilier.DataCenterDeleteReconcilier;

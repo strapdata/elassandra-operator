@@ -1,6 +1,6 @@
 package com.strapdata.strapkop.event;
 
-import com.strapdata.model.sidecar.ElassandraNodeStatus;
+import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;

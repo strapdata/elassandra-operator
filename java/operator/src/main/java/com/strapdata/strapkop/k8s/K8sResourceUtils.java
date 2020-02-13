@@ -6,14 +6,15 @@ import com.google.common.collect.Iterators;
 import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
 import com.squareup.okhttp.Call;
-import com.strapdata.model.Key;
-import com.strapdata.model.backup.*;
-import com.strapdata.model.k8s.cassandra.DataCenter;
-import com.strapdata.model.k8s.cassandra.DataCenterList;
-import com.strapdata.model.k8s.task.Task;
-import com.strapdata.model.k8s.task.TaskList;
-import com.strapdata.model.k8s.task.TaskPhase;
-import com.strapdata.model.k8s.task.TaskSpec;
+import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.backup.*;
+import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenterList;
+import com.strapdata.strapkop.model.k8s.task.Task;
+import com.strapdata.strapkop.model.k8s.task.TaskList;
+import com.strapdata.strapkop.model.k8s.task.TaskPhase;
+import com.strapdata.strapkop.model.k8s.task.TaskSpec;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.reconcilier.TaskReconcilier;
 import io.kubernetes.client.ApiException;
@@ -908,8 +909,8 @@ public class K8sResourceUtils {
             @Override
             public DataCenter call() throws Exception {
                 try {
-                    final Call call = customObjectsApi.getNamespacedCustomObjectCall("stable.strapdata.com", "v1",
-                            key.getNamespace(), "elassandradatacenters", key.getName(), null, null);
+                    final Call call = customObjectsApi.getNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, DataCenter.VERSION,
+                            key.getNamespace(), DataCenter.PLURAL, key.getName(), null, null);
                     final ApiResponse<DataCenter> apiResponse = customObjectsApi.getApiClient().execute(call, DataCenter.class);
                     return apiResponse.getData();
                 } catch(ApiException e) {
@@ -927,8 +928,8 @@ public class K8sResourceUtils {
             @Override
             public Optional<Task> call() throws Exception {
                 try {
-                    final Call call = customObjectsApi.getNamespacedCustomObjectCall("stable.strapdata.com", "v1",
-                            namespace, "elassandratasks", name, null, null);
+                    final Call call = customObjectsApi.getNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, Task.VERSION,
+                            namespace, Task.PLURAL, name, null, null);
                     final ApiResponse<Task> apiResponse = customObjectsApi.getApiClient().execute(call, Task.class);
                     return Optional.ofNullable(apiResponse.getData());
                 } catch(ApiException e) {
@@ -944,8 +945,8 @@ public class K8sResourceUtils {
     public Single<DataCenter> updateDataCenter(final DataCenter dc) throws ApiException {
         return Single.fromCallable( () ->{
             try {
-                final Call call = customObjectsApi.patchNamespacedCustomObjectCall("stable.strapdata.com", "v1",
-                        dc.getMetadata().getNamespace(), "elassandradatacenters", dc.getMetadata().getName(), dc, null, null);
+                final Call call = customObjectsApi.patchNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, Task.VERSION,
+                        dc.getMetadata().getNamespace(), DataCenter.PLURAL, dc.getMetadata().getName(), dc, null, null);
                 final ApiResponse<DataCenter> apiResponse = customObjectsApi.getApiClient().execute(call, DataCenter.class);
                 return apiResponse.getData();
             } catch(ApiException e) {
@@ -959,8 +960,8 @@ public class K8sResourceUtils {
 
     public Single<Object> updateDataCenterStatus(final DataCenter dc) throws ApiException {
         return Single.fromCallable(() -> {
-                return customObjectsApi.replaceNamespacedCustomObjectStatus("stable.strapdata.com", "v1",
-                        dc.getMetadata().getNamespace(), "elassandradatacenters", dc.getMetadata().getName(), dc);
+                return customObjectsApi.replaceNamespacedCustomObjectStatus(StrapdataCrdGroup.GROUP, Task.VERSION,
+                        dc.getMetadata().getNamespace(), DataCenter.PLURAL, dc.getMetadata().getName(), dc);
         });
     }
 
@@ -982,8 +983,8 @@ public class K8sResourceUtils {
             public TaskReconcilier.TaskWrapper call() throws Exception {
                 final Task task = taskWrapper.getTask();
                 try {
-                    final Call call = customObjectsApi.replaceNamespacedCustomObjectStatusCall("stable.strapdata.com", "v1",
-                            task.getMetadata().getNamespace(), "elassandratasks", task.getMetadata().getName(), task, null, null);
+                    final Call call = customObjectsApi.replaceNamespacedCustomObjectStatusCall(StrapdataCrdGroup.GROUP, Task.VERSION,
+                            task.getMetadata().getNamespace(), Task.PLURAL, task.getMetadata().getName(), task, null, null);
                     final ApiResponse<Task> apiResponse = customObjectsApi.getApiClient().execute(call, Task.class);
                     taskWrapper.updateTaskRef(apiResponse.getData());
                     return taskWrapper;
@@ -1002,8 +1003,8 @@ public class K8sResourceUtils {
             @Override
             public Task call() throws Exception {
                 try {
-                    final Call call = customObjectsApi.createNamespacedCustomObjectCall("stable.strapdata.com", "v1",
-                            task.getMetadata().getNamespace(), "elassandratasks", task, null, null, null);
+                    final Call call = customObjectsApi.createNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, Task.VERSION,
+                            task.getMetadata().getNamespace(), Task.PLURAL, task, null, null, null);
                     final ApiResponse<Task> apiResponse = customObjectsApi.getApiClient().execute(call, Task.class);
                     return apiResponse.getData();
                 } catch(ApiException e) {
@@ -1037,8 +1038,8 @@ public class K8sResourceUtils {
                 try {
                     logger.debug("Deleting DataCenter namespace={} name={}", metadata.getNamespace(), metadata.getName());
                     V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
-                    Call call = customObjectsApi.deleteNamespacedCustomObjectCall("stable.strapdata.com", "v1",
-                            metadata.getNamespace(), "elassandratasks", metadata.getName(), deleteOptions,
+                    Call call = customObjectsApi.deleteNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, Task.VERSION,
+                            metadata.getNamespace(), Task.PLURAL, metadata.getName(), deleteOptions,
                             null, null, "Foreground", null, null);
                     final ApiResponse<Task> apiResponse = customObjectsApi.getApiClient().execute(call, Task.class);
                     return apiResponse.getData();

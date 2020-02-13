@@ -2,14 +2,14 @@ package com.strapdata.strapkop.utils;
 
 import com.google.common.base.Strings;
 import com.microsoft.azure.storage.StorageException;
-import com.strapdata.backup.common.Constants;
-import com.strapdata.backup.manifest.AWSManifestReader;
-import com.strapdata.backup.manifest.AzureManifestReader;
-import com.strapdata.backup.manifest.GCPManifestReader;
-import com.strapdata.backup.manifest.ManifestReader;
-import com.strapdata.model.backup.CloudStorageSecret;
-import com.strapdata.model.k8s.cassandra.DataCenter;
-import com.strapdata.model.k8s.cassandra.Restore;
+import com.strapdata.strapkop.backup.common.Constants;
+import com.strapdata.strapkop.backup.manifest.AWSManifestReader;
+import com.strapdata.strapkop.backup.manifest.AzureManifestReader;
+import com.strapdata.strapkop.backup.manifest.GCPManifestReader;
+import com.strapdata.strapkop.backup.manifest.ManifestReader;
+import com.strapdata.strapkop.model.backup.CloudStorageSecret;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.Restore;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import io.kubernetes.client.models.V1EnvVar;
 import org.slf4j.Logger;
@@ -21,7 +21,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.security.InvalidKeyException;
 
-import static com.strapdata.backup.common.CloudDownloadUploadFactory.*;
+import static com.strapdata.strapkop.backup.common.CloudDownloadUploadFactory.*;
 
 @Singleton
 public class ManifestReaderFactory {

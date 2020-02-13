@@ -8,7 +8,11 @@ plugins {
   id 'com.bmuschko.docker-remote-api' version '5.2.0' apply false
   id 'com.github.jk1.dependency-license-report' version '1.11'
   id "com.gorylenko.gradle-git-properties" version "2.2.0"
+  id 'maven-publish'
 }
+
+group = 'com.strapdata.strapkop'
+version = '6.8.4.1'
 
 ext {
   allowInsecureRegistries = true
@@ -47,21 +51,6 @@ if (!ext.javaElassandraVersion) {
   // the elassandra version used to build k8s-addons (seedProvider, config loader...)
   ext.javaElassandraVersion = ext.latestElassandraVersion
 }
-
-allprojects {
-  repositories {
-    mavenLocal()
-    mavenCentral()
-    maven { url "https://nexus.repo.strapdata.com/repository/maven-releases-public" }
-    maven { url "https://jcenter.bintray.com" }
-    maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
-    maven { url 'https://plugins.gradle.org/m2/' }
-    jcenter() // or Maven central, required for Lombok dependency
-  }
-}
-
-
-
 
 licenseReport {
   renderers = [new CsvReportRenderer(separator:';'), new TextReportRenderer(), new InventoryHtmlReportRenderer('index.html', 'Strapkop License Report')]

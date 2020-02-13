@@ -1,15 +1,14 @@
 package com.strapdata.strapkop.reconcilier;
 
-import com.strapdata.model.backup.BackupArguments;
-import com.strapdata.model.backup.CloudStorageSecret;
-import com.strapdata.model.backup.CommonBackupArguments;
-import com.strapdata.model.backup.StorageProvider;
-import com.strapdata.model.k8s.cassandra.BlockReason;
-import com.strapdata.model.k8s.cassandra.DataCenter;
-import com.strapdata.model.k8s.task.BackupTaskSpec;
-import com.strapdata.model.k8s.task.Task;
-import com.strapdata.model.k8s.task.TaskPhase;
-import com.strapdata.model.k8s.task.TaskStatus;
+import com.strapdata.strapkop.model.backup.BackupArguments;
+import com.strapdata.strapkop.model.backup.CloudStorageSecret;
+import com.strapdata.strapkop.model.backup.CommonBackupArguments;
+import com.strapdata.strapkop.model.k8s.cassandra.BlockReason;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.task.BackupTaskSpec;
+import com.strapdata.strapkop.model.k8s.task.Task;
+import com.strapdata.strapkop.model.k8s.task.TaskPhase;
+import com.strapdata.strapkop.model.k8s.task.TaskStatus;
 import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;

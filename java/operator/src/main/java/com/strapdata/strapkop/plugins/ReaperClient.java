@@ -1,7 +1,7 @@
 package com.strapdata.strapkop.plugins;
 
 import com.google.common.collect.ImmutableMap;
-import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.http.HttpResponse;
@@ -16,7 +16,6 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Matcher;

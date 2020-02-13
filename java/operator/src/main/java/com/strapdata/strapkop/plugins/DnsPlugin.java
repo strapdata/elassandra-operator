@@ -1,7 +1,7 @@
 package com.strapdata.strapkop.plugins;
 
-import com.strapdata.dns.DnsUpdater;
-import com.strapdata.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.dns.DnsUpdater;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.StrapkopException;
 import io.kubernetes.client.ApiException;
 import io.reactivex.Completable;

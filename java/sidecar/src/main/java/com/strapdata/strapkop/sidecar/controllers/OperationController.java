@@ -2,6 +2,7 @@ package com.strapdata.strapkop.sidecar.controllers;
 
 import com.google.common.collect.ImmutableList;
 import com.strapdata.strapkop.sidecar.cassandra.CassandraModule;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
@@ -49,12 +50,12 @@ public class OperationController {
     @Post("/cleanup")
     @Produces(MediaType.TEXT_PLAIN)
     public Single<String> cleanup(@Nullable @QueryValue("keyspace") String keyspace) {
-        logger.debug("Node cleanup received");
+        logger.debug("cleanup keyspace={}", keyspace);
         return Single.fromCallable( () -> {
             final List<String> keyspaces = keyspace == null ? storageServiceMBean.getNonLocalStrategyKeyspaces() : ImmutableList.of(keyspace);
             for (String ks : keyspaces) {
                 storageServiceMBean.forceKeyspaceCleanup(2, ks);
-                logger.info("Cleanup requested for keyspace={}", ks);
+                logger.info("Cleanup done for keyspace={}", ks);
             }
             return "OK";
         }).subscribeOn(Schedulers.io());
@@ -63,7 +64,7 @@ public class OperationController {
     @Post("/repair")
     @Produces(MediaType.TEXT_PLAIN)
     public Single<String> repair(@Nullable @QueryValue("keyspace") String keyspace) {
-        logger.debug("Node repair received");
+        logger.debug("repair keyspace={}", keyspace);
         return Single.fromCallable( () -> {
             Map<String, String> options = new HashMap<>();
             options.put("incremental", Boolean.FALSE.toString());
@@ -74,6 +75,40 @@ public class OperationController {
                 logger.info("Repair requested for keyspace={}", ks);
             }
             return "OK";
+        }).subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * Datacenter rebuild
+     * @param keyspace
+     * @return
+     */
+    @Post("/flush")
+    @Produces(MediaType.TEXT_PLAIN)
+    public Single<HttpStatus> flush(@Nullable @QueryValue("keyspace") String keyspace) {
+        logger.debug("flush keyspace={}", keyspace);
+        return Single.fromCallable( () -> {
+            logger.info("Flush requested for keyspace={}", keyspace);
+            storageServiceMBean.forceKeyspaceFlush(keyspace);
+            logger.info("Flush done for keyspace={}", keyspace);
+            return HttpStatus.OK;
+        }).subscribeOn(Schedulers.io());
+    }
+
+    /**
+     * Datacenter rebuild
+     * @param keyspace
+     * @return
+     */
+    @Post("/rebuild/{srcDcName}")
+    @Produces(MediaType.TEXT_PLAIN)
+    public Single<HttpStatus> rebuild(@QueryValue("srcDcName") String srcDcName, @Nullable @QueryValue("keyspace") String keyspace) {
+        logger.debug("rebuild srcDcName={} keyspace={}", srcDcName, keyspace);
+        return Single.fromCallable( () -> {
+            logger.info("Rebuilding from dc={} requested for keyspace={}", srcDcName, keyspace);
+            storageServiceMBean.rebuild(srcDcName, keyspace, null, null);
+            logger.info("Rebuilt from dc={} requested for keyspace={}", srcDcName, keyspace);
+            return HttpStatus.OK;
         }).subscribeOn(Schedulers.io());
     }
 }
