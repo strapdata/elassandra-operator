@@ -167,7 +167,13 @@ public class DataCenterUpdateAction {
         if (this.dataCenterSpec.getEnterprise() == null) {
             this.dataCenterSpec.setEnterprise(new Enterprise());
         } else if (!this.dataCenterSpec.getEnterprise().getEnabled()) {
-            this.dataCenterSpec.setEnterprise(new Enterprise());
+            // force enable to true but disable all feature in order to create license
+            this.dataCenterSpec.setEnterprise(new Enterprise()
+                    .setCbs(false)
+                    .setHttps(false)
+                    .setJmx(false)
+                    .setSsl(false)
+                    .setAaa(new Aaa().setEnabled(false)));
         }
 
         this.manifestReaderFactory = factory;
@@ -1516,6 +1522,12 @@ public class DataCenterUpdateAction {
             // add authentication config
             switch (dataCenterSpec.getAuthentication()) {
                 case NONE:
+                    // create configMapFile also in NONE case because the ElassandraEnterprise image
+                    // defines the PasswordAuthorizer as default.
+                    configMapVolumeMountBuilder.addFile( "cassandra.yaml.d/002-authentication.yaml",
+                            toYamlString(ImmutableMap.of(
+                                    "authenticator", "AllowAllAuthenticator",
+                                    "authorizer", "AllowAllAuthorizer")));
                     break;
                 case CASSANDRA:
                     configMapVolumeMountBuilder.addFile( "cassandra.yaml.d/002-authentication.yaml",
@@ -2245,6 +2257,7 @@ public class DataCenterUpdateAction {
                     .addEnvItem(new V1EnvVar().name("JMX_PORT").value(Integer.toString(dataCenterSpec.getJmxPort())))
                     .addEnvItem(new V1EnvVar().name("CQLS_OPTS").value( dataCenterSpec.getSsl() ? "--ssl" : ""))
                     .addEnvItem(new V1EnvVar().name("ES_SCHEME").value( dataCenterSpec.getEnterprise().getHttps() ? "https" : "http"))
+                    .addEnvItem(new V1EnvVar().name("ES_PORT").value( Integer.toString(dataCenterSpec.getElasticsearchPort())))
                     .addEnvItem(new V1EnvVar().name("HOST_NETWORK").value( Boolean.toString(dataCenterSpec.getHostNetworkEnabled())))
                     .addEnvItem(new V1EnvVar().name("NAMESPACE").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.namespace"))))
                     .addEnvItem(new V1EnvVar().name("POD_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.name"))))
