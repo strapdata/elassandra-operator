@@ -21,9 +21,23 @@ public abstract class AbstractManager<T> {
         return ressources.get(key(dataCenter));
     }
 
+    public Map<String, T> get(String namespace, String clusterName, String datacenterName) {
+        return ressources.get(key(namespace, clusterName, datacenterName));
+    }
+
+    public Map<String, T> get(String dcKey) {
+        return ressources.get(dcKey);
+    }
+
+
     public T get(final DataCenter dataCenter, String name) {
         Map<String, T> map = get(dataCenter);
         return map == null ? null : map.get(name);
+    }
+
+    public T put(final DataCenter dataCenter, String name, T t) {
+        Map<String, T> map = get(dataCenter);
+        return map == null ? null : map.put(name, t);
     }
 
     public void addIfAbsent(final DataCenter dataCenter, String key, Supplier<T> valueSupplier) {
@@ -46,8 +60,11 @@ public abstract class AbstractManager<T> {
     }
 
     // per DC  unique key
-    private String key(final DataCenter dataCenter) {
-        return dataCenter.getMetadata().getNamespace()+"/"+dataCenter.getSpec().getClusterName()+"/"+dataCenter.getMetadata().getName();
+    public String key(final DataCenter dataCenter) {
+        return dataCenter.getMetadata().getNamespace()+"/"+dataCenter.getSpec().getClusterName()+"/"+dataCenter.getSpec().getDatacenterName();
     }
 
+    public static String key(String namespace, String clusterName, String datacenterName) {
+        return namespace+"/"+clusterName+"/"+datacenterName;
+    }
 }

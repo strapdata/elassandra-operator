@@ -152,6 +152,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                             role.loadPassword(dc, k8sResourceUtils).blockingGet();
                             tuple = connect(dc, Optional.of(role));
                             connectedRole = role;
+                            put(dc, CqlRole.CURRENT_ROLE_KEY, role);
                             break;
                         } catch (AuthenticationException e) {
                             // authentication failed
@@ -217,6 +218,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                         CqlRole strakopRole = get(dc, CqlRole.STRAPKOP_ROLE.username);
                         try {
                             Tuple2<Cluster, Session> strapkopConnection = connect(dc, Optional.of(strakopRole));
+                            put(dc, CqlRole.CURRENT_ROLE_KEY, strakopRole);
                             return strapkopConnection;
                         } catch(Exception e) {
                             logger.error("Failed to reconnect with the operator role="+strakopRole+" :"+e.getMessage(), e);

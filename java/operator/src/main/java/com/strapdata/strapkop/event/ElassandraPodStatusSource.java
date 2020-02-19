@@ -47,18 +47,18 @@ public class ElassandraPodStatusSource implements EventSource<NodeStatusEvent> {
                                         .observeOn(Schedulers.io())
                                         .map(nodeStatus -> {
                                             logger.debug("requesting pod={} sidecar for health check={} on thread {}", event.getPod().getName(), nodeStatus, Thread.currentThread().getName());
-                                            event.setCurrentMode(nodeStatus);
+                                            event.setCurrentMode(nodeStatus.getStatus());
                                             return event;
                                         })
                                         .onErrorReturn(throwable -> {
-                                            logger.debug("failed to get the status from sidecar pod=" + event.getPod().getName(), throwable.getMessage());
-                                            sidecarClientFactory.invalidateClient(event.getPod());
+                                            logger.debug("failed to get the status from sidecar pod=" + event.getPod().getName() + ":", throwable.toString());
+                                            sidecarClientFactory.invalidateClient(event.getPod(), throwable);
                                             event.setCurrentMode(ElassandraNodeStatus.UNKNOWN);
                                             return event;
                                         });
                             } catch (Exception e) {
                                 logger.warn("failed to get the status of pod=" + event.getPod().getName(), e);
-                                sidecarClientFactory.invalidateClient(event.getPod());
+                                sidecarClientFactory.invalidateClient(event.getPod(), e);
                                 return Single.just(event).map(v -> { v.setCurrentMode(ElassandraNodeStatus.UNKNOWN); return v;});
                             }
                         }
