@@ -7,4 +7,5 @@ import javax.inject.Singleton;
 
 @Singleton
 public class NodeCache extends Cache<Key, V1Node> {
+
 }

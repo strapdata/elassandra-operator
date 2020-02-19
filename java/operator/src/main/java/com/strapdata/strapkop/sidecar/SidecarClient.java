@@ -41,12 +41,12 @@ public class SidecarClient {
 
     public Completable rebuild(String sourceDcName, String keyspace) throws UnsupportedEncodingException {
         String qs = (keyspace == null) ? "" : "?keyspace=" + URLEncoder.encode(keyspace,"UTF-8");
-        return httpClient.exchange(POST("/rebuild/"+sourceDcName+ qs, "")).ignoreElements();
+        return httpClient.exchange(POST("/operations/rebuild/"+sourceDcName+ qs, "")).ignoreElements();
     }
 
     public Completable flush(String keyspace) throws UnsupportedEncodingException {
         String qs = (keyspace == null) ? "" : "?keyspace=" + URLEncoder.encode(keyspace,"UTF-8");
-        return httpClient.exchange(POST("/flush" + qs, "")).ignoreElements();
+        return httpClient.exchange(POST("/operations/flush" + qs, "")).ignoreElements();
     }
 
     public Completable repairPrimaryRange(String keyspace) throws UnsupportedEncodingException {

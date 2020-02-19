@@ -1,4 +1,4 @@
-package com.strapdata.strapkop.k8s;
+package com.strapdata.strapkop.model.k8s;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
@@ -77,7 +77,8 @@ public final class OperatorLabels {
                 .put(POD, podName)
                 .build();
     }
-    
+
+    /*
     private static String extractTagFromImage(String imageName) {
         int pos = imageName.indexOf(":");
         if (pos == -1) {
@@ -85,6 +86,8 @@ public final class OperatorLabels {
         }
         return imageName.substring(pos + 1);
     }
+    */
+
     
     public static String toSelector(Map<String, String> labels) {
         return Joiner.on(',').withKeyValueSeparator('=').join(labels);

@@ -179,7 +179,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
      * @return
      * @throws Exception
      */
-    public Completable removeDcFromReplicationMap(final DataCenter dc, final CqlSessionSupplier sessionSupplier) throws Exception {
+    public Completable removeDcFromReplicationMap(final DataCenter dc, final String dcName, final CqlSessionSupplier sessionSupplier) throws Exception {
         return sessionSupplier.getSession(dc)
                 .flatMap(session -> Single.fromFuture(session.executeAsync("SELECT keyspace_name, replication FROM system_schema.keyspaces")))
                 .flatMapCompletable(rs -> {
@@ -189,12 +189,9 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                         final Map<String, String> replication = row.getMap("replication", String.class, String.class);
                         final Map<String, Integer> keyspaceReplicationMap = replication.entrySet().stream()
                                 .filter(e -> !e.getKey().equals("class") && !e.getKey().equals("replication_factor"))
-                                .collect(Collectors.toMap(
-                                        Map.Entry::getKey,
-                                        e -> Integer.parseInt(e.getValue())
-                                ));
-                        if (keyspaceReplicationMap.containsKey(dc.getSpec().getDatacenterName())) {
-                            keyspaceReplicationMap.remove(dc.getSpec().getDatacenterName());
+                                .collect(Collectors.toMap(Map.Entry::getKey, e -> Integer.parseInt(e.getValue())));
+                        if (keyspaceReplicationMap.containsKey(dcName)) {
+                            keyspaceReplicationMap.remove(dcName);
                             todoList.add(alterKeyspace(dc, sessionSupplier, row.getString("keyspace_name"), keyspaceReplicationMap).ignoreElement());
                         }
                     }

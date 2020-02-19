@@ -2,6 +2,7 @@ package com.strapdata.strapkop.sidecar.cassandra;
 
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Infrastructure;
+import jmx.org.apache.cassandra.locator.EndpointSnitchInfoMBean;
 import jmx.org.apache.cassandra.service.StorageServiceMBean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,6 +59,11 @@ public class CassandraModule {
     @Singleton
     public StorageServiceMBean storageServiceMBeanProvider() {
         return JMX.newMBeanProxy(mBeanServerConnection, CassandraObjectNames.STORAGE_SERVICE_MBEAN_NAME, StorageServiceMBean.class);
+    }
+
+    @Singleton
+    public EndpointSnitchInfoMBean endpointSnitchInfoMBean() {
+        return JMX.newMBeanProxy(mBeanServerConnection, CassandraObjectNames.ENDPOINT_SNITCH_INFO_MBEAN_NAME, EndpointSnitchInfoMBean.class);
     }
 
     @Singleton

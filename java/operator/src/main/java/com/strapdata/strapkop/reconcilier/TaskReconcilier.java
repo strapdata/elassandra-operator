@@ -80,7 +80,7 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
     }
 
     Completable processSubmit(Task task) throws Exception {
-        logger.info("processing {} task submit", taskType);
+        logger.info("processing type={} task={}", taskType, task);
 
 /*        // create status if necessary
         if (task.getStatus() == null) {
@@ -128,6 +128,7 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
                 })
                 // failed when datacenter not found => task failed
                 .onErrorResumeNext(t -> {
+                    logger.error("task IGNORED dur to error:", t);
                     taskWrapper.getTask().setStatus(new TaskStatus().setPhase(TaskPhase.IGNORED).setLastMessage(t.getMessage()));
                     return k8sResourceUtils.updateTaskStatus(taskWrapper);
                 });

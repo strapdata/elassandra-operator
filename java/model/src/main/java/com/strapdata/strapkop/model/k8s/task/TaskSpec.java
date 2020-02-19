@@ -5,12 +5,14 @@ import com.google.gson.annotations.SerializedName;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import lombok.experimental.Wither;
 
 @Data
 @Wither
 @AllArgsConstructor
 @NoArgsConstructor
+@ToString
 public class TaskSpec {
     
     // tasks are always elassandra-cluster-scoped
@@ -35,9 +37,13 @@ public class TaskSpec {
     @Expose
     private RebuildTaskSpec rebuild;
 
-    @SerializedName("decommission")
+    @SerializedName("removeNodes")
     @Expose
-    private DecommissionTaskSpec decommission;
+    private RemoveNodesTaskSpec removeNodes;
+
+    @SerializedName("removeReplication")
+    @Expose
+    private RemoveReplicationTaskSpec removeReplication;
 
     @SerializedName("backup")
     @Expose

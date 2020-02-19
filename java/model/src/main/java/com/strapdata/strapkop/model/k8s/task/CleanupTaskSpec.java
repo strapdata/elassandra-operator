@@ -5,12 +5,14 @@ import com.google.gson.annotations.SerializedName;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import lombok.experimental.Wither;
 
 @Data
 @Wither
 @AllArgsConstructor
 @NoArgsConstructor
+@ToString
 public class CleanupTaskSpec {
 
     @SerializedName("keyspace")

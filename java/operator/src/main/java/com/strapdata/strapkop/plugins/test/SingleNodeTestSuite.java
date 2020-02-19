@@ -1,9 +1,9 @@
 package com.strapdata.strapkop.plugins.test;
 
+import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
 import com.strapdata.strapkop.model.k8s.cassandra.Workload;
-import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.plugins.test.step.OnSuccessAction;
 import com.strapdata.strapkop.plugins.test.step.Step;
 import io.kubernetes.client.custom.Quantity;

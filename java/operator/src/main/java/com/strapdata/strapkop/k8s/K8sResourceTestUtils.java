@@ -1,8 +1,12 @@
 package com.strapdata.strapkop.k8s;
 
 import com.google.common.collect.ImmutableMap;
+import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import io.kubernetes.client.ApiException;
-import io.kubernetes.client.models.*;
+import io.kubernetes.client.models.V1DeleteOptions;
+import io.kubernetes.client.models.V1Pod;
+import io.kubernetes.client.models.V1PodList;
+import io.kubernetes.client.models.V1Status;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

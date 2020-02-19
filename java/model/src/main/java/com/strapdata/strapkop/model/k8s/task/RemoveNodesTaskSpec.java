@@ -8,18 +8,21 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.Wither;
 
+/**
+ * Remove a datacenter from the ring
+ */
 @Data
 @Wither
 @AllArgsConstructor
 @NoArgsConstructor
 @ToString
-public class TestTaskSpec {
+public class RemoveNodesTaskSpec {
 
-    @SerializedName("timeOut")
+    /**
+     * datacenter to remove from the ring.
+     */
+    @SerializedName("dcName")
     @Expose
-    private int timeOut;
+    String dcName;
 
-    @SerializedName("testSuite")
-    @Expose
-    private String testSuite;
 }

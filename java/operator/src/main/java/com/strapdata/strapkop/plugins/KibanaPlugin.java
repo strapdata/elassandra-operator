@@ -3,16 +3,16 @@ package com.strapdata.strapkop.plugins;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
-import com.strapdata.strapkop.dns.DnsConfiguration;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.cql.CqlKeyspace;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRole;
 import com.strapdata.strapkop.cql.CqlRoleManager;
+import com.strapdata.strapkop.dns.DnsConfiguration;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.k8s.OperatorNames;
+import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.cassandra.*;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import io.kubernetes.client.ApiException;
@@ -148,7 +148,8 @@ public class KibanaPlugin extends AbstractPlugin {
      * @return The number of reaper pods depending on ReaperStatus
      */
     private int kibanaReplicas(final DataCenter dataCenter, KibanaSpace kibanaSpace) {
-        return (dataCenter.getStatus().getKeyspaceManagerStatus().getKeyspaces().contains(kibanaSpace.keyspace())) ? 1 : 0;
+        return (dataCenter.getStatus().getBootstrapped() == true &&
+                dataCenter.getStatus().getKeyspaceManagerStatus().getKeyspaces().contains(kibanaSpace.keyspace())) ? 1 : 0;
     }
 
 

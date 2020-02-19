@@ -264,7 +264,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
         final Cluster.Builder builder = Cluster.builder()
                 .withClusterName(dc.getSpec().getClusterName())
                 .withPort(dc.getSpec().getNativePort())
-                .withQueryOptions(new QueryOptions().setConsistencyLevel((availableNodes - parkedNodes) <= 1 ? ConsistencyLevel.LOCAL_ONE : ConsistencyLevel.LOCAL_QUORUM))
+                .withQueryOptions(new QueryOptions().setConsistencyLevel(ConsistencyLevel.LOCAL_ONE))
                 .withLoadBalancingPolicy(new TokenAwarePolicy(
                         DCAwareRoundRobinPolicy.builder()
                                 .withLocalDc(dc.getSpec().getDatacenterName())

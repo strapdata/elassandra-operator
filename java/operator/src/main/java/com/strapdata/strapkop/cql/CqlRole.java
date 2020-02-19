@@ -140,9 +140,14 @@ public class CqlRole implements Cloneable {
                         return sessionSupplier.getSession(dataCenter);
                     })
                     .flatMap(session -> {
-                        String q = String.format(Locale.ROOT, "CREATE ROLE IF NOT EXISTS %s with SUPERUSER = %b AND LOGIN = %b and PASSWORD = '%s'", username, superUser, login, password);
-                        logger.debug(q);
-                        return Single.fromFuture(session.executeAsync(q)).map(rs -> session);
+                        if (!"cassandra".equals(username)) {
+                            // don not create the cassandra role, it always exists
+                            String q = String.format(Locale.ROOT, "CREATE ROLE IF NOT EXISTS %s with SUPERUSER = %b AND LOGIN = %b and PASSWORD = '%s'", username, superUser, login, password);
+                            logger.debug(q);
+                            return Single.fromFuture(session.executeAsync(q)).map(rs -> session);
+                        } else {
+                            return Single.just(session);
+                        }
                     })
                     .flatMap(session -> {
                         String q = String.format(Locale.ROOT, "ALTER ROLE %s WITH PASSWORD = '%s'", username, password);

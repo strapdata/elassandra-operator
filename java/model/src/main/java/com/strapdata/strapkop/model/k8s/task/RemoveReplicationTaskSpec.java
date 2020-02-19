@@ -8,18 +8,21 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.Wither;
 
+/**
+ * Remove a datacenter from replication map, before removing DC
+ */
 @Data
 @Wither
 @AllArgsConstructor
 @NoArgsConstructor
 @ToString
-public class TestTaskSpec {
+public class RemoveReplicationTaskSpec {
 
-    @SerializedName("timeOut")
+    /**
+     * datacenter to remove from the replication map.
+     */
+    @SerializedName("dcName")
     @Expose
-    private int timeOut;
+    String dcName;
 
-    @SerializedName("testSuite")
-    @Expose
-    private String testSuite;
 }

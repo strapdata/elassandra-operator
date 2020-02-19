@@ -37,7 +37,7 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
                        TestTaskReconcilier testTaskReconcilier,
                        RepairTaskReconcilier repairTaskReconcilier,
                        RebuildTaskReconcilier rebuildTaskReconcilier,
-                       DecommissionTaskReconcilier decommissionTaskSpec) {
+                       RemoveReplicationTaskReconcilier decommissionTaskSpec) {
      
         this.workQueue = workQueue;
 

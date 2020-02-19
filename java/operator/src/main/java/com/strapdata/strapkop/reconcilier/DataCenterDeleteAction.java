@@ -1,8 +1,6 @@
 package com.strapdata.strapkop.reconcilier;
 
 import com.google.gson.JsonSyntaxException;
-import com.strapdata.strapkop.model.Key;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.backup.BackupScheduler;
 import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.cache.SidecarConnectionCache;
@@ -10,7 +8,9 @@ import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.cql.CqlSessionSupplier;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import com.strapdata.strapkop.k8s.OperatorLabels;
+import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.k8s.OperatorLabels;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
@@ -137,7 +137,8 @@ public class DataCenterDeleteAction {
                 // delete tasks
                 k8sResourceUtils.deleteTasks(dataCenter.getMetadata().getNamespace(), null).subscribe();
 
-                cqlRoleManager.markRolesAsUnapplied(dataCenter);
+                cqlRoleManager.remove(dataCenter);
+                cqlKeyspaceManager.remove(dataCenter);
 
                 logger.info("Deleted DataCenter namespace={} name={}", dataCenter.getMetadata().getNamespace(), dataCenter.getMetadata().getName());
             }

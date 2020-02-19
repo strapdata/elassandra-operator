@@ -1,17 +1,20 @@
 package com.strapdata.strapkop.reconcilier;
 
-import com.strapdata.strapkop.model.k8s.cassandra.BlockReason;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenterPhase;
-import com.strapdata.strapkop.model.k8s.task.RebuildTaskSpec;
-import com.strapdata.strapkop.model.k8s.task.Task;
-import com.strapdata.strapkop.model.k8s.task.TaskPhase;
 import com.strapdata.strapkop.cql.CqlKeyspace;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.cql.CqlSessionHandler;
 import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
+import com.strapdata.strapkop.model.ClusterKey;
+import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.k8s.cassandra.BlockReason;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenterPhase;
+import com.strapdata.strapkop.model.k8s.task.RebuildTaskSpec;
+import com.strapdata.strapkop.model.k8s.task.Task;
+import com.strapdata.strapkop.model.k8s.task.TaskPhase;
+import com.strapdata.strapkop.pipeline.WorkQueue;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CustomObjectsApi;
@@ -41,12 +44,14 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
     private final ApplicationContext context;
     private final CqlRoleManager cqlRoleManager;
     private final CqlKeyspaceManager cqlKeyspaceManager;
+    private final WorkQueue workQueue;
 
     public RebuildTaskReconcilier(ReconcilierObserver reconcilierObserver,
                                   final K8sResourceUtils k8sResourceUtils,
                                   final SidecarClientFactory sidecarClientFactory,
                                   final CustomObjectsApi customObjectsApi,
                                   final ApplicationContext context,
+                                  final WorkQueue workQueue,
                                   final CqlRoleManager cqlRoleManager,
                                   final CqlKeyspaceManager cqlKeyspaceManager,
                                   final MeterRegistry meterRegistry) {
@@ -55,6 +60,7 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
         this.context = context;
         this.cqlRoleManager = cqlRoleManager;
         this.cqlKeyspaceManager = cqlKeyspaceManager;
+        this.workQueue = workQueue;
     }
 
     public BlockReason blockReason() {
@@ -63,6 +69,7 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
 
     /**
      * Execute backup concurrently on all nodes
+     *
      * @param taskWrapper
      * @param dc
      * @return
@@ -82,12 +89,12 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
             // manage CQL replication map update before streaming
             final Map<String, Integer> replicationMap = new HashMap<>();
             replicationMap.putAll(rebuildTaskSpec.getReplicationMap());
-            for(CqlKeyspace systemKs : CqlKeyspaceManager.SYSTEM_KEYSPACES)
+            for (CqlKeyspace systemKs : CqlKeyspaceManager.SYSTEM_KEYSPACES)
                 replicationMap.putIfAbsent(systemKs.getName(), systemKs.getRf());
 
             final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
             Completable todo = Completable.complete();
-            for(Map.Entry<String, Integer> entry : replicationMap.entrySet()) {
+            for (Map.Entry<String, Integer> entry : replicationMap.entrySet()) {
                 todo = todo.andThen(this.cqlKeyspaceManager.updateKeyspaceReplicationMap(dc, rebuildTaskSpec.getDstDcName(), entry.getKey(), Math.min(entry.getValue(), rebuildTaskSpec.getDstDcSize()), cqlSessionHandler, false));
             }
 
@@ -102,7 +109,7 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
                                     .flush(null).blockingGet();
                             if (t != null) throw t;
                         } catch (Throwable throwable) {
-                            logger.error("Error while executing rebuild on {}", pod, throwable);
+                            logger.error("Error while executing rebuild on pod={}", pod, throwable);
                             podPhase = TaskPhase.FAILED;
                             task.getStatus().setLastMessage(throwable.getMessage());
                         }
@@ -121,7 +128,11 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
                     }));
         }
 
-        if (rebuildTaskSpec.getDstDcName().equals(dc.getSpec().getDatacenterName()) && dc.getStatus().getPhase().equals(DataCenterPhase.RUNNING)) {
+        if (rebuildTaskSpec.getDstDcName().equals(dc.getSpec().getDatacenterName())) {
+            if (!dc.getStatus().getPhase().equals(DataCenterPhase.RUNNING)) {
+                // wait a running datacenter to rebuild.
+                return Single.just(task.getStatus().getPhase());
+            }
             // excute a nodetool rebuild on all nodes
             return Observable.fromIterable(pods)
                     .subscribeOn(Schedulers.io())
@@ -133,7 +144,7 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
                                     .rebuild(task.getSpec().getRebuild().getSrcDcName(), null).blockingGet();
                             if (t != null) throw t;
                         } catch (Throwable throwable) {
-                            logger.error("Error while executing rebuild on {}", pod, throwable);
+                            logger.error("Error while executing rebuild on pod={}", pod, throwable);
                             podPhase = TaskPhase.FAILED;
                             task.getStatus().setLastMessage(throwable.getMessage());
                         }
@@ -149,6 +160,15 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
                                 taskPhase = TaskPhase.FAILED;
                         }
                         return taskPhase;
+                    }).flatMap(taskPhase -> {
+                        // submit a dc status update in the working queue to update bootstrapped=true
+                        workQueue.submit(new ClusterKey(dc), k8sResourceUtils.readDatacenter(new Key(dc.getMetadata()))
+                                .flatMapCompletable(dataCenter -> {
+                                    logger.info("Updating datacenter={} bootstrapped=true", dc.id());
+                                    dataCenter.getStatus().setBootstrapped(true);
+                                    return k8sResourceUtils.updateDataCenter(dc).ignoreElement();
+                                }));
+                        return Single.just(taskPhase);
                     });
         }
 

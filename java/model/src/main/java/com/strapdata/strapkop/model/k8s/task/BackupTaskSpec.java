@@ -6,6 +6,7 @@ import com.strapdata.strapkop.model.backup.StorageProvider;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import lombok.experimental.Wither;
 
 import java.util.List;
@@ -14,6 +15,7 @@ import java.util.List;
 @Wither
 @AllArgsConstructor
 @NoArgsConstructor
+@ToString
 public class BackupTaskSpec  {
     @SerializedName("provider")
     @Expose
