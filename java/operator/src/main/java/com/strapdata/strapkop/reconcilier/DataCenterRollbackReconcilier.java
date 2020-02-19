@@ -52,8 +52,7 @@ public class DataCenterRollbackReconcilier extends Reconcilier<Key> {
                         // call the statefullset reconciliation  (before scaling up/down to properly stream data according to the adjusted RF)
                         logger.trace("processing a configuration rollback for {} in thread {}", dc.getMetadata().getName(), Thread.currentThread().getName());
 
-                        return context.createBean(DataCenterUpdateAction.class, dc)
-                                .rollbackDataCenter(key);
+                        return context.createBean(DataCenterUpdateAction.class, dc).rollbackDataCenter(key);
                         // do not perform updateDatacenterStatus here to avoid collision with the update performed in the rollback method
                     } catch (Exception e) {
                         logger.error("an error occurred while processing Rollback for {}", dc.getMetadata().getName(), e);

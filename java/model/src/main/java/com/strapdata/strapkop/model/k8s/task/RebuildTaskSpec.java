@@ -5,17 +5,22 @@ import com.google.gson.annotations.SerializedName;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import lombok.experimental.Wither;
 
 import java.util.Map;
 
 /**
- * Task should be manually published when starting en new DC.
+ * Add a new datacenter:
+ * -Should be run on an existing DC to update the replication map before streaming.
+ * -Should be run on the new DC to stream data.
+ *
  */
 @Data
 @Wither
 @AllArgsConstructor
 @NoArgsConstructor
+@ToString
 public class RebuildTaskSpec {
 
     /**

@@ -9,16 +9,16 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.QueryValue;
 import io.reactivex.Single;
-import io.reactivex.annotations.Nullable;
 import io.reactivex.schedulers.Schedulers;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jmx.org.apache.cassandra.locator.EndpointSnitchInfoMBean;
 import jmx.org.apache.cassandra.service.StorageServiceMBean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import javax.annotation.Nullable;
+import javax.validation.constraints.NotBlank;
+import java.util.*;
 
 /**
  * Run a cassandra operation.
@@ -28,11 +28,13 @@ import java.util.Map;
 @Produces(MediaType.APPLICATION_JSON)
 public class OperationController {
     private final StorageServiceMBean storageServiceMBean;
+    private final EndpointSnitchInfoMBean endpointSnitchInfoMBean;
 
     private static final Logger logger = LoggerFactory.getLogger(OperationController.class);
 
     public OperationController(CassandraModule cassandraModule) {
         this.storageServiceMBean = cassandraModule.storageServiceMBeanProvider();
+        this.endpointSnitchInfoMBean = cassandraModule.endpointSnitchInfoMBean();
     }
 
     @Post("/decommission")
@@ -45,7 +47,36 @@ public class OperationController {
             return "OK";
         }).subscribeOn(Schedulers.io());
     }
-    
+
+    @Post("/list/{dcName}")
+    public Single<Set<String>> listNodes(@NotBlank @QueryValue("dcName") String dcName) {
+        logger.debug("listNodes dcName={}", dcName);
+        return Single.fromCallable( () -> {
+            Map<String, String> tokensToEndpoints = storageServiceMBean.getTokenToEndpointMap();
+            Set<String> hostIds = new HashSet<>();
+            for (Map.Entry<String, String> tokenAndEndPoint : tokensToEndpoints.entrySet()) {
+                String dc = endpointSnitchInfoMBean.getDatacenter(tokenAndEndPoint.getValue());
+                if (dcName.equals(dc))
+                    hostIds.add(tokenAndEndPoint.getValue());
+            }
+            return hostIds;
+        }).subscribeOn(Schedulers.io());
+    }
+
+    @Post("/remove/{hostId}")
+    public Single<Set<String>> listNodes(@NotBlank @QueryValue("dcName") String dcName) {
+        logger.debug("listNodes dcName={}", dcName);
+        return Single.fromCallable( () -> {
+            Map<String, String> tokensToEndpoints = storageServiceMBean.getTokenToEndpointMap();
+            Set<String> hostIds = new HashSet<>();
+            for (Map.Entry<String, String> tokenAndEndPoint : tokensToEndpoints.entrySet()) {
+                String dc = endpointSnitchInfoMBean.getDatacenter(tokenAndEndPoint.getValue());
+                if (dcName.equals(dc))
+                    hostIds.add(tokenAndEndPoint.getValue());
+            }
+            return hostIds;
+        }).subscribeOn(Schedulers.io());
+    }
     
     @Post("/cleanup")
     @Produces(MediaType.TEXT_PLAIN)
@@ -88,9 +119,11 @@ public class OperationController {
     public Single<HttpStatus> flush(@Nullable @QueryValue("keyspace") String keyspace) {
         logger.debug("flush keyspace={}", keyspace);
         return Single.fromCallable( () -> {
-            logger.info("Flush requested for keyspace={}", keyspace);
-            storageServiceMBean.forceKeyspaceFlush(keyspace);
-            logger.info("Flush done for keyspace={}", keyspace);
+            List<String> keyspaceList = (keyspace == null) ? storageServiceMBean.getKeyspaces() : ImmutableList.of(keyspace);
+            logger.info("Flush requested for keyspaces={}", keyspaceList);
+            for(String ks : keyspaceList)
+                storageServiceMBean.forceKeyspaceFlush(ks);
+            logger.info("Flush done for keyspaces={}", keyspaceList);
             return HttpStatus.OK;
         }).subscribeOn(Schedulers.io());
     }

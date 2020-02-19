@@ -7,6 +7,7 @@ import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.model.k8s.cassandra.BlockReason;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.task.RemoveNodesTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
@@ -20,6 +21,7 @@ import io.reactivex.Observable;
 import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
 import io.vavr.Tuple2;
+import org.elasticsearch.common.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,21 +33,21 @@ import java.util.stream.Collectors;
 
 @Singleton
 @Infrastructure
-public class DecommissionTaskReconcilier extends TaskReconcilier {
-    private static final Logger logger = LoggerFactory.getLogger(DecommissionTaskReconcilier.class);
+public class RemoveNodesTaskReconcilier extends TaskReconcilier {
+    private static final Logger logger = LoggerFactory.getLogger(RemoveNodesTaskReconcilier.class);
     private final SidecarClientFactory sidecarClientFactory;
     private final ApplicationContext context;
     private final CqlRoleManager cqlRoleManager;
     private final CqlKeyspaceManager cqlKeyspaceManager;
 
-    public DecommissionTaskReconcilier(ReconcilierObserver reconcilierObserver,
-                                       final K8sResourceUtils k8sResourceUtils,
-                                       final SidecarClientFactory sidecarClientFactory,
-                                       final CustomObjectsApi customObjectsApi,
-                                       final ApplicationContext context,
-                                       final CqlRoleManager cqlRoleManager,
-                                       final CqlKeyspaceManager cqlKeyspaceManager,
-                                       final MeterRegistry meterRegistry) {
+    public RemoveNodesTaskReconcilier(ReconcilierObserver reconcilierObserver,
+                                      final K8sResourceUtils k8sResourceUtils,
+                                      final SidecarClientFactory sidecarClientFactory,
+                                      final CustomObjectsApi customObjectsApi,
+                                      final ApplicationContext context,
+                                      final CqlRoleManager cqlRoleManager,
+                                      final CqlKeyspaceManager cqlKeyspaceManager,
+                                      final MeterRegistry meterRegistry) {
         super(reconcilierObserver, "decommission", k8sResourceUtils, meterRegistry);
         this.sidecarClientFactory = sidecarClientFactory;
         this.context = context;
@@ -58,7 +60,8 @@ public class DecommissionTaskReconcilier extends TaskReconcilier {
     }
 
     /**
-     * Execute backup concurrently on all nodes
+     * Remove node of a stopped datacenters.
+     *
      * @param taskWrapper
      * @param dc
      * @return
@@ -67,10 +70,16 @@ public class DecommissionTaskReconcilier extends TaskReconcilier {
     @Override
     protected Single<TaskPhase> doTask(TaskWrapper taskWrapper, DataCenter dc) throws Exception {
         final Task task = taskWrapper.getTask();
+        final RemoveNodesTaskSpec removeNodesTaskSpec = task.getSpec().getRemoveNodes();
         final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
 
+        if (Strings.isNullOrEmpty(removeNodesTaskSpec.getDcName())) {
+            logger.warn("dcName not set, ignore task");
+            return Single.just(TaskPhase.FAILED);
+        }
         // remove the dc from all replication maps
-        Completable todo = this.cqlKeyspaceManager.removeDcFromReplicationMap(dc, cqlSessionHandler);
+
+        Completable todo = (this.cqlKeyspaceManager.removeDcFromReplicationMap(dc, decommissionTaskSpec.getDcName(), cqlSessionHandler);
 
         final List<String> pods = task.getStatus().getPods().entrySet().stream()
                 .filter(e -> Objects.equals(e.getValue(), TaskPhase.WAITING))

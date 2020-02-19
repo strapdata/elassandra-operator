@@ -1,10 +1,10 @@
 package com.strapdata.strapkop.pipeline;
 
 import com.squareup.okhttp.Call;
-import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.StatefulsetCache;
-import com.strapdata.strapkop.k8s.OperatorLabels;
+import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import io.kubernetes.client.ApiClient;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;

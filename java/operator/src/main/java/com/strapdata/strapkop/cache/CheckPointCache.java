@@ -2,8 +2,8 @@ package com.strapdata.strapkop.cache;
 
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenterSpec;
-import io.vavr.Tuple2;
-import lombok.Data;
+import lombok.*;
+import lombok.experimental.Wither;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -11,52 +11,74 @@ import javax.inject.Singleton;
 import java.util.Optional;
 
 @Singleton
-public class CheckPointCache extends Cache<Key, Tuple2<CheckPointCache.CheckPoint, CheckPointCache.CheckPoint>>  {
+public class CheckPointCache extends Cache<Key, CheckPointCache.CheckPoint>  {
     private static final Logger LOGGER = LoggerFactory.getLogger(CheckPointCache.class);
 
-    public void prepareCheckPoint(Key key, DataCenterSpec spec, Optional<String> userConfigMapRef) {
-        LOGGER.debug("prepare a new RestorePoint with spec={} userConfigMap={}", spec == null ? "null" : spec.fingerprint(), userConfigMapRef);
-        LOGGER.trace("prepare a new RestorePoint with spec={}", spec == null ? "null" : spec);
+    @Data
+    @Wither
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Getter
+    @Setter
+    public class CheckPoint {
+        private DataCenterSpec committedSpec;    // last successfully applied spec
+        private String committedUserConfigMap;   // last successfully applied configmap
 
+        private DataCenterSpec nextCurrentSpec;
+        private String nextUserConfigMap;
+
+        public CheckPoint prepare(DataCenterSpec nextCurrentSpec, String nextUserConfigMap) {
+            LOGGER.debug("prepare next spec={} userConfigMap={}", nextCurrentSpec == null ? "null" : nextCurrentSpec.fingerprint(), nextUserConfigMap);
+            LOGGER.trace("prepare next spec={}", nextCurrentSpec == null ? "null" : nextCurrentSpec);
+            this.nextCurrentSpec = nextCurrentSpec;
+            this.nextUserConfigMap = nextUserConfigMap;
+            return this;
+        }
+
+        public CheckPoint commit() {
+            LOGGER.debug("commit new spec={} userConfigMap={}", nextCurrentSpec == null ? "null" : nextCurrentSpec.fingerprint(), nextUserConfigMap);
+            LOGGER.trace("commit new spec={}", nextCurrentSpec == null ? "null" : nextCurrentSpec);
+            if (nextCurrentSpec != null)
+                this.committedSpec = this.nextCurrentSpec;
+            if (nextUserConfigMap != null)
+                this.committedUserConfigMap = this.nextUserConfigMap;
+            return this;
+        }
+
+        public CheckPoint rollback() {
+            LOGGER.debug("rollback to spec={} userConfigMap={}", committedSpec == null ? "null" : committedSpec.fingerprint(), committedUserConfigMap);
+            LOGGER.trace("rollback to spec={}", committedSpec == null ? "null" : committedSpec);
+            this.nextCurrentSpec = null;
+            this.nextUserConfigMap = null;
+            return this;
+        }
+    }
+
+    public CheckPoint prepareCheckPoint(Key key, DataCenterSpec spec, Optional<String> userConfigMapRef) {
         if (spec != null) {
-            CheckPointCache.CheckPoint ongoingCheckPoint = new CheckPointCache.CheckPoint()
-                    .setSpec(spec)
-                    .setUserConfigMap(userConfigMapRef.orElse(null));
-            Tuple2<CheckPointCache.CheckPoint, CheckPointCache.CheckPoint> checkPoint = get(key);
-            if (checkPoint != null) {
-                checkPoint = checkPoint.update1(ongoingCheckPoint);
-            } else {
-                checkPoint = new Tuple2<>(ongoingCheckPoint, null);
-            }
-            put(key, checkPoint);
+            return compute(key, (k, v) -> {
+                if (v == null)
+                    v = new CheckPoint().withCommittedSpec(spec).withCommittedUserConfigMap(userConfigMapRef.orElse(null));
+                return v;
+            }).prepare(spec, userConfigMapRef.orElse(null));
         }
+        return null;
     }
 
-    public void commitCheckPoint(Key key, DataCenterSpec spec) {
-        Tuple2<CheckPointCache.CheckPoint, CheckPointCache.CheckPoint> tuple = get(key);
-        CheckPoint ongoingCheckPoint = tuple == null ? null : tuple._1;
-        if ( ongoingCheckPoint != null && ongoingCheckPoint.spec != null && ongoingCheckPoint.spec.fingerprint().equals(spec.fingerprint())) {
-            put(key, tuple.update2(ongoingCheckPoint).update1(null));
-            LOGGER.debug("new stable RestorePoint with spec={}", spec == null ? "null" : spec.fingerprint());
-        } else {
-            // update only the ongoing restore point, to preserve the last committed successfully
-            put(key, tuple.update1(null));
-            LOGGER.info("new stable RestorePoint with spec={} can't be committed", spec == null ? "null" : spec.fingerprint());
-        }
+    public CheckPoint commitCheckPoint(Key key) {
+        return containsKey(key) ? get(key).rollback() : null;
     }
 
-    public void clearCheckPoint(Key key) {
-        remove(key);
-        LOGGER.info("RestorePoint removed");
+    public CheckPoint rollbackCheckPoint(Key key) {
+        return containsKey(key) ? get(key).commit() : null;
+    }
+
+    public CheckPointCache.CheckPoint clearCheckPoint(Key key) {
+        return remove(key);
     }
 
     public Optional<CheckPointCache.CheckPoint> getCheckPoint(Key key) {
-        return Optional.ofNullable(get(key)).map(t -> t._2);
+        return Optional.ofNullable(get(key));
     }
 
-    @Data
-    public class CheckPoint {
-        private DataCenterSpec spec;
-        private String userConfigMap;
-    }
 }

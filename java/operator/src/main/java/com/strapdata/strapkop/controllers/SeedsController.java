@@ -2,9 +2,9 @@ package com.strapdata.strapkop.controllers;
 
 import com.google.common.collect.ImmutableMap;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.micronaut.http.HttpStatus;

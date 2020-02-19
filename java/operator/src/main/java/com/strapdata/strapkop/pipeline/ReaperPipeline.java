@@ -1,11 +1,11 @@
 package com.strapdata.strapkop.pipeline;
 
 import com.squareup.okhttp.Call;
-import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.PodCache;
-import com.strapdata.strapkop.k8s.OperatorLabels;
-import com.strapdata.strapkop.k8s.ReaperLabels;
+import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.k8s.OperatorLabels;
+import com.strapdata.strapkop.plugins.ReaperPlugin;
 import io.kubernetes.client.ApiClient;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CoreV1Api;
@@ -50,7 +50,7 @@ public class ReaperPipeline extends K8sWatchPipeline<V1Pod, V1PodList>  {
         @Override
         public Call createListApiCall(boolean watch, String resourceVersion) throws ApiException {
             return coreV1Api.listNamespacedPodCall( config.getNamespace(), false, null, null,
-                    null, OperatorLabels.toSelector(ReaperLabels.PODS_SELECTOR), null,
+                    null, OperatorLabels.toSelector(ReaperPlugin.PODS_SELECTOR), null,
                     null, null, watch, null, null
             );
         }

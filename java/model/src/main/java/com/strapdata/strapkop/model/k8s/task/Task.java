@@ -5,10 +5,7 @@ import com.google.gson.annotations.SerializedName;
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import io.kubernetes.client.models.V1ObjectMeta;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import lombok.experimental.Wither;
 
 @Data
@@ -16,6 +13,7 @@ import lombok.experimental.Wither;
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter
+@ToString
 public class Task {
 
     public static final String NAME = "elassandratask";

@@ -2,7 +2,7 @@ package com.strapdata.strapkop.ssl;
 
 
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import com.strapdata.strapkop.k8s.OperatorLabels;
+import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.ssl.utils.CertManager;
 import com.strapdata.strapkop.ssl.utils.X509CertificateAndPrivateKey;
 import io.kubernetes.client.ApiException;

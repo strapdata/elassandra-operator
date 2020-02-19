@@ -1,9 +1,9 @@
 package com.strapdata.strapkop.handler;
 
+import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.model.ClusterKey;
 import com.strapdata.strapkop.model.Key;
-import com.strapdata.strapkop.event.K8sWatchEvent;
-import com.strapdata.strapkop.k8s.OperatorLabels;
+import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.pipeline.WorkQueue;
 import com.strapdata.strapkop.reconcilier.DataCenterUpdateReconcilier;
 import io.kubernetes.client.ApiException;

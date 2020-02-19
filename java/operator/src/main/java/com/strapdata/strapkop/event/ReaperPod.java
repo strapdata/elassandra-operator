@@ -1,6 +1,6 @@
 package com.strapdata.strapkop.event;
 
-import com.strapdata.strapkop.k8s.OperatorLabels;
+import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import io.kubernetes.client.models.V1ContainerStatus;
 import io.kubernetes.client.models.V1ObjectMeta;
 import io.kubernetes.client.models.V1Pod;

@@ -2,13 +2,14 @@ package com.strapdata.strapkop.plugins;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
-import com.strapdata.strapkop.dns.DnsConfiguration;
+import com.google.common.collect.ImmutableMap;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.cql.*;
+import com.strapdata.strapkop.dns.DnsConfiguration;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.k8s.OperatorNames;
+import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.cassandra.*;
 import com.strapdata.strapkop.reconcilier.DataCenterUpdateAction;
 import com.strapdata.strapkop.ssl.AuthorityManager;
@@ -34,6 +35,11 @@ import java.util.concurrent.Callable;
 public class ReaperPlugin extends AbstractPlugin {
 
     private String reaperAdminPassword = null; // keep password to avoid secret reloading.
+
+    public static final Map<String, String> PODS_SELECTOR = ImmutableMap.of(
+            "app.kubernetes.io/managed-by", "elassandra-operator",
+            "app", "reaper"
+    );
 
     public static final String APP_SERVICE_NAME = "app";
     public static final String ADMIN_SERVICE_NAME = "admin";

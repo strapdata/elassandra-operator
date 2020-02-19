@@ -1,8 +1,10 @@
 package com.strapdata.strapkop.reconcilier;
 
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.cache.*;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.cql.CqlSessionHandler;
+import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.plugins.PluginRegistry;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
@@ -21,17 +23,41 @@ public class DataCenterDeleteReconcilier extends Reconcilier<DataCenter> {
     private final ApplicationContext context;
     private final PluginRegistry pluginRegistry;
     private final CqlRoleManager cqlRoleManager;
+    private final CheckPointCache checkPointCache;
+    private final DataCenterCache dataCenterCache;
+    private final ElassandraNodeStatusCache elassandraNodeStatusCache;
+    private final PodCache podCache;
+    private final DeploymentCache deploymentCache;
+    private final SidecarConnectionCache sidecarConnectionCache;
+    private final StatefulsetCache statefulsetCache;
+    private final TaskCache taskCache;
     private final MeterRegistry meterRegistry;
 
     public DataCenterDeleteReconcilier(final ReconcilierObserver reconcilierObserver,
                                        final ApplicationContext context,
                                        final CqlRoleManager cqlRoleManager,
                                        final PluginRegistry pluginRegistry,
+                                       final CheckPointCache checkPointCache,
+                                       final DataCenterCache dataCenterCache,
+                                       final ElassandraNodeStatusCache elassandraNodeStatusCache,
+                                       final PodCache podCache,
+                                       final DeploymentCache deploymentCache,
+                                       final SidecarConnectionCache sidecarConnectionCache,
+                                       final StatefulsetCache statefulsetCache,
+                                       final TaskCache taskCache,
                                        final MeterRegistry meterRegistry) {
         super(reconcilierObserver);
         this.context = context;
         this.pluginRegistry = pluginRegistry;
         this.cqlRoleManager = cqlRoleManager;
+        this.checkPointCache = checkPointCache;
+        this.dataCenterCache = dataCenterCache;
+        this.elassandraNodeStatusCache = elassandraNodeStatusCache;
+        this.podCache = podCache;
+        this.deploymentCache = deploymentCache;
+        this.sidecarConnectionCache = sidecarConnectionCache;
+        this.statefulsetCache = statefulsetCache;
+        this.taskCache = taskCache;
         this.meterRegistry = meterRegistry;
     }
     
@@ -53,8 +79,18 @@ public class DataCenterDeleteReconcilier extends Reconcilier<DataCenter> {
                     @Override
                     public void run() throws Exception {
                         cqlSessionHandler.close();
+
+                        // clear caches to avoid memory leak
+                        Key dcKey = new Key(dataCenter.getMetadata());
+                        checkPointCache.clearCheckPoint(dcKey);
+                        dataCenterCache.remove(dcKey);
+                        elassandraNodeStatusCache.purgeDataCenter(dataCenter);
+                        sidecarConnectionCache.purgeDataCenter(dataCenter);
+                        taskCache.purgeDataCenter(dataCenter);
+                        statefulsetCache.purgeDataCenter(dataCenter);
+                        deploymentCache.purgeDataCenter(dataCenter);
+                        podCache.purgeDataCenter(dataCenter);
                     }
                 });
-
     }
 }

@@ -9,6 +9,6 @@ public enum TaskPhase {
 
 
     public boolean isTerminated() {
-        return this.equals(SUCCEED) || this.equals(FAILED);
+        return this.equals(SUCCEED) || this.equals(FAILED) || this.equals(IGNORED);
     }
 }

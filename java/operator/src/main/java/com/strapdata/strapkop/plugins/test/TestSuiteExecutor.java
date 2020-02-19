@@ -1,16 +1,16 @@
 package com.strapdata.strapkop.plugins.test;
 
-import com.strapdata.strapkop.model.Key;
-import com.strapdata.strapkop.model.k8s.cassandra.*;
-import com.strapdata.strapkop.model.k8s.task.Task;
-import com.strapdata.strapkop.model.k8s.task.TaskPhase;
-import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.cache.CheckPointCache;
 import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.k8s.K8sResourceTestUtils;
-import com.strapdata.strapkop.k8s.OperatorLabels;
 import com.strapdata.strapkop.k8s.OperatorNames;
+import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.k8s.OperatorLabels;
+import com.strapdata.strapkop.model.k8s.cassandra.*;
+import com.strapdata.strapkop.model.k8s.task.Task;
+import com.strapdata.strapkop.model.k8s.task.TaskPhase;
+import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.plugins.test.step.OnSuccessAction;
 import com.strapdata.strapkop.plugins.test.step.Step;
 import com.strapdata.strapkop.plugins.test.step.StepFailedException;
@@ -207,11 +207,11 @@ public abstract class TestSuiteExecutor {
     protected void checkHistoryDataCenter(final DataCenter dc) {
         Optional<CheckPointCache.CheckPoint> restorePoint = checkPointCache.getCheckPoint(new Key(dc.getMetadata()));
         if (restorePoint.isPresent()) {
-            if (restorePoint.get().getSpec() == null) {
+            if (restorePoint.get().getCommittedSpec() == null) {
                 failed("ElassandraDataCenter should have a restore point");
             }
 
-            String stableFingerPrint = restorePoint.get().getSpec().fingerprint();
+            String stableFingerPrint = restorePoint.get().getCommittedSpec().fingerprint();
             if (!dc.getSpec().fingerprint().equals(stableFingerPrint)) {
                 failed("ElassandraDataCenter RestorePoint instance should reference the fingerprint " + dc.getSpec().fingerprint());
             }
