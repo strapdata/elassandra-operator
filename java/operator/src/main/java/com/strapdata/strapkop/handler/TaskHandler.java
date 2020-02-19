@@ -46,8 +46,7 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
                 Tuple.of(cleanupTaskReconcilier, TaskSpec::getCleanup),
                 Tuple.of(repairTaskReconcilier, TaskSpec::getRepair),
                 Tuple.of(testTaskReconcilier, TaskSpec::getTest),
-                Tuple.of(rebuildTaskReconcilier, TaskSpec::getRebuild),
-                Tuple.of(decommissionTaskSpec, TaskSpec::getDecommission));
+                Tuple.of(rebuildTaskReconcilier, TaskSpec::getRebuild));
     }
     
     @Override

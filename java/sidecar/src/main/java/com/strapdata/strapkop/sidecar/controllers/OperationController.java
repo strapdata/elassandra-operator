@@ -62,21 +62,6 @@ public class OperationController {
             return hostIds;
         }).subscribeOn(Schedulers.io());
     }
-
-    @Post("/remove/{hostId}")
-    public Single<Set<String>> listNodes(@NotBlank @QueryValue("dcName") String dcName) {
-        logger.debug("listNodes dcName={}", dcName);
-        return Single.fromCallable( () -> {
-            Map<String, String> tokensToEndpoints = storageServiceMBean.getTokenToEndpointMap();
-            Set<String> hostIds = new HashSet<>();
-            for (Map.Entry<String, String> tokenAndEndPoint : tokensToEndpoints.entrySet()) {
-                String dc = endpointSnitchInfoMBean.getDatacenter(tokenAndEndPoint.getValue());
-                if (dcName.equals(dc))
-                    hostIds.add(tokenAndEndPoint.getValue());
-            }
-            return hostIds;
-        }).subscribeOn(Schedulers.io());
-    }
     
     @Post("/cleanup")
     @Produces(MediaType.TEXT_PLAIN)

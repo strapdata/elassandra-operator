@@ -79,7 +79,7 @@ public class RemoveNodesTaskReconcilier extends TaskReconcilier {
         }
         // remove the dc from all replication maps
 
-        Completable todo = (this.cqlKeyspaceManager.removeDcFromReplicationMap(dc, decommissionTaskSpec.getDcName(), cqlSessionHandler);
+        Completable todo = this.cqlKeyspaceManager.removeDcFromReplicationMap(dc, removeNodesTaskSpec.getDcName(), cqlSessionHandler);
 
         final List<String> pods = task.getStatus().getPods().entrySet().stream()
                 .filter(e -> Objects.equals(e.getValue(), TaskPhase.WAITING))

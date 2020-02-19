@@ -1,15 +1,35 @@
 package com.strapdata.strapkop.sidecar;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.strapdata.strapkop.cql.CqlRole;
+import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.model.backup.BackupArguments;
 import com.strapdata.strapkop.model.sidecar.BackupResponse;
-import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
+import com.strapdata.strapkop.model.sidecar.StatusResponse;
+import io.micronaut.core.annotation.AnnotationMetadataResolver;
+import io.micronaut.core.io.ResourceResolver;
+import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.client.DefaultHttpClient;
+import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.RxHttpClient;
+import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.jackson.ObjectMapperFactory;
+import io.micronaut.jackson.codec.JsonMediaTypeCodec;
+import io.micronaut.jackson.codec.JsonStreamMediaTypeCodec;
+import io.micronaut.runtime.ApplicationConfiguration;
+import io.netty.channel.MultithreadEventLoopGroup;
+import io.netty.handler.ssl.SslContext;
+import io.netty.util.concurrent.DefaultThreadFactory;
 import io.reactivex.Completable;
 import io.reactivex.Single;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.util.Map;
 
 import static io.micronaut.http.HttpRequest.GET;
 import static io.micronaut.http.HttpRequest.POST;
@@ -20,42 +40,84 @@ import static io.micronaut.http.HttpRequest.POST;
  */
 public class SidecarClient {
 
+    static final Logger logger = LoggerFactory.getLogger(SidecarClient.class);
+
     private RxHttpClient httpClient;
-    
-    public SidecarClient(URL url) {
-        httpClient = RxHttpClient.create(url);
+    private CqlRoleManager cqlRoleManager;
+    private String dcKey;
+
+    public SidecarClient(URL url,
+                         HttpClientConfiguration httpClientConfiguration,
+                         SslContext sslContext,
+                         CqlRoleManager cqlRoleManager,
+                         String dcKey) {
+        this.httpClient = new DefaultHttpClient(LoadBalancer.fixed(url),
+                httpClientConfiguration,
+                null,
+                new DefaultThreadFactory(MultithreadEventLoopGroup.class),
+                new SidecarNettyClientSslBuilder(new ResourceResolver(), sslContext),
+                createDefaultMediaTypeRegistry(),
+                AnnotationMetadataResolver.DEFAULT);
+        this.cqlRoleManager = cqlRoleManager;
+        this.dcKey = dcKey;
     }
-    
-    public Single<ElassandraNodeStatus> status() {
-        return httpClient.retrieve(GET("/status"), ElassandraNodeStatus.class).singleOrError();
+
+    private static MediaTypeCodecRegistry createDefaultMediaTypeRegistry() {
+        ObjectMapper objectMapper = new ObjectMapperFactory().objectMapper(null, null);
+        ApplicationConfiguration applicationConfiguration = new ApplicationConfiguration();
+        return MediaTypeCodecRegistry.of(
+                new JsonMediaTypeCodec(objectMapper, applicationConfiguration, null), new JsonStreamMediaTypeCodec(objectMapper, applicationConfiguration, null)
+        );
+    }
+
+    /**
+     * Use the last connected cqlRole used by the CqlRoleManager, or the default cassandra.
+     * When connection fails, sidecarClient is removed from the connection cache.
+     * @param req
+     * @return
+     */
+    public <I> MutableHttpRequest<I> auth(MutableHttpRequest<I> req) {
+        CqlRole cqlRole = CqlRole.DEFAULT_CASSANDRA_ROLE;
+
+        Map<String, CqlRole> roles = this.cqlRoleManager.get(dcKey);
+        if (roles != null && roles.containsKey(CqlRole.CURRENT_ROLE_KEY))
+            cqlRole = roles.get(CqlRole.CURRENT_ROLE_KEY);
+
+        logger.debug("auth cqlRole={}", cqlRole);
+        req.basicAuth(cqlRole.getUsername(), cqlRole.getPassword());
+        return req;
+    }
+
+    public Single<StatusResponse> status() {
+        return httpClient.retrieve(auth(GET("_nodetool/status")), StatusResponse.class).singleOrError();
     }
     
     public Completable decommission() {
-        return httpClient.exchange(POST("/operations/decommission", "")).ignoreElements();
+        return httpClient.exchange(auth(POST("_nodetool/decommission", ""))).ignoreElements();
     }
     
     public Completable cleanup(String keyspace) throws UnsupportedEncodingException {
         String qs = (keyspace == null) ? "" : "?keyspace=" + URLEncoder.encode(keyspace,"UTF-8");
-        return httpClient.exchange(POST("/operations/cleanup" +qs, "")).ignoreElements();
+        return httpClient.exchange(auth(POST("_nodetool/cleanup" +qs, ""))).ignoreElements();
     }
 
     public Completable rebuild(String sourceDcName, String keyspace) throws UnsupportedEncodingException {
         String qs = (keyspace == null) ? "" : "?keyspace=" + URLEncoder.encode(keyspace,"UTF-8");
-        return httpClient.exchange(POST("/operations/rebuild/"+sourceDcName+ qs, "")).ignoreElements();
+        return httpClient.exchange(auth(POST("_nodetool/rebuild/"+sourceDcName+ qs, ""))).ignoreElements();
     }
 
     public Completable flush(String keyspace) throws UnsupportedEncodingException {
         String qs = (keyspace == null) ? "" : "?keyspace=" + URLEncoder.encode(keyspace,"UTF-8");
-        return httpClient.exchange(POST("/operations/flush" + qs, "")).ignoreElements();
+        return httpClient.exchange(auth(POST("_nodetool/flush" + qs, ""))).ignoreElements();
     }
 
     public Completable repairPrimaryRange(String keyspace) throws UnsupportedEncodingException {
         String qs = (keyspace == null) ? "" : "?keyspace=" + URLEncoder.encode(keyspace,"UTF-8");
-        return httpClient.exchange(POST("/operations/repair" + qs, "")).ignoreElements();
+        return httpClient.exchange(auth(POST("_nodetool/repair" + qs, ""))).ignoreElements();
     }
 
     public Single<BackupResponse> backup(BackupArguments backupArguments) {
-        return httpClient.retrieve(POST("/backups", backupArguments), BackupResponse.class).singleOrError();
+        return httpClient.retrieve(auth(POST("_nodetool/snapshot", backupArguments)), BackupResponse.class).singleOrError();
     }
 
     public boolean isRunning() {
