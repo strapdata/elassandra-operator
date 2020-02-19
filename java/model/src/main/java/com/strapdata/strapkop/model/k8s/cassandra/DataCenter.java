@@ -41,4 +41,8 @@ public class DataCenter {
     @SerializedName("status")
     @Expose
     private DataCenterStatus status = new DataCenterStatus();
+
+    public String id() {
+        return metadata.getName()+"/"+metadata.getNamespace();
+    }
 }
