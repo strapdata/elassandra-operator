@@ -24,8 +24,7 @@ resources: {}
 dns:
   enabled: true
   ttl: 60
-  zone: "azure.strapcloud.com"
-  azureSecretName: "dns-azure-spn"
+  domainName: "azure.strapcloud.com"
 
 namespace:
 

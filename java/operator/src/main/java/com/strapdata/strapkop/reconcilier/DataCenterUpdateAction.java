@@ -1709,98 +1709,13 @@ public class DataCenterUpdateAction {
                 cassandraContainer.addPortsItem(new V1ContainerPort().name(PROMETHEUS_PORT_NAME).containerPort(PROMETHEUS_PORT_VALUE));
             }
 
-            final V1Container sidecarContainer = new V1Container()
-                    .name("sidecar")
-                    .terminationMessagePolicy("FallbackToLogsOnError")
-                    .env(new ArrayList<>(dataCenterSpec.getEnv()))
-                    .addEnvItem(new V1EnvVar()
-                            .name("ELASSANDRA_USERNAME")
-                            .value("elassandra_operator")
-                    )
-                    .addEnvItem(new V1EnvVar()
-                            .name("ELASSANDRA_PASSWORD")
-                            .valueFrom(new V1EnvVarSource()
-                                    .secretKeyRef(new V1SecretKeySelector()
-                                            .name(OperatorNames.clusterSecret(dataCenter))
-                                            .key(CqlRole.KEY_ELASSANDRA_OPERATOR_PASSWORD)))
-                    )
-                    .image(dataCenterSpec.getSidecarImage())
-                    .imagePullPolicy(dataCenterSpec.getImagePullPolicy())
-                    .securityContext(new V1SecurityContext().runAsUser(CASSANDRA_USER_ID).runAsGroup(CASSANDRA_GROUP_ID))
-                    .addPortsItem(new V1ContainerPort().name("http").containerPort(8080))
-                    .addVolumeMountsItem(new V1VolumeMount()
-                            .name("data-volume")
-                            .mountPath("/var/lib/cassandra")
-                    )
-                    .addVolumeMountsItem(new V1VolumeMount()
-                            .name("sidecar-config-volume")
-                            .mountPath("/tmp/sidecar-config-volume")
-                    )
-                    .addVolumeMountsItem(new V1VolumeMount()
-                            .name("cassandra-log-volume")
-                            .mountPath("/var/log/cassandra")
-                    )
-                    .addVolumeMountsItem(new V1VolumeMount()
-                            .name("nodeinfo")
-                            .mountPath("/nodeinfo")
-                    )
-                    .addVolumeMountsItem(new V1VolumeMount()
-                            .name("sidecar-truststore-volume")
-                            .mountPath("/tmp/sidecar-truststore")
-                    )
-                    .addEnvItem(new V1EnvVar().name("NAMESPACE").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.namespace"))))
-                    .addEnvItem(new V1EnvVar().name("POD_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.name"))))
-                    .addEnvItem(new V1EnvVar().name("POD_IP").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("status.podIP"))))
-                    .addEnvItem(new V1EnvVar().name("NODE_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("spec.nodeName"))))
-                    .addEnvItem(new V1EnvVar().name("JMX_PORT").value(Integer.toString(dataCenterSpec.getJmxPort())))
-                    .addEnvItem(new V1EnvVar().name("SIDECAR_SSL_ENABLE").value(dataCenterSpec.getSsl().toString()))
-                    .addEnvItem(new V1EnvVar().name("SEED_HOST_ID").value(rackStatus.getSeedHostId().toString()))
-                    .addEnvItem(new V1EnvVar().name("CASSANDRA_RACK").value(rack))
-                    .addEnvItem(new V1EnvVar().name("CASSANDRA_DATACENTER").value(dataCenterMetadata.getName()))
-                    .addEnvItem(new V1EnvVar().name("CASSANDRA_CLUSTER").value(dataCenterSpec.getClusterName()));
-
-            if (operatorConfig.getDns() != null && operatorConfig.getDns().isEnabled()) {
-                sidecarContainer.addEnvItem(new V1EnvVar().name("DNS_ENABLED").value("true"));
-                sidecarContainer.addEnvItem(new V1EnvVar().name("DNS_ZONE").value(operatorConfig.getDns().getZone()));
-                sidecarContainer.addEnvItem(new V1EnvVar().name("DNS_TTL").value(Integer.toString(operatorConfig.getDns().getTtl())));
-                addDnsAzureServicePrincipal(sidecarContainer, operatorConfig.getDns().getAzureSecretName());
-            } else {
-                sidecarContainer.addEnvItem(new V1EnvVar().name("DNS_ENABLED").value("false"));
-            }
-
-            if (dataCenterSpec.getSsl()) {
-                sidecarContainer
-                        .addPortsItem(new V1ContainerPort().name("https").containerPort(8443))
-                        .addEnvItem(new V1EnvVar()
-                                .name("SIDECAR_SSL_KEYSTORE_SECRET")
-                                .value(OPERATOR_KEYPASS))// TODO [ELE] how to set pwd when keystore define by customer...?
-                        .addEnvItem(new V1EnvVar()
-                                .name("SIDECAR_SSL_KEYSTORE_PATH")
-                                .value("file:" + OPERATOR_KEYSTORE_MOUNT_PATH + "/" + OPERATOR_KEYSTORE));
-            }
-
-            {
-                String javaToolOptions = "";
-                // WARN: Cannot enable SSL on JMXMP because VisualVM does not support it => JMXMP in clear with no auth
-                javaToolOptions += dataCenterSpec.getJmxmpEnabled() ? " -Dcassandra.jmxmp " : "";
-                javaToolOptions += (useJmxOverSSL() ?
-                        "-Dssl.enable=true " +
-                                "-Dcom.sun.management.jmxremote.registry.ssl=true " +
-                                "-Djavax.net.ssl.trustStore=/tmp/sidecar-truststore/cacerts " +
-                                "-Djavax.net.ssl.trustStorePassword=changeit " :
-                        "");
-                if (javaToolOptions.length() > 0) {
-                    sidecarContainer.addEnvItem(new V1EnvVar().name("JAVA_TOOL_OPTIONS").value(javaToolOptions));
-                }
-            }
-
             final V1PodSpec podSpec = new V1PodSpec()
                     .securityContext(new V1PodSecurityContext().fsGroup(CASSANDRA_GROUP_ID))
                     .serviceAccountName(dataCenterSpec.getAppServiceAccount())
                     .hostNetwork(dataCenterSpec.getHostNetworkEnabled())
                     .addInitContainersItem(buildInitContainerVmMaxMapCount())
                     .addContainersItem(cassandraContainer)
-                    .addContainersItem(sidecarContainer)
+                    //.addContainersItem(sidecarContainer)
                     .addVolumesItem(new V1Volume()
                             .name("pod-info")
                             .downwardAPI(new V1DownwardAPIVolumeSource()
@@ -1877,20 +1792,7 @@ public class DataCenterUpdateAction {
             // kubectl create clusterrolebinding nodeinfo-cluster-rule --clusterrole=nodeinfo --serviceaccount=default:nodeinfo
             // kubectl get serviceaccount nodeinfo -o json | jq ".secrets[0].name"
             // See datacenter HELM chart and https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#manually-create-a-service-account-api-token
-            podSpec.addInitContainersItem(buildInitContainerNodeInfo("nodeinfo"));
-
-            /*
-            {
-
-                try {
-                    nodeInfoSecretName = k8sResourceUtils.readNamespacedServiceAccount(dataCenterMetadata.getNamespace(), serviceAccountName).getSecrets().get(0).getName();
-                    podSpec.addInitContainersItem(buildInitContainerNodeInfo(nodeInfoSecretName));
-                    logger.debug("Add nodeinfo secret={} to datacenter={} in namespace={}", nodeInfoSecretName, dataCenterMetadata.getName(), dataCenterMetadata.getNamespace());
-                } catch (Exception e) {
-                    logger.warn("Cannot read serviceAccount=" + serviceAccountName + " in namespace=" + dataCenterMetadata.getNamespace(), e);
-                }
-            }
-            */
+            podSpec.addInitContainersItem(buildInitContainerNodeInfo("nodeinfo", rackStatus.getSeedHostId().toString()));
 
             {
                 if (dataCenterSpec.getImagePullSecrets() != null) {
@@ -1931,9 +1833,6 @@ public class DataCenterUpdateAction {
                 commitlogInitContainer.addVolumeMountsItem(configMapVolumeMountBuilder.buildV1VolumeMount());
                 commitlogInitContainer.addArgsItem(configMapVolumeMountBuilder.mountPath);
 
-                // provide access to config map volumes in the sidecar, these reside in /tmp though and are not overlayed into /etc/cassandra
-                sidecarContainer.addVolumeMountsItem(configMapVolumeMountBuilder.buildV1VolumeMount());
-
                 podSpec.addVolumesItem(new V1Volume()
                         .name(configMapVolumeMountBuilder.mountName)
                         .configMap(configMapVolumeMountBuilder.volumeSource)
@@ -1961,14 +1860,12 @@ public class DataCenterUpdateAction {
                             .key(KEY_JMX_PASSWORD)));
             cassandraContainer.addEnvItem(jmxPasswordEnvVar);
             commitlogInitContainer.addEnvItem(jmxPasswordEnvVar);
-            sidecarContainer.addEnvItem(jmxPasswordEnvVar);
 
             // mount SSL keystores
             if (dataCenterSpec.getSsl()) {
                 V1VolumeMount opKeystoreVolMount = new V1VolumeMount().name("operator-keystore").mountPath(OPERATOR_KEYSTORE_MOUNT_PATH);
                 cassandraContainer.addVolumeMountsItem(opKeystoreVolMount);
                 commitlogInitContainer.addVolumeMountsItem(opKeystoreVolMount);
-                sidecarContainer.addVolumeMountsItem(opKeystoreVolMount);
 
                 podSpec.addVolumesItem(new V1Volume().name("operator-keystore")
                         .secret(new V1SecretVolumeSource().secretName(OperatorNames.keystoreSecret(dataCenter))
@@ -1977,7 +1874,6 @@ public class DataCenterUpdateAction {
                 V1VolumeMount opTruststoreVolMount = new V1VolumeMount().name("operator-truststore").mountPath(authorityManager.getPublicCaMountPath());
                 cassandraContainer.addVolumeMountsItem(opTruststoreVolMount);
                 commitlogInitContainer.addVolumeMountsItem(opTruststoreVolMount);
-                sidecarContainer.addVolumeMountsItem(opTruststoreVolMount);
                 podSpec.addVolumesItem(new V1Volume().name("operator-truststore")
                         .secret(new V1SecretVolumeSource()
                                 .secretName(authorityManager.getPublicCaSecretName())
@@ -2338,7 +2234,41 @@ public class DataCenterUpdateAction {
         }
 
         // Nodeinfo init container if NODEINFO_SECRET is available as env var
-        private V1Container buildInitContainerNodeInfo(String nodeInfoSecretName) {
+        private V1Container buildInitContainerNodeInfo(String nodeInfoSecretName, String seedHostId) {
+            String yaml = null;
+
+            boolean updateDns = false;
+            if (dataCenterSpec.getHostPortEnabled() && operatorConfig.getDns().isEnabled()) {
+                yaml = "apiVersion: externaldns.k8s.io/v1alpha1 \n"+
+                        "kind: DNSEndpoint\n" +
+                        "metadata:\n" +
+                        "  name: "+ OperatorNames.dataCenterChildObjectName("%s-" + seedHostId, dataCenter) + "\n" +
+                        "  namespace: "+ dataCenterMetadata.getNamespace() + "\n" +
+                        "  ownerReferences:\n" +
+                        "  - apiVersion: stable.strapdata.com/v1\n" +
+                        "    controller: true\n" +
+                        "    blockOwnerDeletion: true\n" +
+                        "    kind: ElassandraDataCenter\n" +
+                        "    name: "+ dataCenterMetadata.getName() +"\n" +
+                        "    uid: "+ dataCenterMetadata.getUid()+"\n" + // Datacenter UUID is mandatory to allow Cascading deletion
+                        "spec:\n" +
+                        "  endpoints:\n" +
+                        "  - dnsName: " + seedHostId + "." + operatorConfig.getDns().getDomainName() + "\n" +
+                        "    recordTTL: " + operatorConfig.getDns().getTtl() + "\n" +
+                        "    recordType: A\n" +
+                        "    targets:\n" +
+                        "    - __NODE_IP__ ";
+
+                if (Strings.isNullOrEmpty(operatorConfig.getDns().getDomainName())) {
+                    logger.warn("DNS DomainName isn't configured, skip DNS Update");
+                } else {
+                    updateDns = true;
+                    if (logger.isTraceEnabled()) {
+                        logger.trace("Template generated for DNSEndpoint CRD : {}", yaml);
+                    }
+                }
+            }
+
             return new V1Container()
                     .securityContext(new V1SecurityContext().privileged(dataCenterSpec.getPrivilegedSupported()))
                     .name("nodeinfo")
@@ -2346,21 +2276,26 @@ public class DataCenterUpdateAction {
                     .imagePullPolicy("IfNotPresent")
                     .terminationMessagePolicy("FallbackToLogsOnError")
                     .command(ImmutableList.of("sh", "-c",
-                            "kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"failure-domain.beta.kubernetes.io/zone\"}}' | awk '!/<no value>/ { print $0 }' > /nodeinfo/zone " +
-                                    " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"beta.kubernetes.io/instance-type\"}}'| awk '!/<no value>/ { print $0 }' > /nodeinfo/instance-type " +
-                                    " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"storagetier\"}}' | awk '!/<no value>/ { print $0 }' > /nodeinfo/storagetier " +
-                                    ((dataCenterSpec.getHostPortEnabled()) ? " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"kubernetes.strapdata.com/public-ip\"}}' | awk '!/<no value>/ { print $0 }' > /nodeinfo/public-ip " : "") +
-                                    ((dataCenterSpec.getHostPortEnabled()) ? " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}' > /nodeinfo/node-ip " : "") +
-                                    " && grep ^ /nodeinfo/*"
+                            " kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"failure-domain.beta.kubernetes.io/zone\"}}' | awk '!/<no value>/ { print $0 }' > /nodeinfo/zone " +
+                            " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"beta.kubernetes.io/instance-type\"}}'| awk '!/<no value>/ { print $0 }' > /nodeinfo/instance-type " +
+                            " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"storagetier\"}}' | awk '!/<no value>/ { print $0 }' > /nodeinfo/storagetier " +
+                            ((dataCenterSpec.getHostPortEnabled()) ? " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"kubernetes.strapdata.com/public-ip\"}}' | awk '!/<no value>/ { print $0 }' > /nodeinfo/public-ip " : "") +
+                            ((dataCenterSpec.getHostPortEnabled()) ? " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}' > /nodeinfo/node-ip " : "") +
+                            " && grep ^ /nodeinfo/* " +
+                            // here we create the CRD for ExternalDNS in order to register the Seed as DNS A Record (only node 0 of each rack is registered
+                            (updateDns ? " && ((IDX=`echo $POD_NAME | sed -r 's/^.*-0$/0/g' ` && test \"$IDX\" = \"0\" &&" +
+                                    " NODE_IP=`cat /nodeinfo/node-ip` && echo \""+yaml+"\" > /tmp/dns-manifest.yaml &&" +
+                                    " sed -i \"s#__NODE_IP__#${NODE_IP}#g\" /tmp/dns-manifest.yaml &&" +
+                                    " cat /tmp/dns-manifest.yaml && kubectl apply --token=\"$NODEINFO_TOKEN\" -f /tmp/dns-manifest.yaml) || true)" : "")
                     ))
                     .addVolumeMountsItem(new V1VolumeMount()
                             .name("nodeinfo")
                             .mountPath("/nodeinfo")
                     )
                     .addEnvItem(new V1EnvVar().name("NODE_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("spec.nodeName"))))
-                    .addEnvItem(new V1EnvVar().name("NODEINFO_TOKEN").valueFrom(new V1EnvVarSource().secretKeyRef(new V1SecretKeySelector().name(nodeInfoSecretName).key("token"))));
+                    .addEnvItem(new V1EnvVar().name("NODEINFO_TOKEN").valueFrom(new V1EnvVarSource().secretKeyRef(new V1SecretKeySelector().name(nodeInfoSecretName).key("token"))))
+                    .addEnvItem(new V1EnvVar().name("POD_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.name"))));
         }
-
     }
 
     private boolean useJmxOverSSL() {
