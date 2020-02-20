@@ -50,10 +50,9 @@ operator:
     elassandraNodeWatchPeriodInSec: ${ELASSANDRA_NODE_WATCH_PERIOD:60}
     namespace: "${OPERATOR_NAMESPACE:}"
     dns:
-        zone: "${DNS_ZONE:}"
+        domainName: "${DNS_DOMAIN_NAME:}"
         ttl: "${DNS_TTL:60}"
         enabled: "${DNS_ENABLED:false}"
-        azureSecretName: "${DNS_AZURE_SECRET_NAME:dns-azure-spn}"
 
     test:
         enabled: "${TESTSUITE_ENABLE:false}"

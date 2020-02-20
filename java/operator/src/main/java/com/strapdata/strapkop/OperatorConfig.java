@@ -59,11 +59,9 @@ public class OperatorConfig {
 
         boolean enabled;
 
-        String zone;
+        String domainName;
 
         int ttl;
-
-        String azureSecretName;
     }
 
 

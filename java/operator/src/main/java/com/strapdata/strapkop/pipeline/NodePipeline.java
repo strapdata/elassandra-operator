@@ -1,7 +1,6 @@
 package com.strapdata.strapkop.pipeline;
 
 import com.squareup.okhttp.Call;
-import com.strapdata.model.Key;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.cache.NodeCache;
