@@ -271,7 +271,7 @@ public class DataCenterUpdateAction {
 
                     if (pvcsToDelete.size() > 1) {
                         logger.error("Too many PVC found for deletion, cancel it ! (List of PVC = {})", pvcsToDelete);
-                    } else {
+                    } else if (!pvcsToDelete.isEmpty()) {
                         return k8sResourceUtils.deletePersistentVolumeClaim(pvcsToDelete.get(0));
                     }
             }
