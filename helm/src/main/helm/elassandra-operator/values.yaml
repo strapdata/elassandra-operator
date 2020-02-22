@@ -5,7 +5,7 @@ apiVersion: stable.strapdata.com/v1
 
 image:
   repository: strapdata.azurecr.io/strapdata/elassandra-operator-dev
-  tag: 6.2.3.22
+  tag: 6.8.4.1
   pullPolicy: Always
   pullSecrets: []
 
@@ -20,22 +20,18 @@ resources: {}
 #    cpu: 100m
 #    memory: 50Mi
 
-# DNS external updater for contact point
+# Publish a CRD DNSEndpoint for external-dns on seed pods.
 dns:
   enabled: true
+  zone: ""
   ttl: 60
-  domainName: "azure.strapcloud.com"
 
 namespace:
 
 env:
-#  DNS_DOMAIN
-#  DNS_AZURE_CLIENT_ID:
-#  DNS_AZURE_TENANT_ID:
-#  DNS_AZURE_CLIENT_SECRET:
-#  DNS_AZURE_SUBSCRIPTION_ID:
-#  DNS_AZURE_RESOURCE_GROUP:
+#  INGRESS_SUFFIX: "{datacenterName}-{clusterName}-{namespace}.int.test.strapkube.com"
 #  K8S_API_DEBUG: true
+
 
 ingress:
   enabled: false
@@ -44,6 +40,9 @@ ingress:
 #    kubernetes.io/ingress.class: traefik
 #  tls:
 #  - hosts: []
+
+#
+elasticsearchLoadBalancerEnabled: false
 
 nodeSelector: {}
 

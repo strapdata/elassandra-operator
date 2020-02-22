@@ -66,10 +66,6 @@ public class DataCenterSpec {
     @Expose
     private java.lang.String elassandraImage;
 
-    @SerializedName("sidecarImage")
-    @Expose
-    private java.lang.String sidecarImage;
-
     @SerializedName("imagePullPolicy")
     @Expose
     private java.lang.String imagePullPolicy;
@@ -107,14 +103,6 @@ public class DataCenterSpec {
     @SerializedName("dataVolumeClaim")
     @Expose
     private V1PersistentVolumeClaimSpec dataVolumeClaim;
-
-    /**
-     * Name of the CassandraBackup to restore from
-     *
-     */
-    @SerializedName("restoreFromBackup")
-    @Expose
-    private Restore restoreFromBackup = new Restore();
 
     /**
      * Name of an optional config map that contains cassandra configuration in the form of yaml fragments
@@ -173,13 +161,6 @@ public class DataCenterSpec {
     private Boolean privilegedSupported = false;
 
     /**
-     * Enable elasticsearch service
-     */
-    @SerializedName("elasticsearchEnabled")
-    @Expose
-    private Boolean elasticsearchEnabled = true;
-
-    /**
      * Enable hostPort for nativePort, storagePort and sslStoragePort
      */
     @SerializedName("hostPortEnabled")
@@ -192,6 +173,14 @@ public class DataCenterSpec {
     @SerializedName("hostNetworkEnabled")
     @Expose
     private Boolean hostNetworkEnabled = false;
+
+
+    /**
+     * Enable elasticsearch service
+     */
+    @SerializedName("elasticsearchEnabled")
+    @Expose
+    private Boolean elasticsearchEnabled = true;
 
     /**
      * Elasticsearch HTTP port
@@ -289,25 +278,32 @@ public class DataCenterSpec {
     private List<String> remoteSeeders = new ArrayList<>();
 
     /**
+     * Create a Load balancer service with external IP for Elasticsearch
+     */
+    @SerializedName("elasticsearchLoadBalancerEnabled")
+    @Expose
+    private Boolean elasticsearchLoadBalancerEnabled = false;
+
+    /**
      * The LoadBalancer exposing cql + elasticsearch nodePorts
      */
-    @SerializedName("loadBalancerIp")
+    @SerializedName("elasticsearchLoadBalancerIp")
     @Expose
-    private String loadBalancerIp;
+    private String elasticsearchLoadBalancerIp;
 
     /**
      * Public DNS FQDN associated to the public Loadbalancer IP.
      */
-    @SerializedName("publicDnsFqdn")
+    @SerializedName("elasticsearchPublicDnsFqdn")
     @Expose
-    private String publicDnsFqdn;
+    private String elasticsearchPublicDnsFqdn;
 
     /**
      * Public DNS TTL.
      */
-    @SerializedName("publicDnsTtl")
+    @SerializedName("elasticsearchPublicDnsTtl")
     @Expose
-    private Integer publicDnsTtl = 300;
+    private Integer elasticsearchPublicDnsTtl = 120;
 
     /**
      * Enable Elasticsearch service ingress
@@ -349,13 +345,17 @@ public class DataCenterSpec {
         acc.add(workload);
         acc.add(podsAffinityPolicy);
         acc.add(elassandraImage);
-        acc.add(sidecarImage);
         acc.add(imagePullPolicy);
         acc.add(imagePullSecrets);
         acc.add(env);
         acc.add(resources);
         acc.add(prometheusEnabled);
         acc.add(elasticsearchEnabled);
+        acc.add(elasticsearchPort);
+        acc.add(elasticsearchLoadBalancerEnabled);
+        acc.add(elasticsearchLoadBalancerIp);
+        acc.add(elasticsearchPublicDnsFqdn);
+        acc.add(elasticsearchPublicDnsTtl);
         acc.add(privilegedSupported);
         acc.add(hostNetworkEnabled);
         acc.add(hostPortEnabled);

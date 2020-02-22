@@ -40,9 +40,10 @@ managedKeyspaces: {}
 # URL template support {namespace}, {clusterName}, {datacenterName}, {phase}, {replicas}, {readyReplicas}
 webHookUrl:
 
-loadBalancerIp:
-publicDnsFqdn:
-publicDnsTtl:
+elasticsearchLoadBalancerEnabled: false
+elasticsearchLoadBalancerIp:
+elasticsearchPublicDnsFqdn:
+elasticsearchPublicDnsTtl:
 
 
 # TODO: we do not support unprivileged setup yet
@@ -120,9 +121,6 @@ enterprise:
 #  name: configMapReference
 #data:
 #  service_key.json: "XXXXXXXXX"
-
-
-#restoreFromBackup: backup-hostname
 
 prometheusEnabled: true
 

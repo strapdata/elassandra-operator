@@ -77,9 +77,9 @@ spec:
             value: {{ $val | quote }}
           {{- end }}
           {{- end }}
-          {{- if .Values.dns.azureSecretName }}
+          {{- if .Values.dns }}
           - name: "DNS_ENABLED"
-            value: "true"
+            value: {{ default "false" .Values.dns.enabled | quote }}
           - name: "DNS_DOMAIN_NAME"
             value: {{ .Values.dns.domainName | quote }}
           - name: "DNS_TTL"

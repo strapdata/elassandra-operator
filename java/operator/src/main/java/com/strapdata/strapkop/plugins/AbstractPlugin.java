@@ -1,10 +1,9 @@
 package com.strapdata.strapkop.plugins;
 
-import com.strapdata.strapkop.dns.DnsConfiguration;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.reconcilier.DataCenterUpdateReconcilier;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import io.kubernetes.client.ApiException;
@@ -25,7 +24,6 @@ public abstract class AbstractPlugin implements Plugin {
     final CoreV1Api coreApi;
     final AppsV1Api appsApi;
     final OperatorConfig operatorConfig;
-    final DnsConfiguration dnsConfiguration;
     final MeterRegistry meterRegistry;
 
     public AbstractPlugin(final ApplicationContext context,
@@ -34,7 +32,6 @@ public abstract class AbstractPlugin implements Plugin {
                           CoreV1Api coreApi,
                           AppsV1Api appsApi,
                           OperatorConfig operatorConfig,
-                          DnsConfiguration dnsConfiguration,
                           MeterRegistry meterRegistry) {
         this.context = context;
         this.k8sResourceUtils = k8sResourceUtils;
@@ -42,7 +39,6 @@ public abstract class AbstractPlugin implements Plugin {
         this.coreApi = coreApi;
         this.appsApi = appsApi;
         this.operatorConfig = operatorConfig;
-        this.dnsConfiguration = dnsConfiguration;
         this.meterRegistry = meterRegistry;
     }
 

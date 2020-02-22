@@ -2,6 +2,7 @@ package com.strapdata.strapkop.plugins;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
@@ -9,7 +10,6 @@ import com.strapdata.strapkop.cql.CqlKeyspace;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRole;
 import com.strapdata.strapkop.cql.CqlRoleManager;
-import com.strapdata.strapkop.dns.DnsConfiguration;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
@@ -22,6 +22,7 @@ import io.kubernetes.client.custom.IntOrString;
 import io.kubernetes.client.models.*;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.http.uri.UriTemplate;
 import io.reactivex.Completable;
 import io.reactivex.Single;
 
@@ -44,9 +45,8 @@ public class KibanaPlugin extends AbstractPlugin {
                         CoreV1Api coreApi,
                         AppsV1Api appsApi,
                         OperatorConfig operatorConfig,
-                        DnsConfiguration dnsConfiguration,
                         MeterRegistry meterRegistry) {
-        super(context, k8sResourceUtils, authorityManager, coreApi, appsApi, operatorConfig, dnsConfiguration, meterRegistry);
+        super(context, k8sResourceUtils, authorityManager, coreApi, appsApi, operatorConfig, meterRegistry);
     }
 
     @Override
@@ -300,9 +300,14 @@ public class KibanaPlugin extends AbstractPlugin {
                             ));
                 })
                 .flatMap(s -> {
-                    String ingressDomain = System.getenv("INGRESS_DOMAIN");
-                    if (!Strings.isNullOrEmpty(ingressDomain)) {
-                        String kibanaHost = space.name() + "-" + dataCenterSpec.getClusterName().toLowerCase(Locale.ROOT) + "-" + dataCenterSpec.getDatacenterName().toLowerCase(Locale.ROOT) + "-" + ingressDomain.replace("${namespace}", dataCenterMetadata.getNamespace());
+                    // INGRESS_SUFFIX= <space>-kibana-{datacenterName}-{clusterName}-{namespace}.xxxxx.com
+                    String ingressSuffix = System.getenv("INGRESS_SUFFIX");
+                    if (!Strings.isNullOrEmpty(ingressSuffix)) {
+                        String kibanaHost = UriTemplate.of(space.name() + "-" + ingressSuffix)
+                                .expand(ImmutableMap.of(
+                                "namespace", dataCenterMetadata.getNamespace(),
+                                "datacenterName", dataCenterSpec.getDatacenterName().toLowerCase(Locale.ROOT),
+                                "clusterName", dataCenterSpec.getClusterName().toLowerCase(Locale.ROOT)));
                         logger.info("Creating kibana ingress for host={}", kibanaHost);
                         final V1beta1Ingress ingress = new V1beta1Ingress()
                                 .metadata(meta)
