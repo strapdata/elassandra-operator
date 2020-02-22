@@ -9,10 +9,8 @@
 
 rootProject.name = 'strapkop'
 include 'java'
-include 'java:dns'
 include 'java:model'
 include 'java:backup'
-include 'java:sidecar'
 include 'java:operator'
 include 'java:k8s-addons'
 include 'docker'

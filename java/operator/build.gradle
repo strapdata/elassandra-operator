@@ -128,7 +128,6 @@ dependencies {
         exclude group: 'com.strapdata.elasticsearch', module: 'elasticsearch'
     }
 
-    compile project(':java:dns')
     compile project(':java:model')
     compile project(':java:backup')
     compile project(':java:k8s-addons')

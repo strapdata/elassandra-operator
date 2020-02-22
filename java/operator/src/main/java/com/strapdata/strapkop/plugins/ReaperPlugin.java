@@ -6,7 +6,6 @@ import com.google.common.collect.ImmutableMap;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.cql.*;
-import com.strapdata.strapkop.dns.DnsConfiguration;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
@@ -20,6 +19,7 @@ import io.kubernetes.client.custom.IntOrString;
 import io.kubernetes.client.models.*;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.http.uri.UriTemplate;
 import io.reactivex.Completable;
 import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
@@ -52,9 +52,8 @@ public class ReaperPlugin extends AbstractPlugin {
                         CoreV1Api coreApi,
                         AppsV1Api appsApi,
                         OperatorConfig operatorConfig,
-                        DnsConfiguration dnsConfiguration,
                         MeterRegistry meterRegistry) {
-            super(context, k8sResourceUtils, authorityManager, coreApi, appsApi, operatorConfig, dnsConfiguration, meterRegistry);
+            super(context, k8sResourceUtils, authorityManager, coreApi, appsApi, operatorConfig, meterRegistry);
     }
 
     public static final CqlKeyspace REAPER_KEYSPACE = new CqlKeyspace("reaper_db", 3) {
@@ -372,12 +371,16 @@ public class ReaperPlugin extends AbstractPlugin {
                 );
 
         // create reaper ingress
-        String ingressDomain = System.getenv("INGRESS_DOMAIN");
+        String ingressSuffix = System.getenv("INGRESS_SUFFIX");
         final V1beta1Ingress ingress;
-        if (!Strings.isNullOrEmpty(ingressDomain)) {
-            String reaperAppHost = "reaper-" + dataCenterSpec.getClusterName().toLowerCase(Locale.ROOT) + "-" + dataCenterSpec.getDatacenterName().toLowerCase(Locale.ROOT) + "-" + ingressDomain.replace("${namespace}", dataCenterMetadata.getNamespace());
-            String reaperAdminHost = "admin-reaper-" + dataCenterSpec.getClusterName().toLowerCase(Locale.ROOT) + "-" + dataCenterSpec.getDatacenterName().toLowerCase(Locale.ROOT) + "-" + ingressDomain.replace("${namespace}", dataCenterMetadata.getNamespace());
-            logger.info("Creating reaper ingress for host={}", reaperAppHost);
+        if (!Strings.isNullOrEmpty(ingressSuffix)) {
+            String baseHostname = UriTemplate.of(ingressSuffix).expand(ImmutableMap.of(
+                    "namespace", dataCenterMetadata.getNamespace(),
+                    "datacenterName", dataCenterSpec.getDatacenterName().toLowerCase(Locale.ROOT),
+                    "clusterName", dataCenterSpec.getClusterName().toLowerCase(Locale.ROOT)));
+            String reaperAppHost = "reaper-" + baseHostname;
+            String reaperAdminHost = "admin-reaper-" + baseHostname;
+            logger.info("Creating reaper ingress for reaperAppHost={} reaperAdminHost={}", reaperAppHost, reaperAdminHost);
             ingress = new V1beta1Ingress()
                     .metadata(meta)
                     .spec(new V1beta1IngressSpec()

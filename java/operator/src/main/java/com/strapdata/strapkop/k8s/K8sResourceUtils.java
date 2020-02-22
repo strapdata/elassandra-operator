@@ -75,9 +75,9 @@ public class K8sResourceUtils {
                     logger.trace("Attempting to create resource.");
                     return createResourceCallable.call();
                 } catch (final ApiException e) {
-                    if (e.getCode() != 409)
+                    if (e.getCode() != 409) {
                         throw e;
-
+                    }
                     logger.trace("Resource already exists. Attempting to replace.");
                     return replaceResourceCallable.call();
                 }
@@ -111,9 +111,15 @@ public class K8sResourceUtils {
         final String namespace = service.getMetadata().getNamespace();
         return createOrReplaceResource(
                 () -> {
-                    V1Service service2 = coreApi.createNamespacedService(namespace, service, null, null, null);
-                    logger.debug("Created namespaced Service={}", service.getMetadata().getName());
-                    return service2;
+                    try {
+                        V1Service service2 = coreApi.createNamespacedService(namespace, service, null, null, null);
+                        logger.debug("Created namespaced Service={}", service.getMetadata().getName());
+                        return service2;
+                    } catch(ApiException e) {
+                        logger.warn("Created namespaced Service={} in namespace={} service={} error: {}",
+                                service.getMetadata().getName(), service.getMetadata().getNamespace(), service, e.getMessage());
+                        throw e;
+                    }
                 },
                 () -> {
         // temporarily disable service replace call to fix issue #41 since service can't be customized right now
@@ -133,8 +139,8 @@ public class K8sResourceUtils {
                         logger.debug("Created namespaced Service={}", service.getMetadata().getName());
                         return service2;
                     } catch(ApiException e) {
-                        logger.warn("Created namespaced Service={} in namespace={} error:"+e.getMessage(),
-                                service.getMetadata().getName(), service.getMetadata().getNamespace());
+                        logger.warn("Created namespaced Service={} in namespace={} service={} error: {}",
+                                service.getMetadata().getName(), service.getMetadata().getNamespace(), service, e.getMessage());
                         throw e;
                     }
                 });
@@ -144,9 +150,15 @@ public class K8sResourceUtils {
         final String namespace = ingress.getMetadata().getNamespace();
         return createOrReplaceResource(
                 () -> {
-                    V1beta1Ingress ingress2 = extensionsV1beta1Api.createNamespacedIngress(namespace, ingress, null, null, null);
-                    logger.debug("Created namespaced Ingress={}", ingress.getMetadata().getName());
-                    return ingress2;
+                    try {
+                        V1beta1Ingress ingress2 = extensionsV1beta1Api.createNamespacedIngress(namespace, ingress, null, null, null);
+                        logger.debug("Created namespaced Ingress={}", ingress.getMetadata().getName());
+                        return ingress2;
+                    } catch(ApiException e) {
+                        logger.warn("Created namespaced Ingress={} in namespace={} ingress={} error: {}",
+                                ingress.getMetadata().getName(), ingress.getMetadata().getNamespace(), ingress, e.getMessage());
+                        throw e;
+                    }
                 },
                 () -> {
                     // temporarily disable service replace call to fix issue #41 since service can't be customized right now
@@ -161,14 +173,26 @@ public class K8sResourceUtils {
         final String namespace = configMap.getMetadata().getNamespace();
         return createOrReplaceResource(
                 () -> {
-                    V1ConfigMap configMap2 = coreApi.createNamespacedConfigMap(namespace, configMap, null, null, null);
-                    logger.debug("Created namespaced ConfigMap={}", configMap.getMetadata().getName());
-                    return configMap2;
+                    try {
+                        V1ConfigMap configMap2 = coreApi.createNamespacedConfigMap(namespace, configMap, null, null, null);
+                        logger.debug("Created namespaced ConfigMap={}", configMap.getMetadata().getName());
+                        return configMap2;
+                    } catch(ApiException e) {
+                        logger.warn("Created namespaced configMap={} in namespace={} configMap={} error: {}",
+                                configMap.getMetadata().getName(), configMap.getMetadata().getNamespace(), configMap, e.getMessage());
+                        throw e;
+                    }
                 },
                 () -> {
-                    V1ConfigMap configMap2 = coreApi.replaceNamespacedConfigMap(configMap.getMetadata().getName(), namespace, configMap, null, null);
-                    logger.debug("Replaced namespaced ConfigMap={}", configMap.getMetadata().getName());
-                    return configMap2;
+                    try {
+                        V1ConfigMap configMap2 = coreApi.replaceNamespacedConfigMap(configMap.getMetadata().getName(), namespace, configMap, null, null);
+                        logger.debug("Replaced namespaced ConfigMap={}", configMap.getMetadata().getName());
+                        return configMap2;
+                    } catch(ApiException e) {
+                        logger.warn("Created namespaced configMap={} in namespace={} configMap={} error: {}",
+                                configMap.getMetadata().getName(), configMap.getMetadata().getNamespace(), configMap, e.getMessage());
+                        throw e;
+                    }
                 }
         );
     }
@@ -195,14 +219,26 @@ public class K8sResourceUtils {
         final String namespace = deployment.getMetadata().getNamespace();
         return createOrReplaceResource(
                 () -> {
-                    V1Deployment deployment2 = appsApi.createNamespacedDeployment(namespace, deployment, null, null, null);
-                    logger.debug("Created namespaced Deployment={} in namespace={}", deployment.getMetadata().getName(), deployment.getMetadata().getNamespace());
-                    return deployment2;
+                    try {
+                        V1Deployment deployment2 = appsApi.createNamespacedDeployment(namespace, deployment, null, null, null);
+                        logger.debug("Created namespaced Deployment={} in namespace={}", deployment.getMetadata().getName(), deployment.getMetadata().getNamespace());
+                        return deployment2;
+                    } catch(ApiException e) {
+                        logger.warn("Created namespaced deployment={} in namespace={} deployment={} error: {}",
+                                deployment.getMetadata().getName(), deployment.getMetadata().getNamespace(), deployment, e.getMessage());
+                        throw e;
+                    }
                 },
                 () -> {
-                    V1Deployment deployment2 = appsApi.replaceNamespacedDeployment(deployment.getMetadata().getName(), namespace, deployment, null, null);
-                    logger.debug("Replaced namespaced Deployment in namespace={}", deployment.getMetadata().getName(), deployment.getMetadata().getNamespace());
-                    return deployment2;
+                    try {
+                        V1Deployment deployment2 = appsApi.replaceNamespacedDeployment(deployment.getMetadata().getName(), namespace, deployment, null, null);
+                        logger.debug("Replaced namespaced Deployment in namespace={}", deployment.getMetadata().getName(), deployment.getMetadata().getNamespace());
+                        return deployment2;
+                    } catch(ApiException e) {
+                        logger.warn("Created namespaced deployment={} in namespace={} deployment={} error: {}",
+                                deployment.getMetadata().getName(), deployment.getMetadata().getNamespace(), deployment, e.getMessage());
+                        throw e;
+                    }
                 }
         );
     }
@@ -211,14 +247,26 @@ public class K8sResourceUtils {
         final String namespace = statefulset.getMetadata().getNamespace();
         return createOrReplaceResource(
                 () -> {
-                    V1StatefulSet statefulSet2 = appsApi.createNamespacedStatefulSet(namespace, statefulset, null, null, null);
-                    logger.debug("Created namespaced Deployment={} in namespace={}", statefulset.getMetadata().getName(), statefulset.getMetadata().getNamespace());
-                    return statefulSet2;
+                    try {
+                        V1StatefulSet statefulSet2 = appsApi.createNamespacedStatefulSet(namespace, statefulset, null, null, null);
+                        logger.debug("Created namespaced Deployment={} in namespace={}", statefulset.getMetadata().getName(), statefulset.getMetadata().getNamespace());
+                        return statefulSet2;
+                    } catch(ApiException e) {
+                        logger.warn("Created namespaced statefulset={} in namespace={} statefulset={} error: {}",
+                                statefulset.getMetadata().getName(), statefulset.getMetadata().getNamespace(), statefulset, e.getMessage());
+                        throw e;
+                    }
                 },
                 () -> {
-                    V1StatefulSet statefulSet2 = appsApi.replaceNamespacedStatefulSet(statefulset.getMetadata().getName(), namespace, statefulset, null, null);
-                    logger.debug("Replaced namespaced Deployment in namespace={}", statefulset.getMetadata().getName(), statefulset.getMetadata().getNamespace());
-                    return statefulSet2;
+                    try {
+                        V1StatefulSet statefulSet2 = appsApi.replaceNamespacedStatefulSet(statefulset.getMetadata().getName(), namespace, statefulset, null, null);
+                        logger.debug("Replaced namespaced Deployment in namespace={}", statefulset.getMetadata().getName(), statefulset.getMetadata().getNamespace());
+                        return statefulSet2;
+                    } catch(ApiException e) {
+                        logger.warn("Created namespaced statefulset={} in namespace={} statefulset={} error: {}",
+                                statefulset.getMetadata().getName(), statefulset.getMetadata().getNamespace(), statefulset, e.getMessage());
+                        throw e;
+                    }
                 }
         );
     }

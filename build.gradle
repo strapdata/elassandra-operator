@@ -68,25 +68,21 @@ task prepareDependenciesSources(type:Exec) {
 task dockerBuild {
   dependsOn 'prepareDependenciesSources'
   dependsOn ':java:operator:jibDockerBuild'
-  dependsOn ':java:sidecar:jibDockerBuild'
   dependsOn ':docker:dockerBuildImage'
 }
 
 task dockerPush {
   dependsOn ':java:operator:jib'
-  dependsOn ':java:sidecar:jib'
   dependsOn ':docker:dockerPushImage'
 }
 
 task dockerBuildAllVersions {
   dependsOn ':java:operator:jibDockerBuild'
-  dependsOn ':java:sidecar:jibDockerBuild'
   dependsOn ':docker:dockerBuildAllVersions'
 }
 
 task dockerPushAllVersions {
   dependsOn ':java:operator:jib'
-  dependsOn ':java:sidecar:jib'
   dependsOn ':docker:dockerPushAllVersions'
 }
 

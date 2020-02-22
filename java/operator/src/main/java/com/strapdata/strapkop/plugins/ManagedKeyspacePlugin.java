@@ -1,8 +1,5 @@
 package com.strapdata.strapkop.plugins;
 
-import com.strapdata.strapkop.dns.DnsConfiguration;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
-import com.strapdata.strapkop.model.k8s.cassandra.ManagedKeyspace;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.cql.CqlKeyspace;
@@ -11,6 +8,8 @@ import com.strapdata.strapkop.cql.CqlRole;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.ManagedKeyspace;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
@@ -34,9 +33,8 @@ public class ManagedKeyspacePlugin extends AbstractPlugin {
                                  CoreV1Api coreApi,
                                  AppsV1Api appsApi,
                                  OperatorConfig operatorConfig,
-                                 DnsConfiguration dnsConfiguration,
                                  MeterRegistry meterRegistry) {
-        super(context, k8sResourceUtils, authorityManager, coreApi, appsApi, operatorConfig, dnsConfiguration, meterRegistry);
+        super(context, k8sResourceUtils, authorityManager, coreApi, appsApi, operatorConfig, meterRegistry);
     }
 
     @Override

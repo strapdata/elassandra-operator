@@ -1,5 +1,0 @@
-profile: service
-defaultPackage: sidecar
----
-testFramework: junit
-sourceLanguage: java

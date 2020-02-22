@@ -43,22 +43,9 @@ spec:
   env:
 {{ toYaml .Values.env | indent 4 }}
 {{- end }}
-{{- if .Values.loadBalancerIp }}
-  loadBalancerIp: {{  .Values.loadBalancerIp }}
-{{- end }}
-{{- if .Values.publicDnsFqdn }}
-  publicDnsFqdn: {{  .Values.publicDnsFqdn }}
-{{- end }}
-{{- if .Values.publicDnsTtl }}
-  publicDnsTtl: {{  .Values.publicDnsTtl }}
-{{- end }}
 {{- if .Values.scheduledBackups }}
   scheduledBackups:
 {{ toYaml .Values.scheduledBackups | indent 4 }}
-{{- end }}
-{{- if .Values.restoreFromBackup }}
-  restoreFromBackup:
-{{ toYaml .Values.restoreFromBackup | indent 4 }}
 {{- end }}
   userConfigMapVolumeSource:
     name: {{ template "elassandra.resourceName" . }}
@@ -74,8 +61,16 @@ spec:
   userSecretVolumeSource:
 {{ toYaml .Values.userSecretVolumeSource | indent 4 }}
 {{- end }}
-  elasticsearchIngressEnabled: {{ default "false" .Values.elasticsearchIngressEnabled }}
   elasticsearchEnabled: {{ default "true" .Values.elasticsearchEnabled }}
+  elasticsearchLoadBalancerEnabled: {{ default "false" .Values.elasticsearchLoadBalancerEnabled }}
+  {{- if .Values.elasticsearchLoadBalancerIp }}
+  elasticsearchLoadBalancerIp: {{ .Values.elasticsearchLoadBalancerIp }}
+  {{- end }}
+  {{- if .Values.elasticsearchPublicDnsFqdn }}
+  elasticsearchPublicDnsFqdn: {{ .Values.elasticsearchPublicDnsFqdn }}
+  {{- end }}
+  elasticsearchPublicDnsTtl: {{ default "120" .Values.elasticsearchPublicDnsTtl }}
+  elasticsearchIngressEnabled: {{ default "false" .Values.elasticsearchIngressEnabled }}
   prometheusEnabled: {{ default "false" .Values.prometheusEnabled }}
 {{- if .Values.reaper }}
   reaper:

@@ -1,15 +1,14 @@
 package com.strapdata.strapkop.plugins;
 
-import com.strapdata.strapkop.dns.DnsConfiguration;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
-import com.strapdata.strapkop.model.k8s.task.Task;
-import com.strapdata.strapkop.model.k8s.task.TaskPhase;
-import com.strapdata.strapkop.model.k8s.task.TestTaskSpec;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.task.Task;
+import com.strapdata.strapkop.model.k8s.task.TaskPhase;
+import com.strapdata.strapkop.model.k8s.task.TestTaskSpec;
 import com.strapdata.strapkop.plugins.test.TestSuiteExecutor;
 import com.strapdata.strapkop.plugins.test.TestSuiteHandler;
 import com.strapdata.strapkop.reconcilier.TaskReconcilier;
@@ -42,9 +41,8 @@ public class TestSuitePlugin extends AbstractPlugin implements TestSuiteHandler 
                            CoreV1Api coreApi,
                            AppsV1Api appsApi,
                            OperatorConfig config,
-                           DnsConfiguration dnsConfiguration,
                            MeterRegistry meterRegistry) {
-        super(context, k8sResourceUtils, authorityManager, coreApi, appsApi, config, dnsConfiguration, meterRegistry);
+        super(context, k8sResourceUtils, authorityManager, coreApi, appsApi, config, meterRegistry);
     }
 
     public TestSuiteExecutor getTestSuite(Platform platform, String testSuiteClass) {

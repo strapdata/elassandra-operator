@@ -8,9 +8,6 @@ import com.strapdata.cassandra.k8s.ElassandraOperatorSeedProviderAndNotifier;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.backup.BackupScheduler;
-import com.strapdata.strapkop.backup.common.Constants;
-import com.strapdata.strapkop.backup.manifest.GlobalManifest;
-import com.strapdata.strapkop.backup.manifest.ManifestReader;
 import com.strapdata.strapkop.cache.CheckPointCache;
 import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.cql.*;
@@ -18,7 +15,6 @@ import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.Key;
-import com.strapdata.strapkop.model.backup.CloudStorageSecret;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.cassandra.*;
 import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
@@ -27,14 +23,12 @@ import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import com.strapdata.strapkop.ssl.utils.X509CertificateAndPrivateKey;
 import com.strapdata.strapkop.utils.CloudStorageSecretsKeys;
-import com.strapdata.strapkop.utils.DnsUpdateSecretsKeys;
 import com.strapdata.strapkop.utils.ManifestReaderFactory;
 import com.strapdata.strapkop.utils.QuantityConverter;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.apis.CustomObjectsApi;
-import io.kubernetes.client.custom.IntOrString;
 import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.models.*;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -62,7 +56,6 @@ import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import static com.strapdata.strapkop.k8s.ServicesConstants.*;
 
@@ -358,18 +351,8 @@ public class DataCenterUpdateAction {
 
         return Single.zip(
                 k8sResourceUtils.createOrReplaceNamespacedService(builder.buildServiceNodes()),
-                k8sResourceUtils.createOrReplaceNamespacedService(builder.buildServiceElasticsearch())
-                        .flatMap((searchService) -> {
-                            Optional<V1beta1Ingress> optIngress = builder.buildIngressElasticsearch();
-                            if (optIngress.isPresent()) {
-                                // create ElasticSearch ingress if required
-                                return k8sResourceUtils.createOrReplaceNamespacedIngress(optIngress.get());
-                            } else {
-                                // otherwise, just return the elastic service
-                                return Single.just(searchService);
-                            }
-                        }),
-                k8sResourceUtils.createOrReplaceNamespacedService(builder.buildServiceExternalNodes()),
+                k8sResourceUtils.createOrReplaceNamespacedService(builder.buildServiceElasticsearch()),
+                k8sResourceUtils.createOrReplaceNamespacedService(builder.buildElasticsearchService()),
                 (s1, s2, s3) -> builder.clusterObjectMeta(OperatorNames.clusterSecret(dataCenter))
         )
                 .flatMap(clusterSecretMeta -> {
@@ -654,36 +637,6 @@ public class DataCenterUpdateAction {
                     if (failedPod != null) {
                         logger.info("pod={} FAILED, cannot scale the datacenter now", failedPod);
                         return todo;
-                    }
-
-                    Restore restoreFromBackup = dataCenterSpec.getRestoreFromBackup();
-                    if (restoreRequired(zones, restoreFromBackup)) {
-                        // restore is required, check that all saved nodes will have a new host
-                        final String dcName = OperatorNames.dataCenterResource(dataCenterSpec.getClusterName(), dataCenterSpec.getDatacenterName());
-                        final CloudStorageSecret cloudCredentials = k8sResourceUtils.readAndValidateStorageSecret(dataCenterMetadata.getNamespace(), restoreFromBackup.getSecretRef(), restoreFromBackup.getProvider());
-                        ManifestReader reader = manifestReaderFactory.getManifestReader(dataCenter, restoreFromBackup, cloudCredentials);
-                        GlobalManifest manifests = reader.aggregateManifest(restoreFromBackup.getSnapshotTag());
-
-                        Set<String> nodesToRestore = manifests.getNodes();
-                        Set<String> availableNodes = zones.zoneMap.values().stream().flatMap(zone -> {
-                            String stsName = OperatorNames.stsName(dataCenter, zone.name);
-                            return IntStream.range(0, zone.size).mapToObj(Integer::toString).map(index -> stsName + "-" + index);
-                        }).collect(Collectors.toSet());
-
-                        logger.debug("Restore : '{}' node to restore with '{}' available nodes", nodesToRestore.size(), availableNodes.size());
-                        if (availableNodes.size() < nodesToRestore.size()) {
-                            logger.error("Not enough nodes to restore the snapshot '{}', expected '{}' but '{}' are available", restoreFromBackup.getSnapshotTag(), nodesToRestore.size(), availableNodes.size());
-                            throw new StrapkopException("Not enough nodes to restore the snapshot [" + availableNodes.size() + "/" + nodesToRestore.size() + "]");
-                        }
-
-                        if (!availableNodes.containsAll(nodesToRestore)) {
-                            if (logger.isTraceEnabled()) {
-                                logger.trace("Nodes to restore : {}", nodesToRestore);
-                                logger.trace("Available nodes  : {}", availableNodes);
-                            }
-                            logger.error("Nodes topology doesn't match the previous one, restoration can't be processed");
-                            throw new StrapkopException("Nodes topology is invalid");
-                        }
                     }
 
                     if (!dataCenterSpec.isParked()) {
@@ -1104,31 +1057,32 @@ public class DataCenterUpdateAction {
         // see https://github.com/kubernetes-sigs/cloud-provider-azure/blob/master/docs/services/README.md
         // see https://github.com/kubernetes-sigs/external-dns
         // Unfortunately, AKS does not allow to reuse a public IP for multiple LB.
-        public V1Service buildServiceExternalNodes() throws ApiException {
+        public V1Service buildElasticsearchService() throws ApiException {
             V1ServiceSpec v1ServiceSpec = new V1ServiceSpec()
-                    .type("LoadBalancer")
-                    .externalTrafficPolicy("Local")
-                    //.addPortsItem(new V1ServicePort().name("internode").port(dataCenterSpec.getSsl() ? dataCenterSpec.getSslStoragePort() : dataCenterSpec.getStoragePort()))
+                    .type(dataCenterSpec.getElasticsearchLoadBalancerEnabled() ? "LoadBalancer" : "ClusterIP")
                     .addPortsItem(new V1ServicePort().name("cql").port(dataCenterSpec.getNativePort()))
                     .addPortsItem(new V1ServicePort().name("elasticsearch").port(dataCenterSpec.getElasticsearchPort()))
-                    //.addPortsItem(new V1ServicePort().name("jmx").port(dataCenterSpec.getJmxPort()))
-                    // select any available pod in the DC, which is good only if internal seed service is good !
                     .selector(ImmutableMap.of(
                             OperatorLabels.CLUSTER, dataCenterSpec.getClusterName(),
                             OperatorLabels.DATACENTER, dataCenter.getSpec().getDatacenterName(),
                             OperatorLabels.APP, "elassandra"));
 
-            // set loadbalancer public ip if available
-            if (!Strings.isNullOrEmpty(dataCenterSpec.getLoadBalancerIp()))
-                v1ServiceSpec.setLoadBalancerIP(dataCenterSpec.getLoadBalancerIp());
-
-            // Add external-dns annotation to update public DNS
             V1ObjectMeta v1ObjectMeta = dataCenterObjectMeta(OperatorNames.externalService(dataCenter));
-            if (!Strings.isNullOrEmpty(dataCenterSpec.getPublicDnsFqdn())) {
-                v1ObjectMeta.putAnnotationsItem("external-dns.alpha.kubernetes.io/hostname", dataCenterSpec.getPublicDnsFqdn());
-                if (dataCenterSpec.getPublicDnsTtl() != null)
-                    v1ObjectMeta.putAnnotationsItem("external-dns.alpha.kubernetes.io/ttl", Integer.toString(dataCenterSpec.getPublicDnsTtl()));
+
+            // set loadbalancer public ip if available
+            if (dataCenterSpec.getElasticsearchLoadBalancerEnabled()) {
+                v1ServiceSpec.externalTrafficPolicy("Local");
+                if (!Strings.isNullOrEmpty(dataCenterSpec.getElasticsearchLoadBalancerIp()))
+                    v1ServiceSpec.setLoadBalancerIP(dataCenterSpec.getElasticsearchLoadBalancerIp());
+
+                // Add external-dns annotation to update public DNS
+                if (!Strings.isNullOrEmpty(dataCenterSpec.getElasticsearchPublicDnsFqdn())) {
+                    v1ObjectMeta.putAnnotationsItem("external-dns.alpha.kubernetes.io/hostname", dataCenterSpec.getElasticsearchPublicDnsFqdn());
+                    if (dataCenterSpec.getElasticsearchPublicDnsTtl() != null)
+                        v1ObjectMeta.putAnnotationsItem("external-dns.alpha.kubernetes.io/ttl", Integer.toString(dataCenterSpec.getElasticsearchPublicDnsTtl()));
+                }
             }
+
             return new V1Service()
                     .metadata(v1ObjectMeta)
                     .spec(v1ServiceSpec);
@@ -1194,10 +1148,10 @@ public class DataCenterUpdateAction {
                             .selector(OperatorLabels.datacenter(dataCenter))
                     );
         }
-
+/* Ingress on Elasticsearch break TLS and basic auth
         public Optional<V1beta1Ingress> buildIngressElasticsearch() {
             Optional<V1beta1Ingress> ingress = Optional.empty();
-            String ingressDomain = System.getenv("INGRESS_DOMAIN");
+            String ingressDomain = System.getenv("Workload");
             if (dataCenterSpec.getElasticsearchEnabled() && dataCenterSpec.getElasticsearchIngressEnabled() && !Strings.isNullOrEmpty(ingressDomain)) {
                 String serviceName = OperatorNames.elasticsearchService(dataCenter);
                 String elasticHost = serviceName + "-" + ingressDomain.replace("${namespace}", dataCenterMetadata.getNamespace());
@@ -1233,7 +1187,7 @@ public class DataCenterUpdateAction {
             }
             return ingress;
         }
-
+*/
         /**
          * Mutable configmap for seeds, one for all racks, does not require a rolling restart.
          *
@@ -1715,7 +1669,6 @@ public class DataCenterUpdateAction {
                     .hostNetwork(dataCenterSpec.getHostNetworkEnabled())
                     .addInitContainersItem(buildInitContainerVmMaxMapCount())
                     .addContainersItem(cassandraContainer)
-                    //.addContainersItem(sidecarContainer)
                     .addVolumesItem(new V1Volume()
                             .name("pod-info")
                             .downwardAPI(new V1DownwardAPIVolumeSource()
@@ -1736,14 +1689,6 @@ public class DataCenterUpdateAction {
                                             .fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.name"))
                                     )
                             )
-                    )
-                    .addVolumesItem(new V1Volume()
-                            .name("sidecar-config-volume")
-                            .emptyDir(new V1EmptyDirVolumeSource())
-                    )
-                    .addVolumesItem(new V1Volume()
-                            .name("sidecar-truststore-volume")
-                            .emptyDir(new V1EmptyDirVolumeSource())
                     )
                     .addVolumesItem(new V1Volume()
                             .name("cassandra-log-volume")
@@ -1782,8 +1727,6 @@ public class DataCenterUpdateAction {
                                 )
                         )
                 );
-
-                podSpec.addInitContainersItem(buildInitContainerMergeTrustCerts());
             }
 
             // Add the nodeinfo init container if we have the nodeinfo secret name provided in the env var NODEINFO_SECRET
@@ -1897,66 +1840,6 @@ public class DataCenterUpdateAction {
                 commitlogInitContainer.addArgsItem(opClusterSecretPath);
             }
 
-            final Restore restoreFromBackup = dataCenterSpec.getRestoreFromBackup();
-            if (restoreFromBackup != null && StringUtils.isNotEmpty(restoreFromBackup.getSnapshotTag())) {
-                logger.debug("Restore requested.");
-
-                List<V1EnvVar> env = new ArrayList<>();
-                if (dataCenterSpec.getEnv() != null) {
-                    for (V1EnvVar evar : dataCenterSpec.getEnv()) {
-                        if (!Strings.isNullOrEmpty(restoreFromBackup.getBackupDir())
-                                && Constants.ENV_ROOT_BACKUP_DIR.equals(evar.getName())) {
-                            // backup root directory specified into the restore object, we use it in priority
-                            logger.debug("{} env variable set to '{}', but restore configuration specify '{}'.",
-                                    Constants.ENV_ROOT_BACKUP_DIR, evar.getValue(), restoreFromBackup.getBackupDir());
-                        } else {
-                            env.add(evar);
-                        }
-                    }
-                }
-
-                if (!Strings.isNullOrEmpty(restoreFromBackup.getBackupDir())) {
-                    V1EnvVar backupDir = new V1EnvVar()
-                            .name(Constants.ENV_ROOT_BACKUP_DIR)
-                            .value(restoreFromBackup.getBackupDir());
-                    env.add(backupDir);
-                }
-
-                V1Container restoreInitContainer = new V1Container()
-                        .name("sidecar-restore")
-                        .terminationMessagePolicy("FallbackToLogsOnError")
-                        .env(env)
-                        .image(dataCenterSpec.getSidecarImage())
-                        .imagePullPolicy(dataCenterSpec.getImagePullPolicy())
-                        .securityContext(new V1SecurityContext().runAsUser(CASSANDRA_USER_ID).runAsGroup(CASSANDRA_GROUP_ID))
-                        .command(ImmutableList.of(
-                                "java", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseCGroupMemoryLimitForHeap", "-XX:MaxRAMFraction=2",
-                                "-cp", "/app/resources:/app/classes:/app/libs/*",
-                                "com.strapdata.strapkop.sidecar.SidecarRestore",
-                                "-bb", restoreFromBackup.getBucket(), // bucket name
-                                "-c", dataCenterMetadata.getName(), // clusterID == DcName. Backup dc and restore dc must have the same name
-                                "-bi", OperatorNames.stsName(dataCenter, rack), // pod name prefix
-                                "-s", restoreFromBackup.getSnapshotTag(), // backup tag used to find the manifest file
-                                "--bs", restoreFromBackup.getProvider().name(),
-                                "-rs",
-                                "--shared-path", "/tmp", // elassandra can't run as root,
-                                "--cd", "/tmp/sidecar-config-volume", // location where the restore task can write config fragments
-                                "-ns", restoreFromBackup.getNamespace() // namespace of the backuped datacenter
-                        ))
-                        .addVolumeMountsItem(new V1VolumeMount()
-                                .name("pod-info")
-                                .mountPath("/etc/podinfo")
-                        ).addVolumeMountsItem(new V1VolumeMount()
-                                .name("sidecar-config-volume")
-                                .mountPath("/tmp/sidecar-config-volume")
-                        ).addVolumeMountsItem(new V1VolumeMount()
-                                .name("data-volume")
-                                .mountPath("/var/lib/cassandra")
-                        );
-                addBlobCredentialsForBackup(podSpec, restoreInitContainer, restoreFromBackup);
-                podSpec.addInitContainersItem(restoreInitContainer);
-            }
-
             final Map<String, String> rackLabels = OperatorLabels.rack(dataCenter, rack);
 
             final V1ObjectMeta templateMetadata = new V1ObjectMeta()
@@ -2032,14 +1915,6 @@ public class DataCenterUpdateAction {
                     addAWSBlobCredentialsForBackup(container, restoreFrom.getSecretRef());
                     break;
             }
-        }
-
-        private void addDnsAzureServicePrincipal(V1Container container, String secretName) {
-            container.addEnvItem(buildEnvVarFromSecret("DNS_AZURE_SUBSCRIPTION_ID", DnsUpdateSecretsKeys.AZURE_SUBSCRIPTION_ID, secretName))
-                    .addEnvItem(buildEnvVarFromSecret("DNS_AZURE_RESOURCE_GROUP", DnsUpdateSecretsKeys.AZURE_RESOURCE_GROUP, secretName))
-                    .addEnvItem(buildEnvVarFromSecret("DNS_AZURE_CLIENT_ID", DnsUpdateSecretsKeys.AZURE_CLIENT_ID, secretName))
-                    .addEnvItem(buildEnvVarFromSecret("DNS_AZURE_CLIENT_SECRET", DnsUpdateSecretsKeys.AZURE_CLIENT_SECRET, secretName))
-                    .addEnvItem(buildEnvVarFromSecret("DNS_AZURE_TENANT_ID", DnsUpdateSecretsKeys.AZURE_TENANT_ID, secretName));
         }
 
         private void addAzureBlobCredentiaksForBackup(V1Container container, String secretName) {
@@ -2136,10 +2011,6 @@ public class DataCenterUpdateAction {
                             .mountPath("/etc/podinfo")
                     )
                     .addVolumeMountsItem(new V1VolumeMount()
-                            .name("sidecar-config-volume")
-                            .mountPath("/tmp/sidecar-config-volume")
-                    )
-                    .addVolumeMountsItem(new V1VolumeMount()
                             .name("cassandra-log-volume")
                             .mountPath("/var/log/cassandra")
                     )
@@ -2153,7 +2024,6 @@ public class DataCenterUpdateAction {
                             .mountPath("/home/cassandra/.curlrc")
                             .subPath(".curlrc")
                     )
-                    .addArgsItem("/tmp/sidecar-config-volume")
                     .addEnvItem(new V1EnvVar().name("JMX_PORT").value(Integer.toString(dataCenterSpec.getJmxPort())))
                     .addEnvItem(new V1EnvVar().name("CQLS_OPTS").value( dataCenterSpec.getSsl() ? "--ssl" : ""))
                     .addEnvItem(new V1EnvVar().name("ES_SCHEME").value( dataCenterSpec.getEnterprise().getHttps() ? "https" : "http"))
@@ -2215,22 +2085,6 @@ public class DataCenterUpdateAction {
                     .imagePullPolicy("IfNotPresent")
                     .terminationMessagePolicy("FallbackToLogsOnError")
                     .command(ImmutableList.of("sysctl", "-w", "vm.max_map_count=1048575"));
-        }
-
-        private V1Container buildInitContainerMergeTrustCerts() {
-            return new V1Container()
-                    .securityContext(new V1SecurityContext().privileged(false))
-                    .name("merge-trust-certs")
-                    .image("openjdk:alpine")
-                    .imagePullPolicy("IfNotPresent")
-                    .terminationMessagePolicy("FallbackToLogsOnError")
-                    .command(ImmutableList.of("sh", "-c",
-                            "cp $JAVA_HOME/jre/lib/security/cacerts /tmp/sidecar-truststore/ && " +
-                                    String.format(Locale.ROOT, "keytool -import -trustcacerts -keystore /tmp/sidecar-truststore/cacerts -storepass changeit -alias strapkop -noprompt -file %s/cacert.pem",
-                                            authorityManager.getPublicCaMountPath())
-                    ))
-                    .addVolumeMountsItem(new V1VolumeMount().name("operator-truststore").mountPath(authorityManager.getPublicCaMountPath()))
-                    .addVolumeMountsItem(new V1VolumeMount().name("sidecar-truststore-volume").mountPath("/tmp/sidecar-truststore"));
         }
 
         // Nodeinfo init container if NODEINFO_SECRET is available as env var
