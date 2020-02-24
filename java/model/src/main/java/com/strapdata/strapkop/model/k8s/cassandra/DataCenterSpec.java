@@ -344,15 +344,9 @@ public class DataCenterSpec {
         acc.add(prometheusEnabled);
         acc.add(elasticsearchEnabled);
         acc.add(elasticsearchPort);
-        acc.add(elasticsearchLoadBalancerEnabled);
-        acc.add(elasticsearchLoadBalancerIp);
-        acc.add(externalDns);
-        acc.add(kibana);
-        acc.add(reaper);
         acc.add(privilegedSupported);
         acc.add(hostNetworkEnabled);
         acc.add(hostPortEnabled);
-        acc.add(managedKeyspaces);
         acc.add(nativePort);
         acc.add(storagePort);
         acc.add(sslStoragePort);
