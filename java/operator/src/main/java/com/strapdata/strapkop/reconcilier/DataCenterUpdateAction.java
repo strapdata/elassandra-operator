@@ -2122,7 +2122,7 @@ public class DataCenterUpdateAction {
                         "  - apiVersion: stable.strapdata.com/v1\n" +
                         "    controller: true\n" +
                         "    blockOwnerDeletion: true\n" +
-                        "    kind: ElassandraDataCenter\n" +
+                        "    kind: ElassandraDatacenter\n" +
                         "    name: "+ dataCenterMetadata.getName() +"\n" +
                         "    uid: "+ dataCenterMetadata.getUid()+"\n" + // Datacenter UUID is mandatory to allow Cascading deletion
                         "spec:\n" +

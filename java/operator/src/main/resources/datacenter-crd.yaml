@@ -17,7 +17,7 @@ spec:
     # singular name to be used as an alias on the CLI and for display
     singular: elassandradatacenter
     # kind is normally the CamelCased singular type. Your resource manifests use this.
-    kind: ElassandraDataCenter
+    kind: ElassandraDatacenter
     # shortNames allow shorter string to match your resource on the CLI
     shortNames:
     - edc

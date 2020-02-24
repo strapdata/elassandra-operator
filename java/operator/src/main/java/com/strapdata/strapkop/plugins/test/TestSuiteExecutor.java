@@ -208,12 +208,12 @@ public abstract class TestSuiteExecutor {
         Optional<CheckPointCache.CheckPoint> restorePoint = checkPointCache.getCheckPoint(new Key(dc.getMetadata()));
         if (restorePoint.isPresent()) {
             if (restorePoint.get().getCommittedSpec() == null) {
-                failed("ElassandraDataCenter should have a restore point");
+                failed("ElassandraDatacenter should have a restore point");
             }
 
             String stableFingerPrint = restorePoint.get().getCommittedSpec().fingerprint();
             if (!dc.getSpec().fingerprint().equals(stableFingerPrint)) {
-                failed("ElassandraDataCenter RestorePoint instance should reference the fingerprint " + dc.getSpec().fingerprint());
+                failed("ElassandraDatacenter RestorePoint instance should reference the fingerprint " + dc.getSpec().fingerprint());
             }
         }
     }
