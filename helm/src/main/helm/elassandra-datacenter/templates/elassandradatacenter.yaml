@@ -18,7 +18,6 @@ spec:
   replicas: {{ default "1" .Values.replicas }}
   autoScaleMode: {{ default "MANUAL" .Values.autoScaleMode }}
   elassandraImage: "{{ .Values.image.elassandraRepository }}:{{ .Values.image.tag }}"
-  sidecarImage: "{{ .Values.image.sidecarRepository }}:{{ .Values.image.tag }}"
   {{- if .Values.webHookUrl }}
   webHookUrl: {{ .Values.webHookUrl }}
   {{- end }}
