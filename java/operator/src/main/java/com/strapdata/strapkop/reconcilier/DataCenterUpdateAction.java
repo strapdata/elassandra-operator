@@ -2158,7 +2158,7 @@ public class DataCenterUpdateAction {
                             " && grep ^ /nodeinfo/* " +
                             // here we create the CRD for ExternalDNS in order to register the Seed as DNS A Record (only node 0 of each rack is registered
                             (updateDns ? " && ((IDX=`echo $POD_NAME | sed -r 's/^.*-0$/0/g' ` && test \"$IDX\" = \"0\" &&" +
-                                    " NODE_IP=`cat /nodeinfo/node-ip` && echo \""+yaml+"\" > /tmp/dns-manifest.yaml &&" +
+                                    " NODE_IP=`cat /nodeinfo/public-ip` && echo \""+yaml+"\" > /tmp/dns-manifest.yaml &&" +
                                     " sed -i \"s#__NODE_IP__#${NODE_IP}#g\" /tmp/dns-manifest.yaml &&" +
                                     " cat /tmp/dns-manifest.yaml && kubectl apply --token=\"$NODEINFO_TOKEN\" -f /tmp/dns-manifest.yaml) || true)" : "")
                     ))
