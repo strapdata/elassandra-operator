@@ -1,5 +1,5 @@
 apiVersion: stable.strapdata.com/v1
-kind: ElassandraDataCenter
+kind: ElassandraDatacenter
 metadata:
   name: {{ template "elassandra.resourceName" . }}
   namespace: {{ .Release.Namespace }}
