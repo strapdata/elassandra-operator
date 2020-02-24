@@ -122,7 +122,6 @@ public class DataCenterSpec {
 
     /**
      * Enable Prometheus support.
-     `     * `
      */
     @SerializedName("prometheusEnabled")
     @Expose
@@ -348,6 +347,8 @@ public class DataCenterSpec {
         acc.add(elasticsearchLoadBalancerEnabled);
         acc.add(elasticsearchLoadBalancerIp);
         acc.add(externalDns);
+        acc.add(kibana);
+        acc.add(reaper);
         acc.add(privilegedSupported);
         acc.add(hostNetworkEnabled);
         acc.add(hostPortEnabled);
