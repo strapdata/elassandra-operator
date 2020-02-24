@@ -39,7 +39,7 @@ public class RemoveReplicationTaskReconcilier extends TaskReconcilier {
                                             final CqlRoleManager cqlRoleManager,
                                             final CqlKeyspaceManager cqlKeyspaceManager,
                                             final MeterRegistry meterRegistry) {
-        super(reconcilierObserver, "decommission", k8sResourceUtils, meterRegistry);
+        super(reconcilierObserver, "removeReplication", k8sResourceUtils, meterRegistry);
         this.sidecarClientFactory = sidecarClientFactory;
         this.context = context;
         this.cqlRoleManager = cqlRoleManager;
@@ -47,7 +47,7 @@ public class RemoveReplicationTaskReconcilier extends TaskReconcilier {
     }
 
     public BlockReason blockReason() {
-        return BlockReason.DECOMMISSION;
+        return BlockReason.REMOVE_REPLICATION;
     }
 
     /**
@@ -64,12 +64,18 @@ public class RemoveReplicationTaskReconcilier extends TaskReconcilier {
         final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
 
         if (Strings.isNullOrEmpty(removeReplicationTaskSpec.getDcName())) {
-            logger.warn("dcName not set, ignore task");
+            logger.warn("task={} dcName not set, ignoring task", task.getMetadata().getName());
             return Single.just(TaskPhase.FAILED);
         }
 
         // remove the dc from all replication maps
         return this.cqlKeyspaceManager.removeDcFromReplicationMap(dc, removeReplicationTaskSpec.getDcName(), cqlSessionHandler)
-                .andThen(Single.just(TaskPhase.SUCCEED));
+                .andThen(finalizeTaskStatus(dc, taskWrapper, TaskPhase.SUCCEED))
+                .onErrorResumeNext(throwable -> {
+                    logger.error("task={} remove replication to dc={} failed, error={}",
+                            task.getMetadata().getName(), removeReplicationTaskSpec.getDcName(), throwable.getMessage());
+                    task.getStatus().setLastMessage(throwable.getMessage());
+                    return updateTaskStatus(dc, taskWrapper, TaskPhase.FAILED).toSingleDefault(TaskPhase.FAILED);
+                });
     }
 }

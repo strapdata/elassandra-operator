@@ -48,7 +48,7 @@ public class SidecarClientFactory {
     /**
      * Get a sidecar client from cache or create it
      */
-    public SidecarClient clientForPod(final ElassandraPod pod) throws MalformedURLException, InterruptedException, ExecutionException, ApiException, SSLException {
+    public synchronized SidecarClient clientForPod(final ElassandraPod pod) throws MalformedURLException, InterruptedException, ExecutionException, ApiException, SSLException {
 
         SidecarClient sidecarClient = sidecarConnectionCache.get(pod);
 
