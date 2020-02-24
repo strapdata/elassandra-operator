@@ -92,7 +92,11 @@ public class SidecarClient {
     public Single<StatusResponse> status() {
         return httpClient.retrieve(auth(GET("_nodetool/status")), StatusResponse.class).singleOrError();
     }
-    
+
+    public Completable decommission() {
+        return httpClient.exchange(auth(POST("_nodetool/decommission", ""))).ignoreElements();
+    }
+
     public Completable remove(@Nullable  String dcName, String... hostIds) throws UnsupportedEncodingException {
         String qs = (dcName == null) ? "" : "?dc=" + URLEncoder.encode(dcName,"UTF-8");
         if (hostIds.length > 0) {
