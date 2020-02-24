@@ -22,18 +22,13 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Infrastructure;
 import io.reactivex.Completable;
-import io.reactivex.Observable;
+import io.reactivex.CompletableSource;
 import io.reactivex.Single;
-import io.reactivex.schedulers.Schedulers;
-import io.vavr.Tuple2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Singleton
@@ -98,34 +93,19 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
                 todo = todo.andThen(this.cqlKeyspaceManager.updateKeyspaceReplicationMap(dc, rebuildTaskSpec.getDstDcName(), entry.getKey(), Math.min(entry.getValue(), rebuildTaskSpec.getDstDcSize()), cqlSessionHandler, false));
             }
 
-            // flush sstables to stream properly
-            return todo.andThen(Observable.fromIterable(pods)
-                    .subscribeOn(Schedulers.io())
-                    .flatMapSingle(pod -> {
-                        // execute cleanup on a each pod sequentially
-                        TaskPhase podPhase = TaskPhase.SUCCEED;
-                        try {
-                            final Throwable t = sidecarClientFactory.clientForPod(ElassandraPod.fromName(dc, pod))
-                                    .flush(null).blockingGet();
-                            if (t != null) throw t;
-                        } catch (Throwable throwable) {
+            // flush sstables in parallel to stream properly
+            List<CompletableSource> todoList = new ArrayList<>();
+            for(String pod : pods) {
+                todoList.add(sidecarClientFactory.clientForPod(ElassandraPod.fromName(dc, pod)).flush(null)
+                        .andThen(updateTaskPodStatus(dc, taskWrapper, TaskPhase.RUNNING, pod, TaskPhase.SUCCEED))
+                        .onErrorResumeNext(throwable -> {
                             logger.error("Error while executing rebuild on pod={}", pod, throwable);
-                            podPhase = TaskPhase.FAILED;
-                            task.getStatus().setLastMessage(throwable.getMessage());
-                        }
-                        task.getStatus().getPods().put(pod, podPhase);
-                        return updateTaskStatus(dc, taskWrapper, TaskPhase.RUNNING).toSingleDefault(new Tuple2<String, TaskPhase>(pod, podPhase));
-                    })
-                    .toList()
-                    .map(list -> {
-                        // finally compute the task phase
-                        TaskPhase taskPhase = TaskPhase.SUCCEED;
-                        for (Tuple2<String, TaskPhase> t : list) {
-                            if (t._2.equals(TaskPhase.FAILED))
-                                taskPhase = TaskPhase.FAILED;
-                        }
-                        return taskPhase;
-                    }));
+                            return updateTaskPodStatus(dc, taskWrapper, TaskPhase.RUNNING, pod, TaskPhase.FAILED, throwable.getMessage());
+                        })
+                );
+            }
+            todo.andThen(Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()])))
+                    .andThen(finalizeTaskStatus(dc, taskWrapper));
         }
 
         if (rebuildTaskSpec.getDstDcName().equals(dc.getSpec().getDatacenterName())) {
@@ -133,41 +113,33 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
                 // wait a running datacenter to rebuild.
                 return Single.just(task.getStatus().getPhase());
             }
-            // excute a nodetool rebuild on all nodes
-            return Observable.fromIterable(pods)
-                    .subscribeOn(Schedulers.io())
-                    .flatMapSingle(pod -> {
-                        // execute cleanup on a each pod sequentially
-                        TaskPhase podPhase = TaskPhase.SUCCEED;
-                        try {
-                            final Throwable t = sidecarClientFactory.clientForPod(ElassandraPod.fromName(dc, pod))
-                                    .rebuild(task.getSpec().getRebuild().getSrcDcName(), null).blockingGet();
-                            if (t != null) throw t;
-                        } catch (Throwable throwable) {
+
+            // rebuild in parallel to stream data
+            List<CompletableSource> todoList = new ArrayList<>();
+            for(String pod : pods) {
+                todoList.add(sidecarClientFactory.clientForPod(ElassandraPod.fromName(dc, pod)).rebuild(task.getSpec().getRebuild().getSrcDcName(), null)
+                        .onErrorResumeNext(throwable -> {
                             logger.error("Error while executing rebuild on pod={}", pod, throwable);
-                            podPhase = TaskPhase.FAILED;
-                            task.getStatus().setLastMessage(throwable.getMessage());
+                            return updateTaskPodStatus(dc, taskWrapper, TaskPhase.RUNNING, pod, TaskPhase.FAILED, throwable.getMessage());
+                        })
+                        .andThen(updateTaskPodStatus(dc, taskWrapper, TaskPhase.RUNNING, pod, TaskPhase.SUCCEED))
+
+                );
+            }
+            return Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()]))
+                    .andThen(finalizeTaskStatus(dc, taskWrapper))
+                    .flatMap(taskPhase -> {
+                        // submit a dc status update in the working queue to update dc bootstrapped=true
+                        if (TaskPhase.SUCCEED.equals(taskPhase)) {
+                            workQueue.submit(new ClusterKey(dc), k8sResourceUtils.readDatacenter(new Key(dc.getMetadata()))
+                                    .flatMapCompletable(dataCenter -> {
+                                        logger.info("Rebuild done datacenter={} bootstrapped=true", dc.id());
+                                        dataCenter.getStatus().setBootstrapped(true);
+                                        return k8sResourceUtils.updateDataCenter(dc).ignoreElement();
+                                    }));
+                        } else {
+                            logger.warn("Rebuild task={} failed, dc={} boostrapped=false", task.getMetadata().getName(), dc.getMetadata().getName());
                         }
-                        task.getStatus().getPods().put(pod, podPhase);
-                        return updateTaskStatus(dc, taskWrapper, TaskPhase.RUNNING).toSingleDefault(new Tuple2<String, TaskPhase>(pod, podPhase));
-                    })
-                    .toList()
-                    .map(list -> {
-                        // finally compute the task phase
-                        TaskPhase taskPhase = TaskPhase.SUCCEED;
-                        for (Tuple2<String, TaskPhase> t : list) {
-                            if (t._2.equals(TaskPhase.FAILED))
-                                taskPhase = TaskPhase.FAILED;
-                        }
-                        return taskPhase;
-                    }).flatMap(taskPhase -> {
-                        // submit a dc status update in the working queue to update bootstrapped=true
-                        workQueue.submit(new ClusterKey(dc), k8sResourceUtils.readDatacenter(new Key(dc.getMetadata()))
-                                .flatMapCompletable(dataCenter -> {
-                                    logger.info("Updating datacenter={} bootstrapped=true", dc.id());
-                                    dataCenter.getStatus().setBootstrapped(true);
-                                    return k8sResourceUtils.updateDataCenter(dc).ignoreElement();
-                                }));
                         return Single.just(taskPhase);
                     });
         }

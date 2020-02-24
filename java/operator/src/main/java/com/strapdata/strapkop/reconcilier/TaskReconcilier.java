@@ -162,6 +162,41 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
         return k8sResourceUtils.updateTaskStatus(taskWrapper);
     }
 
+    public Completable updateTaskPodStatus(DataCenter dc, TaskWrapper taskWrapper, TaskPhase phase, String pod, TaskPhase podPhase) throws ApiException {
+        return updateTaskPodStatus(dc, taskWrapper, phase, pod, podPhase, null);
+    }
+
+    public Completable updateTaskPodStatus(DataCenter dc, TaskWrapper taskWrapper, TaskPhase phase, String pod, TaskPhase podPhase, String msg) throws ApiException {
+        Task task = taskWrapper.getTask();
+        TaskStatus taskStatus = task.getStatus();
+        taskStatus.getPods().put(pod, podPhase);
+        taskStatus.setPhase(phase);
+        if (msg != null)
+            taskStatus.setLastMessage(msg);
+        return k8sResourceUtils.updateTaskStatus(taskWrapper);
+    }
+
+    public Single<TaskPhase> finalizeTaskStatus(DataCenter dc, TaskWrapper taskWrapper) throws ApiException {
+        Task task = taskWrapper.getTask();
+        TaskStatus taskStatus = task.getStatus();
+        TaskPhase taskPhase = TaskPhase.SUCCEED;
+        for (Map.Entry<String, TaskPhase> e : taskStatus.getPods().entrySet()) {
+            if (e.getValue().equals(TaskPhase.FAILED)) {
+                taskPhase = TaskPhase.FAILED;
+                break;
+            }
+        }
+        taskStatus.setPhase(taskPhase);
+        return k8sResourceUtils.updateTaskStatus(taskWrapper).toSingleDefault(taskPhase);
+    }
+
+    public Single<TaskPhase> finalizeTaskStatus(DataCenter dc, TaskWrapper taskWrapper, TaskPhase taskPhase) throws ApiException {
+        Task task = taskWrapper.getTask();
+        TaskStatus taskStatus = task.getStatus();
+        taskStatus.setPhase(taskPhase);
+        return k8sResourceUtils.updateTaskStatus(taskWrapper).toSingleDefault(taskPhase);
+    }
+
     Single<DataCenter> fetchDataCenter(TaskWrapper taskWrapper) throws ApiException {
         final Task task = taskWrapper.getTask();
         final Key dcKey =  new Key(

@@ -26,6 +26,7 @@ import io.reactivex.Single;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -92,26 +93,36 @@ public class SidecarClient {
         return httpClient.retrieve(auth(GET("_nodetool/status")), StatusResponse.class).singleOrError();
     }
     
-    public Completable decommission() {
-        return httpClient.exchange(auth(POST("_nodetool/decommission", ""))).ignoreElements();
+    public Completable remove(@Nullable  String dcName, String... hostIds) throws UnsupportedEncodingException {
+        String qs = (dcName == null) ? "" : "?dc=" + URLEncoder.encode(dcName,"UTF-8");
+        if (hostIds.length > 0) {
+            qs += (qs.length() > 0) ? "&hosts=" : "?hosts=";
+            boolean first = true;
+            for (String hostId : hostIds) {
+                qs += (first) ? "" : ",";
+                qs += URLEncoder.encode(hostId, "UTF-8");
+                first = false;
+            }
+        }
+        return httpClient.exchange(auth(POST("_nodetool/remove" + qs, ""))).ignoreElements();
     }
     
-    public Completable cleanup(String keyspace) throws UnsupportedEncodingException {
+    public Completable cleanup(@Nullable String keyspace) throws UnsupportedEncodingException {
         String qs = (keyspace == null) ? "" : "?keyspace=" + URLEncoder.encode(keyspace,"UTF-8");
         return httpClient.exchange(auth(POST("_nodetool/cleanup" +qs, ""))).ignoreElements();
     }
 
-    public Completable rebuild(String sourceDcName, String keyspace) throws UnsupportedEncodingException {
+    public Completable rebuild(String sourceDcName, @Nullable String keyspace) throws UnsupportedEncodingException {
         String qs = (keyspace == null) ? "" : "?keyspace=" + URLEncoder.encode(keyspace,"UTF-8");
         return httpClient.exchange(auth(POST("_nodetool/rebuild/"+sourceDcName+ qs, ""))).ignoreElements();
     }
 
-    public Completable flush(String keyspace) throws UnsupportedEncodingException {
+    public Completable flush(@Nullable String keyspace) throws UnsupportedEncodingException {
         String qs = (keyspace == null) ? "" : "?keyspace=" + URLEncoder.encode(keyspace,"UTF-8");
         return httpClient.exchange(auth(POST("_nodetool/flush" + qs, ""))).ignoreElements();
     }
 
-    public Completable repairPrimaryRange(String keyspace) throws UnsupportedEncodingException {
+    public Completable repairPrimaryRange(@Nullable String keyspace) throws UnsupportedEncodingException {
         String qs = (keyspace == null) ? "" : "?keyspace=" + URLEncoder.encode(keyspace,"UTF-8");
         return httpClient.exchange(auth(POST("_nodetool/repair" + qs, ""))).ignoreElements();
     }

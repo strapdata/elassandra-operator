@@ -1,5 +1,8 @@
 package com.strapdata.strapkop.reconcilier;
 
+import com.strapdata.strapkop.event.ElassandraPod;
+import com.strapdata.strapkop.k8s.K8sResourceUtils;
+import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.backup.BackupArguments;
 import com.strapdata.strapkop.model.backup.CloudStorageSecret;
 import com.strapdata.strapkop.model.backup.CommonBackupArguments;
@@ -8,10 +11,6 @@ import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.task.BackupTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
-import com.strapdata.strapkop.model.k8s.task.TaskStatus;
-import com.strapdata.strapkop.event.ElassandraPod;
-import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CustomObjectsApi;
@@ -98,19 +97,7 @@ public class BackupTaskReconcilier extends TaskReconcilier {
                             });
                 })
                 .toList()
-                .map(list -> {
-                    // update pod status map a the end to avoid concurrency issue
-                    TaskStatus status = task.getStatus();
-                    Map<String, TaskPhase> podsMap = task.getStatus().getPods();
-                    Map<String, TaskPhase> podStatus = status.getPods();
-                    TaskPhase taskPhase = TaskPhase.SUCCEED;
-                    for(Tuple2<String, Boolean> e : list) {
-                        podsMap.put(e._1, e._2 ? TaskPhase.SUCCEED : TaskPhase.FAILED);
-                        if (!e._2)
-                            taskPhase = TaskPhase.FAILED;
-                    }
-                    return taskPhase;
-                });
+                .flatMap(list -> finalizeTaskStatus(dc, taskWrapper));
     }
 
 
