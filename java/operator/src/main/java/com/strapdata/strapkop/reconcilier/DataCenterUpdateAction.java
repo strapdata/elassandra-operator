@@ -550,7 +550,7 @@ public class DataCenterUpdateAction {
                                 break;
 
                             default:
-                                for (int i = 0; i < movingZone.size; i++) {
+                                for (int i = 0; i < movingZone.size && i < dataCenterSpec.getReplicas(); i++) {
                                     ElassandraPod pod = movingZone.pod(dataCenter, i);
                                     if (ElassandraNodeStatus.FAILED.equals(elassandraNodeStatusCache.getOrDefault(pod, ElassandraNodeStatus.UNKNOWN))) {
                                         failedPod = pod;
