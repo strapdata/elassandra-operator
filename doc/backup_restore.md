@@ -52,7 +52,6 @@ metadata:
 spec:
   replicas: 3
   cassandraImage: "gcr.io/cassandra-operator/cassandra:latest"
-  sidecarImage: "gcr.io/cassandra-operator/cassandra-sidecar:latest"
   imagePullPolicy: IfNotPresent
   resources:
     limits:
@@ -105,7 +104,6 @@ metadata:
 spec:
   replicas: 3
   cassandraImage: "gcr.io/cassandra-operator/cassandra:latest"
-  sidecarImage: "gcr.io/cassandra-operator/cassandra-sidecar:latest"
   imagePullPolicy: IfNotPresent
   resources:
     limits:
@@ -155,7 +153,6 @@ metadata:
 spec:
   replicas: 1
   cassandraImage: "gcr.io/cassandra-operator/cassandra:latest"
-  sidecarImage: "gcr.io/cassandra-operator/cassandra-sidecar:latest"
   imagePullPolicy: IfNotPresent
   resources:
     limits:
@@ -256,7 +253,6 @@ metadata:
 spec:
   replicas: 3
   cassandraImage: "gcr.io/cassandra-operator/cassandra:latest"
-  sidecarImage: "gcr.io/cassandra-operator/cassandra-sidecar:latest"
   imagePullPolicy: IfNotPresent
   resources:
     limits:
