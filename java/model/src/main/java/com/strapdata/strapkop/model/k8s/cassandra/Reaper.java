@@ -40,4 +40,13 @@ public class Reaper {
     @SerializedName("enabled")
     @Expose
     private Boolean enabled = false;
+
+    /**
+     * Reaper ingress suffix concatened with "repaer-" and "reaper-admin-"
+     * reaper-suffix
+     * reaper-admin-suffix
+     */
+    @SerializedName("ingressSuffix")
+    @Expose
+    private String ingressSuffix = null;
 }

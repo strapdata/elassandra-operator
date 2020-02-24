@@ -77,14 +77,6 @@ spec:
             value: {{ $val | quote }}
           {{- end }}
           {{- end }}
-          {{- if .Values.dns }}
-          - name: "DNS_ENABLED"
-            value: {{ default "false" .Values.dns.enabled | quote }}
-          - name: "DNS_DOMAIN_NAME"
-            value: {{ .Values.dns.domainName | quote }}
-          - name: "DNS_TTL"
-            value: {{ default "60" .Values.dns.ttl | quote }}
-         {{- end }}
     {{- if .Values.nodeSelector }}
       nodeSelector:
 {{ toYaml .Values.nodeSelector | indent 8 }}

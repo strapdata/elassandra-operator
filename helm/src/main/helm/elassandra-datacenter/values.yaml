@@ -17,6 +17,7 @@ image:
 kibana:
   enabled: true
   image: "docker.elastic.co/kibana/kibana-oss"
+  ingressSuffix:
   #tag: 6.8.4
   spaces:
     - name: ""
@@ -25,6 +26,13 @@ kibana:
 reaper:
   image: strapdata.azurecr.io/strapdata/cassandra-reaper:1.4.7.1
   enabled: true
+  ingressSuffix:
+
+externalDns:
+  enabled: false
+  root: "xxx"
+  domain: "example.com"
+  ttl: 300
 
 managedKeyspaces: {}
 #  - keyspace: gravitee
@@ -42,8 +50,6 @@ webHookUrl:
 
 elasticsearchLoadBalancerEnabled: false
 elasticsearchLoadBalancerIp:
-elasticsearchPublicDnsFqdn:
-elasticsearchPublicDnsTtl:
 
 
 # TODO: we do not support unprivileged setup yet

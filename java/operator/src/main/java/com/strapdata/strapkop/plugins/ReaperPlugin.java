@@ -19,7 +19,6 @@ import io.kubernetes.client.custom.IntOrString;
 import io.kubernetes.client.models.*;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.http.uri.UriTemplate;
 import io.reactivex.Completable;
 import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
@@ -371,13 +370,9 @@ public class ReaperPlugin extends AbstractPlugin {
                 );
 
         // create reaper ingress
-        String ingressSuffix = System.getenv("INGRESS_SUFFIX");
         final V1beta1Ingress ingress;
-        if (!Strings.isNullOrEmpty(ingressSuffix)) {
-            String baseHostname = UriTemplate.of(ingressSuffix).expand(ImmutableMap.of(
-                    "namespace", dataCenterMetadata.getNamespace(),
-                    "datacenterName", dataCenterSpec.getDatacenterName().toLowerCase(Locale.ROOT),
-                    "clusterName", dataCenterSpec.getClusterName().toLowerCase(Locale.ROOT)));
+        if (!Strings.isNullOrEmpty(dataCenterSpec.getReaper().getIngressSuffix())) {
+            String baseHostname = dataCenterSpec.getReaper().getIngressSuffix();
             String reaperAppHost = "reaper-" + baseHostname;
             String reaperAdminHost = "admin-reaper-" + baseHostname;
             logger.info("Creating reaper ingress for reaperAppHost={} reaperAdminHost={}", reaperAppHost, reaperAdminHost);

@@ -11,6 +11,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.QueryValue;
 import io.reactivex.Single;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
@@ -18,6 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Return nodes IP of pod 0 for active racks
@@ -45,14 +47,18 @@ public class SeedsController {
     }
 
     /**
-     * Retreive seed node IP addresses.
+     * Retreive seed node (or pod) IP addresses or external DNS names.
      * @param namespace
      * @param clusterName
      * @param datacenterName
+     * @param externalDns
      * @return
      */
     @Get(value = "/{namespace}/{clusterName}/{datacenterName}", produces = MediaType.APPLICATION_JSON)
-    public Single<List<String>> seeds(String namespace, String clusterName, String datacenterName) throws ApiException {
+    public Single<List<String>> seeds(@QueryValue("namespace") String namespace,
+                                      @QueryValue("clusterName") String clusterName,
+                                      @QueryValue("datacenterName") String datacenterName,
+                                      @QueryValue(value = "externalDns",defaultValue = "false") Boolean externalDns) throws ApiException {
         return k8sResourceUtils.readDatacenter(new Key(OperatorNames.dataCenterResource(clusterName, datacenterName), namespace))
                 .map(dataCenter -> {
                 List<String> seeds = new ArrayList<>();
@@ -68,10 +74,20 @@ public class SeedsController {
                                             logger.debug("found node={}", nodeName);
                                             if (pod.getStatus() != null && pod.getStatus().getHostIP() != null) {
                                                 if (dataCenter.getSpec().getHostPortEnabled() == true || dataCenter.getSpec().getHostNetworkEnabled() == true) {
-                                                    logger.debug("add hostIp={}", pod.getStatus().getHostIP());
-                                                    seeds.add(pod.getStatus().getHostIP());
+                                                    if (externalDns && dataCenter.getSpec().getExternalDns() != null && dataCenter.getSpec().getExternalDns().getEnabled()) {
+                                                        String seedHostname =
+                                                                "elassandra-" + dataCenter.getMetadata().getNamespace()+
+                                                                        "-" + dataCenter.getSpec().getClusterName().toLowerCase(Locale.ROOT) +
+                                                                        "-" + dataCenter.getSpec().getDatacenterName().toLowerCase(Locale.ROOT) +
+                                                                        "-" + statefulSet.getMetadata().getLabels().get(OperatorLabels.RACK).toLowerCase(Locale.ROOT) +
+                                                                        "-0";
+                                                        logger.debug("Add external hostname={}", seedHostname);
+                                                    } else {
+                                                        logger.debug("Add hostIp={}", pod.getStatus().getHostIP());
+                                                        seeds.add(pod.getStatus().getHostIP());
+                                                    }
                                                 } else {
-                                                    logger.debug("add podIp={}", pod.getStatus().getPodIP());
+                                                    logger.debug("Add podIp={}", pod.getStatus().getPodIP());
                                                     seeds.add(pod.getStatus().getPodIP());
                                                 }
                                             }

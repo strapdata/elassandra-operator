@@ -2,7 +2,6 @@ package com.strapdata.strapkop.plugins;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
@@ -22,7 +21,6 @@ import io.kubernetes.client.custom.IntOrString;
 import io.kubernetes.client.models.*;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.http.uri.UriTemplate;
 import io.reactivex.Completable;
 import io.reactivex.Single;
 
@@ -300,14 +298,8 @@ public class KibanaPlugin extends AbstractPlugin {
                             ));
                 })
                 .flatMap(s -> {
-                    // INGRESS_SUFFIX= <space>-kibana-{datacenterName}-{clusterName}-{namespace}.xxxxx.com
-                    String ingressSuffix = System.getenv("INGRESS_SUFFIX");
-                    if (!Strings.isNullOrEmpty(ingressSuffix)) {
-                        String kibanaHost = UriTemplate.of(space.name() + "-" + ingressSuffix)
-                                .expand(ImmutableMap.of(
-                                "namespace", dataCenterMetadata.getNamespace(),
-                                "datacenterName", dataCenterSpec.getDatacenterName().toLowerCase(Locale.ROOT),
-                                "clusterName", dataCenterSpec.getClusterName().toLowerCase(Locale.ROOT)));
+                    if (!Strings.isNullOrEmpty(dataCenterSpec.getKibana().getIngressSuffix())) {
+                        String kibanaHost = space.name() + "-" + dataCenterSpec.getKibana().getIngressSuffix();
                         logger.info("Creating kibana ingress for host={}", kibanaHost);
                         final V1beta1Ingress ingress = new V1beta1Ingress()
                                 .metadata(meta)

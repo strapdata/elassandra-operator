@@ -20,12 +20,6 @@ resources: {}
 #    cpu: 100m
 #    memory: 50Mi
 
-# Publish a CRD DNSEndpoint for external-dns on seed pods.
-dns:
-  enabled: true
-  zone: ""
-  ttl: 60
-
 namespace:
 
 env:
