@@ -15,7 +15,6 @@ import io.reactivex.schedulers.Schedulers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Inject;
 import javax.inject.Named;
 import java.util.concurrent.TimeUnit;
 
@@ -101,7 +100,7 @@ public class K8sWatchEventSource<ResourceT, ResourceListT> implements EventSourc
                 .observeOn(Schedulers.io()).observeOn(Schedulers.io()) // blocking io seemed to happen on computational thread...
                 .doOnError(t -> {
                     if (t.getCause() instanceof java.net.SocketTimeoutException) {
-                        logger.debug("Watcher for adapter '{}' receive a socket timeout", adapter.getClass().getName(), t);
+                        logger.trace("Watcher for adapter '{}' receive a socket timeout", adapter.getClass().getName(), t);
                         // ignore read timeout
                         return;
                     }

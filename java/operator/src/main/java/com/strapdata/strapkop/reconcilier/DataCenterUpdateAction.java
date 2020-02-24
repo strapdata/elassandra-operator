@@ -550,7 +550,7 @@ public class DataCenterUpdateAction {
                                 break;
 
                             default:
-                                for (int i = 0; i < movingZone.size && i < dataCenterSpec.getReplicas(); i++) {
+                                for (int i = 0; i < movingZone.size; i++) {
                                     ElassandraPod pod = movingZone.pod(dataCenter, i);
                                     if (ElassandraNodeStatus.FAILED.equals(elassandraNodeStatusCache.getOrDefault(pod, ElassandraNodeStatus.UNKNOWN))) {
                                         failedPod = pod;
@@ -1138,7 +1138,6 @@ public class DataCenterUpdateAction {
                     .spec(new V1ServiceSpec()
                             .clusterIP("None")
                             .addPortsItem(new V1ServicePort().name("cql").port(dataCenterSpec.getNativePort()))
-                            .addPortsItem(new V1ServicePort().name("jmx").port(dataCenterSpec.getJmxPort()))
                             .addPortsItem(new V1ServicePort().name("internode").port(dataCenterSpec.getSsl() ? dataCenterSpec.getSslStoragePort() : dataCenterSpec.getStoragePort()))
                             .selector(OperatorLabels.datacenter(dataCenter))
                     );
@@ -1229,7 +1228,8 @@ public class DataCenterUpdateAction {
 
             Set<String> seeds = new HashSet<>();
             for (RackStatus rackStatus : dataCenterStatus.getRackStatuses().values()) {
-                if (rackStatus.getJoinedReplicas() > 0 && dataCenterSpec.getReplicas() > 1) // also test the nb of expected replicas to avoid crashloopbackup in a single node configuration update
+                if (rackStatus.getJoinedReplicas() > 0 && dataCenterSpec.getReplicas() > 1)
+                    // also test the nb of expected replicas to avoid crashloopbackup in a single node configuration update
                     seeds.add(new ElassandraPod(dataCenter, rackStatus.getName(), 0).getFqdn());
             }
 
@@ -2293,7 +2293,7 @@ public class DataCenterUpdateAction {
     }
 
     public static class Zones implements Iterable<Zone> {
-        Map<String, Zone> zoneMap = new LinkedHashMap<>();
+        Map<String, Zone> zoneMap = new TreeMap<>();    // sort racks
 
         public Zones(CoreV1Api coreApi, Map<String, V1StatefulSet> existingStatefulSetsByZone) throws ApiException {
             this(coreApi.listNode(false, null, null, null, null,
@@ -2424,10 +2424,12 @@ public class DataCenterUpdateAction {
         final Map<String, ElassandraNodeStatus> podStatuses = new HashMap<>();
 
         // update pod
+        int replicaCount = 0;
         for (Zone zone : zones) {
-            for (int i = 0; i < zone.size; i++) {
+            for (int i = 0; i < zone.size && replicaCount < dataCenterSpec.getReplicas(); i++) {
                 ElassandraPod pod = new ElassandraPod(dataCenter, zone.name, i);
                 podStatuses.put(pod.getName(), elassandraNodeStatusCache.getOrDefault(pod, ElassandraNodeStatus.UNKNOWN));
+                replicaCount++;
             }
         }
         status.setRackStatuses(rackStatusMap);
