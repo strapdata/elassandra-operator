@@ -66,18 +66,24 @@ spec:
   {{- if .Values.elasticsearchLoadBalancerIp }}
   elasticsearchLoadBalancerIp: {{ .Values.elasticsearchLoadBalancerIp }}
   {{- end }}
-  {{- if .Values.elasticsearchPublicDnsFqdn }}
-  elasticsearchPublicDnsFqdn: {{ .Values.elasticsearchPublicDnsFqdn }}
-  {{- end }}
-  elasticsearchPublicDnsTtl: {{ default "120" .Values.elasticsearchPublicDnsTtl }}
   elasticsearchIngressEnabled: {{ default "false" .Values.elasticsearchIngressEnabled }}
   prometheusEnabled: {{ default "false" .Values.prometheusEnabled }}
 {{- if .Values.reaper }}
   reaper:
     enabled: {{ default "false" .Values.reaper.enabled }}
-{{- if .Values.reaper.image }}
+    {{- if .Values.reaper.image }}
     image: {{ .Values.reaper.image }}
+    {{- end }}
+    {{- if .Values.reaper.ingressSuffix }}
+    ingressSuffix: {{ .Values.reaper.ingressSuffix }}
+    {{- end }}
 {{- end }}
+{{- if .Values.externalDns }}
+  externalDns:
+    enabled: {{ default "false" .Values.externalDns.enabled }}
+    root: {{ default "xxx" .Values.externalDns.root }}
+    domain: {{ .Values.externalDns.domain }}
+    ttl: {{ default "300" .Values.externalDns.ttl }}
 {{- end }}
   privilegedSupported: {{ default "false" .Values.privilegedSupported }}
   hostPortEnabled: {{ default "false" .Values.hostPortEnabled }}
@@ -125,12 +131,15 @@ spec:
 {{- if .Values.kibana }}
   kibana:
     enabled: {{ default "true" .Values.kibana.enabled }}
-{{- if .Values.kibana.image }}
-  {{- if .Values.kibana.tag }}
+    {{- if .Values.kibana.ingressSuffix }}
+    ingressSuffix: {{ .Values.kibana.ingressSuffix }}
+    {{- end }}
+    {{- if .Values.kibana.image }}
+    {{- if .Values.kibana.tag }}
     image:  "{{ .Values.kibana.image }}:{{ .Values.kibana.tag }}"
-  {{- else }}
+    {{- else }}
     image:  "{{ .Values.kibana.image }}:{{ template "kibana.version" . }}"
-  {{- end }}
+    {{- end }}
 {{- end }}
 {{- if .Values.kibana.spaces }}
     spaces:

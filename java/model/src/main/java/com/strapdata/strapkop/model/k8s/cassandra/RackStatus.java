@@ -20,6 +20,13 @@ public class RackStatus {
     private String name;
 
     /**
+     * Rack index starting at 0
+     */
+    @SerializedName("index")
+    @Expose
+    private Integer index;
+
+    /**
      * Current rack phase
      */
     @SerializedName("phase")

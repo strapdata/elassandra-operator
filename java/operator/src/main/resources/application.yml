@@ -49,10 +49,6 @@ operator:
     k8sWatchPeriodInSec: ${K8S_WATCH_PERIOD:180}
     elassandraNodeWatchPeriodInSec: ${ELASSANDRA_NODE_WATCH_PERIOD:60}
     namespace: "${OPERATOR_NAMESPACE:}"
-    dns:
-        domainName: "${DNS_DOMAIN_NAME:}"
-        ttl: "${DNS_TTL:60}"
-        enabled: "${DNS_ENABLED:false}"
 
     test:
         enabled: "${TESTSUITE_ENABLE:false}"

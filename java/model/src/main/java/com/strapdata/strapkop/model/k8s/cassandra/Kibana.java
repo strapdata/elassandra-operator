@@ -41,4 +41,11 @@ public class Kibana {
     @Expose
     private List<KibanaSpace> spaces = new ArrayList<>();
 
+    /**
+     * Kibana ingress suffix (concatened with kibana spaces).
+     * host: space-suffix
+     */
+    @SerializedName("ingressSuffix")
+    @Expose
+    private String ingressSuffix = null;
 }

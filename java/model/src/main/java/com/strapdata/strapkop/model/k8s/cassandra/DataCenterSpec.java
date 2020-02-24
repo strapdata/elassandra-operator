@@ -246,6 +246,13 @@ public class DataCenterSpec {
     private Boolean ssl = false;
 
     /**
+     * External DNS config for public nodes and elasticsearch service.
+     */
+    @SerializedName("externalDns")
+    @Expose
+    private ExternalDns externalDns = null;
+
+    /**
      * Decomission policy control PVC when node removed.
      */
     @SerializedName("decommissionPolicy")
@@ -290,20 +297,6 @@ public class DataCenterSpec {
     @SerializedName("elasticsearchLoadBalancerIp")
     @Expose
     private String elasticsearchLoadBalancerIp;
-
-    /**
-     * Public DNS FQDN associated to the public Loadbalancer IP.
-     */
-    @SerializedName("elasticsearchPublicDnsFqdn")
-    @Expose
-    private String elasticsearchPublicDnsFqdn;
-
-    /**
-     * Public DNS TTL.
-     */
-    @SerializedName("elasticsearchPublicDnsTtl")
-    @Expose
-    private Integer elasticsearchPublicDnsTtl = 120;
 
     /**
      * Enable Elasticsearch service ingress
@@ -354,8 +347,7 @@ public class DataCenterSpec {
         acc.add(elasticsearchPort);
         acc.add(elasticsearchLoadBalancerEnabled);
         acc.add(elasticsearchLoadBalancerIp);
-        acc.add(elasticsearchPublicDnsFqdn);
-        acc.add(elasticsearchPublicDnsTtl);
+        acc.add(externalDns);
         acc.add(privilegedSupported);
         acc.add(hostNetworkEnabled);
         acc.add(hostPortEnabled);

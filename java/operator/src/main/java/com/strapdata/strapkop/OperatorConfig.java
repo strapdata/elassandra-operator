@@ -23,8 +23,6 @@ public class OperatorConfig {
     @Nullable
     int elassandraNodeWatchPeriodInSec = 60;
 
-    DnsConfig dns = new DnsConfig();
-
     TestSuiteConfig test = new TestSuiteConfig();
 
     TasksConfig tasks = new TasksConfig();
@@ -52,18 +50,6 @@ public class OperatorConfig {
             throw new StrapkopException("Invalid RetentionPeriod '" + retentionPeriod +"'");
         }
     }
-
-    @Getter
-    @ConfigurationProperties("dns")
-    public static class DnsConfig {
-
-        boolean enabled;
-
-        String domainName;
-
-        int ttl;
-    }
-
 
     @Getter
     @ConfigurationProperties("test")

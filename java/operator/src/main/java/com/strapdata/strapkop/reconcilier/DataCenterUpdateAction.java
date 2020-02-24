@@ -196,10 +196,10 @@ public class DataCenterUpdateAction {
                     final String zone = sts.getMetadata().getLabels().get(OperatorLabels.RACK);
 
                     if (zone == null) {
-                        throw new StrapkopException(String.format("statefulset %s has no RACK label", sts.getMetadata().getName()));
+                        throw new StrapkopException(String.format(Locale.ROOT, "statefulset %s has no RACK label", sts.getMetadata().getName()));
                     }
                     if (result.containsKey(zone)) {
-                        throw new StrapkopException(String.format("two statefulsets in the same zone=%s dc=%s", zone, dataCenter.getMetadata().getName()));
+                        throw new StrapkopException(String.format(Locale.ROOT, "two statefulsets in the same zone=%s dc=%s", zone, dataCenter.getMetadata().getName()));
                     }
                     result.put(zone, sts);
                 }
@@ -346,12 +346,24 @@ public class DataCenterUpdateAction {
 
         if (dataCenterSpec.getReplicas() <= 0) {
             meterRegistry.counter("datacenter.reconciliation.error").increment();
-            throw new StrapkopException(String.format("dc=%s has an invalid number of replicas", dataCenterMetadata.getName()));
+            throw new StrapkopException(String.format(Locale.ROOT, "dc=%s has an invalid number of replicas", dataCenterMetadata.getName()));
         }
 
         return Single.zip(
                 k8sResourceUtils.createOrReplaceNamespacedService(builder.buildServiceNodes()),
                 k8sResourceUtils.createOrReplaceNamespacedService(builder.buildServiceElasticsearch()),
+                        /*
+                        .flatMap((searchService) -> {
+                            Optional<V1beta1Ingress> optIngress = builder.buildIngressElasticsearch();
+                            if (optIngress.isPresent()) {
+                                // create ElasticSearch ingress if required
+                                return k8sResourceUtils.createOrReplaceNamespacedIngress(optIngress.get());
+                            } else {
+                                // otherwise, just return the elastic service
+                                return Single.just(searchService);
+                            }
+                        })
+                         */
                 k8sResourceUtils.createOrReplaceNamespacedService(builder.buildElasticsearchService()),
                 (s1, s2, s3) -> builder.clusterObjectMeta(OperatorNames.clusterSecret(dataCenter))
         )
@@ -650,6 +662,7 @@ public class DataCenterUpdateAction {
                                     // create new sts with replicas = 1,
                                     RackStatus rackStatus = new RackStatus()
                                             .setName(zone.name)
+                                            .setIndex(rackStatusByName.size())
                                             .setPhase(RackPhase.CREATING)
                                             .setSeedHostId(UUID.randomUUID());
                                     rackStatusByName.put(zone.name, rackStatus);
@@ -1036,7 +1049,7 @@ public class DataCenterUpdateAction {
         }
 
         public String clusterChildObjectName(final String nameFormat) {
-            return String.format(nameFormat, "elassandra-" + dataCenter.getSpec().getClusterName());
+            return String.format(Locale.ROOT, nameFormat, "elassandra-" + dataCenter.getSpec().getClusterName());
         }
 
         public String dataCenterResource(final String clusterName, final String dataCenterName) {
@@ -1044,11 +1057,11 @@ public class DataCenterUpdateAction {
         }
 
         public String dataCenterChildObjectName(final String nameFormat) {
-            return String.format(nameFormat, dataCenterResource(dataCenterSpec.getClusterName(), dataCenter.getSpec().getDatacenterName()));
+            return String.format(Locale.ROOT, nameFormat, dataCenterResource(dataCenterSpec.getClusterName(), dataCenter.getSpec().getDatacenterName()));
         }
 
         public String rackChildObjectName(final String nameFormat, final String rack) {
-            return String.format(nameFormat,
+            return String.format(Locale.ROOT, nameFormat,
                     "elassandra-" + dataCenter.getSpec().getClusterName()
                             + "-" + dataCenter.getSpec().getDatacenterName()
                             + "-" + rack);
@@ -1076,10 +1089,11 @@ public class DataCenterUpdateAction {
                     v1ServiceSpec.setLoadBalancerIP(dataCenterSpec.getElasticsearchLoadBalancerIp());
 
                 // Add external-dns annotation to update public DNS
-                if (!Strings.isNullOrEmpty(dataCenterSpec.getElasticsearchPublicDnsFqdn())) {
-                    v1ObjectMeta.putAnnotationsItem("external-dns.alpha.kubernetes.io/hostname", dataCenterSpec.getElasticsearchPublicDnsFqdn());
-                    if (dataCenterSpec.getElasticsearchPublicDnsTtl() != null)
-                        v1ObjectMeta.putAnnotationsItem("external-dns.alpha.kubernetes.io/ttl", Integer.toString(dataCenterSpec.getElasticsearchPublicDnsTtl()));
+                if (dataCenterSpec.getExternalDns() != null && dataCenterSpec.getExternalDns().getEnabled() == true) {
+                    String elasticsearchHostname = "elasticsearch-" + dataCenterSpec.getExternalDns().getRoot();
+                    v1ObjectMeta.putAnnotationsItem("external-dns.alpha.kubernetes.io/hostname", elasticsearchHostname + "." + dataCenterSpec.getExternalDns().getDomain());
+                    if (dataCenterSpec.getExternalDns().getTtl() != null && dataCenterSpec.getExternalDns().getTtl() > 0)
+                        v1ObjectMeta.putAnnotationsItem("external-dns.alpha.kubernetes.io/ttl", Integer.toString(dataCenterSpec.getExternalDns().getTtl()));
                 }
             }
 
@@ -1148,10 +1162,12 @@ public class DataCenterUpdateAction {
                             .selector(OperatorLabels.datacenter(dataCenter))
                     );
         }
-/* Ingress on Elasticsearch break TLS and basic auth
+
+        // Add Ingress on Elasticsearch, but break TLS and basic auth
+        /*
         public Optional<V1beta1Ingress> buildIngressElasticsearch() {
             Optional<V1beta1Ingress> ingress = Optional.empty();
-            String ingressDomain = System.getenv("Workload");
+            String ingressDomain = System.getenv("INGRESS_DOMAIN");
             if (dataCenterSpec.getElasticsearchEnabled() && dataCenterSpec.getElasticsearchIngressEnabled() && !Strings.isNullOrEmpty(ingressDomain)) {
                 String serviceName = OperatorNames.elasticsearchService(dataCenter);
                 String elasticHost = serviceName + "-" + ingressDomain.replace("${namespace}", dataCenterMetadata.getNamespace());
@@ -1187,7 +1203,8 @@ public class DataCenterUpdateAction {
             }
             return ingress;
         }
-*/
+        */
+
         /**
          * Mutable configmap for seeds, one for all racks, does not require a rolling restart.
          *
@@ -1405,8 +1422,8 @@ public class DataCenterUpdateAction {
                 //final StringWriter writer = new StringWriter();
                 StringBuilder jvmGCOptions = new StringBuilder(500);
 
-                jvmGCOptions.append(String.format("-Xms%dm", (long) jvmHeapSizeInMb) + "\n"); // min heap size
-                jvmGCOptions.append(String.format("-Xmx%dm", (long) jvmHeapSizeInMb) + "\n"); // max heap size
+                jvmGCOptions.append(String.format(Locale.ROOT, "-Xms%dm", (long) jvmHeapSizeInMb) + "\n"); // min heap size
+                jvmGCOptions.append(String.format(Locale.ROOT, "-Xmx%dm", (long) jvmHeapSizeInMb) + "\n"); // max heap size
 
                 // copied from stock jvm.options
                 if (useG1GC) {
@@ -1420,7 +1437,7 @@ public class DataCenterUpdateAction {
 
                     // TODO: tune -XX:ParallelGCThreads, -XX:ConcGCThreads
                 } else {
-                    jvmGCOptions.append(String.format("-Xmn%dm", (long) youngGenSizeInMb) + "\n"); // young gen size
+                    jvmGCOptions.append(String.format(Locale.ROOT, "-Xmn%dm", (long) youngGenSizeInMb) + "\n"); // young gen size
 
                     jvmGCOptions.append("-XX:+UseParNewGC\n");
                     jvmGCOptions.append("-XX:+UseConcMarkSweepGC\n");
@@ -1735,7 +1752,7 @@ public class DataCenterUpdateAction {
             // kubectl create clusterrolebinding nodeinfo-cluster-rule --clusterrole=nodeinfo --serviceaccount=default:nodeinfo
             // kubectl get serviceaccount nodeinfo -o json | jq ".secrets[0].name"
             // See datacenter HELM chart and https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#manually-create-a-service-account-api-token
-            podSpec.addInitContainersItem(buildInitContainerNodeInfo("nodeinfo", rackStatus.getSeedHostId().toString()));
+            podSpec.addInitContainersItem(buildInitContainerNodeInfo("nodeinfo", rackStatus));
 
             {
                 if (dataCenterSpec.getImagePullSecrets() != null) {
@@ -2088,15 +2105,18 @@ public class DataCenterUpdateAction {
         }
 
         // Nodeinfo init container if NODEINFO_SECRET is available as env var
-        private V1Container buildInitContainerNodeInfo(String nodeInfoSecretName, String seedHostId) {
+        private V1Container buildInitContainerNodeInfo(String nodeInfoSecretName, RackStatus rackStatus) {
             String yaml = null;
 
             boolean updateDns = false;
-            if (dataCenterSpec.getHostPortEnabled() && operatorConfig.getDns().isEnabled()) {
+            if ((dataCenterSpec.getHostPortEnabled() || dataCenterSpec.getHostNetworkEnabled()) &&
+                    dataCenterSpec.getExternalDns() != null && dataCenterSpec.getExternalDns().getEnabled()) {
+                String seedHostname = "cassandra-" + dataCenterSpec.getExternalDns().getRoot() + "-" + rackStatus.getIndex();
+
                 yaml = "apiVersion: externaldns.k8s.io/v1alpha1 \n"+
                         "kind: DNSEndpoint\n" +
                         "metadata:\n" +
-                        "  name: "+ OperatorNames.dataCenterChildObjectName("%s-" + seedHostId, dataCenter) + "\n" +
+                        "  name: "+ seedHostname + "\n" +
                         "  namespace: "+ dataCenterMetadata.getNamespace() + "\n" +
                         "  ownerReferences:\n" +
                         "  - apiVersion: stable.strapdata.com/v1\n" +
@@ -2107,13 +2127,13 @@ public class DataCenterUpdateAction {
                         "    uid: "+ dataCenterMetadata.getUid()+"\n" + // Datacenter UUID is mandatory to allow Cascading deletion
                         "spec:\n" +
                         "  endpoints:\n" +
-                        "  - dnsName: " + seedHostId + "." + operatorConfig.getDns().getDomainName() + "\n" +
-                        "    recordTTL: " + operatorConfig.getDns().getTtl() + "\n" +
+                        "  - dnsName: " + seedHostname + "." + dataCenterSpec.getExternalDns().getDomain() + "\n" +
+                        "    recordTTL: " + dataCenterSpec.getExternalDns().getTtl() + "\n" +
                         "    recordType: A\n" +
                         "    targets:\n" +
                         "    - __NODE_IP__ ";
 
-                if (Strings.isNullOrEmpty(operatorConfig.getDns().getDomainName())) {
+                if (Strings.isNullOrEmpty(dataCenterSpec.getExternalDns().getDomain())) {
                     logger.warn("DNS DomainName isn't configured, skip DNS Update");
                 } else {
                     updateDns = true;
@@ -2284,7 +2304,7 @@ public class DataCenterUpdateAction {
             for (V1Node node : nodes) {
                 String zoneName = node.getMetadata().getLabels().get(OperatorLabels.ZONE);
                 if (zoneName == null) {
-                    throw new RuntimeException(new StrapkopException(String.format("missing label %s on node %s", OperatorLabels.ZONE, node.getMetadata().getName())));
+                    throw new RuntimeException(new StrapkopException(String.format(Locale.ROOT, "missing label %s on node %s", OperatorLabels.ZONE, node.getMetadata().getName())));
                 }
                 zoneMap.compute(zoneName, (k, z) -> {
                     if (z == null) {
