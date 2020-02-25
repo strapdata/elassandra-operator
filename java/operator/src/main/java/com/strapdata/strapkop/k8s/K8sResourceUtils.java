@@ -275,9 +275,15 @@ public class K8sResourceUtils {
         final String namespace = statefulset.getMetadata().getNamespace();
         return Single.fromCallable(
                 () -> {
-                    V1StatefulSet statefulSet2 = appsApi.createNamespacedStatefulSet(namespace, statefulset, null, null, null);
-                    logger.debug("Created namespaced Deployment={} in namespace={}", statefulset.getMetadata().getName(), statefulset.getMetadata().getNamespace());
-                    return statefulSet2;
+                    try {
+                        V1StatefulSet statefulSet2 = appsApi.createNamespacedStatefulSet(namespace, statefulset, null, null, null);
+                        logger.debug("Created namespaced statefulset={} in namespace={}", statefulset.getMetadata().getName(), statefulset.getMetadata().getNamespace());
+                        return statefulSet2;
+                    } catch (ApiException e) {
+                        logger.warn("Created namespaced statefulset={} in namespace={} error: {}",
+                                statefulset.getMetadata().getName(), statefulset.getMetadata().getNamespace(), e.getMessage());
+                        throw e;
+                    }
                 });
     }
 
@@ -285,18 +291,30 @@ public class K8sResourceUtils {
         final String namespace = secret.getMetadata().getNamespace();
         return Single.fromCallable(
                 () -> {
-                    V1Secret secret2 = coreApi.createNamespacedSecret(namespace, secret, null, null, null);
-                    logger.debug("Created namespaced Deployment={} in namespace={}", secret2.getMetadata().getName(), secret2.getMetadata().getNamespace());
-                    return secret2;
+                    try {
+                        V1Secret secret2 = coreApi.createNamespacedSecret(namespace, secret, null, null, null);
+                        logger.debug("Created namespaced secret={} in namespace={}", secret2.getMetadata().getName(), secret2.getMetadata().getNamespace());
+                        return secret2;
+                    } catch(ApiException e) {
+                        logger.warn("Created namespaced secret={} in namespace={} error: {}",
+                                secret.getMetadata().getName(), secret.getMetadata().getNamespace(), e.getMessage());
+                        throw e;
+                    }
                 });
     }
 
     public Single<V1StatefulSet> replaceNamespacedStatefulSet(final V1StatefulSet statefulset) throws ApiException {
         final String namespace = statefulset.getMetadata().getNamespace();
         return Single.fromCallable(() -> {
-                    V1StatefulSet statefulSet2 = appsApi.replaceNamespacedStatefulSet(statefulset.getMetadata().getName(), namespace, statefulset, null, null);
-                    logger.debug("Replaced namespaced Deployment in namespace={}", statefulset.getMetadata().getName(), statefulset.getMetadata().getNamespace());
-                    return statefulSet2;
+                    try {
+                        V1StatefulSet statefulSet2 = appsApi.replaceNamespacedStatefulSet(statefulset.getMetadata().getName(), namespace, statefulset, null, null);
+                        logger.debug("Replaced namespaced statefulset={} in namespace={}", statefulset.getMetadata().getName(), statefulset.getMetadata().getNamespace());
+                        return statefulSet2;
+                    } catch (ApiException e) {
+                        logger.warn("Created namespaced statefulset={} in namespace={} error: {}",
+                                statefulset.getMetadata().getName(), statefulset.getMetadata().getNamespace(), e.getMessage());
+                        throw e;
+                    }
                 }
         );
     }
