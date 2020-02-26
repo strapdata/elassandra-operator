@@ -15,15 +15,18 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 
+/**
+ * Free deleted pod's PVC
+ */
 @Singleton
-public class DataCenterPodDeletedReconcilier extends Reconcilier<Tuple2<Key, ElassandraPod>> {
+public class ElassandraPodDeletedReconcilier extends Reconcilier<Tuple2<Key, ElassandraPod>> {
 
-    private final Logger logger = LoggerFactory.getLogger(DataCenterPodDeletedReconcilier.class);
+    private final Logger logger = LoggerFactory.getLogger(ElassandraPodDeletedReconcilier.class);
 
     private final ApplicationContext context;
     private final K8sResourceUtils k8sResourceUtils;
 
-    public DataCenterPodDeletedReconcilier(final ReconcilierObserver reconcilierObserver,
+    public ElassandraPodDeletedReconcilier(final ReconcilierObserver reconcilierObserver,
                                            final ApplicationContext context,
                                            final K8sResourceUtils k8sResourceUtils) {
         super(reconcilierObserver);
@@ -47,7 +50,7 @@ public class DataCenterPodDeletedReconcilier extends Reconcilier<Tuple2<Key, Ela
                         logger.trace("freeing resource of pod {} during datacenter reconciliation request for {} in thread {}", tuple._2.getName(), dc.getMetadata().getName(), Thread.currentThread().getName());
                         return context.createBean(DataCenterUpdateAction.class, dc).freePodResource(tuple._2);
                     } catch (Exception e) {
-                        logger.error("an error occurred while processing UnscheduledPod during DataCenter update reconciliation for {}", tuple._1.getName(), e);
+                        logger.error("an error occurred while processing DeletedPod during DataCenter update reconciliation for {}", tuple._1.getName(), e);
                         if (dc != null) {
                             if (dc.getStatus() == null) {
                                 dc.setStatus(new DataCenterStatus());

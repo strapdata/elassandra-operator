@@ -21,9 +21,9 @@ import java.util.Collection;
 
 @Context
 @Infrastructure
-public class ElassandraPodsPipeline extends K8sWatchPipeline<V1Pod, V1PodList>  {
+public class ElassandraPodPipeline extends K8sWatchPipeline<V1Pod, V1PodList>  {
 
-    public ElassandraPodsPipeline(@Named("apiClient") ApiClient apiClient, CoreV1Api coreV1Api, OperatorConfig config, PodCache cache) {
+    public ElassandraPodPipeline(@Named("apiClient") ApiClient apiClient, CoreV1Api coreV1Api, OperatorConfig config, PodCache cache) {
         super(apiClient, new ElassandraPodsAdapter(coreV1Api, config), cache, config);
     }
 
