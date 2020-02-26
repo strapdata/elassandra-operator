@@ -1,10 +1,11 @@
 package com.strapdata.strapkop.reconcilier;
 
-import com.strapdata.strapkop.model.Key;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenterPhase;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
 import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
+import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenterPhase;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
 import io.kubernetes.client.ApiException;
 import io.micronaut.context.ApplicationContext;
 import io.reactivex.Completable;
@@ -16,17 +17,20 @@ import org.slf4j.LoggerFactory;
 import javax.inject.Singleton;
 import java.util.Objects;
 
+/**
+ * Trigger a DC reconcilation to update dc+rack phase
+ */
 @Singleton
-public class DataCenterUnscheduledReconcilier extends Reconcilier<Tuple2<Key, ElassandraPod>> {
+public class ElassandraPodUnscheduledReconcilier extends Reconcilier<Tuple2<Key, ElassandraPod>> {
 
-    private final Logger logger = LoggerFactory.getLogger(DataCenterUnscheduledReconcilier.class);
+    private final Logger logger = LoggerFactory.getLogger(ElassandraPodUnscheduledReconcilier.class);
 
     private final ApplicationContext context;
     private final K8sResourceUtils k8sResourceUtils;
 
-    public DataCenterUnscheduledReconcilier(final ReconcilierObserver reconcilierObserver,
-                                            final ApplicationContext context,
-                                            final K8sResourceUtils k8sResourceUtils) {
+    public ElassandraPodUnscheduledReconcilier(final ReconcilierObserver reconcilierObserver,
+                                               final ApplicationContext context,
+                                               final K8sResourceUtils k8sResourceUtils) {
         super(reconcilierObserver);
         this.context = context;
         this.k8sResourceUtils = k8sResourceUtils;
@@ -36,8 +40,11 @@ public class DataCenterUnscheduledReconcilier extends Reconcilier<Tuple2<Key, El
     public Completable reconcile(final Tuple2<Key, ElassandraPod> tuple) throws ApiException, InterruptedException {
         // this is a "read-before-write" to ensure we are processing the latest resource version (otherwise, status update will failed with a 409 conflict)
         return k8sResourceUtils.readDatacenter(tuple._1)
-                .flatMap(dc -> reconcilierObserver.onReconciliationBegin().toSingleDefault(dc))
-                .flatMapCompletable(dc -> {
+                .flatMap(dc -> reconcilierObserver.onReconciliationBegin().toSingleDefault(new Tuple2<>(dc, tuple._2)))
+                .flatMapCompletable(tuple2 -> {
+                    DataCenter dc = tuple2._1;
+                    logger.debug("datacenter={}/{} pod={} unscheduled", dc.getMetadata().getName(), dc.getMetadata().getNamespace(), tuple2._2.getName());
+
                     if (dc.getStatus() != null && !Objects.equals(dc.getStatus().getPhase(), DataCenterPhase.UPDATING)) {
                         logger.debug("do not reconcile datacenter on unscheduled pod, the DataCenter phase is  ({})", dc.getStatus().getPhase());
                         return Completable.complete();

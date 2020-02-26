@@ -22,9 +22,9 @@ import java.util.Collection;
 
 @Context
 @Infrastructure
-public class ReaperPipeline extends K8sWatchPipeline<V1Pod, V1PodList>  {
+public class ReaperPodPipeline extends K8sWatchPipeline<V1Pod, V1PodList>  {
 
-    public ReaperPipeline(@Named("apiClient") ApiClient apiClient, CoreV1Api coreV1Api, OperatorConfig config, PodCache cache) {
+    public ReaperPodPipeline(@Named("apiClient") ApiClient apiClient, CoreV1Api coreV1Api, OperatorConfig config, PodCache cache) {
         super(apiClient, new ReaperAdapter(coreV1Api, config), cache, config);
     }
 
