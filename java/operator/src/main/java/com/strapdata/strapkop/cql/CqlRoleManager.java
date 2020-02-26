@@ -90,19 +90,20 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                         try {
                             plugin.syncRoles(CqlRoleManager.this, dataCenter);
                         } catch(Exception e) {
-                            logger.warn("Failed to syncRoles for plugin={}", plugin.getClass().getName());
+                            logger.warn("datacenter={} Failed to syncRoles for plugin={}", dataCenter.id(), plugin.getClass().getName());
                         }
                     }
                 }
 
                 // now we are sure authentication is required and cql connection has been set
-                logger.info("reconcile roles for dc={}", dataCenter.getMetadata().getName());
+                logger.info("datacenter={} reconcile roles", dataCenter.id());
                 for(CqlRole role : get(dataCenter).values()) {
                     if (!role.isApplied()) {
                         try {
                             role.createOrUpdateRole(dataCenter, k8sResourceUtils, sessionSupplier).blockingGet();
                         } catch (Exception ex) {
-                            logger.error("Cannot load password or apply for role=" + role.getUsername() + " in dc=" + dataCenter.getMetadata().getName() + ":" + ex.getMessage());
+                            logger.error("datacenter={} Cannot load password or apply for role={} error={}",
+                                    dataCenter.id(), role.getUsername(), ex.getMessage());
                         }
                     }
                 }
@@ -111,7 +112,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
     }
 
     public void markRolesAsUnapplied(final DataCenter dc) {
-        logger.debug("Clear roles for datacenter {}", dc.getMetadata().getName());
+        logger.debug("datacenter={} roles cleared", dc.id());
         remove(dc);
     }
 
@@ -132,7 +133,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
         return Single.fromCallable(new Callable<Tuple2<Cluster,Session>>() {
                 @Override
                 public Tuple2<Cluster,Session> call() throws Exception {
-                    logger.debug("Creating a new CQL connection for dc={}", dc.getMetadata().getName());
+                    logger.debug("datacenter={} Creating a new CQL connection", dc.id());
                     if (dc.getSpec().getAuthentication().equals(Authentication.NONE))
                         return connect(dc, Optional.empty());
 
@@ -156,24 +157,24 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                             break;
                         } catch (AuthenticationException e) {
                             // authentication failed
-                            logger.debug("Authentication to dc={} failed with role={} from secret={}",
-                                    dc.getMetadata().getName(), role.username, (role.secretKey == null) ? null : role.secret(dc));
+                            logger.debug("datacenter={} Authentication failed with role={} from secret={}",
+                                    dc.id(), role.username, (role.secretKey == null) ? null : role.secret(dc));
                             lastException = e;
                         } catch (ApiException e) {
                             // cannot load k8s secret
-                            logger.warn("Cannot load secret in dc={} for role={} from secret={}",
-                                    dc.getMetadata().getName(), role.username, (role.secretKey == null) ? null : role.secret(dc));
+                            logger.warn("datacenter={} Cannot load secret in for role={} from secret={}",
+                                    dc.id(), role.username, (role.secretKey == null) ? null : role.secret(dc));
                             lastException = e;
                         } catch (StrapkopException e) {
                             // password contains illegal caracters
-                            logger.warn("Bas password in dc={} for role={} from secret={}",
-                                    dc.getMetadata().getName(), role.username, role.secret(dc));
+                            logger.warn("datacenter={} Bad password for role={} from secret={}",
+                                    dc.id(), role.username, role.secret(dc));
                             lastException = e;
                         } catch(DriverException e) {
-                            logger.warn("Driver exception:" + e.getMessage(), e);
+                            logger.warn("datacenter=" + dc.id() + " Driver exception:" + e.getMessage(), e);
                             lastException = e;
                         } catch(Exception e) {
-                            logger.debug("Unexpected exception:" + e.getMessage(), e);
+                            logger.debug("datacenter=" + dc.id() + " Unexpected exception:" + e.getMessage(), e);
                             lastException = e;
                         }
                     }
@@ -181,7 +182,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                     if (connectedRole == null) {
                         // auth failed for all roles
                         List<String> r = roles.stream().map(CqlRole::getUsername).collect(Collectors.toList());
-                        logger.warn("Cannot connect dc={} with roles={}", dc.getMetadata().getName(), r);
+                        logger.warn("datacenter={} Cannot connect with roles={}", dc.id(), r);
                         dc.getStatus().setCqlStatus(CqlStatus.ERRORED);
                         dc.getStatus().setCqlStatusMessage("Authentication failed with roles=" + r);
                         if (lastException != null) {
@@ -189,7 +190,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                                 CqlSessionSupplier.closeQuietly(tuple._2);
                                 CqlSessionSupplier.closeQuietly(tuple._1);
                             }
-                            logger.warn("Authentication failed with roles=" + r + " error:" + lastException.getMessage(), lastException);
+                            logger.warn("datacenter=" + dc.id() + " Authentication failed with roles=" + r + " error:" + lastException.getMessage(), lastException);
                             throw lastException;
                         }
                     }
@@ -210,7 +211,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                                     }
                                 }).blockingGet();
                             } catch (Exception e) {
-                                logger.error("Cannot CreateOrUpdate role '{}'", role, e);
+                                logger.error("datacenter={} Cannot CreateOrUpdate role={}", dc.id(), role, e);
                             }
                         }
 
@@ -221,7 +222,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                             put(dc, CqlRole.CURRENT_ROLE_KEY, strakopRole);
                             return strapkopConnection;
                         } catch(Exception e) {
-                            logger.error("Failed to reconnect with the operator role="+strakopRole+" :"+e.getMessage(), e);
+                            logger.error("datacenter="+dc.id()+" Failed to reconnect with the operator role="+strakopRole+" :"+e.getMessage(), e);
                         } finally {
                             // connection with strapkop user succeeded
                             // we close the previous session to avoid non relevant authentication exception
@@ -250,7 +251,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
         dc.getStatus().setCqlStatus(CqlStatus.ESTABLISHED);
         dc.getStatus().setCqlStatusMessage("Connected to cluster=[" + cluster.getClusterName() + "]" +
                 ((optionalCqlRole.isPresent()) ? (" with role=[" + optionalCqlRole.get().username+"] secret=["+optionalCqlRole.get().secret(dc)+"]") : ""));
-        logger.debug("Connected to dc=" + dc.getMetadata().getName() + ((optionalCqlRole.isPresent()) ? (" with role=" + optionalCqlRole.get().username+" secret="+optionalCqlRole.get().secret(dc)) : ""));
+        logger.debug("Connected to dc=" + dc.id() + ((optionalCqlRole.isPresent()) ? (" with role=" + optionalCqlRole.get().username+" secret="+optionalCqlRole.get().secret(dc)) : ""));
         return new Tuple2<>(cluster, session);
     }
 
@@ -276,7 +277,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
         // add remote seeds to contact points to be able to adjust RF of system keyspace before starting the first local node.
         if (dc.getSpec().getRemoteSeeds() != null)
             for(String remoteSeed : dc.getSpec().getRemoteSeeds()) {
-                logger.debug("Add remote seed={} for datacenter={}", remoteSeed, dc.getMetadata().getName());
+                logger.debug("datacenter={} Add remote seed={}", dc.id(), remoteSeed);
                 builder.addContactPoint(remoteSeed);
             }
 
@@ -285,12 +286,12 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
             for(String remoteSeeder : dc.getSpec().getRemoteSeeders()) {
                 try {
                     for(InetAddress addr : ElassandraOperatorSeedProvider.seederCall(remoteSeeder)) {
-                        logger.debug("Add remote seed={} from seeder={} for datacenter={}",
-                                addr.getHostAddress(), remoteSeeder, dc.getMetadata().getName());
+                        logger.debug("datacenter={} Add remote seed={} from seeder={}",
+                                dc.id(), addr.getHostAddress(), remoteSeeder);
                         builder.addContactPoint(addr.getHostAddress());
                     }
                 } catch (Exception e) {
-                    logger.error("Seeder error", e);
+                    logger.error("datacenter="+dc.id()+" Seeder error", e);
                 }
             }
         }
@@ -301,12 +302,12 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                 ((dc.getSpec().getRemoteSeeds() == null || dc.getSpec().getRemoteSeeds().isEmpty()) && (dc.getSpec().getRemoteSeeders() == null || dc.getSpec().getRemoteSeeders().isEmpty()))) {
             String contactPoint = OperatorNames.nodesService(dc) + "." + dc.getMetadata().getNamespace() + ".svc.cluster.local";
             try {
-                logger.debug("add local seed={} for datacenter={} in namespace={}", contactPoint, dc.getMetadata().getName(), dc.getMetadata().getNamespace());
+                logger.debug("datacenter={} add local seed={}", dc.id(), contactPoint);
                 builder.addContactPoint(contactPoint);
             } catch(IllegalArgumentException e) {
                 if (e.getCause() != null && e.getCause() instanceof  java.net.UnknownHostException) {
                     // ignore DNS resolution failure because dc removed....
-                    logger.debug("seed={} for datacenter={} can't be added due to UnknownHostException, DC removed", contactPoint, dc.getMetadata().getName());
+                    logger.debug("datacenter={} seed={} can't be added due to UnknownHostException, DC removed", dc.id(), contactPoint);
                 } else {
                     throw e;
                 }
@@ -318,7 +319,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
         }
 
         if (optionalCqlRole.isPresent()) {
-            logger.debug("username={} password={}", optionalCqlRole.get().getUsername(), optionalCqlRole.get().secret(dc));
+            logger.trace("datacenter={} username={} password={}", dc.id(), optionalCqlRole.get().getUsername(), optionalCqlRole.get().secret(dc));
             builder.withCredentials(
                     optionalCqlRole.get().getUsername(),
                     optionalCqlRole.get().getPassword()

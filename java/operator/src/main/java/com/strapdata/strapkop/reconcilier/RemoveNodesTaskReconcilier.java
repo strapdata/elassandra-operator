@@ -12,6 +12,7 @@ import com.strapdata.strapkop.model.k8s.task.RemoveNodesTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
 import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
+import com.strapdata.strapkop.pipeline.WorkQueue;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CustomObjectsApi;
@@ -44,9 +45,10 @@ public class RemoveNodesTaskReconcilier extends TaskReconcilier {
                                       final ApplicationContext context,
                                       final CqlRoleManager cqlRoleManager,
                                       final CqlKeyspaceManager cqlKeyspaceManager,
+                                      final WorkQueue workQueue,
                                       final ElassandraNodeStatusCache elassandraNodeStatusCache,
                                       final MeterRegistry meterRegistry) {
-        super(reconcilierObserver, "removeNodes", k8sResourceUtils, meterRegistry);
+        super(reconcilierObserver, "removeNodes", k8sResourceUtils, meterRegistry, workQueue);
         this.sidecarClientFactory = sidecarClientFactory;
         this.context = context;
         this.cqlRoleManager = cqlRoleManager;
@@ -75,7 +77,7 @@ public class RemoveNodesTaskReconcilier extends TaskReconcilier {
         final String dcName = removeNodesTaskSpec.getDcName();
 
         if (Strings.isNullOrEmpty(removeNodesTaskSpec.getDcName())) {
-            logger.warn("dcName not set, ignoring task={}", task.getMetadata().getName());
+            logger.warn("datacenter={} removeNodes={} dcName not set, ignoring task={}", dc.id(), task.id());
             return Single.just(TaskPhase.FAILED);
         }
 
@@ -88,12 +90,13 @@ public class RemoveNodesTaskReconcilier extends TaskReconcilier {
             return todo.andThen(sidecarClientFactory.clientForPod(optionalPod.get()).remove(dcName))
                     .andThen(finalizeTaskStatus(dc, taskWrapper, TaskPhase.SUCCEED))
                     .onErrorResumeNext(throwable -> {
-                        logger.error("Error while executing task={} remove nodes in dc={} on pod={} error:{}", task.getMetadata().getName(), dcName, optionalPod.get(), throwable.getMessage());
+                        logger.error("datacenter={} task={} Error removinf nodes on pod={} error:{}",
+                                dc.id(), task.id(), dcName, optionalPod.get(), throwable.getMessage());
                         task.getStatus().setLastMessage(throwable.getMessage());
                         return updateTaskStatus(dc, taskWrapper, TaskPhase.FAILED).toSingleDefault(TaskPhase.FAILED);
                     });
         } else {
-            logger.warn("task={}, no NORMAL pod found in dc={} to remove dc={}", task.getMetadata().getName(), dc.getMetadata().getName(), dcName);
+            logger.warn("datacenter={} task={}, no NORMAL pod found to remove dc={}", dc.id(), task.id(), dcName);
             return Single.just(TaskPhase.FAILED);
         }
     }

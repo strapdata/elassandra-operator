@@ -6,7 +6,8 @@ import com.strapdata.strapkop.model.k8s.cassandra.BlockReason;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
-import com.strapdata.strapkop.sidecar.SidecarClientFactory;
+import com.strapdata.strapkop.pipeline.WorkQueue;
+import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
 import io.kubernetes.client.ApiException;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.annotation.Infrastructure;
@@ -28,14 +29,15 @@ import java.util.stream.Collectors;
 public final class RepairTaskReconcilier extends TaskReconcilier {
     private static final Logger logger = LoggerFactory.getLogger(RepairTaskReconcilier.class);
 
-    private final SidecarClientFactory sidecarClientFactory;
+    private final JmxmpElassandraProxy jmxmpElassandraProxy;
 
     public RepairTaskReconcilier(ReconcilierObserver reconcilierObserver,
                                  final K8sResourceUtils k8sResourceUtils,
-                                 final SidecarClientFactory sidecarClientFactory,
+                                 final JmxmpElassandraProxy jmxmpElassandraProxy,
+                                 final WorkQueue workQueue,
                                  final MeterRegistry meterRegistry) {
-        super(reconcilierObserver,"repair", k8sResourceUtils, meterRegistry);
-        this.sidecarClientFactory = sidecarClientFactory;
+        super(reconcilierObserver,"repair", k8sResourceUtils, meterRegistry, workQueue);
+        this.jmxmpElassandraProxy = jmxmpElassandraProxy;
     }
 
     public BlockReason blockReason() {
@@ -58,7 +60,7 @@ public final class RepairTaskReconcilier extends TaskReconcilier {
 
         return Observable.zip(Observable.fromIterable(pods), Observable.interval(10, TimeUnit.SECONDS), (pod, timer) -> pod)
                 .subscribeOn(Schedulers.computation())
-                .flatMapSingle(pod -> sidecarClientFactory.clientForPod(ElassandraPod.fromName(dc, pod)).repairPrimaryRange(task.getSpec().getRepair().getKeyspace())
+                .flatMapSingle(pod -> jmxmpElassandraProxy.repair(ElassandraPod.fromName(dc, pod), task.getSpec().getRepair().getKeyspace())
                         .andThen(updateTaskPodStatus(dc, taskWrapper, TaskPhase.RUNNING, pod, TaskPhase.SUCCEED))
                         .onErrorResumeNext(throwable -> {
                             logger.error("Error while executing repair on pod={}", pod, throwable);

@@ -1,5 +1,6 @@
 package com.strapdata.strapkop.cache;
 
+import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenterSpec;
 import lombok.*;
@@ -28,7 +29,9 @@ public class CheckPointCache extends Cache<Key, CheckPointCache.CheckPoint>  {
         private String nextUserConfigMap;
 
         public CheckPoint prepare(DataCenterSpec nextCurrentSpec, String nextUserConfigMap) {
-            LOGGER.debug("prepare next spec={} userConfigMap={}", nextCurrentSpec == null ? "null" : nextCurrentSpec.fingerprint(), nextUserConfigMap);
+            LOGGER.debug("dc={} prepare next spec={} userConfigMap={}",
+                    OperatorNames.dataCenterResource(nextCurrentSpec.getClusterName(), nextCurrentSpec.getDatacenterName()),
+                    nextCurrentSpec == null ? "null" : nextCurrentSpec.fingerprint(), nextUserConfigMap);
             LOGGER.trace("prepare next spec={}", nextCurrentSpec == null ? "null" : nextCurrentSpec);
             this.nextCurrentSpec = nextCurrentSpec;
             this.nextUserConfigMap = nextUserConfigMap;
@@ -36,7 +39,9 @@ public class CheckPointCache extends Cache<Key, CheckPointCache.CheckPoint>  {
         }
 
         public CheckPoint commit() {
-            LOGGER.debug("commit new spec={} userConfigMap={}", nextCurrentSpec == null ? "null" : nextCurrentSpec.fingerprint(), nextUserConfigMap);
+            LOGGER.debug("dc={} commit new spec={} userConfigMap={}",
+                    OperatorNames.dataCenterResource(nextCurrentSpec.getClusterName(), nextCurrentSpec.getDatacenterName()),
+                    nextCurrentSpec == null ? "null" : nextCurrentSpec.fingerprint(), nextUserConfigMap);
             LOGGER.trace("commit new spec={}", nextCurrentSpec == null ? "null" : nextCurrentSpec);
             if (nextCurrentSpec != null)
                 this.committedSpec = this.nextCurrentSpec;
@@ -46,7 +51,9 @@ public class CheckPointCache extends Cache<Key, CheckPointCache.CheckPoint>  {
         }
 
         public CheckPoint rollback() {
-            LOGGER.debug("rollback to spec={} userConfigMap={}", committedSpec == null ? "null" : committedSpec.fingerprint(), committedUserConfigMap);
+            LOGGER.debug("dc={} rollback to spec={} userConfigMap={}",
+                    OperatorNames.dataCenterResource(nextCurrentSpec.getClusterName(), nextCurrentSpec.getDatacenterName()),
+                    committedSpec == null ? "null" : committedSpec.fingerprint(), committedUserConfigMap);
             LOGGER.trace("rollback to spec={}", committedSpec == null ? "null" : committedSpec);
             this.nextCurrentSpec = null;
             this.nextUserConfigMap = null;

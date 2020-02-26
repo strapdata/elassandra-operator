@@ -34,13 +34,13 @@ public class CqlLicenseManager extends AbstractManager<License> implements Licen
                         Stream<License> rowStream = StreamSupport.stream(rs.spliterator(), false).map(CqlLicense::fromRow);
 
                         License license = verifyLicenses(rowStream, dataCenter.getSpec().getClusterName(), dataCenter.getSpec().getDatacenterName());
-                        LOGGER.trace("[{}] license={}", dataCenter.id(), license);
+                        LOGGER.trace("datacenter={} license={}", dataCenter.id(), license);
                         if (license.isExpired())
                             throw new InvalidLicenseException("License '"+license.getId()+"' has expired");
 
                         return Optional.ofNullable(license);
                     } catch(AuthenticationException | NoHostAvailableException e) {
-                        LOGGER.warn("Unable to get the Elassandra License", e);
+                        LOGGER.warn("datacenter="+dataCenter.id()+" Unable to get the Elassandra License", e);
                         return Optional.empty();
                     }
                 }).ignoreElement();

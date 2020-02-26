@@ -5,6 +5,7 @@ import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
+import com.strapdata.strapkop.pipeline.WorkQueue;
 import com.strapdata.strapkop.plugins.TestSuitePlugin;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.reactivex.Completable;
@@ -20,8 +21,9 @@ public class TestTaskReconcilier extends TaskReconcilier {
     public TestTaskReconcilier(ReconcilierObserver reconcilierObserver,
                                final K8sResourceUtils k8sResourceUtils,
                                final TestSuitePlugin testPlugin,
+                               final WorkQueue workQueue,
                                final MeterRegistry meterRegistry) {
-        super(reconcilierObserver, "test", k8sResourceUtils, meterRegistry);
+        super(reconcilierObserver, "test", k8sResourceUtils, meterRegistry, workQueue);
         this.testSuitePlugin = testPlugin;
     }
 

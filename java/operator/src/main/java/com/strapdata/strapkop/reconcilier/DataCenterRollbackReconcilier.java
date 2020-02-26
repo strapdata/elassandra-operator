@@ -16,6 +16,9 @@ import org.slf4j.LoggerFactory;
 import javax.inject.Singleton;
 import java.util.Objects;
 
+/**
+ * Rollback to the last successfully applied dc state.
+ */
 @Singleton
 public class DataCenterRollbackReconcilier extends Reconcilier<Key> {
 
@@ -43,8 +46,11 @@ public class DataCenterRollbackReconcilier extends Reconcilier<Key> {
         return k8sResourceUtils.readDatacenter(key)
                 .flatMap(dc -> reconcilierObserver.onReconciliationBegin().toSingleDefault(dc))
                 .flatMapCompletable(dc -> {
+                    logger.debug("rollback dc={}/{}", dc.getMetadata().getName(), dc.getMetadata().getNamespace());
+
                     if (dc.getStatus() != null && !Objects.equals(dc.getStatus().getPhase(), DataCenterPhase.ERROR)) {
-                        logger.debug("Rollback cancelled, the DataCenter phase is ({})", dc.getStatus().getPhase());
+                        logger.debug("Rollback cancelled, the datacenter={}/{} phase={}",
+                                dc.getMetadata().getName(), dc.getMetadata().getNamespace(), dc.getStatus().getPhase());
                         return Completable.complete();
                     }
 

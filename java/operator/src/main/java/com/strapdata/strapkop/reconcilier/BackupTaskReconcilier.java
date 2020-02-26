@@ -11,6 +11,7 @@ import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.task.BackupTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
+import com.strapdata.strapkop.pipeline.WorkQueue;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CustomObjectsApi;
@@ -41,8 +42,9 @@ public class BackupTaskReconcilier extends TaskReconcilier {
                                  final K8sResourceUtils k8sResourceUtils,
                                  final SidecarClientFactory sidecarClientFactory,
                                  final CustomObjectsApi customObjectsApi,
+                                 final WorkQueue workQueue,
                                  final MeterRegistry meterRegistry) {
-        super(reconcilierObserver, "backup", k8sResourceUtils, meterRegistry);
+        super(reconcilierObserver, "backup", k8sResourceUtils, meterRegistry, workQueue);
         this.sidecarClientFactory = sidecarClientFactory;
     }
 

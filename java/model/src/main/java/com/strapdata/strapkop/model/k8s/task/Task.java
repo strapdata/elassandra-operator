@@ -50,4 +50,8 @@ public class Task {
                         .setDatacenter(dc.getSpec().getDatacenterName())
                 );
     }
+
+    public String id() {
+        return metadata.getName()+"/"+metadata.getNamespace();
+    }
 }

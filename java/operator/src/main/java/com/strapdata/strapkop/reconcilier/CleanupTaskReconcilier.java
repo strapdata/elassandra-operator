@@ -6,7 +6,8 @@ import com.strapdata.strapkop.model.k8s.cassandra.BlockReason;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
-import com.strapdata.strapkop.sidecar.SidecarClientFactory;
+import com.strapdata.strapkop.pipeline.WorkQueue;
+import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
 import io.kubernetes.client.ApiException;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.annotation.Infrastructure;
@@ -28,14 +29,15 @@ import java.util.stream.Collectors;
 public final class CleanupTaskReconcilier extends TaskReconcilier {
     private static final Logger logger = LoggerFactory.getLogger(CleanupTaskReconcilier.class);
     
-    private final SidecarClientFactory sidecarClientFactory;
+    private final JmxmpElassandraProxy jmxmpElassandraProxy;
     
     public CleanupTaskReconcilier(ReconcilierObserver reconcilierObserver,
                                   final K8sResourceUtils k8sResourceUtils,
-                                  final SidecarClientFactory sidecarClientFactory,
+                                  final JmxmpElassandraProxy jmxmpElassandraProxy,
+                                  final WorkQueue workQueue,
                                   final MeterRegistry meterRegistry) {
-        super(reconcilierObserver,"cleanup", k8sResourceUtils, meterRegistry);
-        this.sidecarClientFactory = sidecarClientFactory;
+        super(reconcilierObserver,"cleanup", k8sResourceUtils, meterRegistry, workQueue);
+        this.jmxmpElassandraProxy = jmxmpElassandraProxy;
     }
 
     public BlockReason blockReason() {
@@ -67,10 +69,10 @@ public final class CleanupTaskReconcilier extends TaskReconcilier {
         // TODO: maybe we should try to caught outer exception (even if we already catch inside doOnNext)
         return Observable.zip(Observable.fromIterable(pods), Observable.interval(10, TimeUnit.SECONDS), (pod, timer) -> pod)
                 .subscribeOn(Schedulers.computation())
-                .flatMapSingle(pod -> sidecarClientFactory.clientForPod(ElassandraPod.fromName(dc, pod)).cleanup(task.getSpec().getCleanup().getKeyspace())
+                .flatMapSingle(pod -> jmxmpElassandraProxy.cleanup(ElassandraPod.fromName(dc, pod), task.getSpec().getCleanup().getKeyspace())
                         .andThen(updateTaskPodStatus(dc, taskWrapper, TaskPhase.RUNNING, pod, TaskPhase.SUCCEED))
                         .onErrorResumeNext(throwable -> {
-                            logger.error("Error while executing cleanup on pod={}", pod, throwable);
+                            logger.error("datacenter={} cleanup={} Error while executing cleanup on pod={}", dc.id(), task.id(), pod, throwable);
                             task.getStatus().setLastMessage(throwable.getMessage());
                             return updateTaskPodStatus(dc, taskWrapper, TaskPhase.RUNNING, pod, TaskPhase.FAILED, throwable.getMessage());
                         })
