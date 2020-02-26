@@ -43,7 +43,7 @@ subprojects {
     compile(group: 'com.datastax.cassandra', name: 'cassandra-driver-core', version: '3.7.1') {
       exclude group: 'com.google.guava', module: 'guava'
     }
-    compile "io.kubernetes:client-java:4.0.0"
+    compile "io.kubernetes:client-java:6.0.1"
     compile "javax.inject:javax.inject:1"
 
     runtime "ch.qos.logback:logback-classic:1.2.3"

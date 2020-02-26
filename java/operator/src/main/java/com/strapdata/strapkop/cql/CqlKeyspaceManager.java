@@ -74,7 +74,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                                 keyspace.createIfNotExistsKeyspace(dataCenter, sessionSupplier).blockingGet();
                                 dataCenter.getStatus().getKeyspaceManagerStatus().getKeyspaces().add(keyspace.name);
                             } catch(Exception e) {
-                                logger.warn("Failed to create keyspace="+keyspace.name, e);
+                                logger.warn("datacenter=" + dataCenter.id() + " Failed to create keyspace="+keyspace.name, e);
                             }
                         }
                     }
@@ -88,7 +88,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                         try {
                             updateKeyspaceReplicationMap(dataCenter, keyspace.name, effectiveRF(dataCenter, keyspace.rf), sessionSupplier).blockingGet();
                         } catch (Exception e) {
-                            logger.warn("Failed to adjust RF for keyspace="+keyspace, e);
+                            logger.warn("datacenter=" + dataCenter.id() + " Failed to adjust RF for keyspace="+keyspace, e);
                         }
                     }
 
@@ -97,7 +97,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                     try {
                         updateKeyspaceReplicationMap(dataCenter, elasticAdminKeyspace, effectiveRF(dataCenter, dataCenter.getSpec().getReplicas()), sessionSupplier).blockingGet();
                     } catch (Exception e) {
-                        logger.warn("Failed to adjust RF for keyspace="+elasticAdminKeyspace, e);
+                        logger.warn("datacenter=" + dataCenter.id() + " Failed to adjust RF for keyspace="+elasticAdminKeyspace, e);
                     }
 
                     // adjust user keyspace RF
@@ -106,7 +106,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                             try {
                                 updateKeyspaceReplicationMap(dataCenter, keyspace.name, effectiveRF(dataCenter, keyspace.rf), sessionSupplier).blockingGet();
                             } catch (Exception e) {
-                                logger.warn("Failed to adjust RF for keyspace="+keyspace, e);
+                                logger.warn("datacenter=" + dataCenter.id() + " Failed to adjust RF for keyspace="+keyspace, e);
                             }
                         }
                     }
@@ -146,7 +146,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                 }
             } catch (Exception e) {
                 // TODO [ELE] should be ignored in single DC deployment but maybe retry in multiDC configuration...
-                logger.warn("Unable to update Keyspace Replication Map due to '{}'", e.getMessage(), e);
+                logger.warn("datacenter=" + dataCenter.id() + " Unable to update Keyspace Replication Map due to '{}'", e.getMessage(), e);
             }
         }
         remove(dataCenter);
@@ -212,7 +212,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                 .flatMapCompletable(rs -> {
                     Row row = rs.one();
                     if (row == null) {
-                        logger.warn("keyspace={} does not exist in dc={}, ignoring.", keyspace, dc.getMetadata().getName());
+                        logger.warn("datacenter={} keyspace={} does not exist, ignoring.", dc.id(), keyspace, dc.getMetadata().getName());
                         return Completable.complete();
                     }
                     final Map<String, String> replication = row.getMap("replication", String.class, String.class);
@@ -226,7 +226,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                                     e -> Integer.parseInt(e.getValue())
                             ));
                     final int currentRf = currentRfMap.getOrDefault(dcName, 0);
-                    logger.debug("keyspace={} currentRf={} targetRf={}", keyspace, currentRf, targetRf);
+                    logger.debug("datacenter={} keyspace={} currentRf={} targetRf={}", dc.id(), keyspace, currentRf, targetRf);
                     if (currentRf != targetRf) {
                         currentRfMap.put(dcName, targetRf);
                         if (currentRfMap.entrySet().stream().filter(e -> e.getValue() > 0).count() > 0) {
@@ -238,7 +238,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                                         if (targetRf > currentRf) {
                                             // RF increased
                                             if (targetRf > 1) {
-                                                logger.info("Trigger a repair for keyspace={} in dc={}", keyspace, dc.getMetadata().getName());
+                                                logger.info("datacenter={} Trigger a repair for keyspace={}", dc.id(), keyspace);
                                                 // TODO: trigger repair if RF is manually increased while DC was RUNNING (if RF is incremented just before scaling up, streaming propely pull data)
                                                 return k8sResourceUtils.createTask(dc, "repair", new Consumer<TaskSpec>() {
                                                     @Override
@@ -250,7 +250,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                                         } else {
                                             // RF deacreased
                                             if (targetRf < dc.getStatus().getReplicas()) {
-                                                logger.info("Trigger a cleanup for keyspace={} in dc={}", keyspace, dc.getMetadata().getName());
+                                                logger.info("datacenter={} Trigger a cleanup for keyspace={} in dc={}", dc.id(), keyspace);
                                                 // TODO: trigger cleanup when RF is manually decrease while DC was RUNNING.
                                                 return k8sResourceUtils.createTask(dc, "cleanup", new Consumer<TaskSpec>() {
                                                     @Override
@@ -274,7 +274,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                     final String query = String.format(Locale.ROOT,
                             "ALTER KEYSPACE %s WITH replication = {'class': 'NetworkTopologyStrategy', %s};",
                             quoteKeyspaceName(name), stringifyRfMap(rfMap));
-                    logger.debug("dc={} execute: {}", dc.getMetadata().getName(), query);
+                    logger.debug("dc={} query={}", dc.id(), query);
                     return Single.fromFuture(session.executeAsync(query)).map(x -> session);
                 });
     }

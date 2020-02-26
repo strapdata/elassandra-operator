@@ -86,4 +86,8 @@ public class ElassandraPod {
             return new ElassandraPod(namespace, matcher.group(1), matcher.group(2), podName);
         throw new IllegalArgumentException("Pod name=" + podName + " does not match expected regular expression");
     }
+
+    public String dataCenterName() {
+        return "elassandra-"+this.cluster+"-"+this.dataCenter;
+    }
 }

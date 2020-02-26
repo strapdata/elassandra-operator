@@ -9,6 +9,7 @@ import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.task.RemoveReplicationTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
+import com.strapdata.strapkop.pipeline.WorkQueue;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CustomObjectsApi;
@@ -38,8 +39,9 @@ public class RemoveReplicationTaskReconcilier extends TaskReconcilier {
                                             final ApplicationContext context,
                                             final CqlRoleManager cqlRoleManager,
                                             final CqlKeyspaceManager cqlKeyspaceManager,
+                                            final WorkQueue workQueue,
                                             final MeterRegistry meterRegistry) {
-        super(reconcilierObserver, "removeReplication", k8sResourceUtils, meterRegistry);
+        super(reconcilierObserver, "removeReplication", k8sResourceUtils, meterRegistry, workQueue);
         this.sidecarClientFactory = sidecarClientFactory;
         this.context = context;
         this.cqlRoleManager = cqlRoleManager;
@@ -64,7 +66,7 @@ public class RemoveReplicationTaskReconcilier extends TaskReconcilier {
         final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
 
         if (Strings.isNullOrEmpty(removeReplicationTaskSpec.getDcName())) {
-            logger.warn("task={} dcName not set, ignoring task", task.getMetadata().getName());
+            logger.warn("datacenter={} task={} dcName not set, ignoring task", dc.id(), task.id());
             return Single.just(TaskPhase.FAILED);
         }
 
@@ -72,8 +74,8 @@ public class RemoveReplicationTaskReconcilier extends TaskReconcilier {
         return this.cqlKeyspaceManager.removeDcFromReplicationMap(dc, removeReplicationTaskSpec.getDcName(), cqlSessionHandler)
                 .andThen(finalizeTaskStatus(dc, taskWrapper, TaskPhase.SUCCEED))
                 .onErrorResumeNext(throwable -> {
-                    logger.error("task={} remove replication to dc={} failed, error={}",
-                            task.getMetadata().getName(), removeReplicationTaskSpec.getDcName(), throwable.getMessage());
+                    logger.error("datacenter={} task={} remove replication failed, error={}",
+                            dc.id(), task.id(), removeReplicationTaskSpec.getDcName(), throwable.getMessage());
                     task.getStatus().setLastMessage(throwable.getMessage());
                     return updateTaskStatus(dc, taskWrapper, TaskPhase.FAILED).toSingleDefault(TaskPhase.FAILED);
                 });

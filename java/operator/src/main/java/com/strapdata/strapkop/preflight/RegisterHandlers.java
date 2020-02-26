@@ -28,8 +28,8 @@ public class RegisterHandlers implements Preflight<Void> {
         //bind(NodePipeline.class, NodeHandler.class);
         bind(NodeStatusPipeline.class, ElassandraNodeStatusHandler.class);
         bind(TaskPipeline.class, TaskHandler.class);
-        bind(ReaperPipeline.class, ReaperPodHandler.class);
-        bind(ElassandraPodsPipeline.class, ElassandraPodHandler.class);
+        bind(ReaperPodPipeline.class, ReaperPodHandler.class);
+        bind(ElassandraPodPipeline.class, ElassandraPodHandler.class);
         return null;
     }
     

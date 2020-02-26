@@ -6,6 +6,7 @@ import com.google.common.collect.Iterators;
 import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
 import com.squareup.okhttp.Call;
+import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.backup.*;
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
@@ -15,7 +16,6 @@ import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskList;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
 import com.strapdata.strapkop.model.k8s.task.TaskSpec;
-import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.reconcilier.TaskReconcilier;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.ApiResponse;
@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.io.IOException;
 import java.lang.reflect.Type;
 import java.nio.charset.Charset;
 import java.util.Collection;
@@ -67,19 +68,74 @@ public class K8sResourceUtils {
         void call() throws ApiException;
     }
 
-    public static <T> Single<T> createOrReplaceResource(final Callable<T> createResourceCallable, final Callable<T> replaceResourceCallable) throws ApiException {
+
+    public static <T> Single<T> createNamespacedResource(String namespace, T t, K8sSupplier<T> create) throws ApiException {
         return Single.fromCallable(new Callable<T>() {
             @Override
             public T call() throws Exception {
                 try {
-                    logger.trace("Attempting to create resource.");
-                    return createResourceCallable.call();
+                    return create.get();
+                } catch (final ApiException e) {
+                    logger.error("create error code={} namespace={} object={}", e.getCode(), namespace, t);
+                    throw e;
+                }
+            }
+        });
+    }
+
+    public static <T> Single<T> createOrReplaceResource(String namespace, T t, K8sSupplier<T> create, K8sSupplier<T> replace) throws ApiException {
+        return Single.fromCallable(new Callable<T>() {
+            @Override
+            public T call() throws Exception {
+                try {
+                    return create.get();
                 } catch (final ApiException e) {
                     if (e.getCode() != 409) {
+                        logger.error("create error code={} namespace={} object={}", e.getCode(), namespace, t);
                         throw e;
                     }
-                    logger.trace("Resource already exists. Attempting to replace.");
-                    return replaceResourceCallable.call();
+                    try {
+                        return replace.get();
+                    } catch (final ApiException e2) {
+                        logger.error("replace error code={} namespace={} object={}", e2.getCode(), namespace, t);
+                        throw e2;
+                    }
+                }
+            }
+        });
+    }
+
+    public static <T> Single<T> readOrCreateResource(String namespace, T t, K8sSupplier<T> read, K8sSupplier<T> create) throws ApiException {
+        return Single.fromCallable(new Callable<T>() {
+            @Override
+            public T call() throws Exception {
+                try {
+                    return read.get();
+                } catch (final ApiException e) {
+                    if (e.getCode() != 404) {
+                        logger.error("read error code={} namespace={} object={}", e.getCode(), namespace, t);
+                        throw e;
+                    }
+                    try {
+                        return create.get();
+                    } catch (final ApiException e2) {
+                        logger.error("create error code={} namespace={} object={}", e2.getCode(), namespace, t);
+                        throw e2;
+                    }
+                }
+            }
+        });
+    }
+
+    public static  <T> Completable deleteNamespacedResource(String namespace, T t, K8sSupplier<T> delete) {
+        return Completable.fromCallable(new Callable<T>() {
+            @Override
+            public T call() throws Exception {
+                try {
+                    return delete.get();
+                } catch (final ApiException e) {
+                    logger.error("delete error code={} namespace={} object={}", e.getCode(), namespace, t);
+                    throw e;
                 }
             }
         });
@@ -107,94 +163,50 @@ public class K8sResourceUtils {
         return Completable.fromCallable(deleteResourceRunnable);
     }
 
-    public Single<V1Service> createOrReplaceNamespacedService(final V1Service service) throws ApiException {
+    public Single<V1Service> createOrReplaceNamespacedService(final V1Service service) throws ApiException, IOException {
         final String namespace = service.getMetadata().getNamespace();
-        return createOrReplaceResource(
+        /*
+        ApiClient debuggableApiClient = ClientBuilder.standard().build();
+        debuggableApiClient.setDebugging(true);
+        CoreV1Api debuggableCore = new CoreV1Api(debuggableApiClient);
+        */
+        return createOrReplaceResource(namespace, service,
+                () -> coreApi.createNamespacedService(namespace, service, null, null, null),
                 () -> {
-                    try {
-                        V1Service service2 = coreApi.createNamespacedService(namespace, service, null, null, null);
-                        logger.debug("Created namespaced Service={}", service.getMetadata().getName());
-                        return service2;
-                    } catch(ApiException e) {
-                        logger.warn("Created namespaced Service={} in namespace={} service={} error: {}",
-                                service.getMetadata().getName(), service.getMetadata().getNamespace(), service, e.getMessage());
-                        throw e;
-                    }
-                },
-                () -> {
-        // temporarily disable service replace call to fix issue #41 since service can't be customized right now
-        //                        coreApi.replaceNamespacedService(service.getMetadata().getName(), service.getMetadata().getNamespace(), service, null, null);
-        //                        logger.debug("Replaced namespaced Service.");
+            /*  CANNOT UPDATE SERVICE !
+                    // read resourceVersion to update service, see https://github.com/kubernetes/kubernetes/issues/70674
+                    V1Service s = debuggableCore.readNamespacedService(service.getMetadata().getName(), namespace, null, false, false);
+                    V1ObjectMeta metadata = service.getMetadata();
+                    metadata.setResourceVersion(s.getMetadata().getResourceVersion());
+                    service.setMetadata(metadata);
+                    return debuggableCore.replaceNamespacedService(service.getMetadata().getName(), service.getMetadata().getNamespace(), service, null, null);
+             */
                     return service;
-                }
-        );
+                });
     }
 
     public Single<V1Service> createNamespacedService(final V1Service service) throws ApiException {
         final String namespace = service.getMetadata().getNamespace();
-        return Single.fromCallable(
-                () -> {
-                    try {
-                        V1Service service2 = coreApi.createNamespacedService(namespace, service, null, null, null);
-                        logger.debug("Created namespaced Service={}", service.getMetadata().getName());
-                        return service2;
-                    } catch(ApiException e) {
-                        logger.warn("Created namespaced Service={} in namespace={} service={} error: {}",
-                                service.getMetadata().getName(), service.getMetadata().getNamespace(), service, e.getMessage());
-                        throw e;
-                    }
-                });
+        return createNamespacedResource(namespace, service,
+                () -> coreApi.createNamespacedService(namespace, service, null, null, null));
     }
 
     public Single<V1beta1Ingress> createOrReplaceNamespacedIngress(final V1beta1Ingress ingress) throws ApiException {
         final String namespace = ingress.getMetadata().getNamespace();
-        return createOrReplaceResource(
+        return createOrReplaceResource(namespace, ingress,
+                () -> extensionsV1beta1Api.createNamespacedIngress(namespace, ingress, null, null, null),
                 () -> {
-                    try {
-                        V1beta1Ingress ingress2 = extensionsV1beta1Api.createNamespacedIngress(namespace, ingress, null, null, null);
-                        logger.debug("Created namespaced Ingress={}", ingress.getMetadata().getName());
-                        return ingress2;
-                    } catch(ApiException e) {
-                        logger.warn("Created namespaced Ingress={} in namespace={} ingress={} error: {}",
-                                ingress.getMetadata().getName(), ingress.getMetadata().getNamespace(), ingress, e.getMessage());
-                        throw e;
-                    }
-                },
-                () -> {
-                    // temporarily disable service replace call to fix issue #41 since service can't be customized right now
-//                        coreApi.replaceNamespacedService(service.getMetadata().getName(), service.getMetadata().getNamespace(), service, null, null);
-//                        logger.debug("Replaced namespaced Service.");
+                    // CANNOT UPDATE ingres (like service)
+                    // extensionsV1beta1Api.replaceNamespacedIngress(ingress.getMetadata().getName(), ingress.getMetadata().getNamespace(), ingress, null, null)
                     return ingress;
-                }
-        );
+                });
     }
 
     public Single<V1ConfigMap> createOrReplaceNamespacedConfigMap(final V1ConfigMap configMap) throws ApiException {
         final String namespace = configMap.getMetadata().getNamespace();
-        return createOrReplaceResource(
-                () -> {
-                    try {
-                        V1ConfigMap configMap2 = coreApi.createNamespacedConfigMap(namespace, configMap, null, null, null);
-                        logger.debug("Created namespaced ConfigMap={}", configMap.getMetadata().getName());
-                        return configMap2;
-                    } catch(ApiException e) {
-                        logger.warn("Created namespaced configMap={} in namespace={} configMap={} error: {}",
-                                configMap.getMetadata().getName(), configMap.getMetadata().getNamespace(), configMap, e.getMessage());
-                        throw e;
-                    }
-                },
-                () -> {
-                    try {
-                        V1ConfigMap configMap2 = coreApi.replaceNamespacedConfigMap(configMap.getMetadata().getName(), namespace, configMap, null, null);
-                        logger.debug("Replaced namespaced ConfigMap={}", configMap.getMetadata().getName());
-                        return configMap2;
-                    } catch(ApiException e) {
-                        logger.warn("Created namespaced configMap={} in namespace={} configMap={} error: {}",
-                                configMap.getMetadata().getName(), configMap.getMetadata().getNamespace(), configMap, e.getMessage());
-                        throw e;
-                    }
-                }
-        );
+        return createOrReplaceResource(namespace, configMap,
+                () -> coreApi.createNamespacedConfigMap(namespace, configMap, null, null, null),
+                () -> coreApi.replaceNamespacedConfigMap(configMap.getMetadata().getName(), namespace, configMap, null, null));
     }
 
     public Single<V1ConfigMap> readNamespacedConfigMap(final String namespace, final String name) {
@@ -217,58 +229,16 @@ public class K8sResourceUtils {
 
     public Single<V1Deployment> createOrReplaceNamespacedDeployment(final V1Deployment deployment) throws ApiException {
         final String namespace = deployment.getMetadata().getNamespace();
-        return createOrReplaceResource(
-                () -> {
-                    try {
-                        V1Deployment deployment2 = appsApi.createNamespacedDeployment(namespace, deployment, null, null, null);
-                        logger.debug("Created namespaced Deployment={} in namespace={}", deployment.getMetadata().getName(), deployment.getMetadata().getNamespace());
-                        return deployment2;
-                    } catch(ApiException e) {
-                        logger.warn("Created namespaced deployment={} in namespace={} deployment={} error: {}",
-                                deployment.getMetadata().getName(), deployment.getMetadata().getNamespace(), deployment, e.getMessage());
-                        throw e;
-                    }
-                },
-                () -> {
-                    try {
-                        V1Deployment deployment2 = appsApi.replaceNamespacedDeployment(deployment.getMetadata().getName(), namespace, deployment, null, null);
-                        logger.debug("Replaced namespaced Deployment in namespace={}", deployment.getMetadata().getName(), deployment.getMetadata().getNamespace());
-                        return deployment2;
-                    } catch(ApiException e) {
-                        logger.warn("Created namespaced deployment={} in namespace={} deployment={} error: {}",
-                                deployment.getMetadata().getName(), deployment.getMetadata().getNamespace(), deployment, e.getMessage());
-                        throw e;
-                    }
-                }
-        );
+        return createOrReplaceResource(namespace, deployment,
+                () -> appsApi.createNamespacedDeployment(namespace, deployment, null, null, null),
+                () -> appsApi.replaceNamespacedDeployment(deployment.getMetadata().getName(), namespace, deployment, null, null));
     }
 
-    public Single<V1StatefulSet> createOrReplaceNamespacedStatefulSet(final V1StatefulSet statefulset) throws ApiException {
+    public Single<V1StatefulSet> createOrReplaceNamespacedDeployment(final V1StatefulSet statefulset) throws ApiException {
         final String namespace = statefulset.getMetadata().getNamespace();
-        return createOrReplaceResource(
-                () -> {
-                    try {
-                        V1StatefulSet statefulSet2 = appsApi.createNamespacedStatefulSet(namespace, statefulset, null, null, null);
-                        logger.debug("Created namespaced Deployment={} in namespace={}", statefulset.getMetadata().getName(), statefulset.getMetadata().getNamespace());
-                        return statefulSet2;
-                    } catch(ApiException e) {
-                        logger.warn("Created namespaced statefulset={} in namespace={} statefulset={} error: {}",
-                                statefulset.getMetadata().getName(), statefulset.getMetadata().getNamespace(), statefulset, e.getMessage());
-                        throw e;
-                    }
-                },
-                () -> {
-                    try {
-                        V1StatefulSet statefulSet2 = appsApi.replaceNamespacedStatefulSet(statefulset.getMetadata().getName(), namespace, statefulset, null, null);
-                        logger.debug("Replaced namespaced Deployment in namespace={}", statefulset.getMetadata().getName(), statefulset.getMetadata().getNamespace());
-                        return statefulSet2;
-                    } catch(ApiException e) {
-                        logger.warn("Created namespaced statefulset={} in namespace={} statefulset={} error: {}",
-                                statefulset.getMetadata().getName(), statefulset.getMetadata().getNamespace(), statefulset, e.getMessage());
-                        throw e;
-                    }
-                }
-        );
+        return createOrReplaceResource(namespace, statefulset,
+                () -> appsApi.createNamespacedStatefulSet(namespace, statefulset, null, null, null),
+                () -> appsApi.replaceNamespacedStatefulSet(statefulset.getMetadata().getName(), namespace, statefulset, null, null));
     }
 
     public Single<V1StatefulSet> createNamespacedStatefulSet(final V1StatefulSet statefulset) throws ApiException {
@@ -331,10 +301,10 @@ public class K8sResourceUtils {
                         }
                         throw e;
                     }
-
                 }
         );
     }
+
 
     public V1ServiceAccount readNamespacedServiceAccount(final String namespace, final String name) throws ApiException {
             try {
@@ -351,33 +321,24 @@ public class K8sResourceUtils {
             }
     }
 
-    public Single<V1Secret> createOrReplaceNamespacedSecret(final V1Secret secret) throws ApiException {
+    public Single<V1Secret> createOrReplaceNamespacedDeployment(final V1Secret secret) throws ApiException {
         final String namespace = secret.getMetadata().getNamespace();
-        return createOrReplaceResource(
-                () -> {
-                    V1Secret secret2 = coreApi.createNamespacedSecret(namespace, secret, null, null, null);
-                    logger.debug("Created namespaced secret={}", secret.getMetadata().getName());
-                    return secret2;
-                },
-                () -> {
-                    V1Secret secret2 = coreApi.replaceNamespacedSecret(secret.getMetadata().getName(), namespace, secret, null, null);
-                    logger.debug("Replaced namespaced secret={}", secret.getMetadata().getName());
-                    return secret2;
-                }
-        );
+        return createOrReplaceResource(namespace, secret,
+                () -> coreApi.createNamespacedSecret(namespace, secret, null, null, null),
+                () -> coreApi.replaceNamespacedSecret(secret.getMetadata().getName(), namespace, secret, null, null));
     }
 
     public Single<V1Secret> readOrCreateNamespacedSecret(V1ObjectMeta secretObjectMeta, final Supplier<V1Secret> secretSupplier) throws ApiException {
         return readOrCreateResource(
                 () -> {
-                        V1Secret secret2 = coreApi.readNamespacedSecret(secretObjectMeta.getName(), secretObjectMeta.getNamespace(), null, null, null);
+                    V1Secret secret2 = coreApi.readNamespacedSecret(secretObjectMeta.getName(), secretObjectMeta.getNamespace(), null, null, null);
                         /*
                         logger.warn("Get namespaced secret={} in namespace={} stringData={} data={}",
                                 secret2.getMetadata().getName(), secret2.getMetadata().getNamespace(),
                                 secret2.getStringData(),
                                 secret2.getData().entrySet().stream().collect(Collectors.toMap(e -> e.getKey(), e -> new String(e.getValue()))));
                          */
-                        return secret2;
+                    return secret2;
                 },
                 () -> {
                     V1Secret secret2 = coreApi.createNamespacedSecret(secretObjectMeta.getNamespace(), secretSupplier.get(), null, null, null);

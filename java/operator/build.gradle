@@ -48,12 +48,7 @@ jib {
                     '-XX:+ExitOnOutOfMemoryError',
                     '-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005',
                     '-Dmicronaut.environments=$MICRONAUT_ENV',
-                    '-Dcom.sun.management.jmxremote',
-                    '-Dcom.sun.management.jmxremote.port=7199',
-                    '-Dcom.sun.management.jmxremote.rmi.port=7199',
-                    '-Dcom.sun.management.jmxremote.ssl=false',
-                    '-Dcom.sun.management.jmxremote.authenticate=false',
-                    '-Djava.rmi.server.hostname=127.0.0.1'
+                    '-XshowSettings:vm'
         ]
         mainClass = mainClassName
         ports = ['8080']

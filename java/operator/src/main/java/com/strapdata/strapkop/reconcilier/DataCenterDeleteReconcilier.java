@@ -3,13 +3,11 @@ package com.strapdata.strapkop.reconcilier;
 import com.strapdata.strapkop.cache.*;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.cql.CqlSessionHandler;
-import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.plugins.PluginRegistry;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
 import io.reactivex.Completable;
-import io.reactivex.functions.Action;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,31 +64,14 @@ public class DataCenterDeleteReconcilier extends Reconcilier<DataCenter> {
         final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
         meterRegistry.counter("datacenter.delete").increment();
         return reconcilierObserver.onReconciliationBegin()
-                .andThen(context.createBean(DataCenterDeleteAction.class, dataCenter).deleteDataCenter(cqlSessionHandler))
                 .andThen(pluginRegistry.deleteAll(dataCenter))
+                .andThen(context.createBean(DataCenterDeleteAction.class, dataCenter).deleteDataCenter(cqlSessionHandler))
                 .doOnError(t -> { // TODO au lieu de faire le deleteDC en premier ne faut-il pas faire une action deleteDC sur erreur ou simplement logguer les erreur de deletePlugin ???
                     logger.warn("An error occured during delete datacenter action : {} ", t.getMessage(), t);
                     if (!(t instanceof ReconcilierShutdownException)) {
                         reconcilierObserver.failedReconciliationAction();
                     }
                 })
-                .doOnComplete(reconcilierObserver.endReconciliationAction())
-                .doFinally(new Action() {
-                    @Override
-                    public void run() throws Exception {
-                        cqlSessionHandler.close();
-
-                        // clear caches to avoid memory leak
-                        Key dcKey = new Key(dataCenter.getMetadata());
-                        checkPointCache.clearCheckPoint(dcKey);
-                        dataCenterCache.remove(dcKey);
-                        elassandraNodeStatusCache.purgeDataCenter(dataCenter);
-                        sidecarConnectionCache.purgeDataCenter(dataCenter);
-                        taskCache.purgeDataCenter(dataCenter);
-                        statefulsetCache.purgeDataCenter(dataCenter);
-                        deploymentCache.purgeDataCenter(dataCenter);
-                        podCache.purgeDataCenter(dataCenter);
-                    }
-                });
+                .doOnComplete(reconcilierObserver.endReconciliationAction());
     }
 }

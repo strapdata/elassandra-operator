@@ -114,7 +114,7 @@ public class CqlRole implements Cloneable {
                 .map(secret -> {
                     byte[] passBytes = secret.getData().get(secretKey);
                     if (passBytes == null) {
-                        logger.error("secret={} does not contain password for role={}", secret.getMetadata().getName(), this);
+                        logger.error("datacenter={} secret={} does not contain password for role={}", dataCenter.id(), secret.getMetadata().getName(), this);
                         throw new StrapkopException("secret=" + secret.getMetadata().getName() + " does not contain password for role=" + username);
                     }
                     this.password = new String(passBytes);
@@ -137,14 +137,14 @@ public class CqlRole implements Cloneable {
             // create role if not exists, then alter... so this is completely idempotent and can even update password, although it might not be optimized
             return loadPassword(dataCenter, k8sResourceUtils)
                     .flatMap(cqlRole -> {
-                        logger.debug("Creating role={} in cluster={} dc={}", this, dataCenter.getSpec().getClusterName(), dataCenter.getMetadata().getName());
+                        logger.debug("datacenter={} Creating role={}", dataCenter.id(), this);
                         return sessionSupplier.getSession(dataCenter);
                     })
                     .flatMap(session -> {
                         if (!"cassandra".equals(username)) {
                             // don not create the cassandra role, it always exists
                             String q = String.format(Locale.ROOT, "CREATE ROLE IF NOT EXISTS %s with SUPERUSER = %b AND LOGIN = %b and PASSWORD = '%s'", username, superUser, login, password);
-                            logger.debug(q);
+                            logger.debug("datacenter={} query={}", dataCenter.id(), q);
                             return Single.fromFuture(session.executeAsync(q)).map(rs -> session);
                         } else {
                             return Single.just(session);
@@ -152,7 +152,7 @@ public class CqlRole implements Cloneable {
                     })
                     .flatMap(session -> {
                         String q = String.format(Locale.ROOT, "ALTER ROLE %s WITH PASSWORD = '%s'", username, password);
-                        logger.debug(q);
+                        logger.debug("datacenter={} query={}", dataCenter.id(), q);
                         return Single.fromFuture(session.executeAsync(q)).map(rs -> session);
                     })
                     .flatMap(session -> {
@@ -167,7 +167,7 @@ public class CqlRole implements Cloneable {
                             try {
                                 this.postCreateHandler.postCreate(dataCenter, sessionSupplier);
                             } catch (Exception e) {
-                                logger.error("Failed to execute posteCreate for role=" + this.username, e);
+                                logger.error("datacenter="+ dataCenter.id()+" Failed to execute posteCreate for role=" + this.username, e);
                             }
                         }
                         this.applied = true;     // mark the role as up-to-date

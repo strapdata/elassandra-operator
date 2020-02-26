@@ -15,7 +15,7 @@ import com.strapdata.strapkop.model.k8s.task.RebuildTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
 import com.strapdata.strapkop.pipeline.WorkQueue;
-import com.strapdata.strapkop.sidecar.SidecarClientFactory;
+import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CustomObjectsApi;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
 @Infrastructure
 public class RebuildTaskReconcilier extends TaskReconcilier {
     private static final Logger logger = LoggerFactory.getLogger(RebuildTaskReconcilier.class);
-    private final SidecarClientFactory sidecarClientFactory;
+    private final JmxmpElassandraProxy jmxmpElassandraProxy;
     private final ApplicationContext context;
     private final CqlRoleManager cqlRoleManager;
     private final CqlKeyspaceManager cqlKeyspaceManager;
@@ -43,15 +43,15 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
 
     public RebuildTaskReconcilier(ReconcilierObserver reconcilierObserver,
                                   final K8sResourceUtils k8sResourceUtils,
-                                  final SidecarClientFactory sidecarClientFactory,
+                                  final JmxmpElassandraProxy jmxmpElassandraProxy,
                                   final CustomObjectsApi customObjectsApi,
                                   final ApplicationContext context,
                                   final WorkQueue workQueue,
                                   final CqlRoleManager cqlRoleManager,
                                   final CqlKeyspaceManager cqlKeyspaceManager,
                                   final MeterRegistry meterRegistry) {
-        super(reconcilierObserver, "rebuild", k8sResourceUtils, meterRegistry);
-        this.sidecarClientFactory = sidecarClientFactory;
+        super(reconcilierObserver, "rebuild", k8sResourceUtils, meterRegistry, workQueue);
+        this.jmxmpElassandraProxy = jmxmpElassandraProxy;
         this.context = context;
         this.cqlRoleManager = cqlRoleManager;
         this.cqlKeyspaceManager = cqlKeyspaceManager;
@@ -82,6 +82,7 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
 
         if (rebuildTaskSpec.getSrcDcName().equals(dc.getSpec().getDatacenterName())) {
             // manage CQL replication map update before streaming
+            logger.info("datacenter={} rebuild={} executed on source DC", dc.id(), task.id());
             final Map<String, Integer> replicationMap = new HashMap<>();
             replicationMap.putAll(rebuildTaskSpec.getReplicationMap());
             for (CqlKeyspace systemKs : CqlKeyspaceManager.SYSTEM_KEYSPACES)
@@ -96,19 +97,20 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
             // flush sstables in parallel to stream properly
             List<CompletableSource> todoList = new ArrayList<>();
             for(String pod : pods) {
-                todoList.add(sidecarClientFactory.clientForPod(ElassandraPod.fromName(dc, pod)).flush(null)
+                todoList.add(jmxmpElassandraProxy.flush(ElassandraPod.fromName(dc, pod), null)
                         .andThen(updateTaskPodStatus(dc, taskWrapper, TaskPhase.RUNNING, pod, TaskPhase.SUCCEED))
                         .onErrorResumeNext(throwable -> {
-                            logger.error("Error while executing rebuild on pod={}", pod, throwable);
+                            logger.error("datacenter={} rebuild={} Error while executing flush on source DC pod={}", dc.id(), task.id(), pod, throwable);
                             return updateTaskPodStatus(dc, taskWrapper, TaskPhase.RUNNING, pod, TaskPhase.FAILED, throwable.getMessage());
                         })
                 );
             }
-            todo.andThen(Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()])))
+            return todo.andThen(Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()])))
                     .andThen(finalizeTaskStatus(dc, taskWrapper));
         }
 
         if (rebuildTaskSpec.getDstDcName().equals(dc.getSpec().getDatacenterName())) {
+            logger.info("datacenter={} rebuild={} executed on destination DC", dc.id(), task.id());
             if (!dc.getStatus().getPhase().equals(DataCenterPhase.RUNNING)) {
                 // wait a running datacenter to rebuild.
                 return Single.just(task.getStatus().getPhase());
@@ -117,9 +119,9 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
             // rebuild in parallel to stream data
             List<CompletableSource> todoList = new ArrayList<>();
             for(String pod : pods) {
-                todoList.add(sidecarClientFactory.clientForPod(ElassandraPod.fromName(dc, pod)).rebuild(task.getSpec().getRebuild().getSrcDcName(), null)
+                todoList.add(jmxmpElassandraProxy.rebuild(ElassandraPod.fromName(dc, pod), task.getSpec().getRebuild().getSrcDcName(), null)
                         .onErrorResumeNext(throwable -> {
-                            logger.error("Error while executing rebuild on pod={}", pod, throwable);
+                            logger.error("datacenter={} ebuild={} Error while executing destination DC on pod={}", dc.id(), task.id(), pod, throwable);
                             return updateTaskPodStatus(dc, taskWrapper, TaskPhase.RUNNING, pod, TaskPhase.FAILED, throwable.getMessage());
                         })
                         .andThen(updateTaskPodStatus(dc, taskWrapper, TaskPhase.RUNNING, pod, TaskPhase.SUCCEED))
@@ -133,17 +135,17 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
                         if (TaskPhase.SUCCEED.equals(taskPhase)) {
                             workQueue.submit(new ClusterKey(dc), k8sResourceUtils.readDatacenter(new Key(dc.getMetadata()))
                                     .flatMapCompletable(dataCenter -> {
-                                        logger.info("Rebuild done datacenter={} bootstrapped=true", dc.id());
+                                        logger.info("datacenter={} rebuild={} done on destination DC, update status bootstrapped=true", dc.id(), task.id());
                                         dataCenter.getStatus().setBootstrapped(true);
                                         return k8sResourceUtils.updateDataCenter(dc).ignoreElement();
                                     }));
                         } else {
-                            logger.warn("Rebuild task={} failed, dc={} boostrapped=false", task.getMetadata().getName(), dc.getMetadata().getName());
+                            logger.warn("datacenter={} rebuild={} failed on destination DC, boostrapped=false", dc.id(), task.getMetadata().getName());
                         }
                         return Single.just(taskPhase);
                     });
         }
 
-        throw new IllegalArgumentException("Datacenter name does not match src or dst DC name");
+        throw new IllegalArgumentException("datacenter="+dc.id()+"rebuild="+task.id()+" name does not match src="+rebuildTaskSpec.getDstDcName()+" nor dst="+rebuildTaskSpec.getDstDcName());
     }
 }

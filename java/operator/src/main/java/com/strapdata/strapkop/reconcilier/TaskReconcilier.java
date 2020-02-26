@@ -2,6 +2,7 @@ package com.strapdata.strapkop.reconcilier;
 
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
+import com.strapdata.strapkop.model.ClusterKey;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.cassandra.Block;
 import com.strapdata.strapkop.model.k8s.cassandra.BlockReason;
@@ -10,6 +11,7 @@ import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
 import com.strapdata.strapkop.model.k8s.task.TaskStatus;
 import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
+import com.strapdata.strapkop.pipeline.WorkQueue;
 import io.kubernetes.client.ApiException;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.reactivex.Completable;
@@ -20,6 +22,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier.Action, Task>> {
 
@@ -27,18 +31,21 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
     final K8sResourceUtils k8sResourceUtils;
     final String taskType;
     final MeterRegistry meterRegistry;
+    private final WorkQueue workQueue;
 
     private volatile int runningTaskCount = 0;
 
     TaskReconcilier(ReconcilierObserver reconcilierObserver,
                     String taskType,
                     final K8sResourceUtils k8sResourceUtils,
-                    final MeterRegistry meterRegistry
+                    final MeterRegistry meterRegistry,
+                    final WorkQueue workQueue
                     ) {
         super(reconcilierObserver);
         this.k8sResourceUtils = k8sResourceUtils;
         this.taskType = taskType;
         this.meterRegistry = meterRegistry;
+        this.workQueue = workQueue;
     }
     
     enum Action {
@@ -57,12 +64,12 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
         final Task task = item._2;
         
         if (item._1.equals(Action.SUBMIT)) {
-            logger.debug("processing a task submit request for {} in thread {}", task.getMetadata().getName(), Thread.currentThread().getName());
+            logger.debug("task={} submit", task.id());
             return processSubmit(task);
         }
 
         if (item._1.equals(Action.CANCEL)) {
-            logger.warn("task cancel for {} in thread {} (NOT IMPLEMENTED)", task.getMetadata().getName(), Thread.currentThread().getName());
+            logger.warn("task={} cancel (NOT IMPLEMENTED)", task.id());
             // TODO: implement cancel
         }
         return Completable.complete();
@@ -80,7 +87,7 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
     }
 
     Completable processSubmit(Task task) throws Exception {
-        logger.info("processing type={} task={}", taskType, task);
+        logger.info("task={} type={}", task.id(), taskType);
 
 /*        // create status if necessary
         if (task.getStatus() == null) {
@@ -94,7 +101,7 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
                 .flatMapCompletable(dc -> {
                     // finish on going task
                     if (taskWrapper.getTask().getStatus().getPhase() != null && isTerminated(taskWrapper.getTask())) {
-                        logger.debug("task {} was terminated", task.getMetadata().getName());
+                        logger.debug("task={} was terminated", task.id());
                         return ensureUnlockDc(dc, taskWrapper);
                     }
 
@@ -128,7 +135,7 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
                 })
                 // failed when datacenter not found => task failed
                 .onErrorResumeNext(t -> {
-                    logger.error("task IGNORED dur to error:", t);
+                    logger.error("task={} IGNORED dur to error:", task.id(), t);
                     taskWrapper.getTask().setStatus(new TaskStatus().setPhase(TaskPhase.IGNORED).setLastMessage(t.getMessage()));
                     return k8sResourceUtils.updateTaskStatus(taskWrapper);
                 });
@@ -155,8 +162,7 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
 
     public Completable updateTaskStatus(DataCenter dc, TaskWrapper taskWrapper, TaskPhase phase) throws ApiException {
         final Task task = taskWrapper.getTask();
-        logger.debug("Update task {}/{} in dc name={} namespace={} phase={}",
-                taskType, task.getMetadata().getName(), dc.getMetadata().getName(), dc.getMetadata().getNamespace(), phase);
+        logger.debug("datacenter={} task={} type={} phase={}", dc.id(), task.id(), taskType, phase);
         task.getStatus().setPhase(phase);
         // TODO update wrapper
         return k8sResourceUtils.updateTaskStatus(taskWrapper);
@@ -232,49 +238,95 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
             case SCALING_UP:
             case SCALING_DOWN:
             case RUNNING:
-                logger.debug("Dc name={} in namespace={} phase={} ready to run task={}",
-                        dc.getMetadata().getName(), dc.getMetadata().getNamespace(), dc.getStatus().getPhase(), task.getMetadata().getName());
+                logger.debug("datacenter={} phase={} ready to run task={}",
+                        dc.id(), dc.getStatus().getPhase(), task.id());
                 return true;
             default:
-                logger.debug("Dc name={} in namespace={} phase={} NOT ready to run task={}",
-                        dc.getMetadata().getName(), dc.getMetadata().getNamespace(), dc.getStatus().getPhase(), task.getMetadata().getName());
+                logger.debug("datacenter={} phase={} NOT ready to run task={}",
+                        dc.id(), dc.getStatus().getPhase(), task.id());
                 return false;
         }
     }
 
-    protected Completable ensureLockDc(TaskWrapper taskWrapper, DataCenter dc) throws ApiException {
+    /**
+     * Setup a lock on datacenter status (submit DC update and wait for lock)
+     * @param taskWrapper
+     * @param dc
+     * @return
+     * @throws ApiException
+     * @throws InterruptedException
+     */
+    protected Completable ensureLockDc(TaskWrapper taskWrapper, DataCenter dc) throws ApiException, InterruptedException {
         final Task task = taskWrapper.getTask();
-
         BlockReason reason = blockReason();
-        if (!reason.equals(BlockReason.NONE)) {
-            logger.info("Locking dc name={} in namespace={} for task {} {}",
-                    dc.getMetadata().getName(), dc.getMetadata().getNamespace(), taskType, task.getMetadata().getName());
-            dc.getStatus().setCurrentTask(task.getMetadata().getName());
-            Block block = dc.getStatus().getBlock();
-            block.getReasons().add(reason);
-            block.setLocked(true);
-        }
-        return k8sResourceUtils.updateDataCenterStatus(dc).ignoreElement();
+        return Completable.fromAction(new io.reactivex.functions.Action() {
+            @Override
+            public void run() throws Exception {
+                if (!reason.equals(BlockReason.NONE)) {
+                    // lock and unlock can't be executed in the same reconciliation (it will conflict when updating status otherwise)
+                    final CountDownLatch countDownLatch = new CountDownLatch(1);
+                    workQueue.submit(new ClusterKey(dc), k8sResourceUtils.readDatacenter(new Key(dc.getMetadata()))
+                            .flatMapCompletable(dataCenter -> {
+                                logger.info("datacenter={} task={} type={} starting, Locking datacenter", dc.id(), task.id(), taskType);
+                                dc.getStatus().setCurrentTask(task.getMetadata().getName());
+                                Block block = dc.getStatus().getBlock();
+                                block.getReasons().add(reason);
+                                block.setLocked(true);
+                                return k8sResourceUtils.updateDataCenter(dc)
+                                        .map(dc2 -> {
+                                            logger.debug("datacenter={} task={} DC locked", dc2.id(), task.id());
+                                            countDownLatch.countDown();
+                                            return dc;
+                                        }).ignoreElement();
+                            }));
+
+                    // wait until DC status applied lock.
+                    if (!countDownLatch.await(1, TimeUnit.HOURS)) {
+                        logger.warn("datacenter={} task={} did not obtain lock on datacenter within 1h", dc.id(), task.id());
+                    } else {
+                        logger.debug("datacenter={} task={} obtain lock on datacenter", dc.id(), task.id());
+                    }
+                }
+            }
+        });
+
     }
 
     protected Completable ensureUnlockDc(DataCenter dc, TaskWrapper taskWrapper) throws ApiException {
         final Task task = taskWrapper.getTask();
         BlockReason reason = blockReason();
-        if (!reason.equals(BlockReason.NONE)) {
-            logger.debug("Unlocking datacenter name={}  in namespace={} after task {} {} terminated",
-                    dc.getMetadata().getName(), dc.getMetadata().getNamespace(), taskType, task.getMetadata().getName());
-            dc.getStatus().setCurrentTask("");
+        return Completable.fromAction(new io.reactivex.functions.Action() {
+            @Override
+            public void run() throws Exception {
+                if (!reason.equals(BlockReason.NONE)) {
+                    // lock and unlock can't be executed in the same reconciliation (it will conflict when updating status otherwise)
+                    final CountDownLatch countDownLatch = new CountDownLatch(1);
+                    workQueue.submit(new ClusterKey(dc), k8sResourceUtils.readDatacenter(new Key(dc.getMetadata()))
+                            .flatMapCompletable(dataCenter -> {
+                                logger.info("datacenter={} task={} type={} done, Unlocking  the datacenter", dc.id(), task.id(), taskType);
+                                dc.getStatus().setCurrentTask("");
+                                Block block = dc.getStatus().getBlock();
+                                block.getReasons().remove(reason);
+                                if (block.getReasons().isEmpty())
+                                    block.setLocked(false);
+                                return k8sResourceUtils.updateDataCenter(dc)
+                                        .map(dc2 -> {
+                                            logger.debug("datacenter={} task={} DC unlocked", dc2.id(), task.id());
+                                            countDownLatch.countDown();
+                                            return dc;
+                                        })
+                                        .ignoreElement();
+                            }));
 
-            Block block = dc.getStatus().getBlock();
-            block.getReasons().remove(reason);
-            if (block.getReasons().isEmpty())
-                block.setLocked(false);
-
-
-            // lock and unlock can't be executed in the same reconciliation (it will conflict when updating status otherwise)
-            return k8sResourceUtils.updateDataCenterStatus(dc).ignoreElement();
-        }
-        return Completable.complete();
+                    // wait until DC status applied unlock.
+                    if (!countDownLatch.await(1, TimeUnit.HOURS)) {
+                        logger.warn("datacenter={} task={} did not released lock on datacenter within 1h", dc.id(), task.id());
+                    } else {
+                        logger.debug("datacenter={} task={} released lock on datacenter", dc.id(), task.id());
+                    }
+                }
+            }
+        });
     }
 
     /**

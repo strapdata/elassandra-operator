@@ -45,20 +45,20 @@ public class DataCenterUpdateReconcilier extends Reconcilier<Key> {
                 .flatMap(dc -> reconcilierObserver.onReconciliationBegin().toSingleDefault(dc))
                 .flatMapCompletable(dc -> {
                     if (dc.getStatus() != null && dc.getStatus().getBlock().isLocked()) {
-                        logger.info("Do not reconcile datacenter block reasons={} as a task is already being executed ({})",
-                                dc.getStatus().getBlock().getReasons(), dc.getStatus().getCurrentTask());
+                        logger.info("datacenter={} Do not reconcile block reasons={} as a task is already being executed ({})",
+                                dc.id(), dc.getStatus().getBlock().getReasons(), dc.getStatus().getCurrentTask());
                         return Completable.complete();
                     }
                     try {
                         // call the statefullset reconciliation  (before scaling up/down to properly stream data according to the adjusted RF)
-                        logger.trace("processing a dc reconciliation request for {} in thread {}", dc.getMetadata().getName(), Thread.currentThread().getName());
+                        logger.trace("datacenter={} processing a DC reconciliation", dc.id());
 
                         return context.createBean(DataCenterUpdateAction.class, dc)
                                 .reconcileDataCenter()
                                 .andThen(Completable.mergeArray(pluginRegistry.reconcileAll(dc)))
                                 .andThen(k8sResourceUtils.updateDataCenterStatus(dc).ignoreElement());
                     } catch (Exception e) {
-                        logger.error("an error occurred while processing DataCenter update reconciliation for {}", key.getName(), e);
+                        logger.error("datacenter={} an error occurred while processing DataCenter update reconciliation", key.getName(), e);
                         if (dc != null) {
                             if (dc.getStatus() == null) {
                                 dc.setStatus(new DataCenterStatus());
