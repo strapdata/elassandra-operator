@@ -1,13 +1,16 @@
 package com.strapdata.strapkop.handler;
 
 import com.google.common.collect.ImmutableList;
+import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.event.K8sWatchEvent;
+import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.model.ClusterKey;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskSpec;
 import com.strapdata.strapkop.model.k8s.task.TaskStatus;
 import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.reconcilier.*;
+import io.reactivex.Completable;
 import io.vavr.Tuple;
 import io.vavr.Tuple2;
 import org.slf4j.Logger;
@@ -29,10 +32,14 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
     private static final EnumSet<K8sWatchEvent.Type> deletionEventTypes = EnumSet.of(DELETED);
     
     private final WorkQueues workQueues;
-    
+    private final OperatorConfig operatorConfig;
+    private final K8sResourceUtils k8sResourceUtils;
+
     private final List<Tuple2<TaskReconcilier, Function<TaskSpec, Object>>> taskFamily;
     
     public TaskHandler(WorkQueues workQueues,
+                       OperatorConfig operatorConfig,
+                       final K8sResourceUtils k8sResourceUtils,
                        BackupTaskReconcilier backupTaskReconcilier,
                        CleanupTaskReconcilier cleanupTaskReconcilier,
                        TestTaskReconcilier testTaskReconcilier,
@@ -42,6 +49,9 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
                        RemoveNodesTaskReconcilier removeNodesTaskReconcilier) {
      
         this.workQueues = workQueues;
+        this.operatorConfig = operatorConfig;
+        this.k8sResourceUtils = k8sResourceUtils;
+
         taskFamily = ImmutableList.of(
                 Tuple.of(backupTaskReconcilier, TaskSpec::getBackup),
                 Tuple.of(cleanupTaskReconcilier, TaskSpec::getCleanup),
@@ -71,9 +81,21 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
         }
         
         if (creationEventTypes.contains(event.getType())) {
-            TaskStatus taskStatus = event.getResource().getStatus();
-            if (taskStatus == null || taskStatus.getPhase() == null || !taskStatus.getPhase().isTerminated())
+            Task task = event.getResource();
+            TaskStatus taskStatus = task.getStatus();
+            if (taskStatus == null || taskStatus.getPhase() == null || !taskStatus.getPhase().isTerminated()) {
+                // execute task
                 workQueues.submit(key, candidates.get(0)._1.prepareSubmitCompletable(event.getResource()));
+            } else {
+                // purge old task.
+                org.joda.time.DateTime creation = task.getMetadata().getCreationTimestamp();
+                long retentionInstant = System.currentTimeMillis() - operatorConfig.getTaskRetention().getSeconds()*1000;
+                if (creation.isBefore(retentionInstant)) {
+                    logger.info("Delete old terminated task={}", task.id());
+                    Completable delete = k8sResourceUtils.deleteTask(task.getMetadata()).ignoreElement();
+                    workQueues.submit(key, delete);
+                }
+            }
         }
         else if (deletionEventTypes.contains(event.getType())) {
             // TODO: implement task cancellation
