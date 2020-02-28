@@ -5,7 +5,7 @@ import com.strapdata.strapkop.model.ClusterKey;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.event.NodeStatusEvent;
-import com.strapdata.strapkop.pipeline.WorkQueue;
+import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.reconcilier.DataCenterUpdateReconcilier;
 import io.kubernetes.client.ApiException;
 import org.slf4j.Logger;
@@ -28,11 +28,11 @@ public class ElassandraNodeStatusHandler extends TerminalHandler<NodeStatusEvent
             ElassandraNodeStatus.DECOMMISSIONED
     );
     
-    private final WorkQueue workQueue;
+    private final WorkQueues workQueues;
     private final DataCenterUpdateReconcilier dataCenterReconcilier;
     
-    public ElassandraNodeStatusHandler(WorkQueue workQueue, DataCenterUpdateReconcilier dataCenterReconcilier) {
-        this.workQueue = workQueue;
+    public ElassandraNodeStatusHandler(WorkQueues workQueue, DataCenterUpdateReconcilier dataCenterReconcilier) {
+        this.workQueues = workQueue;
         this.dataCenterReconcilier = dataCenterReconcilier;
     }
     
@@ -45,7 +45,7 @@ public class ElassandraNodeStatusHandler extends TerminalHandler<NodeStatusEvent
         if (event.getCurrentMode() != null && reconcileOperationModes.contains(event.getCurrentMode())) {
             final String clusterName = event.getPod().getCluster();
             logger.debug("triggering dc reconciliation because of a ElassandraPodCrdStatus change");
-            workQueue.submit(
+            workQueues.submit(
                     new ClusterKey(clusterName, event.getPod().getNamespace()),
                     dataCenterReconcilier.reconcile(new Key(event.getPod().getParent(), event.getPod().getNamespace())));
         }

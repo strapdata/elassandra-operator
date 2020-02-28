@@ -11,7 +11,6 @@ import com.strapdata.strapkop.model.k8s.task.TaskPhase;
 import com.strapdata.strapkop.model.k8s.task.TestTaskSpec;
 import com.strapdata.strapkop.plugins.test.TestSuiteExecutor;
 import com.strapdata.strapkop.plugins.test.TestSuiteHandler;
-import com.strapdata.strapkop.reconcilier.TaskReconcilier;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
@@ -19,6 +18,7 @@ import io.kubernetes.client.apis.CoreV1Api;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
 import io.reactivex.Completable;
+import io.reactivex.functions.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,7 +32,7 @@ public class TestSuitePlugin extends AbstractPlugin implements TestSuiteHandler 
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TestSuitePlugin.class);
 
-    private AtomicReference<TaskReconcilier.TaskWrapper> runningTask = new AtomicReference<>();
+    private AtomicReference<Task> runningTask = new AtomicReference<>();
     private TestSuiteExecutor testExecutor;
 
     public TestSuitePlugin(final ApplicationContext context,
@@ -70,7 +70,7 @@ public class TestSuitePlugin extends AbstractPlugin implements TestSuiteHandler 
      * @return
      */
     public boolean isBusy(Task task) {
-        return runningTask != null && runningTask.get() != null && runningTask.get().getTask() != null;
+        return runningTask != null && runningTask.get() != null && runningTask.get() != null;
     }
 
     /**
@@ -79,27 +79,26 @@ public class TestSuitePlugin extends AbstractPlugin implements TestSuiteHandler 
      * @return
      */
     public boolean isRunning(Task task) {
-        return runningTask != null && runningTask.get() != null  && runningTask.get().getTask() != null && runningTask.get().getTask().getMetadata().getName().equals(task.getMetadata().getName());
+        return runningTask != null && runningTask.get() != null  && runningTask.get() != null && runningTask.get().getMetadata().getName().equals(task.getMetadata().getName());
     }
 
-    public void runTest(TaskReconcilier.TaskWrapper task, DataCenter dc) {
-        if (isRunning(task.getTask())) {
+    public void runTest(final Task task, DataCenter dc) {
+        if (isRunning(task)) {
             this.runningTask.set(task);
-            this.testExecutor.executeFirstStep(task.getTask(), dc);
+            this.testExecutor.executeFirstStep(task, dc);
         }
     }
 
     /**
      * Start the testSuite execution
      *
-     * @param taskWrapper
+     * @param task
      * @param dc
      * @return
      */
-    public Completable initialize(TaskReconcilier.TaskWrapper taskWrapper, DataCenter dc) {
-        Task task = taskWrapper.getTask();
+    public Completable initialize(Task task, DataCenter dc) {
         if (operatorConfig.getTest().isEnabled()) {
-            this.runningTask.set(taskWrapper);
+            this.runningTask.set(task);
             TestTaskSpec testSpec = task.getSpec().getTest();
             this.testExecutor = getTestSuite(operatorConfig.getTest().getPlatform(), testSpec.getTestSuite());
             this.testExecutor.setHandler(this);
@@ -108,7 +107,7 @@ public class TestSuitePlugin extends AbstractPlugin implements TestSuiteHandler 
             LOGGER.debug("[TEST] test plugin is disabled, ignore the TestTask");
             task.getStatus().setPhase(TaskPhase.SUCCEED);
             task.getStatus().setLastMessage("TestSuitePlugin disable, task ignored");
-            updateTaskStatus(taskWrapper);
+            updateTaskStatus(task);
         }
         return Completable.complete();
     }
@@ -136,7 +135,7 @@ public class TestSuitePlugin extends AbstractPlugin implements TestSuiteHandler 
     @Override
     public Completable reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
         if (operatorConfig.getTest().isEnabled() && hasRunningExecutor()) {
-            return Completable.fromAction(() -> testExecutor.executeNextStep(this.runningTask.get().getTask(), dataCenter));
+            return Completable.fromAction(() -> testExecutor.executeNextStep(this.runningTask.get(), dataCenter));
         } else {
             return Completable.complete();
         }
@@ -155,7 +154,7 @@ public class TestSuitePlugin extends AbstractPlugin implements TestSuiteHandler 
     public void onTimeout(int nbOfSteps) {
         this.testExecutor = null;
         LOGGER.warn("[TEST] Timeout after {} steps", nbOfSteps);
-        this.runningTask.get().getTask().getStatus()
+        this.runningTask.get().getStatus()
                 .setPhase(TaskPhase.FAILED)
                 .setLastMessage("Test Timeout after " + nbOfSteps + " steps");
         updateTaskStatus(this.runningTask.get());
@@ -165,7 +164,7 @@ public class TestSuitePlugin extends AbstractPlugin implements TestSuiteHandler 
     public void onEnd(int nbOfSteps) {
         this.testExecutor = null;
         LOGGER.info("[TEST] end after {} steps", nbOfSteps);
-        this.runningTask.get().getTask().getStatus()
+        this.runningTask.get().getStatus()
                 .setPhase(TaskPhase.SUCCEED)
                 .setLastMessage("Test OK. ("+nbOfSteps+" steps passed)");
         updateTaskStatus(this.runningTask.get());
@@ -175,17 +174,20 @@ public class TestSuitePlugin extends AbstractPlugin implements TestSuiteHandler 
     public void onFailure(int nbOfSteps, String message) {
         this.testExecutor = null;
         LOGGER.warn("[TEST] failure after {} steps with message '{}'", nbOfSteps, message);
-        this.runningTask.get().getTask().getStatus()
+        this.runningTask.get().getStatus()
                 .setPhase(TaskPhase.FAILED)
                 .setLastMessage("Test KO. ("+nbOfSteps+" steps passed / error : "+message+")");
         updateTaskStatus(this.runningTask.get());
     }
 
-    private void updateTaskStatus(TaskReconcilier.TaskWrapper taskWrapper) {
+    private void updateTaskStatus(final Task task) {
         try {
-            k8sResourceUtils.updateTaskStatus(taskWrapper).subscribe(
-                    () -> {
-                        this.runningTask = new AtomicReference<>();
+            k8sResourceUtils.updateTaskStatus(task).subscribe(
+                    new Consumer<Object>() {
+                        @Override
+                        public void accept(Object o) throws Exception {
+                            runningTask = new AtomicReference<>();
+                        }
                     },
                     (t) -> {
                         this.runningTask = new AtomicReference<>();

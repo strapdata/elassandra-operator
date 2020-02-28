@@ -4,7 +4,7 @@ import com.strapdata.strapkop.model.ClusterKey;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.event.ReaperPod;
-import com.strapdata.strapkop.pipeline.WorkQueue;
+import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.reconcilier.DataCenterUpdateReconcilier;
 import io.kubernetes.client.models.V1Pod;
 import org.slf4j.Logger;
@@ -22,11 +22,11 @@ public class ReaperPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> {
     private static final EnumSet<K8sWatchEvent.Type> creationEventTypes = EnumSet.of(ADDED, MODIFIED, INITIAL);
     private static final EnumSet<K8sWatchEvent.Type> deletionEventTypes = EnumSet.of(DELETED);
 
-    private final WorkQueue workQueue;
+    private final WorkQueues workQueues;
     private final DataCenterUpdateReconcilier dataCenterReconcilier;
 
-    public ReaperPodHandler(WorkQueue workQueue, DataCenterUpdateReconcilier dataCenterReconcilier) {
-        this.workQueue = workQueue;
+    public ReaperPodHandler(WorkQueues workQueue, DataCenterUpdateReconcilier dataCenterReconcilier) {
+        this.workQueues = workQueue;
         this.dataCenterReconcilier = dataCenterReconcilier;
      }
     
@@ -40,7 +40,7 @@ public class ReaperPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> {
 
             if (pod.isReady()) {
                 ClusterKey clusterKey = new ClusterKey(pod.getClusterName(), pod.getNamespace());
-                workQueue.submit(
+                workQueues.submit(
                         clusterKey,
                         dataCenterReconcilier.reconcile((new Key(pod.getElassandraDatacenter(), pod.getNamespace()))));
             }

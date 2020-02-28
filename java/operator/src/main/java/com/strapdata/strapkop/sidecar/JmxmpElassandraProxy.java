@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.Infrastructure;
 import io.micronaut.http.uri.UriTemplate;
 import io.reactivex.Completable;
 import io.reactivex.Single;
+import io.vavr.Tuple2;
 import jmx.org.apache.cassandra.locator.EndpointSnitchInfoMBean;
 import jmx.org.apache.cassandra.service.StorageServiceMBean;
 import org.slf4j.Logger;
@@ -44,10 +45,7 @@ import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.security.Security;
 import java.security.cert.X509Certificate;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 
 @Infrastructure
@@ -229,7 +227,7 @@ public class JmxmpElassandraProxy {
                 .map(storageServiceMBean -> {
                     logger.debug("status pod={}", pod);
                     ElassandraNodeStatus elassandraNodeStatus = ElassandraNodeStatus.valueOf(storageServiceMBean.getOperationMode());
-                    logger.debug("elassandraNodeStatus={} pod={}", elassandraNodeStatus, pod);
+                    logger.debug("elassandraNodeStatus={} pod={}", elassandraNodeStatus, pod.id());
                     return elassandraNodeStatus;
                 });
     }
@@ -240,7 +238,7 @@ public class JmxmpElassandraProxy {
                     final List<String> keyspaces = keyspace == null ? storageServiceMBean.getNonLocalStrategyKeyspaces() : ImmutableList.of(keyspace);
                     for (String ks : keyspaces) {
                         storageServiceMBean.forceKeyspaceFlush(ks);
-                        logger.info("Flush done for keyspace={} pod={}", ks, pod);
+                        logger.info("Flush done for keyspace={} pod={}", ks, pod.id());
                     }
                     return storageServiceMBean;
                 }).ignoreElement();
@@ -250,16 +248,33 @@ public class JmxmpElassandraProxy {
         return storageServiceMBeanProvider(pod)
                 .map(storageServiceMBean -> {
                     storageServiceMBean.removeNode(hostId);
-                    logger.info("node removed pod={}", pod);
+                    logger.info("node removed pod={}", pod.id());
                     return storageServiceMBean;
                 }).ignoreElement();
+    }
+
+    public Completable removeDcNodes(ElassandraPod pod, String dcName) throws MalformedURLException {
+        return storageServiceMBeanProvider(pod)
+                .flatMap(storageServiceMBean -> endpointSnitchInfoMBean(pod).map(endpointSnitchInfoMBean -> new Tuple2<>(storageServiceMBean, endpointSnitchInfoMBean)))
+                .flatMapCompletable(tuple -> Completable.create(emitter -> {
+                    Map<String, String> tokensToEndpoints = tuple._1.getTokenToEndpointMap();
+                    Set<String> hostIds = new HashSet<>();
+                    for (Map.Entry<String, String> tokenAndEndPoint : tokensToEndpoints.entrySet()) {
+                        String dc = tuple._2.getDatacenter(tokenAndEndPoint.getValue());
+                        if (dcName.equals(dc)) {
+                            tuple._1.removeNode(tokenAndEndPoint.getValue());
+                            logger.debug("removed node={}", tokenAndEndPoint.getValue());
+                        }
+                    }
+                    logger.info("nodes of datacenter={} removed from pod={}", dcName, pod.id());
+                }));
     }
 
     public Completable decomission(ElassandraPod pod) throws MalformedURLException {
         return storageServiceMBeanProvider(pod)
                 .map(storageServiceMBean -> {
                     storageServiceMBean.decommission();
-                    logger.info("decommission pod={}", pod);
+                    logger.info("decommission pod={}", pod.id());
                     return storageServiceMBean;
                 }).ignoreElement();
     }
@@ -270,7 +285,7 @@ public class JmxmpElassandraProxy {
                     final List<String> keyspaces = keyspace == null ? storageServiceMBean.getNonLocalStrategyKeyspaces() : ImmutableList.of(keyspace);
                     for (String ks : keyspaces) {
                         storageServiceMBean.forceKeyspaceCleanup(2, ks);
-                        logger.info("Cleanup done for keyspace={} pod={}", ks, pod);
+                        logger.info("Cleanup done for keyspace={} pod={}", ks, pod.id());
                     }
                     return storageServiceMBean;
                 }).ignoreElement();
@@ -285,7 +300,7 @@ public class JmxmpElassandraProxy {
                     final List<String> keyspaces = keyspace == null ? storageServiceMBean.getNonLocalStrategyKeyspaces() : ImmutableList.of(keyspace);
                     for (String ks : keyspaces) {
                         storageServiceMBean.repairAsync(ks, options);
-                        logger.info("Repair requested for keyspace={} pod={}", ks, pod);
+                        logger.info("Repair requested for keyspace={} pod={}", ks, pod.id());
                     }
                     return storageServiceMBean;
                 }).ignoreElement();
@@ -294,9 +309,9 @@ public class JmxmpElassandraProxy {
     public Completable rebuild(ElassandraPod pod, String srcDcName, String keyspace) throws MalformedURLException {
         return storageServiceMBeanProvider(pod)
                 .map(storageServiceMBean -> {
-                    logger.debug("Rebuilding from dc={} requested for keyspace={} on pod={}", srcDcName, keyspace, pod);
+                    logger.debug("Rebuilding from dc={} requested for keyspace={} on pod={}", srcDcName, keyspace, pod.id());
                     storageServiceMBean.rebuild(srcDcName, keyspace, null, null);
-                    logger.info("Rebuilt from dc={} requested for keyspace={} on pod={}", srcDcName, keyspace, pod);
+                    logger.info("Rebuilt from dc={} requested for keyspace={} on pod={}", srcDcName, keyspace, pod.id());
                     return storageServiceMBean;
                 }).ignoreElement();
     }

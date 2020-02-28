@@ -595,7 +595,7 @@ public class DataCenterUpdateAction {
 
                     Completable todo = Completable.complete();
                     final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
-                    if (totalNormalPod > 0) {
+                    if (totalNormalPod > 0 && dataCenterStatus.getBootstrapped() == true) {
                         // before scaling, if at least a pod is NORMAL, update keyspaces and roles if needed
                         todo = this.cqlKeyspaceManager.reconcileKeyspaces(dataCenter, cqlSessionHandler)
                                 .andThen(this.cqlRoleManager.reconcileRole(dataCenter, cqlSessionHandler))

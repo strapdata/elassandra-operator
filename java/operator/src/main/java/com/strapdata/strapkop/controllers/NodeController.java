@@ -6,7 +6,7 @@ import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.OperatorNames;
-import com.strapdata.strapkop.pipeline.WorkQueue;
+import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.reconcilier.DataCenterUpdateReconcilier;
 import io.kubernetes.client.ApiException;
 import io.micronaut.http.HttpStatus;
@@ -32,7 +32,7 @@ public class NodeController {
     ElassandraNodeStatusCache elassandraNodeStatusCache;
 
     @Inject
-    WorkQueue workQueue;
+    WorkQueues workQueue;
 
     @Inject
     DataCenterUpdateReconcilier dataCenterUpdateReconcilier;

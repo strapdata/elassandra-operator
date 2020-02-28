@@ -4,7 +4,7 @@ import com.strapdata.strapkop.model.ClusterKey;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.event.K8sWatchEvent;
-import com.strapdata.strapkop.pipeline.WorkQueue;
+import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.reconcilier.ElassandraPodDeletedReconcilier;
 import com.strapdata.strapkop.reconcilier.ElassandraPodUnscheduledReconcilier;
 import io.kubernetes.client.models.V1Pod;
@@ -22,12 +22,12 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
 
     private final Logger logger = LoggerFactory.getLogger(ElassandraPodHandler.class);
 
-    private final WorkQueue workQueue;
+    private final WorkQueues workQueues;
     private final ElassandraPodUnscheduledReconcilier elassandraPodUnscheduledReconcilier;
     private final ElassandraPodDeletedReconcilier elassandraPodDeletedReconcilier;
 
-    public ElassandraPodHandler(WorkQueue workQueue, ElassandraPodUnscheduledReconcilier dataCenterUnscheduleReconcilier, ElassandraPodDeletedReconcilier dataCenterPodDeletedReconcilier) {
-        this.workQueue = workQueue;
+    public ElassandraPodHandler(WorkQueues workQueue, ElassandraPodUnscheduledReconcilier dataCenterUnscheduleReconcilier, ElassandraPodDeletedReconcilier dataCenterPodDeletedReconcilier) {
+        this.workQueues = workQueue;
         this.elassandraPodUnscheduledReconcilier = dataCenterUnscheduleReconcilier;
         this.elassandraPodDeletedReconcilier = dataCenterPodDeletedReconcilier;
      }
@@ -52,7 +52,7 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
                     ElassandraPod pod = ElassandraPod.fromV1Pod(event.getResource());
                     if (scheduleFailed.isPresent()) {
                         ClusterKey clusterKey = new ClusterKey(pod.getCluster(), pod.getNamespace());
-                        workQueue.submit(
+                        workQueues.submit(
                                 clusterKey,
                                 elassandraPodUnscheduledReconcilier.reconcile(new Tuple2<>(new Key(pod.getParent(), pod.getNamespace()), pod)));
                     }
@@ -61,7 +61,7 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
         } else if (event.isDeletion()) {
             ElassandraPod pod = ElassandraPod.fromV1Pod(event.getResource());
             ClusterKey clusterKey = new ClusterKey(pod.getCluster(), pod.getNamespace());
-            workQueue.submit(
+            workQueues.submit(
                     clusterKey,
                     elassandraPodDeletedReconcilier.reconcile(new Tuple2<>(new Key(pod.getParent(), pod.getNamespace()), pod)));
         }

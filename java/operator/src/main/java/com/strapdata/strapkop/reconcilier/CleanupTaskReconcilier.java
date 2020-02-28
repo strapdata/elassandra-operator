@@ -6,11 +6,13 @@ import com.strapdata.strapkop.model.k8s.cassandra.BlockReason;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
-import com.strapdata.strapkop.pipeline.WorkQueue;
+import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
+import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
 import io.kubernetes.client.ApiException;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.annotation.Infrastructure;
+import io.reactivex.Completable;
 import io.reactivex.Observable;
 import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
@@ -32,11 +34,12 @@ public final class CleanupTaskReconcilier extends TaskReconcilier {
     private final JmxmpElassandraProxy jmxmpElassandraProxy;
     
     public CleanupTaskReconcilier(ReconcilierObserver reconcilierObserver,
+                                  final DataCenterUpdateReconcilier dataCenterUpdateReconcilier,
                                   final K8sResourceUtils k8sResourceUtils,
                                   final JmxmpElassandraProxy jmxmpElassandraProxy,
-                                  final WorkQueue workQueue,
+                                  final WorkQueues workQueue,
                                   final MeterRegistry meterRegistry) {
-        super(reconcilierObserver,"cleanup", k8sResourceUtils, meterRegistry, workQueue);
+        super(reconcilierObserver,"cleanup", k8sResourceUtils, meterRegistry, dataCenterUpdateReconcilier);
         this.jmxmpElassandraProxy = jmxmpElassandraProxy;
     }
 
@@ -46,15 +49,13 @@ public final class CleanupTaskReconcilier extends TaskReconcilier {
 
     /**
      * Execute task on each pod and update the task status
-     * @param taskWrapper
+     * @param task
      * @param dc
      * @return
      * @throws ApiException
      */
     @Override
-    protected Single<TaskPhase> doTask(TaskWrapper taskWrapper, DataCenter dc) throws ApiException {
-        final Task task = taskWrapper.getTask();
-
+    protected Single<TaskPhase> doTask(final Task task, final DataCenter dc) throws ApiException {
         // find the next pods to cleanup
         final List<String> pods = task.getStatus().getPods().entrySet().stream()
                 .filter(e -> Objects.equals(e.getValue(), TaskPhase.WAITING))
@@ -70,14 +71,25 @@ public final class CleanupTaskReconcilier extends TaskReconcilier {
         return Observable.zip(Observable.fromIterable(pods), Observable.interval(10, TimeUnit.SECONDS), (pod, timer) -> pod)
                 .subscribeOn(Schedulers.computation())
                 .flatMapSingle(pod -> jmxmpElassandraProxy.cleanup(ElassandraPod.fromName(dc, pod), task.getSpec().getCleanup().getKeyspace())
-                        .andThen(updateTaskPodStatus(dc, taskWrapper, TaskPhase.RUNNING, pod, TaskPhase.SUCCEED))
+                        .andThen(updateTaskPodStatus(dc, task, TaskPhase.RUNNING, pod, TaskPhase.SUCCEED))
                         .onErrorResumeNext(throwable -> {
                             logger.error("datacenter={} cleanup={} Error while executing cleanup on pod={}", dc.id(), task.id(), pod, throwable);
                             task.getStatus().setLastMessage(throwable.getMessage());
-                            return updateTaskPodStatus(dc, taskWrapper, TaskPhase.RUNNING, pod, TaskPhase.FAILED, throwable.getMessage());
+                            return updateTaskPodStatus(dc, task, TaskPhase.RUNNING, pod, TaskPhase.FAILED, throwable.getMessage());
                         })
                         .toSingleDefault(pod))
                 .toList()
-                .flatMap(list -> finalizeTaskStatus(dc, taskWrapper));
+                .flatMap(list -> finalizeTaskStatus(dc, task));
+    }
+
+    @Override
+    public Completable initializePodMap(Task task, DataCenter dc) {
+        for (Map.Entry<String, ElassandraNodeStatus> entry : dc.getStatus().getElassandraNodeStatuses().entrySet()) {
+            if (!entry.getValue().equals(ElassandraNodeStatus.UNKNOWN)) {
+                // only add reachable nodes (usually UNKNWON is used for unreachable or non bootstrapped node)
+                task.getStatus().getPods().put(entry.getKey(), TaskPhase.WAITING);
+            }
+        }
+        return Completable.complete();
     }
 }

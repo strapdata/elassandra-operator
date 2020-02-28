@@ -6,7 +6,7 @@ import com.strapdata.strapkop.model.k8s.cassandra.BlockReason;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
-import com.strapdata.strapkop.pipeline.WorkQueue;
+import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
 import io.kubernetes.client.ApiException;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -32,11 +32,12 @@ public final class RepairTaskReconcilier extends TaskReconcilier {
     private final JmxmpElassandraProxy jmxmpElassandraProxy;
 
     public RepairTaskReconcilier(ReconcilierObserver reconcilierObserver,
+                                 final DataCenterUpdateReconcilier dataCenterUpdateReconcilier,
                                  final K8sResourceUtils k8sResourceUtils,
                                  final JmxmpElassandraProxy jmxmpElassandraProxy,
-                                 final WorkQueue workQueue,
+                                 final WorkQueues workQueue,
                                  final MeterRegistry meterRegistry) {
-        super(reconcilierObserver,"repair", k8sResourceUtils, meterRegistry, workQueue);
+        super(reconcilierObserver,"repair", k8sResourceUtils, meterRegistry, dataCenterUpdateReconcilier);
         this.jmxmpElassandraProxy = jmxmpElassandraProxy;
     }
 
@@ -45,9 +46,7 @@ public final class RepairTaskReconcilier extends TaskReconcilier {
     }
     
     @Override
-    protected Single<TaskPhase> doTask(TaskWrapper taskWrapper, DataCenter dc) throws ApiException {
-        final Task task = taskWrapper.getTask();
-
+    protected Single<TaskPhase> doTask(final Task task, final DataCenter dc) throws ApiException {
         // find the next pods to cleanup
         final List<String> pods = task.getStatus().getPods().entrySet().stream()
                 .filter(e -> Objects.equals(e.getValue(), TaskPhase.WAITING))
@@ -61,14 +60,14 @@ public final class RepairTaskReconcilier extends TaskReconcilier {
         return Observable.zip(Observable.fromIterable(pods), Observable.interval(10, TimeUnit.SECONDS), (pod, timer) -> pod)
                 .subscribeOn(Schedulers.computation())
                 .flatMapSingle(pod -> jmxmpElassandraProxy.repair(ElassandraPod.fromName(dc, pod), task.getSpec().getRepair().getKeyspace())
-                        .andThen(updateTaskPodStatus(dc, taskWrapper, TaskPhase.RUNNING, pod, TaskPhase.SUCCEED))
+                        .andThen(updateTaskPodStatus(dc, task, TaskPhase.RUNNING, pod, TaskPhase.SUCCEED))
                         .onErrorResumeNext(throwable -> {
                             logger.error("Error while executing repair on pod={}", pod, throwable);
                             task.getStatus().setLastMessage(throwable.getMessage());
-                            return updateTaskPodStatus(dc, taskWrapper, TaskPhase.RUNNING, pod, TaskPhase.FAILED, throwable.getMessage());
+                            return updateTaskPodStatus(dc, task, TaskPhase.RUNNING, pod, TaskPhase.FAILED, throwable.getMessage());
                         })
                         .toSingleDefault(pod))
                 .toList()
-                .flatMap(list -> finalizeTaskStatus(dc, taskWrapper));
+                .flatMap(list -> finalizeTaskStatus(dc, task));
     }
 }

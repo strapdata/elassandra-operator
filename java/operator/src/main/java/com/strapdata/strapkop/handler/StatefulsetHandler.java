@@ -4,7 +4,7 @@ import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.model.ClusterKey;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
-import com.strapdata.strapkop.pipeline.WorkQueue;
+import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.reconcilier.DataCenterUpdateReconcilier;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.models.V1StatefulSet;
@@ -24,11 +24,11 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
     
     private static final EnumSet<K8sWatchEvent.Type> acceptedEventTypes = EnumSet.of(MODIFIED, INITIAL, DELETED);
     
-    private final WorkQueue workQueue;
+    private final WorkQueues workQueues;
     private final DataCenterUpdateReconcilier dataCenterReconcilier;
     
-    public StatefulsetHandler(WorkQueue workQueue, DataCenterUpdateReconcilier dataCenterReconcilier) {
-        this.workQueue = workQueue;
+    public StatefulsetHandler(WorkQueues workQueue, DataCenterUpdateReconcilier dataCenterReconcilier) {
+        this.workQueues = workQueue;
         this.dataCenterReconcilier = dataCenterReconcilier;
     }
     
@@ -55,7 +55,7 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
         final String dcResourceName = sts.getMetadata().getLabels().get(OperatorLabels.PARENT);
         final String clusterName = sts.getMetadata().getLabels().get(OperatorLabels.CLUSTER);
         
-        workQueue.submit(
+        workQueues.submit(
                 new ClusterKey(clusterName, sts.getMetadata().getNamespace()),
                 dataCenterReconcilier.reconcile((new Key(dcResourceName, sts.getMetadata().getNamespace()))));
     }

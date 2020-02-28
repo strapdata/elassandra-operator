@@ -5,7 +5,8 @@ import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.model.ClusterKey;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskSpec;
-import com.strapdata.strapkop.pipeline.WorkQueue;
+import com.strapdata.strapkop.model.k8s.task.TaskStatus;
+import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.reconcilier.*;
 import io.vavr.Tuple;
 import io.vavr.Tuple2;
@@ -27,26 +28,28 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
     private static final EnumSet<K8sWatchEvent.Type> creationEventTypes = EnumSet.of(ADDED, MODIFIED, INITIAL);
     private static final EnumSet<K8sWatchEvent.Type> deletionEventTypes = EnumSet.of(DELETED);
     
-    private final WorkQueue workQueue;
+    private final WorkQueues workQueues;
     
     private final List<Tuple2<TaskReconcilier, Function<TaskSpec, Object>>> taskFamily;
     
-    public TaskHandler(WorkQueue workQueue,
+    public TaskHandler(WorkQueues workQueues,
                        BackupTaskReconcilier backupTaskReconcilier,
                        CleanupTaskReconcilier cleanupTaskReconcilier,
                        TestTaskReconcilier testTaskReconcilier,
                        RepairTaskReconcilier repairTaskReconcilier,
+                       ReplicationTaskReconcilier replicationTaskReconcilier,
                        RebuildTaskReconcilier rebuildTaskReconcilier,
-                       RemoveReplicationTaskReconcilier decommissionTaskSpec) {
+                       RemoveNodesTaskReconcilier removeNodesTaskReconcilier) {
      
-        this.workQueue = workQueue;
-
+        this.workQueues = workQueues;
         taskFamily = ImmutableList.of(
                 Tuple.of(backupTaskReconcilier, TaskSpec::getBackup),
                 Tuple.of(cleanupTaskReconcilier, TaskSpec::getCleanup),
                 Tuple.of(repairTaskReconcilier, TaskSpec::getRepair),
-                Tuple.of(testTaskReconcilier, TaskSpec::getTest),
-                Tuple.of(rebuildTaskReconcilier, TaskSpec::getRebuild));
+                Tuple.of(replicationTaskReconcilier, TaskSpec::getReplication),
+                Tuple.of(removeNodesTaskReconcilier, TaskSpec::getRemoveNodes),
+                Tuple.of(rebuildTaskReconcilier, TaskSpec::getRebuild),
+                Tuple.of(testTaskReconcilier, TaskSpec::getTest));
     }
     
     @Override
@@ -68,7 +71,9 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
         }
         
         if (creationEventTypes.contains(event.getType())) {
-            workQueue.submit(key, candidates.get(0)._1.prepareSubmitCompletable(event.getResource()));
+            TaskStatus taskStatus = event.getResource().getStatus();
+            if (taskStatus == null || taskStatus.getPhase() == null || !taskStatus.getPhase().isTerminated())
+                workQueues.submit(key, candidates.get(0)._1.prepareSubmitCompletable(event.getResource()));
         }
         else if (deletionEventTypes.contains(event.getType())) {
             // TODO: implement task cancellation

@@ -41,9 +41,9 @@ public class TaskSpec {
     @Expose
     private RemoveNodesTaskSpec removeNodes;
 
-    @SerializedName("removeReplication")
+    @SerializedName("replication")
     @Expose
-    private RemoveReplicationTaskSpec removeReplication;
+    private ReplicationTaskSpec replication;
 
     @SerializedName("backup")
     @Expose
