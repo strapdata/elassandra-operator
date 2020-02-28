@@ -2,13 +2,18 @@ package com.strapdata.cassandra.k8s;
 
 import com.google.common.net.InetAddresses;
 import org.apache.cassandra.config.DatabaseDescriptor;
+import org.apache.cassandra.config.EncryptionOptions;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.io.util.FileUtils;
+import org.apache.cassandra.security.SSLFactory;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.type.TypeReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocketFactory;
 import java.io.DataInputStream;
 import java.io.FilterInputStream;
 import java.io.IOException;
@@ -41,15 +46,22 @@ public class ElassandraOperatorSeedProvider implements org.apache.cassandra.loca
 
     private Set<InetAddress> nodeInfoSeeds;
 
+    private EncryptionOptions encryptionOptions;
+
     public ElassandraOperatorSeedProvider(final Map<String, String> args) {
         seeds = getParameter(args, "seeds", "SEEDS");
         remoteSeeds = getParameter(args, "remote_seeds", "REMOTE_SEEDS");
         remoteSeeders = getParameter(args, "remote_seeders", "REMOTE_SEEDERS");
 
-        // hugly hack to set the JVM truststore to the cassandra one, the seeder url can pass PKIX validation.
-        logger.info("Setting javax.net.ssl.trustStore={}", DatabaseDescriptor.getClientEncryptionOptions().keystore);
-        System.setProperty("javax.net.ssl.trustStore",  DatabaseDescriptor.getClientEncryptionOptions().keystore);
-        System.setProperty("javax.net.ssl.trustStorePassword", DatabaseDescriptor.getClientEncryptionOptions().keystore_password);
+        this.encryptionOptions = new EncryptionOptions.ClientEncryptionOptions();
+        EncryptionOptions.ClientEncryptionOptions cassandraEncryptionOptions = DatabaseDescriptor.getClientEncryptionOptions();
+        this.encryptionOptions.keystore = getSingleParameter(args, "keystore", "SEEDER_KEYSTORE", cassandraEncryptionOptions.keystore);
+        this.encryptionOptions.keystore_password = getSingleParameter(args, "keystore_password", "SEEDER_KEYSTORE_PASSWORD", cassandraEncryptionOptions.keystore_password);
+        this.encryptionOptions.truststore = getSingleParameter(args, "truststore", "SEEDER_TRUSTSTORE", cassandraEncryptionOptions.truststore);
+        this.encryptionOptions.truststore_password = getSingleParameter(args, "truststore_password", "SEEDER_TRUSTSTORE_PASSWORD", cassandraEncryptionOptions.truststore_password);
+        this.encryptionOptions.store_type = getSingleParameter(args, "store_type", "SEEDER_STORE_TYPE", cassandraEncryptionOptions.store_type);
+        this.encryptionOptions.algorithm = getSingleParameter(args, "algorithm", "SEEDER_ALGORITHM", cassandraEncryptionOptions.algorithm);
+        this.encryptionOptions.protocol = getSingleParameter(args, "protocol", "SEEDER_PROTOCOL", cassandraEncryptionOptions.protocol);
     }
 
     public String[] getParameter(final Map<String, String> args, String paramName, String envVarName) {
@@ -62,14 +74,27 @@ public class ElassandraOperatorSeedProvider implements org.apache.cassandra.loca
         return new String[0];
     }
 
+    public String getSingleParameter(final Map<String, String> args, String paramName, String envVarName, String defaultValue) {
+        if (args.get(paramName) != null) {
+            return args.get(paramName);
+        }
+        if (System.getenv(envVarName) != null) {
+            return System.getenv(envVarName);
+        }
+        if (defaultValue != null) {
+            return defaultValue;
+        }
+        return null;
+    }
+
     @Override
     public List<InetAddress> getSeeds() {
-    
+
         final List<InetAddress> seedAddresses = new ArrayList<>();
 
         if (seeds.length == 0 && remoteSeeds.length == 0 && remoteSeeders.length == 0) {
             // fallback to the local broadcast address for the first node
-            seeds = new String[] { InetAddresses.toAddrString(DatabaseDescriptor.getBroadcastAddress()) };
+            seeds = new String[]{InetAddresses.toAddrString(DatabaseDescriptor.getBroadcastAddress())};
         }
 
         logger.info("seeds={} remote_seeds={} remote_seeders={}", Arrays.toString(seeds), Arrays.toString(remoteSeeds), Arrays.toString(remoteSeeders));
@@ -94,7 +119,7 @@ public class ElassandraOperatorSeedProvider implements org.apache.cassandra.loca
             if (!url.trim().isEmpty()) {
                 try {
                     logger.debug("fetching remote seeds from=[{}]", url.trim());
-                    seedAddresses.addAll(seederCall(url.trim()));
+                    seedAddresses.addAll(seederCall(url.trim(), this.encryptionOptions));
                 } catch (final UnknownHostException e) {
                     logger.warn("Unable to resolve k8s service=[" + url + "]", e);
                 } catch (final Exception e) {
@@ -107,10 +132,23 @@ public class ElassandraOperatorSeedProvider implements org.apache.cassandra.loca
         return seedAddresses;
     }
 
-    public static List<InetAddress> seederCall(String url) throws IOException, ConfigurationException
+    public static List<InetAddress> seederCall(String url) throws IOException, ConfigurationException {
+        return seederCall(url, null);
+    }
+
+    public static List<InetAddress> seederCall(String url, EncryptionOptions encryptionOptions) throws IOException, ConfigurationException
     {
         // Populate the region and zone by introspection, fail if 404 on metadata
         HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+        if(conn instanceof HttpsURLConnection && encryptionOptions != null) {
+            try {
+                SSLContext sslCtx = SSLFactory.createSSLContext(encryptionOptions, true);
+                SSLSocketFactory sslSF = sslCtx.getSocketFactory();
+                ((HttpsURLConnection) conn).setSSLSocketFactory(sslSF);
+            } catch(Exception e) {
+                logger.error("Failed to build seeder SSLContext:", e);
+            }
+        }
         DataInputStream d = null;
         try
         {

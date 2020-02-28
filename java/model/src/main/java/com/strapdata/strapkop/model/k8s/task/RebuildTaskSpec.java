@@ -8,13 +8,8 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.Wither;
 
-import java.util.Map;
-
 /**
- * Add a new datacenter:
- * -Should be run on an existing DC to update the replication map before streaming.
- * -Should be run on the new DC to stream data.
- *
+ * Stream data from a source dc
  */
 @Data
 @Wither
@@ -31,24 +26,9 @@ public class RebuildTaskSpec {
     private String srcDcName;
 
     /**
-     * Destination datacenter name for streaming
+     * rebuild specific keyspace
      */
-    @SerializedName("dstDcName")
+    @SerializedName("keyspace")
     @Expose
-    private String dstDcName;
-
-    /**
-     * Destination datacenter number of nodes
-     */
-    @SerializedName("dstDcSize")
-    @Expose
-    private int dstDcSize;
-
-    /**
-     * Replication map for rebuild keyspaces (both system and user keyspaces)
-     */
-    @SerializedName("replicationMap")
-    @Expose
-    private Map<String, Integer> replicationMap;
-
+    private String keyspace;
 }

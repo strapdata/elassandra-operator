@@ -90,4 +90,6 @@ public class ElassandraPod {
     public String dataCenterName() {
         return "elassandra-"+this.cluster+"-"+this.dataCenter;
     }
+
+    public String id() { return this.name + "/" + this.namespace; }
 }

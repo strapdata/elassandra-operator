@@ -11,12 +11,14 @@ import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.task.BackupTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
-import com.strapdata.strapkop.pipeline.WorkQueue;
+import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
+import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CustomObjectsApi;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.annotation.Infrastructure;
+import io.reactivex.Completable;
 import io.reactivex.Observable;
 import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
@@ -39,12 +41,13 @@ public class BackupTaskReconcilier extends TaskReconcilier {
     private final SidecarClientFactory sidecarClientFactory;
     
     public BackupTaskReconcilier(ReconcilierObserver reconcilierObserver,
+                                 final DataCenterUpdateReconcilier dataCenterUpdateReconcilier,
                                  final K8sResourceUtils k8sResourceUtils,
                                  final SidecarClientFactory sidecarClientFactory,
                                  final CustomObjectsApi customObjectsApi,
-                                 final WorkQueue workQueue,
+                                 final WorkQueues workQueue,
                                  final MeterRegistry meterRegistry) {
-        super(reconcilierObserver, "backup", k8sResourceUtils, meterRegistry, workQueue);
+        super(reconcilierObserver, "backup", k8sResourceUtils, meterRegistry, dataCenterUpdateReconcilier);
         this.sidecarClientFactory = sidecarClientFactory;
     }
 
@@ -54,14 +57,13 @@ public class BackupTaskReconcilier extends TaskReconcilier {
 
     /**
      * Execute backup concurrently on all nodes
-     * @param taskWrapper
+     * @param task
      * @param dc
      * @return
      * @throws ApiException
      */
     @Override
-    protected Single<TaskPhase> doTask(TaskWrapper taskWrapper, DataCenter dc) throws ApiException {
-        final Task task = taskWrapper.getTask();
+    protected Single<TaskPhase> doTask(final Task task, final DataCenter dc) throws ApiException {
         // find the next pods to cleanup
         final List<String> pods = task.getStatus().getPods().entrySet().stream()
                 .filter(e -> Objects.equals(e.getValue(), TaskPhase.WAITING))
@@ -99,7 +101,7 @@ public class BackupTaskReconcilier extends TaskReconcilier {
                             });
                 })
                 .toList()
-                .flatMap(list -> finalizeTaskStatus(dc, taskWrapper));
+                .flatMap(list -> finalizeTaskStatus(dc, task));
     }
 
 
@@ -124,5 +126,16 @@ public class BackupTaskReconcilier extends TaskReconcilier {
         backupArguments.speed = CommonBackupArguments.Speed.LUDICROUS;
         backupArguments.cloudCredentials = cloudCredentials;
         return backupArguments;
+    }
+
+    @Override
+    public Completable initializePodMap(Task task, DataCenter dc) {
+        for (Map.Entry<String, ElassandraNodeStatus> entry : dc.getStatus().getElassandraNodeStatuses().entrySet()) {
+            if (!entry.getValue().equals(ElassandraNodeStatus.UNKNOWN)) {
+                // only add reachable nodes (usually UNKNWON is used for unreachable or non bootstrapped node)
+                task.getStatus().getPods().put(entry.getKey(), TaskPhase.WAITING);
+            }
+        }
+        return Completable.complete();
     }
 }

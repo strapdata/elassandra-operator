@@ -1,20 +1,16 @@
 package com.strapdata.strapkop.reconcilier;
 
-import com.strapdata.strapkop.cql.CqlKeyspace;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRoleManager;
-import com.strapdata.strapkop.cql.CqlSessionHandler;
 import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import com.strapdata.strapkop.model.ClusterKey;
-import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.cassandra.BlockReason;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenterPhase;
 import com.strapdata.strapkop.model.k8s.task.RebuildTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
-import com.strapdata.strapkop.pipeline.WorkQueue;
+import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CustomObjectsApi;
@@ -28,7 +24,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Singleton
@@ -39,23 +38,21 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
     private final ApplicationContext context;
     private final CqlRoleManager cqlRoleManager;
     private final CqlKeyspaceManager cqlKeyspaceManager;
-    private final WorkQueue workQueue;
 
     public RebuildTaskReconcilier(ReconcilierObserver reconcilierObserver,
+                                  final DataCenterUpdateReconcilier dataCenterUpdateReconcilier,
                                   final K8sResourceUtils k8sResourceUtils,
                                   final JmxmpElassandraProxy jmxmpElassandraProxy,
                                   final CustomObjectsApi customObjectsApi,
                                   final ApplicationContext context,
-                                  final WorkQueue workQueue,
                                   final CqlRoleManager cqlRoleManager,
                                   final CqlKeyspaceManager cqlKeyspaceManager,
                                   final MeterRegistry meterRegistry) {
-        super(reconcilierObserver, "rebuild", k8sResourceUtils, meterRegistry, workQueue);
+        super(reconcilierObserver, "rebuild", k8sResourceUtils, meterRegistry, dataCenterUpdateReconcilier);
         this.jmxmpElassandraProxy = jmxmpElassandraProxy;
         this.context = context;
         this.cqlRoleManager = cqlRoleManager;
         this.cqlKeyspaceManager = cqlKeyspaceManager;
-        this.workQueue = workQueue;
     }
 
     public BlockReason blockReason() {
@@ -65,14 +62,13 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
     /**
      * Execute backup concurrently on all nodes
      *
-     * @param taskWrapper
+     * @param task
      * @param dc
      * @return
      * @throws ApiException
      */
     @Override
-    protected Single<TaskPhase> doTask(TaskWrapper taskWrapper, DataCenter dc) throws Exception {
-        final Task task = taskWrapper.getTask();
+    protected Single<TaskPhase> doTask(final Task task, final DataCenter dc) throws Exception {
         final RebuildTaskSpec rebuildTaskSpec = task.getSpec().getRebuild();
 
         final List<String> pods = task.getStatus().getPods().entrySet().stream()
@@ -80,72 +76,46 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
 
-        if (rebuildTaskSpec.getSrcDcName().equals(dc.getSpec().getDatacenterName())) {
-            // manage CQL replication map update before streaming
-            logger.info("datacenter={} rebuild={} executed on source DC", dc.id(), task.id());
-            final Map<String, Integer> replicationMap = new HashMap<>();
-            replicationMap.putAll(rebuildTaskSpec.getReplicationMap());
-            for (CqlKeyspace systemKs : CqlKeyspaceManager.SYSTEM_KEYSPACES)
-                replicationMap.putIfAbsent(systemKs.getName(), systemKs.getRf());
-
-            final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
-            Completable todo = Completable.complete();
-            for (Map.Entry<String, Integer> entry : replicationMap.entrySet()) {
-                todo = todo.andThen(this.cqlKeyspaceManager.updateKeyspaceReplicationMap(dc, rebuildTaskSpec.getDstDcName(), entry.getKey(), Math.min(entry.getValue(), rebuildTaskSpec.getDstDcSize()), cqlSessionHandler, false));
-            }
-
-            // flush sstables in parallel to stream properly
-            List<CompletableSource> todoList = new ArrayList<>();
-            for(String pod : pods) {
-                todoList.add(jmxmpElassandraProxy.flush(ElassandraPod.fromName(dc, pod), null)
-                        .andThen(updateTaskPodStatus(dc, taskWrapper, TaskPhase.RUNNING, pod, TaskPhase.SUCCEED))
-                        .onErrorResumeNext(throwable -> {
-                            logger.error("datacenter={} rebuild={} Error while executing flush on source DC pod={}", dc.id(), task.id(), pod, throwable);
-                            return updateTaskPodStatus(dc, taskWrapper, TaskPhase.RUNNING, pod, TaskPhase.FAILED, throwable.getMessage());
-                        })
-                );
-            }
-            return todo.andThen(Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()])))
-                    .andThen(finalizeTaskStatus(dc, taskWrapper));
+        logger.info("datacenter={} rebuild={} executed on destination DC", dc.id(), task.id());
+        if (!dc.getStatus().getPhase().equals(DataCenterPhase.RUNNING)) {
+            // wait a running datacenter to rebuild.
+            return Single.just(task.getStatus().getPhase());
         }
 
-        if (rebuildTaskSpec.getDstDcName().equals(dc.getSpec().getDatacenterName())) {
-            logger.info("datacenter={} rebuild={} executed on destination DC", dc.id(), task.id());
-            if (!dc.getStatus().getPhase().equals(DataCenterPhase.RUNNING)) {
-                // wait a running datacenter to rebuild.
-                return Single.just(task.getStatus().getPhase());
-            }
-
-            // rebuild in parallel to stream data
-            List<CompletableSource> todoList = new ArrayList<>();
-            for(String pod : pods) {
-                todoList.add(jmxmpElassandraProxy.rebuild(ElassandraPod.fromName(dc, pod), task.getSpec().getRebuild().getSrcDcName(), null)
-                        .onErrorResumeNext(throwable -> {
-                            logger.error("datacenter={} ebuild={} Error while executing destination DC on pod={}", dc.id(), task.id(), pod, throwable);
-                            return updateTaskPodStatus(dc, taskWrapper, TaskPhase.RUNNING, pod, TaskPhase.FAILED, throwable.getMessage());
-                        })
-                        .andThen(updateTaskPodStatus(dc, taskWrapper, TaskPhase.RUNNING, pod, TaskPhase.SUCCEED))
-
-                );
-            }
-            return Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()]))
-                    .andThen(finalizeTaskStatus(dc, taskWrapper))
-                    .flatMap(taskPhase -> {
-                        // submit a dc status update in the working queue to update dc bootstrapped=true
-                        if (TaskPhase.SUCCEED.equals(taskPhase)) {
-                            workQueue.submit(new ClusterKey(dc), k8sResourceUtils.readDatacenter(new Key(dc.getMetadata()))
-                                    .flatMapCompletable(dataCenter -> {
-                                        logger.info("datacenter={} rebuild={} done on destination DC, update status bootstrapped=true", dc.id(), task.id());
-                                        dataCenter.getStatus().setBootstrapped(true);
-                                        return k8sResourceUtils.updateDataCenter(dc).ignoreElement();
-                                    }));
-                        } else {
-                            logger.warn("datacenter={} rebuild={} failed on destination DC, boostrapped=false", dc.id(), task.getMetadata().getName());
-                        }
-                        return Single.just(taskPhase);
-                    });
+        // rebuild in parallel to stream data
+        List<CompletableSource> todoList = new ArrayList<>();
+        for (String pod : pods) {
+            todoList.add(jmxmpElassandraProxy.rebuild(ElassandraPod.fromName(dc, pod), task.getSpec().getRebuild().getSrcDcName(), null)
+                    .toSingleDefault(task)
+                    .map(t -> {
+                        // update pod status in memory (no etcd update)
+                        task.getStatus().getPods().put(pod, TaskPhase.SUCCEED);
+                        return t;
+                    })
+                    .ignoreElement()
+                    .onErrorResumeNext(throwable -> {
+                        logger.error("datacenter={} rebuild={} Error while executing destination DC on pod={}", dc.id(), task.id(), pod, throwable);
+                        return updateTaskPodStatus(dc, task, TaskPhase.RUNNING, pod, TaskPhase.FAILED, throwable.getMessage());
+                    }));
         }
+        return Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()]))
+                .andThen(finalizeTaskStatus(dc, task))
+                .flatMap(taskPhase -> {
+                    // submit a dc status update in the working queue to update dc bootstrapped=true
+                    logger.info("datacenter={} rebuild={} done on destination DC, update status bootstrapped=true", dc.id(), task.id());
+                    dc.getStatus().setBootstrapped(true);
+                    return k8sResourceUtils.updateDataCenterStatus(dc).map(o -> TaskPhase.SUCCEED);
+                });
+    }
 
-        throw new IllegalArgumentException("datacenter="+dc.id()+"rebuild="+task.id()+" name does not match src="+rebuildTaskSpec.getDstDcName()+" nor dst="+rebuildTaskSpec.getDstDcName());
+    @Override
+    public Completable initializePodMap(Task task, DataCenter dc) {
+        for (Map.Entry<String, ElassandraNodeStatus> entry : dc.getStatus().getElassandraNodeStatuses().entrySet()) {
+            if (!entry.getValue().equals(ElassandraNodeStatus.UNKNOWN)) {
+                // only add reachable nodes (usually UNKNWON is used for unreachable or non bootstrapped node)
+                task.getStatus().getPods().put(entry.getKey(), TaskPhase.WAITING);
+            }
+        }
+        return Completable.complete();
     }
 }

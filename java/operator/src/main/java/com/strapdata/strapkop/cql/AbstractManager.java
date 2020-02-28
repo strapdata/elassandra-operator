@@ -4,6 +4,7 @@ import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 /**
@@ -12,7 +13,7 @@ import java.util.function.Supplier;
  */
 public abstract class AbstractManager<T> {
 
-    private final Map<String, Map<String, T>> ressources = new HashMap<>(); // per datacenter resources
+    private final Map<String, Map<String, T>> ressources = new ConcurrentHashMap<>(); // per datacenter resources
 
     public AbstractManager() {
     }

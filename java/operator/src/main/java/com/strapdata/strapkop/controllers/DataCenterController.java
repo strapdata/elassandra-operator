@@ -4,7 +4,7 @@ import com.strapdata.strapkop.model.ClusterKey;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.cache.CheckPointCache;
 import com.strapdata.strapkop.k8s.OperatorNames;
-import com.strapdata.strapkop.pipeline.WorkQueue;
+import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.reconcilier.DataCenterRollbackReconcilier;
 import io.kubernetes.client.ApiException;
 import io.micronaut.http.HttpStatus;
@@ -22,7 +22,7 @@ public class DataCenterController {
     private final Logger logger = LoggerFactory.getLogger(DataCenterController.class);
 
     @Inject
-    WorkQueue workQueue;
+    WorkQueues workQueue;
 
     @Inject
     CheckPointCache checkPointCache;

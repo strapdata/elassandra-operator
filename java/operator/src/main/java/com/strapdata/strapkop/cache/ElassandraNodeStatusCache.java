@@ -54,7 +54,7 @@ public class ElassandraNodeStatusCache extends Cache<ElassandraPod, ElassandraNo
         return pod;
     }
 
-    public Optional<ElassandraPod> findPodByStatus(ElassandraNodeStatus status) {
+    public Optional<ElassandraPod> findFirstPodByStatus(ElassandraNodeStatus status) {
         return this.entrySet().stream()
                 .filter(e -> status.equals(e.getValue()))
                 .findFirst().map(Entry::getKey);

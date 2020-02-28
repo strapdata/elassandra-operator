@@ -11,8 +11,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -21,11 +21,11 @@ import java.util.concurrent.TimeUnit;
  */
 @Singleton
 @Infrastructure
-public class WorkQueue {
+public class WorkQueues {
     
-    private static final Logger logger = LoggerFactory.getLogger(WorkQueue.class);
+    private static final Logger logger = LoggerFactory.getLogger(WorkQueues.class);
     
-    private final Map<ClusterKey, Subject<Completable>> queues = new HashMap<>();
+    private final Map<ClusterKey, Subject<Completable>> queues = new ConcurrentHashMap<>();
     
     /**
      * Submit a task in the sub-queue associated with the cluster key, creating it if does not exist yet
@@ -33,14 +33,8 @@ public class WorkQueue {
      * @param completable
      */
     public synchronized void submit(final ClusterKey key, final Completable completable) {
-        
-        Subject<Completable> queue = queues.get(key);
-        
-        if (queue == null) {
-            queue = createQueue(key);
-            queues.put(key, queue);
-        }
-        
+
+        Subject<Completable> queue  = queues.computeIfAbsent(key, k -> createQueue(k));
         queue.onNext(completable);
     }
     
@@ -75,9 +69,8 @@ public class WorkQueue {
      * @param key
      */
     public void dispose(final ClusterKey key) {
-        final Subject<Completable> queue = queues.get(key);
+        final Subject<Completable> queue = queues.remove(key);
         if (queue != null) {
-            queues.remove(key);
             queue.onComplete();
         }
     }

@@ -14,9 +14,7 @@ import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenterList;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskList;
-import com.strapdata.strapkop.model.k8s.task.TaskPhase;
 import com.strapdata.strapkop.model.k8s.task.TaskSpec;
-import com.strapdata.strapkop.reconcilier.TaskReconcilier;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.ApiResponse;
 import io.kubernetes.client.apis.AppsV1Api;
@@ -972,7 +970,7 @@ public class K8sResourceUtils {
     public Single<DataCenter> updateDataCenter(final DataCenter dc) throws ApiException {
         return Single.fromCallable( () ->{
             try {
-                final Call call = customObjectsApi.patchNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, Task.VERSION,
+                final Call call = customObjectsApi.patchNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, DataCenter.VERSION,
                         dc.getMetadata().getNamespace(), DataCenter.PLURAL, dc.getMetadata().getName(), dc, null, null);
                 final ApiResponse<DataCenter> apiResponse = customObjectsApi.getApiClient().execute(call, DataCenter.class);
                 return apiResponse.getData();
@@ -987,34 +985,44 @@ public class K8sResourceUtils {
 
     public Single<Object> updateDataCenterStatus(final DataCenter dc) throws ApiException {
         return Single.fromCallable(() -> {
-                return customObjectsApi.replaceNamespacedCustomObjectStatus(StrapdataCrdGroup.GROUP, Task.VERSION,
+                return customObjectsApi.replaceNamespacedCustomObjectStatus(StrapdataCrdGroup.GROUP, DataCenter.VERSION,
                         dc.getMetadata().getNamespace(), DataCenter.PLURAL, dc.getMetadata().getName(), dc);
         });
     }
 
-    public Completable updateTaskStatus(TaskReconcilier.TaskWrapper taskWrapper, TaskPhase phase) throws ApiException {
-        taskWrapper.getTask().getStatus().setPhase(phase);
-        return updateTaskStatus(taskWrapper);
+
+    public Single<Object> updateTaskStatus(final Task task) throws ApiException {
+        // read before write to avioid 409 conflict
+        return readTask(task.getMetadata().getNamespace(), task.getMetadata().getName())
+                .map(optionalTask -> {
+                    if (optionalTask.isPresent()) {
+                        Task taskToUdate = optionalTask.get();
+                        taskToUdate.setStatus(task.getStatus());
+                        return taskToUdate;
+                    }
+                    return task;
+                })
+                .flatMap(task2 -> Single.fromCallable(() ->
+                        customObjectsApi.replaceNamespacedCustomObjectStatus(StrapdataCrdGroup.GROUP, Task.VERSION,
+                            task2.getMetadata().getNamespace(), Task.PLURAL, task2.getMetadata().getName(), task2)));
     }
 
-
-    public Completable updateTaskStatus(TaskReconcilier.TaskWrapper taskWrapper) throws ApiException {
-        return Completable.fromCallable(new Callable<TaskReconcilier.TaskWrapper>() {
-            /**
-             * Computes a result, or throws an exception if unable to do so.
-             *
-             * @return computed result
-             * @throws Exception if unable to compute a result
-             */
+    /*
+    public Completable updateTaskStatus(final Task task) throws ApiException {
+        return Completable.fromCallable(new Callable<Task>() {
             @Override
-            public TaskReconcilier.TaskWrapper call() throws Exception {
-                final Task task = taskWrapper.getTask();
+            public Task call() throws Exception {
                 try {
-                    final Call call = customObjectsApi.replaceNamespacedCustomObjectStatusCall(StrapdataCrdGroup.GROUP, Task.VERSION,
+                    assert task.getStatus() != null : "task status is null";
+
+                    ApiClient debuggableApiClient = ClientBuilder.standard().build();
+                    debuggableApiClient.setDebugging(true);
+                    CustomObjectsApi debuggableCustomObjectsApi = new CustomObjectsApi(debuggableApiClient);
+
+                    final Call call = debuggableCustomObjectsApi.replaceNamespacedCustomObjectStatusCall(StrapdataCrdGroup.GROUP, Task.VERSION,
                             task.getMetadata().getNamespace(), Task.PLURAL, task.getMetadata().getName(), task, null, null);
-                    final ApiResponse<Task> apiResponse = customObjectsApi.getApiClient().execute(call, Task.class);
-                    taskWrapper.updateTaskRef(apiResponse.getData());
-                    return taskWrapper;
+                    final ApiResponse<Task> apiResponse = debuggableCustomObjectsApi.getApiClient().execute(call, Task.class);
+                    return apiResponse.getData();
                 } catch(ApiException e) {
                     if (e.getCode() == 404) {
                         logger.warn("elassandratask not found for task={} in namespace={}", task.getMetadata().getName(), task.getMetadata().getNamespace());
@@ -1024,6 +1032,7 @@ public class K8sResourceUtils {
             }
         });
     }
+    */
 
     public Single<Task> createTask(Task task) throws ApiException {
         return Single.fromCallable(new Callable<Task>() {
