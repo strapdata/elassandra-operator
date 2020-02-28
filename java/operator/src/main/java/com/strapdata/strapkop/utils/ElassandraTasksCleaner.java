@@ -31,7 +31,7 @@ public class ElassandraTasksCleaner {
     @Async
     void onStartup(ServiceStartedEvent event) {
         this.cleanerThread = new Timer("elassandra-tasks-cleaner", true);
-        final int retention = operatorConfig.getTasks().convertRetentionPeriodInMillis();
+        final long retention = (int) operatorConfig.getTaskRetention().getSeconds();
         // start cleaner thread after 60s and execute it every hour
         cleanerThread.schedule(new Cleaner(retention, operatorConfig.getNamespace()), 60_000l, 3_600_000l);
     }
@@ -45,10 +45,10 @@ public class ElassandraTasksCleaner {
     }
 
     private class Cleaner extends TimerTask {
-        private final int retentionInMs;
+        private final long retentionInMs;
         private final String namespace;
 
-        public Cleaner(int retentionInMs, String namespace) {
+        public Cleaner(long retentionInMs, String namespace) {
             this.retentionInMs = retentionInMs;
             this.namespace = namespace;
         }
@@ -58,7 +58,7 @@ public class ElassandraTasksCleaner {
             try {
                 Iterable<Task> tasks = k8sResourceUtils.listNamespacedTask(namespace, null);
                 tasks.forEach((task) -> {
-                    if (task.getMetadata().getCreationTimestamp().plusMillis(retentionInMs).isBeforeNow()) {
+                    if (task.getMetadata().getCreationTimestamp().plusMillis( (int) retentionInMs).isBeforeNow()) {
                         logger.debug("Clear terminated task '{}' older than {} ms", task.getMetadata().getName(), retentionInMs);
                         // trigger the deletion but not wait the end.
                         try {
