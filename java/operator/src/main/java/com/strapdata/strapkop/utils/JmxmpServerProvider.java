@@ -1,13 +1,25 @@
 package com.strapdata.strapkop.utils;
 
+import io.micronaut.discovery.event.ServiceShutdownEvent;
+import io.micronaut.discovery.event.ServiceStartedEvent;
+import io.micronaut.runtime.event.annotation.EventListener;
 import io.reactivex.Completable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import javax.inject.Singleton;
+import javax.management.remote.JMXConnectorServer;
+import javax.management.remote.JMXConnectorServerFactory;
+import javax.management.remote.JMXServiceURL;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 
-
+@Singleton
 public class JmxmpServerProvider {
 
-    /*
     private static final Logger logger = LoggerFactory.getLogger(JmxmpServerProvider.class);
 
     private JMXConnectorServer jmxServer = null;
@@ -58,14 +70,12 @@ public class JmxmpServerProvider {
         close();
     }
 
-*/
     public static void main(String[] args) throws IOException{
-        /*JmxmpServerProvider jmxmpServerProvider = new JmxmpServerProvider();
+        JmxmpServerProvider jmxmpServerProvider = new JmxmpServerProvider();
         jmxmpServerProvider.createJMXMPServer();
         System.out.println("Waiting any character to stop...");
         System.in.read();
-        jmxmpServerProvider.close();*/
-
+        jmxmpServerProvider.close();
 
         Completable.complete().andThen(Completable.fromAction(() -> {
             throw new RuntimeException("");
