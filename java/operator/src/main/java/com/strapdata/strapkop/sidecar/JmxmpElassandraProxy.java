@@ -47,6 +47,7 @@ import java.security.Security;
 import java.security.cert.X509Certificate;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 @Infrastructure
 public class JmxmpElassandraProxy {
@@ -258,14 +259,12 @@ public class JmxmpElassandraProxy {
                 .flatMap(storageServiceMBean -> endpointSnitchInfoMBean(pod).map(endpointSnitchInfoMBean -> new Tuple2<>(storageServiceMBean, endpointSnitchInfoMBean)))
                 .flatMapCompletable(tuple -> Completable.create(emitter -> {
                     Map<String, String> endpointToHostId = tuple._1.getEndpointToHostId();
-                    Map<String, String> tokensToEndpoints = tuple._1.getTokenToEndpointMap();
-                    Set<String> hostIds = new HashSet<>();
-                    for (Map.Entry<String, String> tokensToEndpoint : tokensToEndpoints.entrySet()) {
-                        String dc = tuple._2.getDatacenter(tokensToEndpoint.getValue());
+                    Set<String> endpoints = tuple._1.getTokenToEndpointMap().values().stream().collect(Collectors.toSet());
+                    for (String endpoint : endpoints) {
+                        String dc = tuple._2.getDatacenter(endpoint);
                         if (dcName.equals(dc)) {
-                            String hostIp = tokensToEndpoint.getValue();
-                            String hostId = endpointToHostId.get(hostIp);
-                            logger.debug("pod={} removing node ip={} id={}", pod.id(), hostIp, hostId);
+                            String hostId = endpointToHostId.get(endpoint);
+                            logger.debug("pod={} removing node endpoint={} id={}", pod.id(), endpoint, hostId);
                             tuple._1.removeNode(hostId);
                         }
                     }
