@@ -984,15 +984,21 @@ public class K8sResourceUtils {
     }
 
     public Single<Object> updateDataCenterStatus(final DataCenter dc) throws ApiException {
-        return Single.fromCallable(() -> {
-                return customObjectsApi.replaceNamespacedCustomObjectStatus(StrapdataCrdGroup.GROUP, DataCenter.VERSION,
-                        dc.getMetadata().getNamespace(), DataCenter.PLURAL, dc.getMetadata().getName(), dc);
-        });
+        // read before write to avoid 409 conflict
+        return readDatacenter(new Key(dc.getMetadata()))
+                .map(currentDc -> {
+                    currentDc.setStatus(dc.getStatus());
+                    return currentDc;
+                })
+                .flatMap(currentDc ->
+                        Single.fromCallable(() ->
+                                customObjectsApi.replaceNamespacedCustomObjectStatus(StrapdataCrdGroup.GROUP, DataCenter.VERSION,
+                                        dc.getMetadata().getNamespace(), DataCenter.PLURAL, dc.getMetadata().getName(), currentDc)));
     }
 
 
     public Single<Object> updateTaskStatus(final Task task) throws ApiException {
-        // read before write to avioid 409 conflict
+        // read before write to avoid 409 conflict
         return readTask(task.getMetadata().getNamespace(), task.getMetadata().getName())
                 .map(optionalTask -> {
                     if (optionalTask.isPresent()) {
