@@ -231,6 +231,10 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                         currentRfMap.put(dcName, targetRf);
                         if (currentRfMap.entrySet().stream().filter(e -> e.getValue() > 0).count() > 0) {
                             return alterKeyspace(dc, sessionSupplier, keyspace, currentRfMap)
+                                    .map(s -> {
+                                        logger.debug("datacenter={} ALTER done keyspace={} replicationMap={}", dc.id(), keyspace, currentRfMap);
+                                        return s;
+                                    })
                                     .flatMapCompletable(s -> {
                                         if (!triggerRepairOrCleanup)
                                             return Completable.complete();
