@@ -59,7 +59,9 @@ public class SidecarClientFactory {
 
         logger.debug("creating sidecar for pod={} in {}/{}", pod.getName(), pod.getDataCenter(), pod.getNamespace());
         URL url = pod.isSsl() ? new URL("https://" + pod.getFqdn() + ":" + pod.getEsPort()) : new URL("http://" + pod.getFqdn() + ":" + pod.getEsPort());
-        sidecarClient = new SidecarClient(url, new DefaultHttpClientConfiguration(), getSSLContext(pod.getNamespace()), cqlRoleManager, AbstractManager.key(pod.getNamespace(), pod.getCluster(), pod.getDataCenter()));
+        sidecarClient = new SidecarClient(url, new DefaultHttpClientConfiguration(), getSSLContext(pod.getNamespace()), cqlRoleManager, AbstractManager.key(pod.getNamespace(),
+                pod.getCluster(),
+                AbstractManager.key(pod.getNamespace(), pod.getCluster(), pod.getDataCenter())));
         sidecarConnectionCache.put(pod, sidecarClient);
         return sidecarClient;
     }
