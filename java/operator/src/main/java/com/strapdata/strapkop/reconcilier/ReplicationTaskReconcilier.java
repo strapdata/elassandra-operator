@@ -80,7 +80,6 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
             return Single.just(TaskPhase.FAILED);
         }
 
-        Completable todo = Completable.complete();
         switch (replicationTaskSpec.getAction()) {
             case ADD:
                 final Map<String, Integer> replicationMap = new HashMap<>();
@@ -89,6 +88,7 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
                     replicationMap.putIfAbsent(systemKs.getName(), systemKs.getRf());
 
                 // add replication for these keyspaces
+                Completable todo = Completable.complete();
                 for (Map.Entry<String, Integer> entry : replicationMap.entrySet()) {
                     todo = todo.andThen(this.cqlKeyspaceManager.updateKeyspaceReplicationMap(dc, replicationTaskSpec.getDcName(), entry.getKey(), Math.min(entry.getValue(), replicationTaskSpec.getDcSize()), cqlSessionHandler, false));
                 }
@@ -99,9 +99,9 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
                         .collect(Collectors.toList());
 
                 // flush sstables in parallel to stream properly
-                List<CompletableSource> todoList = new ArrayList<>();
+                List<CompletableSource> fulshCompletables = new ArrayList<>();
                 for (String pod : pods) {
-                    todoList.add(jmxmpElassandraProxy.flush(ElassandraPod.fromName(dc, pod), null)
+                    fulshCompletables.add(jmxmpElassandraProxy.flush(ElassandraPod.fromName(dc, pod), null)
                             .toSingleDefault(task)
                             .map(t -> {
                                 // update pod status in memory (no etcd update)
@@ -115,7 +115,8 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
                             })
                     );
                 }
-                return Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()]))
+                return todo
+                        .andThen(Completable.mergeArray(fulshCompletables.toArray(new CompletableSource[fulshCompletables.size()]))
                         .toSingleDefault(TaskPhase.SUCCEED)
                         .flatMap(phase -> finalizeTaskStatus(dc, task))
                         .onErrorResumeNext(throwable -> {
@@ -123,7 +124,7 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
                                     dc.id(), task.id(), replicationTaskSpec.getDcName(), throwable.getMessage());
                             task.getStatus().setLastMessage(throwable.getMessage());
                             return Single.just(TaskPhase.FAILED);
-                        });
+                        }));
 
             case REMOVE:
                 return this.cqlKeyspaceManager.removeDcFromReplicationMap(dc, replicationTaskSpec.getDcName(), cqlSessionHandler)
