@@ -639,7 +639,6 @@ public class DataCenterUpdateAction {
                                         // updateRack also call prepareDataCenterSnapshot
                                         .andThen(updateRack(zones, builder.buildStatefulSetRack(rack, replicas, configMapVolumeMounts, rackStatus), rack, rackStatusByName));
                             }
-
                         } else if (dataCenterSpec.isParked() && rackStatus.isRunning()) {
                             // drain if performed by the shutdownHook of the Elassandra Container
                             return todo.andThen(parkRack(zones, v1StatefulSet, rack, rackStatusByName));
@@ -803,10 +802,7 @@ public class DataCenterUpdateAction {
 
     private void scheduleBackups(Zones zones) {
         if (reconciled(zones)) {
-            logger.debug("datacenter={} reconciled, schedule backup definitions", dataCenter.id());
             backupScheduler.scheduleBackups(dataCenter);
-        } else {
-            logger.debug("datacenter={} isn't reconciled, backups can't be scheduled", dataCenter.id());
         }
     }
 
