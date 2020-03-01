@@ -72,11 +72,12 @@ public class WebHookPlugin extends AbstractPlugin {
                 logger.debug("uri={}", uri);
                 HttpRequest<?> req = HttpRequest.GET(uri);
                 Flowable<HttpStatus> flowable = client.retrieve(req, HttpStatus.class);
-                return flowable.firstElement().map(httpStatus -> {
+                return flowable.firstElement()
+                        .map(httpStatus -> {
                             logger.info("GET {}={}", uri, httpStatus.getCode());
                             return httpStatus;
-                        }
-                ).ignoreElement();
+                        })
+                        .ignoreElement();
             } catch (Exception e) {
                 logger.error("Unexpected exception", e);
             }
@@ -98,11 +99,12 @@ public class WebHookPlugin extends AbstractPlugin {
                 logger.debug("uri={}", uri);
                 HttpRequest<?> req = HttpRequest.DELETE(uri);
                 Flowable<HttpStatus> flowable = client.retrieve(req, HttpStatus.class);
-                return flowable.firstElement().map(httpStatus -> {
+                return flowable.firstElement()
+                        .map(httpStatus -> {
                             logger.info("DELETE {}={}", uri, httpStatus.getCode());
                             return httpStatus;
-                        }
-                ).ignoreElement();
+                        })
+                        .ignoreElement();
             } catch (Exception e) {
                 logger.error("Unexpected exception", e);
             }

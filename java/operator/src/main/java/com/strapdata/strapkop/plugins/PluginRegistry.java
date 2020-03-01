@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * List of available plugins
+ * Plugin registry
  */
 @Singleton
 public class PluginRegistry {
@@ -34,11 +34,15 @@ public class PluginRegistry {
 
     public Completable deleteAll(DataCenter dc) {
         List<Completable> pluginCompletables = new ArrayList<>();
-        for(Plugin plugin : plugins) {
+        for (Plugin plugin : plugins) {
             try {
-                pluginCompletables.add(plugin.delete(dc));
-            } catch(Exception e) {
-                logger.error("Plugin class="+plugin.getClass().getSimpleName()+" reconcilation failed:", e);
+                pluginCompletables.add(plugin.delete(dc)
+                        .onErrorResumeNext(t -> {
+                            logger.warn("plugin={} delete failed, error={}", plugin.getClass().getName(), t.toString());
+                            return Completable.complete();
+                        }));
+            } catch (Exception e) {
+                logger.error("Plugin class=" + plugin.getClass().getSimpleName() + " reconciliation failed:", e);
             }
         }
         return Completable.mergeArray(pluginCompletables.toArray(new Completable[pluginCompletables.size()]));
@@ -50,11 +54,19 @@ public class PluginRegistry {
             if (!dc.getSpec().isParked() || plugin.reconcileOnParkState()) {
                 try {
                     if (plugin.isActive(dc))
-                        pluginCompletables.add(plugin.reconcile(dc));
+                        pluginCompletables.add(plugin.reconcile(dc)
+                                .onErrorResumeNext(t -> {
+                                    logger.warn("plugin={} reconcile failed, error={}", plugin.getClass().getName(), t.toString());
+                                    return Completable.complete();
+                                }));
                     else
-                        pluginCompletables.add(plugin.delete(dc));
+                        pluginCompletables.add(plugin.delete(dc)
+                                .onErrorResumeNext(t -> {
+                                    logger.warn("plugin={} delete failed, error={}", plugin.getClass().getName(), t.toString());
+                                    return Completable.complete();
+                                }));
                 } catch (Exception e) {
-                    logger.error("Plugin class=" + plugin.getClass().getSimpleName() + " reconcilation failed:", e);
+                    logger.error("Plugin class=" + plugin.getClass().getSimpleName() + " reconciliation failed:", e);
                 }
             }
         }
@@ -67,7 +79,12 @@ public class PluginRegistry {
             if (!dc.getSpec().isParked() || plugin.reconcileOnParkState()) {
                 try {
                     if (plugin.isActive(dc))
-                        pluginCompletables.add(plugin.reconciled(dc));
+                        pluginCompletables.add(
+                                plugin.reconciled(dc)
+                                        .onErrorResumeNext(t -> {
+                                            logger.warn("plugin={} reconcilied failed, error={}", plugin.getClass().getName(), t.toString());
+                                            return Completable.complete();
+                                        }));
                 } catch (Exception e) {
                     logger.error("Plugin class=" + plugin.getClass().getSimpleName() + " reconciled failed:", e);
                 }
