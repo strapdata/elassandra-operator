@@ -139,6 +139,9 @@ spec:
     {{- else }}
     image:  "{{ .Values.kibana.image }}:{{ template "kibana.version" . }}"
     {{- end }}
+    {{- if .Values.kibana.version }}
+    version: {{ .Values.kibana.version }}
+    {{- end }}
 {{- end }}
 {{- if .Values.kibana.spaces }}
     spaces:

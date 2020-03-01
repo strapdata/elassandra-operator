@@ -19,6 +19,7 @@ kibana:
   image: "docker.elastic.co/kibana/kibana-oss"
   ingressSuffix:
   #tag: 6.8.4
+  #version: 1
   spaces:
     - name: ""
       keyspaces: []
