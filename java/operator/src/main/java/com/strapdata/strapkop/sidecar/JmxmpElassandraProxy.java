@@ -257,13 +257,16 @@ public class JmxmpElassandraProxy {
         return storageServiceMBeanProvider(pod)
                 .flatMap(storageServiceMBean -> endpointSnitchInfoMBean(pod).map(endpointSnitchInfoMBean -> new Tuple2<>(storageServiceMBean, endpointSnitchInfoMBean)))
                 .flatMapCompletable(tuple -> Completable.create(emitter -> {
+                    Map<String, String> endpointToHostId = tuple._1.getEndpointToHostId();
                     Map<String, String> tokensToEndpoints = tuple._1.getTokenToEndpointMap();
                     Set<String> hostIds = new HashSet<>();
-                    for (Map.Entry<String, String> tokenAndEndPoint : tokensToEndpoints.entrySet()) {
-                        String dc = tuple._2.getDatacenter(tokenAndEndPoint.getValue());
+                    for (Map.Entry<String, String> tokensToEndpoint : tokensToEndpoints.entrySet()) {
+                        String dc = tuple._2.getDatacenter(tokensToEndpoint.getValue());
                         if (dcName.equals(dc)) {
-                            tuple._1.removeNode(tokenAndEndPoint.getValue());
-                            logger.debug("removed node={}", tokenAndEndPoint.getValue());
+                            String hostIp = tokensToEndpoint.getValue();
+                            String hostId = endpointToHostId.get(hostIp);
+                            logger.debug("pod={} removing node ip={} id={}", pod.id(), hostIp, hostId);
+                            tuple._1.removeNode(hostId);
                         }
                     }
                     logger.info("nodes of datacenter={} removed from pod={}", dcName, pod.id());
