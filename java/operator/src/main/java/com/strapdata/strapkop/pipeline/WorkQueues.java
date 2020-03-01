@@ -47,7 +47,7 @@ public class WorkQueues {
         
         Disposable disposable = queue.observeOn(Schedulers.io()).subscribeOn(Schedulers.io())
                 // doOnError will be called if an error occurs within the subject (which is unlikely)
-                .doOnError(throwable -> logger.error("error in work queue for cluster {}", key.getName(), throwable))
+                .doOnError(throwable -> logger.error("error in work queue for cluster " + key.getName(), throwable))
                 // re subscribe the the subject in case it fails (which is unlikely)
                 .retryWhen(errors -> errors.delay(1, TimeUnit.SECONDS))
                 .subscribe(completable -> {

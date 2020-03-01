@@ -116,9 +116,9 @@ public class JmxmpElassandraProxy {
     public void invalidateClient(ElassandraPod pod, Throwable t) throws IOException {
         if (t instanceof java.net.UnknownHostException) {
             // pod hostname not yet available in the k8s DNS.
-            logger.debug("Invalidating JMXMP connection UnknownHostException pod=" + pod);
+            logger.debug("Invalidating JMXMP connection UnknownHostException pod={}", pod.id());
         } else {
-            logger.warn("Invalidating JMXMP connection pod="+pod, t);
+            logger.warn("Invalidating JMXMP connection pod="+pod.id(), t);
         }
         jmxConnectorCache.remove(pod).close();
     }

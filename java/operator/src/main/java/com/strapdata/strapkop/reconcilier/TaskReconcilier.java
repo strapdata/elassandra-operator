@@ -281,7 +281,7 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
                             .ignoreElement();
                 })
                 .onErrorResumeNext(t -> {
-                    logger.error("datacenter={} task={} Failed to unlock dc", dc.id(), task.id());
+                    logger.error("datacenter={} task={} Failed to unlock dc error:{}", dc.id(), task.id(), t.toString());
                     return Completable.complete();
                 });
     }
