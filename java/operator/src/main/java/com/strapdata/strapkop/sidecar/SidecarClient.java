@@ -30,7 +30,6 @@ import javax.annotation.Nullable;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLEncoder;
-import java.util.Map;
 
 import static io.micronaut.http.HttpRequest.GET;
 import static io.micronaut.http.HttpRequest.POST;
@@ -78,12 +77,7 @@ public class SidecarClient {
      * @return
      */
     public <I> MutableHttpRequest<I> auth(MutableHttpRequest<I> req) {
-        CqlRole cqlRole = CqlRole.DEFAULT_CASSANDRA_ROLE;
-
-        Map<String, CqlRole> roles = this.cqlRoleManager.get(dcKey);
-        if (roles != null && roles.containsKey(CqlRole.CURRENT_ROLE_KEY))
-            cqlRole = roles.get(CqlRole.CURRENT_ROLE_KEY);
-
+        CqlRole cqlRole =  this.cqlRoleManager.connectedCqlRole(dcKey);
         logger.debug("auth cqlRole={}", cqlRole);
         req.basicAuth(cqlRole.getUsername(), cqlRole.getPassword());
         return req;
