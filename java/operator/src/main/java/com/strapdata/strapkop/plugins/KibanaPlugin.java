@@ -49,9 +49,10 @@ public class KibanaPlugin extends AbstractPlugin {
 
     @Override
     public void syncKeyspaces(final CqlKeyspaceManager cqlKeyspaceManager, final DataCenter dataCenter) {
+        Integer version = dataCenter.getSpec().getKibana().getVersion();
         for(KibanaSpace kibana : dataCenter.getSpec().getKibana().getSpaces()) {
-            cqlKeyspaceManager.addIfAbsent(dataCenter, kibana.keyspace(), () -> new CqlKeyspace()
-                    .withName(kibana.keyspace())
+            cqlKeyspaceManager.addIfAbsent(dataCenter, kibana.keyspace(version), () -> new CqlKeyspace()
+                    .withName(kibana.keyspace(version))
                     .withRf(3)
             );
         }
@@ -59,10 +60,11 @@ public class KibanaPlugin extends AbstractPlugin {
 
     @Override
     public void syncRoles(final CqlRoleManager cqlRoleManager, final DataCenter dataCenter) {
+        Integer version = dataCenter.getSpec().getKibana().getVersion();
         for(KibanaSpace kibana : dataCenter.getSpec().getKibana().getSpaces()) {
             try {
                 createKibanaSecretIfNotExists(dataCenter, kibana);
-                cqlRoleManager.addIfAbsent(dataCenter, kibana.keyspace(), () -> new CqlRole()
+                cqlRoleManager.addIfAbsent(dataCenter, kibana.keyspace(version), () -> new CqlRole()
                         .withUsername(kibana.role())
                         .withSecretKey("kibana.kibana_password")
                         .withSecretNameProvider( dc -> OperatorNames.clusterChildObjectName("%s-"+kibana.role(), dc))
@@ -71,9 +73,9 @@ public class KibanaPlugin extends AbstractPlugin {
                         .withLogin(true)
                         .withGrantStatements(
                                 ImmutableList.of(
-                                        String.format(Locale.ROOT,"GRANT ALL PERMISSIONS ON KEYSPACE \"%s\" TO %s", kibana.keyspace(), kibana.role()),
-                                        String.format(Locale.ROOT,"INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','cluster:monitor/.*','.*')", kibana.index()),
-                                        String.format(Locale.ROOT,"INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','indices:.*','.*')", kibana.index())
+                                        String.format(Locale.ROOT,"GRANT ALL PERMISSIONS ON KEYSPACE \"%s\" TO %s", kibana.keyspace(version), kibana.role()),
+                                        String.format(Locale.ROOT,"INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','cluster:monitor/.*','.*')", kibana.index(version)),
+                                        String.format(Locale.ROOT,"INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','indices:.*','.*')", kibana.index(version))
                                 )
                         )
                 );
@@ -146,15 +148,16 @@ public class KibanaPlugin extends AbstractPlugin {
      * @return The number of reaper pods depending on ReaperStatus
      */
     private int kibanaReplicas(final DataCenter dataCenter, KibanaSpace kibanaSpace) {
+        Integer version = dataCenter.getSpec().getKibana().getVersion();
         return (dataCenter.getStatus().getBootstrapped() == true &&
-                dataCenter.getStatus().getKeyspaceManagerStatus().getKeyspaces().contains(kibanaSpace.keyspace())) ? 1 : 0;
+                dataCenter.getStatus().getKeyspaceManagerStatus().getKeyspaces().contains(kibanaSpace.keyspace(version))) ? 1 : 0;
     }
 
 
     public Completable createOrReplaceReaperObjects(final DataCenter dataCenter, KibanaSpace space) throws ApiException, StrapkopException {
         final V1ObjectMeta dataCenterMetadata = dataCenter.getMetadata();
         final DataCenterSpec dataCenterSpec = dataCenter.getSpec();
-        final DataCenterStatus dataCenterStatus = dataCenter.getStatus();
+        final Integer version = dataCenter.getSpec().getKibana().getVersion();
 
         final Map<String, String> labels = kibanaLabels(dataCenter, space);
 
@@ -231,7 +234,7 @@ public class KibanaPlugin extends AbstractPlugin {
                 )
                 .addEnvItem(new V1EnvVar()
                         .name("KIBANA_INDEX")
-                        .value(space.index())
+                        .value(space.index(version))
                 )
                 .addEnvItem(new V1EnvVar().name("LOGGING_VERBOSE").value("true"))
                 //.addEnvItem(new V1EnvVar().name("XPACK_MONITORING_ENABLED").value("false"))

@@ -48,4 +48,13 @@ public class Kibana {
     @SerializedName("ingressSuffix")
     @Expose
     private String ingressSuffix = null;
+
+    /**
+     * Kibana upgrade version for Elasticsearch 6.5+
+     * Should be 1 starting with elasticsearch 6.8
+     * See https://www.elastic.co/guide/en/kibana/current/upgrade-migrations.html
+     */
+    @SerializedName("version")
+    @Expose
+    private Integer version = null;
 }

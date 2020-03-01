@@ -21,8 +21,9 @@ import java.util.Set;
 @NoArgsConstructor
 public class KibanaSpace {
 
-    public static final String KIBANA_INDEX_PREFIX = ".kibana";
-    public static final String KIBANA_KEYSPACE_PREFIX = "_kibana";
+    private static final String KIBANA_INDEX_PREFIX = ".kibana";
+    private static final String KIBANA_KEYSPACE_PREFIX = "_kibana";
+
     public static final String KIBANA_PREFIX = "kibana";
     public static final String KIBANA_APP_PREFIX = "kibana";
 
@@ -40,14 +41,20 @@ public class KibanaSpace {
     @Expose
     private Set<String> keyspaces = new HashSet<>();
 
+    /**
+     * Manage kibana index name depending on elasticsearch version
+     * See https://www.elastic.co/guide/en/kibana/current/upgrade-migrations.html
+     * @param version
+     * @return
+     */
     @JsonIgnore
-    public String index() {
-        return KIBANA_INDEX_PREFIX + (name.length() > 0 ? "-" : "") + name;
+    public String index(Integer version) {
+        return KIBANA_INDEX_PREFIX + (name.length() > 0 ? "-" : "") + name + (version == null ? "" : "_"+version);
     }
 
     @JsonIgnore
-    public String keyspace() {
-        return KIBANA_KEYSPACE_PREFIX + (name.length() > 0 ? "-" : "") + name;
+    public String keyspace(Integer version) {
+        return KIBANA_KEYSPACE_PREFIX + (name.length() > 0 ? "-" : "") + name + (version == null ? "" : "_"+version);
     }
 
     @JsonIgnore
@@ -59,4 +66,5 @@ public class KibanaSpace {
     public String name() {
         return KIBANA_PREFIX + (name.length() > 0 ? "-" : "") + name;
     }
+
 }
