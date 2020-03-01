@@ -26,7 +26,6 @@ import java.util.function.Function;
 public class CqlRole implements Cloneable {
     private static final Logger logger = LoggerFactory.getLogger(CqlRole.class);
 
-    public static final String CURRENT_ROLE_KEY = "current_cql_manager_role";
     public static final String KEY_CASSANDRA_PASSWORD = "cassandra.cassandra_password";
     public static final String KEY_ELASSANDRA_OPERATOR_PASSWORD = "cassandra.elassandra_operator_password";
     public static final String KEY_ADMIN_PASSWORD = "cassandra.admin_password";

@@ -3,15 +3,16 @@ package com.strapdata.strapkop.cql;
 import com.datastax.driver.core.*;
 import com.datastax.driver.core.exceptions.AuthenticationException;
 import com.datastax.driver.core.exceptions.DriverException;
-import com.datastax.driver.core.policies.*;
+import com.datastax.driver.core.policies.DCAwareRoundRobinPolicy;
+import com.datastax.driver.core.policies.LoggingRetryPolicy;
+import com.datastax.driver.core.policies.TokenAwarePolicy;
 import com.google.common.collect.ImmutableList;
-import com.strapdata.cassandra.k8s.ElassandraOperatorSeedProvider;
-import com.strapdata.strapkop.model.k8s.cassandra.Authentication;
-import com.strapdata.strapkop.model.k8s.cassandra.CqlStatus;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
+import com.strapdata.strapkop.model.k8s.cassandra.Authentication;
+import com.strapdata.strapkop.model.k8s.cassandra.CqlStatus;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.plugins.Plugin;
 import com.strapdata.strapkop.plugins.PluginRegistry;
 import com.strapdata.strapkop.ssl.AuthorityManager;
@@ -30,12 +31,13 @@ import org.slf4j.LoggerFactory;
 import javax.inject.Singleton;
 import javax.net.ssl.SSLException;
 import java.io.ByteArrayInputStream;
-import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
@@ -55,6 +57,16 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
     final K8sResourceUtils k8sResourceUtils;
     final PluginRegistry pluginRegistry;
     final AuthorityManager authorityManager;
+
+    Map<String, CqlRole> connectedCqlRoles = new ConcurrentHashMap<>();
+
+    public CqlRole connectedCqlRole(DataCenter dc) {
+        return this.connectedCqlRoles.getOrDefault(key(dc), CqlRole.DEFAULT_CASSANDRA_ROLE);
+    }
+
+    public CqlRole connectedCqlRole(String dcKey) {
+        return this.connectedCqlRoles.getOrDefault(dcKey, CqlRole.DEFAULT_CASSANDRA_ROLE);
+    }
 
     public CqlRoleManager(final CoreV1Api coreApi,
                           final K8sResourceUtils k8sResourceUtils,
@@ -112,8 +124,9 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
     }
 
     public void markRolesAsUnapplied(final DataCenter dc) {
-        logger.debug("datacenter={} roles cleared", dc.id());
         remove(dc);
+        this.connectedCqlRoles.remove(key(dc));
+        logger.debug("datacenter={} roles cleared", dc.id());
     }
 
     /**
@@ -153,7 +166,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                             role.loadPassword(dc, k8sResourceUtils).blockingGet();
                             tuple = connect(dc, Optional.of(role));
                             connectedRole = role;
-                            put(dc, CqlRole.CURRENT_ROLE_KEY, role);
+                            connectedCqlRoles.put(key(dc), role);
                             break;
                         } catch (AuthenticationException e) {
                             // authentication failed
@@ -172,6 +185,9 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                             lastException = e;
                         } catch(DriverException e) {
                             logger.warn("datacenter=" + dc.id() + " Driver exception:" + e.getMessage(), e);
+                            lastException = e;
+                        } catch(IllegalArgumentException e) {
+                            logger.warn("datacenter=" + dc.id() + " No pod available for a CQL connection:" + e.getMessage());
                             lastException = e;
                         } catch(Exception e) {
                             logger.debug("datacenter=" + dc.id() + " Unexpected exception:" + e.getMessage(), e);
@@ -219,7 +235,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                         CqlRole strakopRole = get(dc, CqlRole.STRAPKOP_ROLE.username);
                         try {
                             Tuple2<Cluster, Session> strapkopConnection = connect(dc, Optional.of(strakopRole));
-                            put(dc, CqlRole.CURRENT_ROLE_KEY, strakopRole);
+                            connectedCqlRoles.put(key(dc), strakopRole);
                             return strapkopConnection;
                         } catch(Exception e) {
                             logger.error("datacenter="+dc.id()+" Failed to reconnect with the operator role="+strakopRole+" :"+e.getMessage(), e);
@@ -241,7 +257,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
         try {
             cluster = createClusterObject(dc, optionalCqlRole);
             session = cluster.connect();
-        } catch (DriverException | ExecutionException | InterruptedException e) {
+        } catch (DriverException | ExecutionException | InterruptedException | IllegalArgumentException e) {
             // on DriverException try to close the session to avoid cnx leak or non relevant ERROR log message
             CqlSessionSupplier.closeQuietly(session);
             CqlSessionSupplier.closeQuietly(cluster); // also close cluster to free the connection that check the cluster state
@@ -275,6 +291,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                 .withRetryPolicy(new LoggingRetryPolicy(StrapkopRetryPolicy.INSTANCE));
 
         // add remote seeds to contact points to be able to adjust RF of system keyspace before starting the first local node.
+        /***** Local DC connection ONLY *******
         if (dc.getSpec().getRemoteSeeds() != null)
             for(String remoteSeed : dc.getSpec().getRemoteSeeds()) {
                 logger.debug("datacenter={} Add remote seed={}", dc.id(), remoteSeed);
@@ -295,6 +312,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                 }
             }
         }
+        */
 
         // contact local nodes is bootstrapped or first DC in the cluster
         boolean hasSeedBootstrapped = dc.getStatus().getRackStatuses().values().stream().anyMatch(s -> s.getJoinedReplicas() > 0);
