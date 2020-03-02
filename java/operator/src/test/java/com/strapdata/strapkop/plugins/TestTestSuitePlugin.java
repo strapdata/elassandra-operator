@@ -1,6 +1,5 @@
 package com.strapdata.strapkop.plugins;
 
-import com.strapdata.strapkop.dns.DnsConfiguration;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenterPhase;
 import com.strapdata.strapkop.OperatorConfig;
@@ -17,6 +16,7 @@ import io.kubernetes.client.models.V1ObjectMeta;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
 import io.reactivex.Completable;
+import io.reactivex.Single;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -33,7 +33,6 @@ public class TestTestSuitePlugin {
     private TestSuitePlugin plugin;
 
     private OperatorConfig opConfigMock = mock(OperatorConfig.class);
-    private DnsConfiguration dnsConfigMock = mock(DnsConfiguration.class);
 
     private ApplicationContext contextMock = mock(ApplicationContext.class);
     private K8sResourceUtils k8sResourceUtilsMock = mock(K8sResourceUtils.class);
@@ -44,8 +43,8 @@ public class TestTestSuitePlugin {
 
     @BeforeEach
     public void initTest() throws Exception {
-        plugin = new TestSuitePlugin(contextMock, k8sResourceUtilsMock, authorityManagerMock, coreApiMock, appsApiMock, opConfigMock, dnsConfigMock, meterRegistry);
-        when(k8sResourceUtilsMock.updateTaskStatus(any())).thenReturn(Completable.complete());
+        plugin = new TestSuitePlugin(contextMock, k8sResourceUtilsMock, authorityManagerMock, coreApiMock, appsApiMock, opConfigMock, meterRegistry);
+        when(k8sResourceUtilsMock.updateTaskStatus(any())).thenReturn(Single.just(new TaskStatus()));
         when(contextMock.getBean(FakeExecutor.class)).thenReturn(new FakeExecutor());
     }
 
@@ -73,7 +72,7 @@ public class TestTestSuitePlugin {
         assertFalse(plugin.isBusy(task));
         assertFalse(plugin.isRunning(task));
 
-        Completable complatable = plugin.initialize(new TaskReconcilier.TaskWrapper(task), createFakeDc());
+        Completable complatable = plugin.initialize(task, createFakeDc());
         complatable.blockingGet();
 
         assertTrue(plugin.isRunning(task));
@@ -100,7 +99,7 @@ public class TestTestSuitePlugin {
         assertFalse(plugin.isBusy(task));
         assertFalse(plugin.isRunning(task));
 
-        Completable complatable = plugin.initialize(new TaskReconcilier.TaskWrapper(task), createFakeDc());
+        Completable complatable = plugin.initialize(task, createFakeDc());
         complatable.blockingGet();
 
         assertFalse(plugin.isBusy(task));
@@ -117,7 +116,7 @@ public class TestTestSuitePlugin {
         assertFalse(plugin.isBusy(task));
         assertFalse(plugin.isRunning(task));
 
-        Completable complatable = plugin.initialize(new TaskReconcilier.TaskWrapper(task), new DataCenter());
+        Completable complatable = plugin.initialize(task, new DataCenter());
         complatable.blockingGet();
 
         assertTrue(plugin.isRunning(task));
