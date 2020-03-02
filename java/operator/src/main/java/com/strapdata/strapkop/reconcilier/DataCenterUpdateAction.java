@@ -453,7 +453,6 @@ public class DataCenterUpdateAction {
                                 }
 
                                 commitDataCenterSnapshot(zones);
-
                                 break;
                             case UPDATING:
                                 // rolling update done and first node NORMAL
@@ -774,8 +773,9 @@ public class DataCenterUpdateAction {
                             }
                         } else {
                             // DC probably reconciled
-                            todo.andThen(Completable.mergeArray(pluginRegistry.reconciledAll(dataCenter)));
-                            scheduleBackups(zones);
+                            todo = todo
+                                    .andThen(Completable.mergeArray(pluginRegistry.reconciledAll(dataCenter)))
+                                    .andThen(Completable.fromAction(() -> scheduleBackups(zones))); // start backup when plugin are reconcilied.
                         }
                     } else {
                         logger.info("datacenter={} PARKED, do not try to scale the cluster", dataCenter.id());
