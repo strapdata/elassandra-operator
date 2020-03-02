@@ -2,6 +2,7 @@ package com.strapdata.strapkop.plugins;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
@@ -12,7 +13,10 @@ import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
-import com.strapdata.strapkop.model.k8s.cassandra.*;
+import com.strapdata.strapkop.model.k8s.cassandra.Authentication;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenterSpec;
+import com.strapdata.strapkop.model.k8s.cassandra.KibanaSpace;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
@@ -47,10 +51,20 @@ public class KibanaPlugin extends AbstractPlugin {
         super(context, k8sResourceUtils, authorityManager, coreApi, appsApi, operatorConfig, meterRegistry);
     }
 
+    /**
+     * Default space with empty name
+     */
+    private static final KibanaSpace DEFAULT_KIBANA_SPACE = new KibanaSpace().withName("").withKeyspaces(ImmutableSet.of("_kibana"));
+
+    private List<KibanaSpace> getKibanaSpaces(final DataCenter dataCenter) {
+        List<KibanaSpace> spaces = dataCenter.getSpec().getKibana().getSpaces();
+        return (spaces.size() == 0) ? ImmutableList.of(DEFAULT_KIBANA_SPACE) : spaces;
+    }
+
     @Override
     public void syncKeyspaces(final CqlKeyspaceManager cqlKeyspaceManager, final DataCenter dataCenter) {
         Integer version = dataCenter.getSpec().getKibana().getVersion();
-        for(KibanaSpace kibana : dataCenter.getSpec().getKibana().getSpaces()) {
+        for(KibanaSpace kibana : getKibanaSpaces(dataCenter)) {
             cqlKeyspaceManager.addIfAbsent(dataCenter, kibana.keyspace(version), () -> new CqlKeyspace()
                     .withName(kibana.keyspace(version))
                     .withRf(3)
@@ -61,7 +75,7 @@ public class KibanaPlugin extends AbstractPlugin {
     @Override
     public void syncRoles(final CqlRoleManager cqlRoleManager, final DataCenter dataCenter) {
         Integer version = dataCenter.getSpec().getKibana().getVersion();
-        for(KibanaSpace kibana : dataCenter.getSpec().getKibana().getSpaces()) {
+        for(KibanaSpace kibana : getKibanaSpaces(dataCenter)) {
             try {
                 createKibanaSecretIfNotExists(dataCenter, kibana);
                 cqlRoleManager.addIfAbsent(dataCenter, kibana.keyspace(version), () -> new CqlRole()
@@ -109,8 +123,8 @@ public class KibanaPlugin extends AbstractPlugin {
     public Completable reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
             // remove deleted kibana spaces
             Set<String> deployedKibanaSpaces = dataCenter.getStatus().getKibanaSpaces();
-            Map<String, KibanaSpace> kibanaMap = dataCenter.getSpec().getKibana().getSpaces().stream().collect(Collectors.toMap(KibanaSpace::getName, Function.identity()));
-            Completable deleteCompletable = io.reactivex.Observable.fromIterable(Sets.difference(deployedKibanaSpaces, dataCenter.getSpec().getKibana().getSpaces().stream().map(KibanaSpace::getName).collect(Collectors.toSet())))
+            Map<String, KibanaSpace> kibanaMap = getKibanaSpaces(dataCenter).stream().collect(Collectors.toMap(KibanaSpace::getName, Function.identity()));
+            Completable deleteCompletable = io.reactivex.Observable.fromIterable(Sets.difference(deployedKibanaSpaces, getKibanaSpaces(dataCenter).stream().map(KibanaSpace::getName).collect(Collectors.toSet())))
                     .flatMapCompletable(spaceToDelete -> {
                         logger.debug("Deleting kibana space={}", spaceToDelete);
                         dataCenter.getStatus().getKibanaSpaces().remove(spaceToDelete);
@@ -118,7 +132,7 @@ public class KibanaPlugin extends AbstractPlugin {
                     });
 
 
-            Completable createCompletable = io.reactivex.Observable.fromIterable(dataCenter.getSpec().getKibana().getSpaces())
+            Completable createCompletable = io.reactivex.Observable.fromIterable(getKibanaSpaces(dataCenter))
                     .flatMapCompletable(kibanaSpace -> {
                         dataCenter.getStatus().getKibanaSpaces().add(kibanaSpace.getName());
                         return createOrReplaceReaperObjects(dataCenter, kibanaSpace);
@@ -129,7 +143,7 @@ public class KibanaPlugin extends AbstractPlugin {
 
     @Override
     public Completable delete(final DataCenter dataCenter) throws ApiException {
-        return Completable.mergeArray(dataCenter.getSpec().getKibana().getSpaces().stream()
+        return Completable.mergeArray(getKibanaSpaces(dataCenter).stream()
                 .map(kibanaSpace -> delete(dataCenter, kibanaSpace))
                 .toArray(Completable[]::new));
     }
@@ -234,7 +248,7 @@ public class KibanaPlugin extends AbstractPlugin {
                 )
                 .addEnvItem(new V1EnvVar()
                         .name("KIBANA_INDEX")
-                        .value(space.index(version))
+                        .value(space.index(null))
                 )
                 .addEnvItem(new V1EnvVar().name("LOGGING_VERBOSE").value("true"))
                 //.addEnvItem(new V1EnvVar().name("XPACK_MONITORING_ENABLED").value("false"))
