@@ -42,6 +42,21 @@ public class KibanaSpace {
     private Set<String> keyspaces = new HashSet<>();
 
     /**
+     * Number of kibana instance, default is 1
+     */
+    @SerializedName("replicas")
+    @Expose
+    private Integer replicas = 1;
+
+    /**
+     * Kibana nodeJS options, NODE_OPTIONS="--max-old-space-size=4096"
+     */
+    @SerializedName("nodeOptions")
+    @Expose
+    private String nodeOptions;
+
+
+    /**
      * Manage kibana index name depending on elasticsearch version
      * See https://www.elastic.co/guide/en/kibana/current/upgrade-migrations.html
      * @param version

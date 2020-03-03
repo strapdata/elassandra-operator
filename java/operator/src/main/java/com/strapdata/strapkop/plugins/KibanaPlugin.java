@@ -64,7 +64,7 @@ public class KibanaPlugin extends AbstractPlugin {
     @Override
     public void syncKeyspaces(final CqlKeyspaceManager cqlKeyspaceManager, final DataCenter dataCenter) {
         Integer version = dataCenter.getSpec().getKibana().getVersion();
-        for(KibanaSpace kibana : getKibanaSpaces(dataCenter)) {
+        for (KibanaSpace kibana : getKibanaSpaces(dataCenter)) {
             cqlKeyspaceManager.addIfAbsent(dataCenter, kibana.keyspace(version), () -> new CqlKeyspace()
                     .withName(kibana.keyspace(version))
                     .withRf(3)
@@ -75,21 +75,21 @@ public class KibanaPlugin extends AbstractPlugin {
     @Override
     public void syncRoles(final CqlRoleManager cqlRoleManager, final DataCenter dataCenter) {
         Integer version = dataCenter.getSpec().getKibana().getVersion();
-        for(KibanaSpace kibana : getKibanaSpaces(dataCenter)) {
+        for (KibanaSpace kibana : getKibanaSpaces(dataCenter)) {
             try {
                 createKibanaSecretIfNotExists(dataCenter, kibana);
                 cqlRoleManager.addIfAbsent(dataCenter, kibana.keyspace(version), () -> new CqlRole()
                         .withUsername(kibana.role())
                         .withSecretKey("kibana.kibana_password")
-                        .withSecretNameProvider( dc -> OperatorNames.clusterChildObjectName("%s-"+kibana.role(), dc))
+                        .withSecretNameProvider(dc -> OperatorNames.clusterChildObjectName("%s-" + kibana.role(), dc))
                         .withApplied(false)
                         .withSuperUser(true)
                         .withLogin(true)
                         .withGrantStatements(
                                 ImmutableList.of(
-                                        String.format(Locale.ROOT,"GRANT ALL PERMISSIONS ON KEYSPACE \"%s\" TO %s", kibana.keyspace(version), kibana.role()),
-                                        String.format(Locale.ROOT,"INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','cluster:monitor/.*','.*')", kibana.index(version)),
-                                        String.format(Locale.ROOT,"INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','indices:.*','.*')", kibana.index(version))
+                                        String.format(Locale.ROOT, "GRANT ALL PERMISSIONS ON KEYSPACE \"%s\" TO %s", kibana.keyspace(version), kibana.role()),
+                                        String.format(Locale.ROOT, "INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','cluster:monitor/.*','.*')", kibana.index(version)),
+                                        String.format(Locale.ROOT, "INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','indices:.*','.*')", kibana.index(version))
                                 )
                         )
                 );
@@ -121,24 +121,24 @@ public class KibanaPlugin extends AbstractPlugin {
 
     @Override
     public Completable reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
-            // remove deleted kibana spaces
-            Set<String> deployedKibanaSpaces = dataCenter.getStatus().getKibanaSpaces();
-            Map<String, KibanaSpace> kibanaMap = getKibanaSpaces(dataCenter).stream().collect(Collectors.toMap(KibanaSpace::getName, Function.identity()));
-            Completable deleteCompletable = io.reactivex.Observable.fromIterable(Sets.difference(deployedKibanaSpaces, getKibanaSpaces(dataCenter).stream().map(KibanaSpace::getName).collect(Collectors.toSet())))
-                    .flatMapCompletable(spaceToDelete -> {
-                        logger.debug("Deleting kibana space={}", spaceToDelete);
-                        dataCenter.getStatus().getKibanaSpaces().remove(spaceToDelete);
-                        return delete(dataCenter, kibanaMap.get(spaceToDelete));
-                    });
+        // remove deleted kibana spaces
+        Set<String> deployedKibanaSpaces = dataCenter.getStatus().getKibanaSpaces();
+        Map<String, KibanaSpace> kibanaMap = getKibanaSpaces(dataCenter).stream().collect(Collectors.toMap(KibanaSpace::getName, Function.identity()));
+        Completable deleteCompletable = io.reactivex.Observable.fromIterable(Sets.difference(deployedKibanaSpaces, getKibanaSpaces(dataCenter).stream().map(KibanaSpace::getName).collect(Collectors.toSet())))
+                .flatMapCompletable(spaceToDelete -> {
+                    logger.debug("Deleting kibana space={}", spaceToDelete);
+                    dataCenter.getStatus().getKibanaSpaces().remove(spaceToDelete);
+                    return delete(dataCenter, kibanaMap.get(spaceToDelete));
+                });
 
 
-            Completable createCompletable = io.reactivex.Observable.fromIterable(getKibanaSpaces(dataCenter))
-                    .flatMapCompletable(kibanaSpace -> {
-                        dataCenter.getStatus().getKibanaSpaces().add(kibanaSpace.getName());
-                        return createOrReplaceReaperObjects(dataCenter, kibanaSpace);
-                    });
+        Completable createCompletable = io.reactivex.Observable.fromIterable(getKibanaSpaces(dataCenter))
+                .flatMapCompletable(kibanaSpace -> {
+                    dataCenter.getStatus().getKibanaSpaces().add(kibanaSpace.getName());
+                    return createOrReplaceReaperObjects(dataCenter, kibanaSpace);
+                });
 
-            return deleteCompletable.andThen(createCompletable);
+        return deleteCompletable.andThen(createCompletable);
     }
 
     @Override
@@ -164,7 +164,7 @@ public class KibanaPlugin extends AbstractPlugin {
     private int kibanaReplicas(final DataCenter dataCenter, KibanaSpace kibanaSpace) {
         Integer version = dataCenter.getSpec().getKibana().getVersion();
         return (dataCenter.getStatus().getBootstrapped() == true &&
-                dataCenter.getStatus().getKeyspaceManagerStatus().getKeyspaces().contains(kibanaSpace.keyspace(version))) ? 1 : 0;
+                dataCenter.getStatus().getKeyspaceManagerStatus().getKeyspaces().contains(kibanaSpace.keyspace(version))) ? kibanaSpace.getReplicas() : 0;
     }
 
 
@@ -200,7 +200,7 @@ public class KibanaPlugin extends AbstractPlugin {
                 );
 
         if (dataCenterSpec.getImagePullSecrets() != null) {
-            for(String secretName : dataCenterSpec.getImagePullSecrets()) {
+            for (String secretName : dataCenterSpec.getImagePullSecrets()) {
                 final V1LocalObjectReference pullSecret = new V1LocalObjectReference().name(secretName);
                 podSpec.addImagePullSecretsItem(pullSecret);
             }
@@ -243,8 +243,8 @@ public class KibanaPlugin extends AbstractPlugin {
                 */
                 .addEnvItem(new V1EnvVar()
                         .name("ELASTICSEARCH_URL")
-                        .value( (Boolean.TRUE.equals(dataCenterSpec.getEnterprise().getHttps()) ? "https://" : "http://") +
-                                OperatorNames.elasticsearchService(dataCenter) + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local:"+ dataCenterSpec.getElasticsearchPort())
+                        .value((Boolean.TRUE.equals(dataCenterSpec.getEnterprise().getHttps()) ? "https://" : "http://") +
+                                OperatorNames.elasticsearchService(dataCenter) + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local:" + dataCenterSpec.getElasticsearchPort())
                 )
                 .addEnvItem(new V1EnvVar()
                         .name("KIBANA_INDEX")
@@ -254,7 +254,12 @@ public class KibanaPlugin extends AbstractPlugin {
                 //.addEnvItem(new V1EnvVar().name("XPACK_MONITORING_ENABLED").value("false"))
                 //.addEnvItem(new V1EnvVar().name("XPACK_SECURITY_ENABLED").value("false"))
                 //.addEnvItem(new V1EnvVar().name("XPACK_MONITORING_UI_CONTAINER_ELASTICSEARCH_ENABLED").value("false"))
-        ;
+                ;
+
+        // add NODE_OPTIONS for memory tunning
+        if (!Strings.isNullOrEmpty(space.getNodeOptions())) {
+            container.addEnvItem(new V1EnvVar().name("NODE_OPTIONS").value(space.getNodeOptions()));
+        }
 
 
         // kibana with cassandra authentication
