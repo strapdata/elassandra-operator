@@ -7,5 +7,4 @@ public interface ServicesConstants {
     String ELASTICSEARCH_TRANSPORT_PORT_NAME = "transport";
 
     String PROMETHEUS_PORT_NAME = "prometheus";
-    int PROMETHEUS_PORT_VALUE = 9500;
 }

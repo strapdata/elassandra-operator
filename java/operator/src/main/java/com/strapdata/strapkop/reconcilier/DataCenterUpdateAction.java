@@ -1148,7 +1148,7 @@ public class DataCenterUpdateAction {
             }
 
             if (dataCenterSpec.getPrometheusEnabled()) {
-                service.getSpec().addPortsItem(new V1ServicePort().name(PROMETHEUS_PORT_NAME).port(PROMETHEUS_PORT_VALUE));
+                service.getSpec().addPortsItem(new V1ServicePort().name(PROMETHEUS_PORT_NAME).port(dataCenterSpec.getPrometheusPort()));
             }
             return service;
         }
@@ -1346,7 +1346,9 @@ public class DataCenterUpdateAction {
                 // jmx-promtheus exporter
                 // TODO: use version less symlink to avoid issues when upgrading the image
                 configMapVolumeMountBuilder.addFile("cassandra-env.sh.d/001-cassandra-exporter.sh",
-                        "JVM_OPTS=\"${JVM_OPTS} -javaagent:${CASSANDRA_HOME}/agents/jmx_prometheus_javaagent.jar=${POD_IP}:9500:${CASSANDRA_CONF}/jmx_prometheus_exporter.yml\"");
+                        "JVM_OPTS=\"${JVM_OPTS} -javaagent:${CASSANDRA_HOME}/agents/jmx_prometheus_javaagent.jar=${POD_IP}:" +
+                                dataCenterSpec.getPrometheusPort() +
+                                ":${CASSANDRA_CONF}/jmx_prometheus_exporter.yml\"");
             }
 
             StringBuilder jvmOptionsD = new StringBuilder(500);
@@ -1678,7 +1680,7 @@ public class DataCenterUpdateAction {
             final V1Container commitlogInitContainer = buildInitContainerCommitlogReplayer(rack, rackStatus.getSeedHostId());
 
             if (dataCenterSpec.getPrometheusEnabled()) {
-                cassandraContainer.addPortsItem(new V1ContainerPort().name(PROMETHEUS_PORT_NAME).containerPort(PROMETHEUS_PORT_VALUE));
+                cassandraContainer.addPortsItem(new V1ContainerPort().name(PROMETHEUS_PORT_NAME).containerPort(dataCenterSpec.getPrometheusPort()));
             }
 
             final V1PodSpec podSpec = new V1PodSpec()
@@ -1866,7 +1868,7 @@ public class DataCenterUpdateAction {
 
             // add prometheus annotations to scrap nodes
             if (dataCenterSpec.getPrometheusEnabled()) {
-                String[] annotations = new String[]{"prometheus.io/scrape", "true", "prometheus.io/port", Integer.toString(PROMETHEUS_PORT_VALUE)};
+                String[] annotations = new String[]{"prometheus.io/scrape", "true", "prometheus.io/port", Integer.toString(dataCenterSpec.getPrometheusPort()) };
                 for (int i = 0; i < annotations.length; i += 2)
                     templateMetadata.putAnnotationsItem(annotations[i], annotations[i + 1]);
             }
@@ -2043,10 +2045,10 @@ public class DataCenterUpdateAction {
                             .subPath(".curlrc")
                     )
                     .addEnvItem(new V1EnvVar().name("JMX_PORT").value(Integer.toString(dataCenterSpec.getJmxPort())))
+                    .addEnvItem(new V1EnvVar().name("NODETOOL_JMX_PORT").value(Integer.toString(dataCenterSpec.getJmxPort())))
                     .addEnvItem(new V1EnvVar().name("CQLS_OPTS").value(dataCenterSpec.getSsl() ? "--ssl" : ""))
                     .addEnvItem(new V1EnvVar().name("ES_SCHEME").value(dataCenterSpec.getEnterprise().getHttps() ? "https" : "http"))
                     .addEnvItem(new V1EnvVar().name("ES_PORT").value(Integer.toString(dataCenterSpec.getElasticsearchPort())))
-                    .addEnvItem(new V1EnvVar().name("HOST_NETWORK").value(Boolean.toString(dataCenterSpec.getHostNetworkEnabled())))
                     .addEnvItem(new V1EnvVar().name("NAMESPACE").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.namespace"))))
                     .addEnvItem(new V1EnvVar().name("POD_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.name"))))
                     .addEnvItem(new V1EnvVar().name("POD_IP").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("status.podIP"))))
@@ -2055,7 +2057,7 @@ public class DataCenterUpdateAction {
                     .addEnvItem(new V1EnvVar().name("CASSANDRA_RACK").value(rack))
                     .addEnvItem(new V1EnvVar().name("CASSANDRA_DATACENTER").value(dataCenterMetadata.getName()))
                     .addEnvItem(new V1EnvVar().name("CASSANDRA_CLUSTER").value(dataCenterSpec.getClusterName()))
-                    .addEnvItem(new V1EnvVar().name("NODETOOL_JMX_PORT").value(Integer.toString(dataCenterSpec.getJmxPort())));
+                    ;
 
             String nodetoolOpts = " -u cassandra -pwf /etc/cassandra/jmxremote.password ";
             nodetoolOpts += dataCenterSpec.getJmxmpEnabled() ? " --jmxmp " : "";
@@ -2087,7 +2089,7 @@ public class DataCenterUpdateAction {
 
             if (dataCenterSpec.getElasticsearchEnabled()) {
                 cassandraContainer.addPortsItem(new V1ContainerPort().name(ELASTICSEARCH_PORT_NAME).containerPort(dataCenterSpec.getElasticsearchPort()));
-                cassandraContainer.addPortsItem(new V1ContainerPort().name("transport").containerPort(9300));
+                cassandraContainer.addPortsItem(new V1ContainerPort().name("transport").containerPort(dataCenterSpec.getElasticsearchTransportPort()));
                 cassandraContainer.addEnvItem(new V1EnvVar().name("CASSANDRA_DAEMON").value("org.apache.cassandra.service.ElassandraDaemon"));
             } else {
                 cassandraContainer.addEnvItem(new V1EnvVar().name("CASSANDRA_DAEMON").value("org.apache.cassandra.service.CassandraDaemon"));

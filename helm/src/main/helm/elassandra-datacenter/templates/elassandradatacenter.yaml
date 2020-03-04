@@ -88,6 +88,7 @@ spec:
   hostPortEnabled: {{ default "false" .Values.hostPortEnabled }}
   hostNetworkEnabled: {{ default "false" .Values.hostNetworkEnabled }}
   elasticsearchPort: {{ default "9200" .Values.elasticsearchPort | quote }}
+  elasticsearchTransportPort: {{ default "9300" .Values.elasticsearchTransportPort | quote }}
   nativePort: {{ default "9042" .Values.nativePort | quote }}
   storagePort: {{ default "7000" .Values.storagePort | quote }}
   sslStoragePort: {{ default "7001" .Values.sslStoragePort | quote }}
