@@ -12,6 +12,8 @@ import io.kubernetes.client.models.V1Secret;
 import io.micronaut.cache.annotation.CacheConfig;
 import io.micronaut.caffeine.cache.AsyncLoadingCache;
 import io.micronaut.caffeine.cache.Caffeine;
+import io.micronaut.scheduling.executor.ExecutorFactory;
+import io.micronaut.scheduling.executor.UserExecutorConfiguration;
 import io.reactivex.Single;
 import io.vavr.Tuple2;
 import io.vavr.control.Option;
@@ -20,6 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -62,10 +65,16 @@ public class AuthorityManager {
     @Inject
     private CoreV1Api coreApi;
 
-    AsyncLoadingCache<String, X509CertificateAndPrivateKey> cache = Caffeine.newBuilder()
-            .maximumSize(100)
-            .expireAfterWrite(1, TimeUnit.MINUTES)
-            .buildAsync(ns -> loadOrGenerateCa(ns).blockingGet());
+    private final AsyncLoadingCache<String, X509CertificateAndPrivateKey> cache;
+
+    public AuthorityManager(ExecutorFactory executorFactory,
+                            @Named("authority") UserExecutorConfiguration userExecutorConfiguration) {
+        this.cache = Caffeine.newBuilder()
+                .executor(executorFactory.executorService(userExecutorConfiguration))
+                .maximumSize(256)
+                .expireAfterWrite(1, TimeUnit.MINUTES)
+                .buildAsync(ns -> loadOrGenerateCa(ns).blockingGet());
+    }
 
     public X509CertificateAndPrivateKey get(String namespace) throws ExecutionException, InterruptedException {
         return getAsync(namespace).get();

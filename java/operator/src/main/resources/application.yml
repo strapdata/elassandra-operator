@@ -1,6 +1,10 @@
 micronaut:
     application:
         name: operator
+    executors:
+        authority:
+            type: FIXED
+            number-of-threads: 2
     router:
         static-resources:
             swagger:
