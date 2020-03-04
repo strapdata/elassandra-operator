@@ -25,7 +25,7 @@ If release name contains chart name it will be used as a full name.
 {{- end -}}
 
 {{/*
-Return the appropriate apiVersion value to use for the prometheus-operator managed k8s resources
+Return the appropriate apiVersion value to use for the elassandra-operator managed k8s resources
 */}}
 {{- define "elassandra-operator.apiVersion" -}}
 {{- printf "%s" "stable.strapdata.com/v1" -}}
