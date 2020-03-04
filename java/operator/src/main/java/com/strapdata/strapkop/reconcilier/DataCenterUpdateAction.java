@@ -1238,7 +1238,7 @@ public class DataCenterUpdateAction {
             if (!seeds.isEmpty())
                 parameters.put("seeds", String.join(", ", seeds));
             if (!remoteSeeds.isEmpty())
-                parameters.put("remote_seeds", String.join(", ", seeds));
+                parameters.put("remote_seeds", String.join(", ", remoteSeeds));
             if (!remoteSeeders.isEmpty()) {
                 parameters.put("remote_seeders", String.join(", ", remoteSeeders));
             }
