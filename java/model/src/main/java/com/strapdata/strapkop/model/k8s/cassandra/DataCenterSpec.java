@@ -135,6 +135,12 @@ public class DataCenterSpec {
     @Expose
     private Boolean prometheusEnabled = false;
 
+    /**
+     * Prometheus agent listen port.
+     */
+    @SerializedName("prometheusPort")
+    @Expose
+    private Integer prometheusPort = 9500;
 
     /**
      * Reaper configuration.
@@ -195,6 +201,13 @@ public class DataCenterSpec {
     @SerializedName("elasticsearchPort")
     @Expose
     private Integer elasticsearchPort = 9200;
+
+    /**
+     * Elasticsearch Transport port
+     */
+    @SerializedName("elasticsearchTransportPort")
+    @Expose
+    private Integer elasticsearchTransportPort = 9300;
 
     /**
      * CQL native port (also hostPort)
