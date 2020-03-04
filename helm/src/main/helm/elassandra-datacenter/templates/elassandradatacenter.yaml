@@ -123,6 +123,7 @@ spec:
   datacenterGroup:
 {{ toYaml .Values.datacenterGroup | indent 4 }}
 {{- end }}
+  snitchPreferLocal: {{ default "true" .Values.snitchPreferLocal }}
 {{- if .Values.managedKeyspaces }}
   managedKeyspaces:
 {{ toYaml .Values.managedKeyspaces | indent 4 }}

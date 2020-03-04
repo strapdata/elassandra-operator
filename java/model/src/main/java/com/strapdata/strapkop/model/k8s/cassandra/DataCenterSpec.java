@@ -100,6 +100,14 @@ public class DataCenterSpec {
     @Expose
     private boolean computeJvmMemorySettings = true;
 
+    /**
+     *  Tell Cassandra to use the local IP address (INTERNAL_IP).
+     *  May require a VPC  or VPN between the datacenters.
+     */
+    @SerializedName("snitchPreferLocal")
+    @Expose
+    private Boolean snitchPreferLocal = true;
+
     @SerializedName("dataVolumeClaim")
     @Expose
     private V1PersistentVolumeClaimSpec dataVolumeClaim;

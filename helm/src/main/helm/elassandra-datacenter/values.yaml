@@ -35,6 +35,9 @@ externalDns:
   domain: "example.com"
   ttl: 300
 
+# Tell Cassandra to use the local IP address (INTERNAL_IP).
+snitchPreferLocal: false
+
 managedKeyspaces: {}
 #  - keyspace: gravitee
 #    rf: 3

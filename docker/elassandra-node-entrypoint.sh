@@ -73,22 +73,21 @@ if [ -f "/nodeinfo/node-ip" ] && [ -s "/nodeinfo/node-ip" ]; then
     BROADCAST_ADDRESS=$NODE_IP
     BROADCAST_RPC_ADDRESS=$NODE_IP
     ES_USE_INTERNAL_ADDRESS="-Des.use_internal_address=true"
-
-    if [ "$HOST_NETWORK" == "true" ]; then
-        LISTEN_ADDRESS=$NODE_IP
-        echo "listen_address: $LISTEN_ADDRESS" > /etc/cassandra/cassandra.yaml.d/002-listen_address.yaml
-    fi
 fi
 
 if [ -f "/nodeinfo/public-ip" ] && [ -s "/nodeinfo/public-ip" ]; then
    PUBLIC_IP=$(cat /nodeinfo/public-ip)
    BROADCAST_RPC_ADDRESS=$PUBLIC_IP
+   BROADCAST_ADDRESS=$PUBLIC_IP
    ES_USE_INTERNAL_ADDRESS="-Des.use_internal_address=true"
 fi
 
 # Define broadcast address
 echo "broadcast_address: $BROADCAST_ADDRESS" > /etc/cassandra/cassandra.yaml.d/002-broadcast_address.yaml
 echo "broadcast_rpc_address: $BROADCAST_RPC_ADDRESS" > /etc/cassandra/cassandra.yaml.d/002-broadcast_rpc_address.yaml
+
+# Bind elasticsearch transport on POD ip
+echo "transport.bind_host: $POD_IP" > /etc/cassandra/elasticsearch.yml.d/001-transport.yaml
 
 if [ "x${STOP_AFTER_COMMILOG_REPLAY}" != "x" ]; then
   echo "REQUEST FOR cassandra.stop_after_commitlog_replayed : CassandraDeamon will stop after all commitlog will be replayed"
