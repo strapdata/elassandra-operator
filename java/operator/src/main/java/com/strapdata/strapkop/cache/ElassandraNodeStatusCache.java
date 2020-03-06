@@ -40,7 +40,7 @@ public class ElassandraNodeStatusCache extends Cache<ElassandraPod, ElassandraNo
                 .sorted(new Comparator<Entry<ElassandraPod, ElassandraNodeStatus>>() {
                     @Override
                     public int compare(Entry<ElassandraPod, ElassandraNodeStatus> elassandraPodElassandraNodeStatusEntry, Entry<ElassandraPod, ElassandraNodeStatus> t1) {
-                        return podIndex(elassandraPodElassandraNodeStatusEntry.getKey().getName()) - podIndex(t1.getKey().getName());
+                        return ElassandraPod.podIndex(elassandraPodElassandraNodeStatusEntry.getKey().getName()) - ElassandraPod.podIndex(t1.getKey().getName());
                     }
                 }).findFirst().map(Entry::getKey);
         return pod;
@@ -58,10 +58,5 @@ public class ElassandraNodeStatusCache extends Cache<ElassandraPod, ElassandraNo
         return this.entrySet().stream()
                 .filter(e -> status.equals(e.getValue()))
                 .findFirst().map(Entry::getKey);
-    }
-
-    private int podIndex(String podName) {
-        int index = podName.lastIndexOf("-");
-        return Integer.parseInt(podName.substring(index));
     }
 }

@@ -21,9 +21,9 @@ import static com.strapdata.strapkop.event.K8sWatchEvent.Type.*;
 public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1StatefulSet>> {
     
     private final Logger logger = LoggerFactory.getLogger(StatefulsetHandler.class);
-    
+
     private static final EnumSet<K8sWatchEvent.Type> acceptedEventTypes = EnumSet.of(MODIFIED, INITIAL, DELETED);
-    
+
     private final WorkQueues workQueues;
     private final DataCenterUpdateReconcilier dataCenterReconcilier;
     
@@ -38,19 +38,18 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
             return ;
         }
 
-        logger.debug("Processing a Statefulset event={}", event);
-        
         final V1StatefulSet sts = event.getResource();
+        logger.debug("StatefulSet event type={} sts={}/{}", event.getType(), sts.getMetadata().getName(), sts.getMetadata().getNamespace());
 
         // abort if the sts scaling up/down replicas
         if (!event.getType().equals(DELETED) &&
                 (!Objects.equals(sts.getStatus().getReplicas(), ObjectUtils.defaultIfNull(sts.getStatus().getReadyReplicas(), 0))
                 || !Objects.equals(ObjectUtils.defaultIfNull(sts.getStatus().getCurrentReplicas(), 0), sts.getStatus().getReplicas()))) {
-            logger.info("sts is not ready, skipping");
+            logger.info("sts={}/{} is not ready, skipping", sts.getMetadata().getName(), sts.getMetadata().getNamespace());
             return ;
         }
     
-        logger.info("sts is ready, triggering a dc reconciliation");
+        logger.info("sts={}/{} is ready, triggering a dc reconciliation", sts.getMetadata().getName(), sts.getMetadata().getNamespace());
         
         final String dcResourceName = sts.getMetadata().getLabels().get(OperatorLabels.PARENT);
         final String clusterName = sts.getMetadata().getLabels().get(OperatorLabels.CLUSTER);

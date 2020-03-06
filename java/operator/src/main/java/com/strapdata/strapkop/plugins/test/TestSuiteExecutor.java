@@ -3,6 +3,7 @@ package com.strapdata.strapkop.plugins.test;
 import com.strapdata.strapkop.cache.CheckPointCache;
 import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.cql.CqlRoleManager;
+import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceTestUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.Key;
@@ -58,7 +59,7 @@ public abstract class TestSuiteExecutor {
     protected CqlRoleManager cqlRoleManager;
 
     @Inject
-    private ElassandraNodeStatusCache elassandraNodeStatusCache;
+    ElassandraNodeStatusCache elassandraNodeStatusCache;
 
     @Inject
     private CheckPointCache checkPointCache;
@@ -157,9 +158,13 @@ public abstract class TestSuiteExecutor {
     protected Step checkNodeAvailability(final DataCenter dc, final int expectedReplicas, final OnSuccessAction onSuccess, final Step waitingStep) {
         final DataCenterStatus status = dc.getStatus();
         // filter on NORMAL nodes
-        List<String> nodeNames = status.getElassandraNodeStatuses().entrySet().stream()
+        List<String> nodeNames = elassandraNodeStatusCache.entrySet().stream()
+                .filter(e -> e.getKey().getNamespace().equals(dc.getMetadata().getNamespace()) &&
+                        e.getKey().getCluster().equals(dc.getSpec().getClusterName()) &&
+                        e.getKey().getDataCenter().equals(dc.getSpec().getDatacenterName()))
                 .filter(e -> Objects.equals(e.getValue(), ElassandraNodeStatus.NORMAL))
-                .map(e -> e.getKey()).collect(Collectors.toList());
+                .map(e -> e.getKey().getName())
+                .collect(Collectors.toList());
 
 
 
@@ -296,8 +301,14 @@ public abstract class TestSuiteExecutor {
     }
 
     protected final void executeESRequest(final DataCenter dc, ESRequestProcessor processor ) {
-        String pod = dc.getStatus().getElassandraNodeStatuses().entrySet().stream().filter(e -> ElassandraNodeStatus.NORMAL.equals(e.getValue())).map(e -> e.getKey()).findFirst().get();
-        String podFqdn = elassandraNodeStatusCache.findPodByName(pod).get().getFqdn();
+        Map.Entry<ElassandraPod, ElassandraNodeStatus> entry = this.elassandraNodeStatusCache.entrySet().stream()
+                .filter(e -> e.getKey().getNamespace().equals(dc.getMetadata().getNamespace()) &&
+                        e.getKey().getCluster().equals(dc.getSpec().getClusterName()) &&
+                        e.getKey().getDataCenter().equals(dc.getSpec().getDatacenterName()))
+                .filter(e -> ElassandraNodeStatus.NORMAL.equals(e.getValue()))
+                .findFirst()
+                .get();
+        String podFqdn = entry.getKey().getFqdn();
         String eslogin = null;
         String esPwd = null;
         if (Authentication.CASSANDRA.equals(dc.getSpec().getAuthentication())) {

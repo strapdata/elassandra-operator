@@ -117,7 +117,13 @@ public class CommitLogReplayerTestSuite extends TestSuiteExecutor {
 
             LOGGER.debug("[TEST] Update DC to enable Reaper");
 
-            String pod = dc.getStatus().getElassandraNodeStatuses().entrySet().stream().filter(e -> ElassandraNodeStatus.NORMAL.equals(e.getValue())).map(e -> e.getKey()).findFirst().get();
+            String pod = this.elassandraNodeStatusCache.entrySet().stream()
+                    .filter(e -> e.getKey().getNamespace().equals(dc.getMetadata().getNamespace()) &&
+                            e.getKey().getCluster().equals(dc.getSpec().getClusterName()) &&
+                            e.getKey().getDataCenter().equals(dc.getSpec().getDatacenterName()))
+                    .filter(e -> ElassandraNodeStatus.NORMAL.equals(e.getValue()))
+                    .map(e -> e.getKey().getName())
+                    .findFirst().get();
             try {
                 k8sResourceUtils.deletePod(dc.getMetadata().getNamespace(), pod);
             } catch (ApiException e) {

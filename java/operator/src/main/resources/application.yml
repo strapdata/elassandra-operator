@@ -5,6 +5,8 @@ micronaut:
         authority:
             type: FIXED
             number-of-threads: 2
+        status:
+            type: WORK_STEALING
     router:
         static-resources:
             swagger:
@@ -53,10 +55,9 @@ operator:
     k8sWatchPeriodInSec: ${K8S_WATCH_PERIOD:180}
     elassandraNodeWatchPeriodInSec: ${ELASSANDRA_NODE_WATCH_PERIOD:60}
     namespace: "${OPERATOR_NAMESPACE:}"
-
+    serviceName: "${OPERATOR_SERVICE_NAME:elassandra-operator}"
     test:
         enabled: "${TESTSUITE_ENABLE:false}"
         platform: "${TESTSUITE_PLATFORM:LOCAL}"
-
     tasks:
-        retentionPeriod: "${TASKS_RETENTION:15D}"
+        retentionPeriod: "${TASKS_RETENTION:7D}"

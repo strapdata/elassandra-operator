@@ -64,7 +64,8 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
     
     @Override
     public void accept(K8sWatchEvent<Task> event) throws Exception {
-        logger.debug("Processing a Task event={}", event);
+        Task task = event.getResource();
+        logger.debug("Task event type={} task={}", event.getType(), task.id());
         
         final ClusterKey key = new ClusterKey(
                 event.getResource().getSpec().getCluster(),
@@ -81,7 +82,6 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
         }
         
         if (creationEventTypes.contains(event.getType())) {
-            Task task = event.getResource();
             TaskStatus taskStatus = task.getStatus();
             if (taskStatus == null || taskStatus.getPhase() == null || !taskStatus.getPhase().isTerminated()) {
                 // execute task

@@ -1,18 +1,20 @@
 package com.strapdata.strapkop.event;
 
 import com.strapdata.strapkop.OperatorConfig;
-import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
+import io.micronaut.scheduling.executor.ExecutorFactory;
+import io.micronaut.scheduling.executor.UserExecutorConfiguration;
 import io.reactivex.Observable;
+import io.reactivex.Scheduler;
 import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.inject.Named;
 import javax.inject.Singleton;
-import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
@@ -23,38 +25,42 @@ public class ElassandraPodStatusSource implements EventSource<NodeStatusEvent> {
 
 
     private final ElassandraNodeStatusCache elassandraNodeStatusCache;
-    private final DataCenterCache dataCenterCache;
     private final JmxmpElassandraProxy jmxmpElassandraProxy;
     private OperatorConfig config;
+    private Scheduler statusScheduler;
 
-    public ElassandraPodStatusSource(ElassandraNodeStatusCache elassandraNodeStatusCache, DataCenterCache dataCenterCache, JmxmpElassandraProxy jmxmpElassandraProxy, OperatorConfig config) {
+    public ElassandraPodStatusSource(ElassandraNodeStatusCache elassandraNodeStatusCache,
+                                     JmxmpElassandraProxy jmxmpElassandraProxy,
+                                     OperatorConfig config,
+                                     ExecutorFactory executorFactory,
+                                     @Named("status") UserExecutorConfiguration userExecutorConfiguration) {
         this.elassandraNodeStatusCache = elassandraNodeStatusCache;
-        this.dataCenterCache = dataCenterCache;
         this.jmxmpElassandraProxy = jmxmpElassandraProxy;
         this.config = config;
+        this.statusScheduler = Schedulers.from(executorFactory.executorService(userExecutorConfiguration));
     }
 
     @Override
     public Observable<NodeStatusEvent> createObservable() {
         return Observable.interval(config.getElassandraNodeWatchPeriodInSec(), TimeUnit.SECONDS)
-                .observeOn(Schedulers.io())
+                .subscribeOn(statusScheduler)   // which threads are going to emit values
+                .observeOn(statusScheduler)     // which threads are going to handle and observe values
                 .flatMap(i -> {
-                    List<ElassandraPod> pods = dataCenterCache.listPods();
-                    logger.debug("/{}", pods);
-                    return Observable.fromIterable(pods);
+                    logger.debug("elassandraNodeStatusCache={}", elassandraNodeStatusCache);
+                    return Observable.fromIterable(elassandraNodeStatusCache.keySet());
                 })
-                .map(pod -> new NodeStatusEvent().setPod(pod))
-                .flatMapSingle(event -> {
+                .flatMapSingle(pod -> {
+                            NodeStatusEvent event = new NodeStatusEvent().setPod(pod);
                             logger.debug("event={}", event);
                             return jmxmpElassandraProxy.status(event.getPod())
                                     .observeOn(Schedulers.io())
                                     .map(nodeStatus -> {
-                                        logger.debug("requesting pod={} sidecar for health check={}", event.getPod().getName(), nodeStatus);
+                                        logger.debug("pod={} Cassandra status={}", event.getPod().id(), nodeStatus);
                                         event.setCurrentMode(nodeStatus);
                                         return event;
                                     })
                                     .onErrorResumeNext(throwable -> {
-                                        logger.debug("failed to get the status from pod=" + event.getPod().getName() + ":", throwable.toString());
+                                        logger.debug("pod="+event.getPod().id()+" Failed to get Cassandra status:", throwable.toString());
                                         jmxmpElassandraProxy.invalidateClient(event.getPod(), throwable);
                                         event.setCurrentMode(ElassandraNodeStatus.UNKNOWN);
                                         return Single.just(event);
@@ -68,17 +74,10 @@ public class ElassandraPodStatusSource implements EventSource<NodeStatusEvent> {
                         case DOWN:
                         case DECOMMISSIONED:
                         case DRAINED:
-                            // do not change the status if the current one is UNKNOWN to allow resource releasing
-                            // in other case the Node is coming back and the status must be updated
-                            if (!ElassandraNodeStatus.UNKNOWN.equals(event.getCurrentMode())) {
-                                logger.debug("caching {}={} previous={}", event.getPod(), event.getCurrentMode(), event.getPreviousMode());
-                                elassandraNodeStatusCache.put(event.getPod(), event.getCurrentMode());
-                            } else {
-                                logger.debug("ignore caching {}={} previous={}", event.getPod(), event.getCurrentMode(), event.getPreviousMode());
-                            }
+                            logger.debug("pod{} previous={} ignored", event.getPod().id(), event.getPreviousMode());
                             break;
                         default:
-                            logger.debug("caching {}={} previous={}", event.getPod(), event.getCurrentMode(), event.getPreviousMode());
+                            logger.debug("pod{} previous={} current={} next={}", event.getPod().id(), event.getPreviousMode(), event.getCurrentMode(), event.getCurrentMode());
                             elassandraNodeStatusCache.put(event.getPod(), event.getCurrentMode());
                     }
                     return event;

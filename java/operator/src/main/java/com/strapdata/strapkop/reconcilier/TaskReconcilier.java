@@ -1,14 +1,17 @@
 package com.strapdata.strapkop.reconcilier;
 
+import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.cassandra.Block;
 import com.strapdata.strapkop.model.k8s.cassandra.BlockReason;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.task.ReplicationTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
 import com.strapdata.strapkop.model.k8s.task.TaskStatus;
+import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
 import io.kubernetes.client.ApiException;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.reactivex.Completable;
@@ -19,6 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
+import java.util.stream.Collectors;
 
 public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier.Action, Task>> {
 
@@ -27,6 +31,7 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
     final String taskType;
     final MeterRegistry meterRegistry;
     final DataCenterUpdateReconcilier dataCenterUpdateReconcilier;
+    final ElassandraNodeStatusCache elassandraNodeStatusCache;
 
     private volatile int runningTaskCount = 0;
 
@@ -34,13 +39,15 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
                     String taskType,
                     final K8sResourceUtils k8sResourceUtils,
                     final MeterRegistry meterRegistry,
-                    final DataCenterUpdateReconcilier dataCenterUpdateReconcilier
+                    final DataCenterUpdateReconcilier dataCenterUpdateReconcilier,
+                    final ElassandraNodeStatusCache elassandraNodeStatusCache
                     ) {
         super(reconcilierObserver);
         this.k8sResourceUtils = k8sResourceUtils;
         this.taskType = taskType;
         this.meterRegistry = meterRegistry;
         this.dataCenterUpdateReconcilier= dataCenterUpdateReconcilier;
+        this.elassandraNodeStatusCache = elassandraNodeStatusCache;
     }
     
     enum Action {
@@ -88,7 +95,7 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
                 .flatMapCompletable(tuple -> {
                     DataCenter dc = tuple._2;
                     Task task = tuple._1.get();
-                    logger.debug("datacenter={} task={} processing", dc.id(), task);
+                    logger.debug("datacenter={} task={} processing", dc.id(), task.id());
 
                     if (task.getStatus() == null)
                         task.setStatus(new TaskStatus());
@@ -193,7 +200,7 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
             }
         }
         taskStatus.setPhase(taskPhase);
-        logger.debug("task={} update", task);
+        logger.debug("task={} finalized", task.id());
         final TaskPhase phase = taskPhase;
         return k8sResourceUtils.updateTaskStatus(task).map(o -> phase);
     }
@@ -299,6 +306,24 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
      * @return
      */
     public Completable initializePodMap(Task task, DataCenter dc) {
+        return Completable.complete();
+    }
+
+    public Completable initializePodMapWithKnownStatus(Task task, DataCenter dc) {
+        if (ReplicationTaskSpec.Action.ADD.equals(task.getSpec().getReplication().getAction())) {
+            for (Map.Entry<String, ElassandraNodeStatus> entry : elassandraNodeStatusCache.entrySet().stream()
+                    .filter(e -> e.getKey().getNamespace().equals(dc.getMetadata().getNamespace()) &&
+                            e.getKey().getCluster().equals(dc.getSpec().getClusterName()) &&
+                            e.getKey().getDataCenter().equals(dc.getSpec().getDatacenterName()))
+                    .collect(Collectors.toMap(e -> e.getKey().getName(), e -> e.getValue()))
+                    .entrySet()
+            ) {
+                if (!entry.getValue().equals(ElassandraNodeStatus.UNKNOWN)) {
+                    // only add reachable nodes (usually UNKNWON is used for unreachable or non bootstrapped node)
+                    task.getStatus().getPods().put(entry.getKey(), TaskPhase.WAITING);
+                }
+            }
+        }
         return Completable.complete();
     }
 

@@ -2,7 +2,6 @@ package com.strapdata.strapkop.model.k8s.cassandra;
 
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
-import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -97,13 +96,6 @@ public class DataCenterStatus {
     @SerializedName("rackStatuses")
     @Expose
     private Map<String, RackStatus> rackStatuses = new HashMap<>();
-
-    /**
-     * Cassandra node status of pods
-     */
-    @SerializedName("elassandraNodeStatuses")
-    @Expose
-    private Map<String, ElassandraNodeStatus> elassandraNodeStatuses = new HashMap<>();
 
     /**
      * Cassandra reaper status

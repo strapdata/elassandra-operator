@@ -34,7 +34,6 @@ public class RemoveNodesTaskReconcilier extends TaskReconcilier {
     private final ApplicationContext context;
     private final CqlRoleManager cqlRoleManager;
     private final CqlKeyspaceManager cqlKeyspaceManager;
-    private final ElassandraNodeStatusCache elassandraNodeStatusCache;
 
     public RemoveNodesTaskReconcilier(ReconcilierObserver reconcilierObserver,
                                       final DataCenterUpdateReconcilier dataCenterUpdateReconcilier,
@@ -46,12 +45,11 @@ public class RemoveNodesTaskReconcilier extends TaskReconcilier {
                                       final CqlKeyspaceManager cqlKeyspaceManager,
                                       final ElassandraNodeStatusCache elassandraNodeStatusCache,
                                       final MeterRegistry meterRegistry) {
-        super(reconcilierObserver, "removeNodes", k8sResourceUtils, meterRegistry, dataCenterUpdateReconcilier);
+        super(reconcilierObserver, "removeNodes", k8sResourceUtils, meterRegistry, dataCenterUpdateReconcilier, elassandraNodeStatusCache);
         this.jmxmpElassandraProxy = jmxmpElassandraProxy;
         this.context = context;
         this.cqlRoleManager = cqlRoleManager;
         this.cqlKeyspaceManager = cqlKeyspaceManager;
-        this.elassandraNodeStatusCache = elassandraNodeStatusCache;
     }
 
     public BlockReason blockReason() {

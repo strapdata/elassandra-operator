@@ -9,8 +9,7 @@ nodeAffinityPolicy: STRICT
 
 image:
   elassandraRepository: strapdata.azurecr.io/strapdata/elassandra-node-dev
-  sidecarRepository: strapdata.azurecr.io/strapdata/elassandra-sidecar-dev
-  tag: 6.8.4.1
+  tag: 6.8.4.3
   pullPolicy: Always
   pullSecrets: []
 
