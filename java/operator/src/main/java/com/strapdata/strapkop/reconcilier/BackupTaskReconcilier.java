@@ -1,5 +1,6 @@
 package com.strapdata.strapkop.reconcilier;
 
+import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
@@ -11,11 +12,8 @@ import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.task.BackupTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
-import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
-import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import io.kubernetes.client.ApiException;
-import io.kubernetes.client.apis.CustomObjectsApi;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.annotation.Infrastructure;
 import io.reactivex.Completable;
@@ -44,10 +42,9 @@ public class BackupTaskReconcilier extends TaskReconcilier {
                                  final DataCenterUpdateReconcilier dataCenterUpdateReconcilier,
                                  final K8sResourceUtils k8sResourceUtils,
                                  final SidecarClientFactory sidecarClientFactory,
-                                 final CustomObjectsApi customObjectsApi,
-                                 final WorkQueues workQueue,
-                                 final MeterRegistry meterRegistry) {
-        super(reconcilierObserver, "backup", k8sResourceUtils, meterRegistry, dataCenterUpdateReconcilier);
+                                 final MeterRegistry meterRegistry,
+                                 final ElassandraNodeStatusCache elassandraNodeStatusCache) {
+        super(reconcilierObserver, "backup", k8sResourceUtils, meterRegistry, dataCenterUpdateReconcilier, elassandraNodeStatusCache);
         this.sidecarClientFactory = sidecarClientFactory;
     }
 
@@ -130,12 +127,6 @@ public class BackupTaskReconcilier extends TaskReconcilier {
 
     @Override
     public Completable initializePodMap(Task task, DataCenter dc) {
-        for (Map.Entry<String, ElassandraNodeStatus> entry : dc.getStatus().getElassandraNodeStatuses().entrySet()) {
-            if (!entry.getValue().equals(ElassandraNodeStatus.UNKNOWN)) {
-                // only add reachable nodes (usually UNKNWON is used for unreachable or non bootstrapped node)
-                task.getStatus().getPods().put(entry.getKey(), TaskPhase.WAITING);
-            }
-        }
-        return Completable.complete();
+        return initializePodMapWithKnownStatus(task, dc);
     }
 }

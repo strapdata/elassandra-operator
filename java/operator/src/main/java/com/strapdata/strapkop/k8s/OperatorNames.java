@@ -88,13 +88,11 @@ public class OperatorNames {
     }
 
     public static String podFqdn(final DataCenter dc, final String podName) {
-        return String.format("%s.%s.%s.svc.cluster.local", podName,
-                OperatorNames.nodesService(dc), dc.getMetadata().getNamespace());
+        return String.format("%s.%s.%s.svc.cluster.local", podName, OperatorNames.nodesService(dc), dc.getMetadata().getNamespace());
     }
 
     public static String podFqdn(final String namespace, final String clusterName, String dcName, final String podName) {
-        return String.format("%s.%s.%s.svc.cluster.local", podName,
-                dataCenterResource(clusterName, dcName), namespace);
+        return String.format("%s.%s.%s.svc.cluster.local", podName, dataCenterResource(clusterName, dcName), namespace);
     }
 
     

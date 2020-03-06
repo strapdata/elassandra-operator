@@ -88,8 +88,15 @@ public class ElassandraPod {
     }
 
     public String dataCenterName() {
-        return "elassandra-"+this.cluster+"-"+this.dataCenter;
+        return "elassandra-" + this.cluster + "-" + this.dataCenter;
     }
 
-    public String id() { return this.name + "/" + this.namespace; }
+    public String id() {
+        return this.name + "/" + this.namespace;
+    }
+
+    public static int podIndex(String podName) {
+        int index = podName.lastIndexOf("-");
+        return Integer.parseInt(podName.substring(index));
+    }
 }

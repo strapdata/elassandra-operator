@@ -1,10 +1,11 @@
 package com.strapdata.strapkop.reconcilier;
 
+import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
+import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.model.k8s.cassandra.BlockReason;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
-import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.plugins.TestSuitePlugin;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -23,8 +24,9 @@ public class TestTaskReconcilier extends TaskReconcilier {
                                final K8sResourceUtils k8sResourceUtils,
                                final TestSuitePlugin testPlugin,
                                final WorkQueues workQueue,
-                               final MeterRegistry meterRegistry) {
-        super(reconcilierObserver, "test", k8sResourceUtils, meterRegistry, dataCenterUpdateReconcilier);
+                               final MeterRegistry meterRegistry,
+                               final ElassandraNodeStatusCache elassandraNodeStatusCache) {
+        super(reconcilierObserver, "test", k8sResourceUtils, meterRegistry, dataCenterUpdateReconcilier, elassandraNodeStatusCache);
         this.testSuitePlugin = testPlugin;
     }
 

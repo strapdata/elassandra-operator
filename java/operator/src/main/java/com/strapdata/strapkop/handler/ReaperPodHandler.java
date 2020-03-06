@@ -32,11 +32,12 @@ public class ReaperPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> {
     
     @Override
     public void accept(K8sWatchEvent<V1Pod> event) throws Exception {
-        logger.debug("Processing a ReaperPod event={}", event);
+        V1Pod v1Pod = event.getResource();
+        ReaperPod pod = new ReaperPod(event.getResource());
+        logger.debug("ReaperPod event type={} pod={}/{}", event.getType(), v1Pod.getMetadata().getName(), v1Pod.getMetadata().getNamespace());
 
         if (event.getType().equals(MODIFIED)) {
             // currently for reaper watch only MODIFIED status to try a cluster registration
-            ReaperPod pod = new ReaperPod(event.getResource());
 
             if (pod.isReady()) {
                 ClusterKey clusterKey = new ClusterKey(pod.getClusterName(), pod.getNamespace());
@@ -44,8 +45,6 @@ public class ReaperPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> {
                         clusterKey,
                         dataCenterReconcilier.reconcile((new Key(pod.getElassandraDatacenter(), pod.getNamespace()))));
             }
-        } else {
-            logger.trace("Ignore ReaperPod event={}", event);
         }
     }
 

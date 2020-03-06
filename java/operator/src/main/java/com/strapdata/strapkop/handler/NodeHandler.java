@@ -17,8 +17,8 @@ public class NodeHandler extends TerminalHandler<K8sWatchEvent<V1Node>> {
     }
     
     @Override
-    public void accept(K8sWatchEvent<V1Node> data) throws Exception {
-        final V1Node node = data.getResource();
-        logger.debug("Processing an event node={}", node);
+    public void accept(K8sWatchEvent<V1Node> event) throws Exception {
+        final V1Node node = event.getResource();
+        logger.debug("Processing an event type={} node={}", event.getType(), node.getMetadata().getName());
     }
 }

@@ -57,7 +57,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import static com.strapdata.strapkop.k8s.ServicesConstants.*;
+import static com.strapdata.strapkop.k8s.ServicesConstants.ELASTICSEARCH_PORT_NAME;
+import static com.strapdata.strapkop.k8s.ServicesConstants.PROMETHEUS_PORT_NAME;
 
 /**
  * The NodePort service has a DNS name and redirect to STS seed pods
@@ -503,7 +504,7 @@ public class DataCenterUpdateAction {
                                             updateDatacenterStatus(DataCenterPhase.SCALING_DOWN, zones, rackStatusByName);
                                             // scale down sts
                                             logger.debug("datacenter={} SCALE_DOWN started in rack={} size={}, removing pod={} status={}",
-                                                    dataCenter.id(), movingZone.name, movingZone.size, decommissionedPod.get(), dataCenterStatus.getElassandraNodeStatuses().get(decommissionedPod.get()));
+                                                    dataCenter.id(), movingZone.name, movingZone.size, decommissionedPod.get(), elassandraNodeStatusCache.get(decommissionedPod.get()));
                                             return replaceNamespacedStatefulSet(sts);
                                         }
                                     }
@@ -668,16 +669,11 @@ public class DataCenterUpdateAction {
                                     rackStatusByName.put(zone.name, rackStatus);
                                     final V1StatefulSet sts = builder.buildStatefulSetRack(zones, zone.getName(), 1, rackStatus);
                                     updateDatacenterStatus(DataCenterPhase.SCALING_UP, zones, rackStatusByName);
-                                    logger.debug("datcenter={} SCALE_UP started in rack={} size={}",
-                                            dataCenter.id(), zone.name, zone.size);
+                                    logger.debug("datcenter={} SCALE_UP started in rack={} size={}", dataCenter.id(), zone.name, zone.size);
 
-                                    todo = todo.andThen(
-                                            k8sResourceUtils.createOrReplaceNamespacedService(builder.buildServiceSeed(zone.getName()))
-                                                    .flatMapCompletable(s -> {
-                                                        ConfigMapVolumeMounts configMapVolumeMounts = new ConfigMapVolumeMounts(zones, zone.name);
-                                                        return configMapVolumeMounts.createOrReplaceNamespacedConfigMaps();
-                                                    })
-                                                    .andThen(createNamespacedStatefulSet(sts)));
+                                    ConfigMapVolumeMounts configMapVolumeMounts = new ConfigMapVolumeMounts(zones, zone.name);
+                                    todo = todo.andThen(configMapVolumeMounts.createOrReplaceNamespacedConfigMaps())
+                                                    .andThen(createNamespacedStatefulSet(sts));
 
                                     // we preserve the DataCenterSpec only for config update, but this is the very first Statefulset creation
                                     // so we also have to backup the DataCenterSpec.
@@ -1103,11 +1099,10 @@ public class DataCenterUpdateAction {
         /**
          * Create a headless seed service per rack.
          *
-         * @param rack
          * @return
          * @throws ApiException
          */
-        // No used any more
+        /*
         public V1Service buildServiceSeed(String rack) throws ApiException {
             final V1ObjectMeta serviceMetadata = dataCenterObjectMeta(OperatorNames.seedsService(dataCenter))
                     // tolerate-unready-endpoints - allow the seed provider can discover the other seeds (and itself) before the readiness-probe gives the green light
@@ -1129,12 +1124,16 @@ public class DataCenterUpdateAction {
                             .selector(OperatorLabels.rack(dataCenter, rack))
                     );
         }
+        */
+
 
         public V1Service buildServiceNodes() {
-            final V1ObjectMeta serviceMetadata = dataCenterObjectMeta(OperatorNames.nodesService(dataCenter));
+            final V1ObjectMeta serviceMetadata = dataCenterObjectMeta(OperatorNames.nodesService(dataCenter))
+                    .putAnnotationsItem("service.alpha.kubernetes.io/tolerate-unready-endpoints", "true");
             final V1Service service = new V1Service()
                     .metadata(serviceMetadata)
                     .spec(new V1ServiceSpec()
+                            .publishNotReadyAddresses(true)
                             .type("ClusterIP")
                             .clusterIP("None")
                             .addPortsItem(new V1ServicePort().name("internode").port(dataCenterSpec.getSsl() ? dataCenterSpec.getSslStoragePort() : dataCenterSpec.getStoragePort()))
@@ -1242,6 +1241,8 @@ public class DataCenterUpdateAction {
             if (!remoteSeeders.isEmpty()) {
                 parameters.put("remote_seeders", String.join(", ", remoteSeeders));
             }
+            // Status callback URL allowing Cassandra nodes to notify the operator synchronously
+            parameters.put(ElassandraOperatorSeedProviderAndNotifier.STATUS_NOTIFIER_URL, "http://" + operatorConfig.getServiceName() + ":8080/node/" + dataCenterMetadata.getNamespace());
             logger.debug("seed parameters={}", parameters);
             final Map<String, Object> config = new HashMap<>(); // can't use ImmutableMap as some values are null
             config.put("seed_provider", ImmutableList.of(ImmutableMap.of(
@@ -1686,7 +1687,6 @@ public class DataCenterUpdateAction {
             final V1PodSpec podSpec = new V1PodSpec()
                     .securityContext(new V1PodSecurityContext().fsGroup(CASSANDRA_GROUP_ID))
                     .serviceAccountName(dataCenterSpec.getAppServiceAccount())
-                    .hostNetwork(dataCenterSpec.getHostNetworkEnabled())
                     .addInitContainersItem(buildInitContainerVmMaxMapCount())
                     .addContainersItem(cassandraContainer)
                     .addVolumesItem(new V1Volume()
@@ -1736,6 +1736,11 @@ public class DataCenterUpdateAction {
                                     )
                             )
                     );
+
+            // https://kubernetes.io/fr/docs/concepts/services-networking/dns-pod-service/#politique-dns-du-pod
+            if (dataCenterSpec.getHostNetworkEnabled()) {
+                podSpec.setDnsPolicy("ClusterFirstWithHostNet");
+            }
 
             if (dataCenterSpec.getSsl()) {
                 podSpec.addVolumesItem(new V1Volume()
@@ -2428,22 +2433,8 @@ public class DataCenterUpdateAction {
     }
 
     private void updateDatacenterStatus(DataCenterStatus status, DataCenterPhase dcPhase, Zones zones, Map<String, RackStatus> rackStatusMap, Optional<String> lastMeassage) {
-        final Map<String, ElassandraNodeStatus> podStatuses = new HashMap<>();
-
-        // update pod
-        int replicaCount = 0;
-        for (Zone zone : zones) {
-            for (int i = 0; i < zone.size && replicaCount < dataCenterSpec.getReplicas(); i++) {
-                ElassandraPod pod = new ElassandraPod(dataCenter, zone.name, i);
-                podStatuses.put(pod.getName(), elassandraNodeStatusCache.getOrDefault(pod, ElassandraNodeStatus.UNKNOWN));
-                replicaCount++;
-            }
-        }
-        status.setRackStatuses(rackStatusMap);
-        status.setElassandraNodeStatuses(podStatuses);
-
-        // update dc status
         status.setPhase(dcPhase);
+        status.setRackStatuses(rackStatusMap);
         status.setReplicas(zones.totalReplicas());
         status.setJoinedReplicas(rackStatusMap.values().stream().collect(Collectors.summingInt(RackStatus::getJoinedReplicas)));
         status.setReadyReplicas(zones.totalReadyReplicas());

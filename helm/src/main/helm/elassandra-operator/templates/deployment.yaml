@@ -71,6 +71,8 @@ spec:
           - name: OPERATOR_NAMESPACE
             value: {{ .Values.namespace }}
           {{- end }}
+          - name: OPERATOR_SERVICE_NAME
+            value: {{ template "elassandra-operator.fullname" . }}
           {{- if .Values.env }}
           {{- range $key, $val := .Values.env }}
           - name: {{ $key }}

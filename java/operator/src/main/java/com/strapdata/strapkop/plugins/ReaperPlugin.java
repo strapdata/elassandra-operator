@@ -115,7 +115,7 @@ public class ReaperPlugin extends AbstractPlugin {
             // reconcile reaper pds only of the DC is in running state in order to avoid connection issue on Reaper startup
             return (dataCenter.getSpec().getReaper().getEnabled()) ? createOrReplaceReaperObjects(dataCenter) : delete(dataCenter);
         } else {
-            logger.debug("DataCenter {} isn't in RUNNING Phase, skip reaper reconciliation");
+            logger.debug("datacenter={} isn't in RUNNING Phase, skip reaper reconciliation", dataCenter.id());
             return Completable.complete();
         }
     }
@@ -277,7 +277,11 @@ public class ReaperPlugin extends AbstractPlugin {
                 )
                 .addEnvItem(new V1EnvVar()
                         .name("REAPER_CASS_CONTACT_POINTS")
-                        .value("[" + OperatorNames.seedsService(dataCenter) + "]")
+                        .value("[" + OperatorNames.nodesService(dataCenter) + "]")
+                )
+                .addEnvItem(new V1EnvVar()
+                        .name("REAPER_JMX_PORTS")
+                        .value(Integer.toString(dataCenterSpec.getJmxPort()))
                 )
                 .addEnvItem(new V1EnvVar()
                         .name("REAPER_CASS_PORT")

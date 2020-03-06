@@ -1,5 +1,6 @@
 package com.strapdata.strapkop.reconcilier;
 
+import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.cql.CqlKeyspace;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRoleManager;
@@ -11,7 +12,6 @@ import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.task.ReplicationTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
-import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CustomObjectsApi;
@@ -41,6 +41,7 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
     private final CqlRoleManager cqlRoleManager;
     private final CqlKeyspaceManager cqlKeyspaceManager;
     private final JmxmpElassandraProxy jmxmpElassandraProxy;
+    private final ElassandraNodeStatusCache elassandraNodeStatusCache;
 
     public ReplicationTaskReconcilier(ReconcilierObserver reconcilierObserver,
                                       final DataCenterUpdateReconcilier dataCenterUpdateReconcilier,
@@ -50,12 +51,14 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
                                       final ApplicationContext context,
                                       final CqlRoleManager cqlRoleManager,
                                       final CqlKeyspaceManager cqlKeyspaceManager,
-                                      final MeterRegistry meterRegistry) {
-        super(reconcilierObserver, "replication", k8sResourceUtils, meterRegistry, dataCenterUpdateReconcilier);
+                                      final MeterRegistry meterRegistry,
+                                      final ElassandraNodeStatusCache elassandraNodeStatusCache) {
+        super(reconcilierObserver, "replication", k8sResourceUtils, meterRegistry, dataCenterUpdateReconcilier, elassandraNodeStatusCache);
         this.context = context;
         this.cqlRoleManager = cqlRoleManager;
         this.cqlKeyspaceManager = cqlKeyspaceManager;
         this.jmxmpElassandraProxy = jmxmpElassandraProxy;
+        this.elassandraNodeStatusCache = elassandraNodeStatusCache;
     }
 
     public BlockReason blockReason() {
@@ -142,14 +145,6 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
 
     @Override
     public Completable initializePodMap(Task task, DataCenter dc) {
-        if (ReplicationTaskSpec.Action.ADD.equals(task.getSpec().getReplication().getAction())) {
-            for (Map.Entry<String, ElassandraNodeStatus> entry : dc.getStatus().getElassandraNodeStatuses().entrySet()) {
-                if (!entry.getValue().equals(ElassandraNodeStatus.UNKNOWN)) {
-                    // only add reachable nodes (usually UNKNWON is used for unreachable or non bootstrapped node)
-                    task.getStatus().getPods().put(entry.getKey(), TaskPhase.WAITING);
-                }
-            }
-        }
-        return Completable.complete();
+        return initializePodMapWithKnownStatus(task, dc);
     }
 }

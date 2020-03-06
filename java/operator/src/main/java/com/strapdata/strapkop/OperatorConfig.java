@@ -19,11 +19,16 @@ public class OperatorConfig {
     @Nullable
     String namespace;
 
-    @Nullable
-    int k8sWatchPeriodInSec = 180;
+    /**
+     * Operator k8s service name used for callbacks
+     */
+    String serviceName;
 
     @Nullable
-    int elassandraNodeWatchPeriodInSec = 60;
+    int k8sWatchPeriodInSec = 200;
+
+    @Nullable
+    int elassandraNodeWatchPeriodInSec = 30;
 
     /**
      * Terminated task retention

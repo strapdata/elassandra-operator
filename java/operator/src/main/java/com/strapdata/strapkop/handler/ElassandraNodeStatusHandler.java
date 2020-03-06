@@ -38,13 +38,11 @@ public class ElassandraNodeStatusHandler extends TerminalHandler<NodeStatusEvent
     
     @Override
     public void accept(NodeStatusEvent event) throws ApiException {
-        logger.info("Processing a ElassandraNodeStatus event {} {} -> {}",
-                event.getPod().getName(),
-                event.getPreviousMode(), event.getCurrentMode());
+        logger.info("ElassandraNodeStatus event pod={} {} -> {}", event.getPod().id(), event.getPreviousMode(), event.getCurrentMode());
         
         if (event.getCurrentMode() != null && reconcileOperationModes.contains(event.getCurrentMode())) {
             final String clusterName = event.getPod().getCluster();
-            logger.debug("triggering dc reconciliation because of a ElassandraPodCrdStatus change");
+            logger.debug("pod={} new status={} => triggering dc reconciliation", event.getPod().id(), event.getCurrentMode());
             workQueues.submit(
                     new ClusterKey(clusterName, event.getPod().getNamespace()),
                     dataCenterReconcilier.reconcile(new Key(event.getPod().getParent(), event.getPod().getNamespace())));

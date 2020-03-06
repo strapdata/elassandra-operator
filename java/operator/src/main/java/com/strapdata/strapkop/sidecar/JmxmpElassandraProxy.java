@@ -114,14 +114,20 @@ public class JmxmpElassandraProxy {
                 });
     }
 
-    public void invalidateClient(ElassandraPod pod, Throwable t) throws IOException {
+    public void invalidateClient(ElassandraPod pod, Throwable t) {
         if (t instanceof java.net.UnknownHostException) {
             // pod hostname not yet available in the k8s DNS.
             logger.debug("Invalidating JMXMP connection UnknownHostException pod={}", pod.id());
         } else {
             logger.warn("Invalidating JMXMP connection pod="+pod.id(), t);
         }
-        jmxConnectorCache.remove(pod).close();
+        JMXConnector jmxConnector = jmxConnectorCache.remove(pod);
+        if (jmxConnector != null) {
+            try {
+                jmxConnector.close();
+            }catch (IOException e){
+            }
+        }
     }
 
     private SSLContext getSSLContext(String namespace) throws StrapkopException, ApiException, IOException, ExecutionException, InterruptedException, GeneralSecurityException {

@@ -63,6 +63,8 @@ public class DataCenterDeleteReconcilier extends Reconcilier<DataCenter> {
     public Completable reconcile(final DataCenter dataCenter) throws Exception {
         final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
         meterRegistry.counter("datacenter.delete").increment();
+
+
         return reconcilierObserver.onReconciliationBegin()
                 .andThen(pluginRegistry.deleteAll(dataCenter))
                 .andThen(context.createBean(DataCenterDeleteAction.class, dataCenter).deleteDataCenter(cqlSessionHandler))

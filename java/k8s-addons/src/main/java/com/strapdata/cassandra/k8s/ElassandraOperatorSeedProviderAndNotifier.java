@@ -30,6 +30,7 @@ public class ElassandraOperatorSeedProviderAndNotifier extends ElassandraOperato
     private static final Logger logger = LoggerFactory.getLogger(ElassandraOperatorSeedProviderAndNotifier.class);
 
     public static final String STATUS_NOTIFIER_URL = "cassandra.status_notifier_url";
+    public static final String STATUS_NOTIFIER_URL_PROPERTY = "cassandra.status_notifier_url";
     public static int MAX_QUEUE_SIZE = 64;
 
     String urlFormat;
@@ -43,7 +44,7 @@ public class ElassandraOperatorSeedProviderAndNotifier extends ElassandraOperato
         this.localDc = DatabaseDescriptor.getEndpointSnitch().getDatacenter(FBUtilities.getBroadcastAddress());
 
         // baseURL = http://operator/namespace
-        String baseUrl = System.getProperty(STATUS_NOTIFIER_URL);
+        String baseUrl = getSingleParameter(args, "status_notifier_url", STATUS_NOTIFIER_URL_PROPERTY, null);
         if (baseUrl == null) {
             this.endpointStatus = null;
             this.queue = null;
