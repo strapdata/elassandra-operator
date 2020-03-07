@@ -2,9 +2,9 @@ package com.strapdata.strapkop.reconcilier;
 
 import com.google.gson.JsonSyntaxException;
 import com.strapdata.strapkop.backup.BackupScheduler;
-import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
-import com.strapdata.strapkop.cache.SidecarConnectionCache;
+import com.strapdata.strapkop.cache.*;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
+import com.strapdata.strapkop.cql.CqlLicenseManager;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.cql.CqlSessionSupplier;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
@@ -34,8 +34,12 @@ public class DataCenterDeleteAction {
     private final DataCenter dataCenter;
     private final ElassandraNodeStatusCache elassandraNodeStatusCache;
     private final SidecarConnectionCache sidecarConnectionCache;
+    private final PodCache podCache;
+    private final StatefulsetCache statefulsetCache;
+    private final DeploymentCache deploymentCache;
     private final CqlKeyspaceManager cqlKeyspaceManager;
     private final CqlRoleManager cqlRoleManager;
+    private final CqlLicenseManager cqlLicenseManager;
     private final BackupScheduler backupScheduler;
     private final MeterRegistry meterRegistry;
 
@@ -44,8 +48,12 @@ public class DataCenterDeleteAction {
                                   AppsV1Api appsV1Api,
                                   ElassandraNodeStatusCache elassandraNodeStatusCache,
                                   SidecarConnectionCache sidecarConnectionCache,
+                                  PodCache podCache,
+                                  DeploymentCache deploymentCache,
+                                  StatefulsetCache statefulsetCache,
                                   CqlKeyspaceManager cqlKeyspaceManager,
                                   CqlRoleManager cqlRoleManager,
+                                  final CqlLicenseManager cqlLicenseManager,
                                   @Parameter("dataCenter") DataCenter dataCenter,
                                   BackupScheduler backupScheduler,
                                   final MeterRegistry meterRegistry) {
@@ -54,8 +62,12 @@ public class DataCenterDeleteAction {
         this.dataCenter = dataCenter;
         this.elassandraNodeStatusCache = elassandraNodeStatusCache;
         this.sidecarConnectionCache = sidecarConnectionCache;
+        this.podCache = podCache;
+        this.deploymentCache = deploymentCache;
+        this.statefulsetCache = statefulsetCache;
         this.cqlKeyspaceManager = cqlKeyspaceManager;
         this.cqlRoleManager = cqlRoleManager;
+        this.cqlLicenseManager = cqlLicenseManager;
         this.backupScheduler = backupScheduler;
         this.meterRegistry = meterRegistry;
     }
@@ -68,13 +80,16 @@ public class DataCenterDeleteAction {
 
                 backupScheduler.cancelBackups(new Key(dataCenter.getMetadata()));
 
-                cqlKeyspaceManager.removeDatacenter(dataCenter, cqlSessionSupplier);
-
-                final String labelSelector = OperatorLabels.toSelector(OperatorLabels.datacenter(dataCenter));
+                CqlSessionSupplier.closeQuietly(cqlSessionSupplier.getSession(dataCenter).blockingGet());
 
                 // cleanup local caches
                 elassandraNodeStatusCache.purgeDataCenter(dataCenter);
                 sidecarConnectionCache.purgeDataCenter(dataCenter);
+                podCache.purgeDataCenter(dataCenter);
+                deploymentCache.purgeDataCenter(dataCenter);
+                statefulsetCache.purgeDataCenter(dataCenter);
+
+                final String labelSelector = OperatorLabels.toSelector(OperatorLabels.datacenter(dataCenter));
 
                 // delete StatefulSets
                 k8sResourceUtils.listNamespacedStatefulSets(dataCenter.getMetadata().getNamespace(), null, labelSelector).forEach(statefulSet -> {
@@ -137,6 +152,7 @@ public class DataCenterDeleteAction {
                 // delete tasks
                 k8sResourceUtils.deleteTasks(dataCenter.getMetadata().getNamespace(), null).subscribe();
 
+                cqlLicenseManager.remove(dataCenter);
                 cqlRoleManager.remove(dataCenter);
                 cqlKeyspaceManager.remove(dataCenter);
 
