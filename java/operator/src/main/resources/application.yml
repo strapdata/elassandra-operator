@@ -5,6 +5,9 @@ micronaut:
         authority:
             type: FIXED
             number-of-threads: 2
+        reaper:
+            type: FIXED
+            number-of-threads: 2
         status:
             type: WORK_STEALING
     router:

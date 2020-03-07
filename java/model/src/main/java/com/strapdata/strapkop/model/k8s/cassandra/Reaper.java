@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Wither;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -49,4 +50,9 @@ public class Reaper {
     @SerializedName("ingressSuffix")
     @Expose
     private String ingressSuffix = null;
+
+    @SerializedName("reaperScheduledRepairs")
+    @Expose
+    private List<ReaperScheduledRepair> reaperScheduledRepairs = null;
+
 }

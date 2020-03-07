@@ -1,14 +1,18 @@
 package com.strapdata.strapkop.plugins;
 
 import com.google.common.collect.ImmutableMap;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.k8s.OperatorNames;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.ReaperScheduledRepair;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.client.RxHttpClient;
+import io.reactivex.Completable;
+import io.reactivex.Scheduler;
 import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
+import org.elasticsearch.common.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,6 +20,8 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLEncoder;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Matcher;
@@ -32,60 +38,71 @@ import static io.micronaut.http.HttpRequest.POST;
 public class ReaperClient implements Closeable {
 
     private final Logger logger = LoggerFactory.getLogger(ReaperClient.class);
-    
+
+    private final Scheduler scheduler;
     private final RxHttpClient adminHttpClient; // to request the "/ping" endpoint
     private final RxHttpClient httpClient;
     private final DataCenter dataCenter;
-    private final String username;
-    private final String password;
-    
-    public ReaperClient(DataCenter dc, String username, String password) throws MalformedURLException {
-        httpClient = RxHttpClient.create(new URL("http", ReaperPlugin.reaperName(dc), ReaperPlugin.APP_SERVICE_PORT, "/"));
-        adminHttpClient = RxHttpClient.create(new URL("http", ReaperPlugin.reaperName(dc), ReaperPlugin.ADMIN_SERVICE_PORT, "/"));
+    private String jwt = null;
+
+    public ReaperClient(DataCenter dc, Scheduler scheduler) throws MalformedURLException {
+        // cross namespace connection require a FQDN
+        String serviceName = ReaperPlugin.reaperName(dc) + "." + dc.getMetadata().getNamespace() + ".svc.cluster.local";
+        httpClient = RxHttpClient.create(new URL("http", serviceName, ReaperPlugin.APP_SERVICE_PORT, "/"));
+        adminHttpClient = RxHttpClient.create(new URL("http", serviceName, ReaperPlugin.ADMIN_SERVICE_PORT, "/"));
         this.dataCenter = dc;
-        this.username = username;
-        this.password = password;
+        this.scheduler = scheduler;
     }
-    
-    /**
-     * Check for the availability of reaper
-     */
-    public Single<Boolean> ping() {
-        return adminHttpClient.exchange(GET("/ping"))
-                .observeOn(Schedulers.io())
-                .map(res -> res.code() == 200)
-                .onErrorReturnItem(false)
-                .single(false);
-    }
-    
+
     /**
      * Register the cluster (the datacenter in fact, because reaper is configured with availability == EACH and local_dc)
      */
-    public Single<Boolean> registerCluster() {
-        
-        final String seedHost = OperatorNames.seedsService(dataCenter);
-        final int jmxPort = dataCenter.getSpec().getJmxPort();
+    public Single<Boolean> registerCluster(String username, String password) {
 
-        return authenticate()
+        final String seedHost = OperatorNames.nodesService(dataCenter);
+        final int jmxPort = dataCenter.getSpec().getJmxPort();
+        final String url = String.format("/cluster?seedHost=%s&jmxPort=%d", seedHost, jmxPort);
+        logger.debug("datacenter={} url={}", dataCenter.id(), url);
+
+        return authenticate(username, password)
                 .flatMap(jwt -> httpClient.exchange(
-                        POST(String.format("/cluster?seedHost=%s&jmxPort=%d", seedHost, jmxPort), "")
-                                .header("Authorization", String.format("Bearer %s", jwt))
-                        )
-                                .observeOn(Schedulers.io())
-                                .singleOrError()
-                ).map(res -> {
-                    logger.debug("reaper registration rc={}", res.getStatus());
-                    return res.getStatus().getCode() == 200;
-                });
+                        POST(url, "").header("Authorization", String.format(Locale.ROOT, "Bearer %s", jwt)))
+                        .observeOn(scheduler)
+                        .singleOrError()
+                        .map(res -> {
+                            logger.debug("datacenter={} reaper registration rc={}", dataCenter.id(), res.getStatus());
+                            return res.getStatus().getCode() == 200;
+                        }));
     }
-    
-    private String jwt = null;
-    
+
+    public Completable registerScheduledRepair(String username, String password, ReaperScheduledRepair reaperScheduledRepair) {
+        String url = "/repair_schedule?clusterName="+ URLEncoder.encode(dataCenter.getSpec().getClusterName()) +
+                "&owner=elassandra-operator";
+
+        if (!Strings.isNullOrEmpty(reaperScheduledRepair.getKeyspace()))
+            url += "&keyspace" + URLEncoder.encode(reaperScheduledRepair.getKeyspace());
+
+        //TODO add all params.
+
+        logger.debug("datacenter={} url={}", dataCenter.id(), url);
+
+        String url2 = url;
+        return authenticate(username, password)
+                .flatMap(jwt -> httpClient.exchange(
+                        POST(url2, "").header("Authorization", String.format("Bearer %s", jwt)))
+                        .observeOn(Schedulers.io())
+                        .singleOrError()
+                        .map(res -> {
+                            logger.debug("datacenter={} reaperScheduledRepair={} rc={}", dataCenter.id(), reaperScheduledRepair, res.getStatus().getCode());
+                            return res.getStatus().getCode() == 200;
+                        }))
+                .ignoreElement();
+    }
+
     /**
      * Encapsulate the authentication logic, fetch the jwt token the first time then store it for later reuse
      */
-    private Single<String> authenticate() {
-        
+    private Single<String> authenticate(String username, String password) {
         if (this.jwt != null) {
             return Single.just(this.jwt);
         }
@@ -116,7 +133,7 @@ public class ReaperClient implements Closeable {
     }
     
     /**
-     * call GET /jwt to get the token
+     * call GET /jwt with the cookie to get the token
      */
     private Single<String> getJwt(String cookie) {
         return httpClient.exchange(GET("/jwt").header("Cookie", cookie))

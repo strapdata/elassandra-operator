@@ -7,6 +7,8 @@ import com.strapdata.strapkop.cql.CqlRoleManager;
 import io.kubernetes.client.ApiException;
 import io.reactivex.Completable;
 
+import java.io.IOException;
+
 public interface Plugin {
 
     /**
@@ -37,7 +39,7 @@ public interface Plugin {
     /**
      * Call on each reconciliation
      */
-    Completable reconcile(final DataCenter dataCenter) throws ApiException, StrapkopException;
+    Completable reconcile(final DataCenter dataCenter) throws ApiException, StrapkopException, IOException;
 
     /**
      * Call when datacenter is reconcilied after a start or scale up/down
