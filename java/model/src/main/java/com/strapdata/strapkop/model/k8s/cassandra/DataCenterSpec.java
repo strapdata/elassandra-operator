@@ -108,6 +108,9 @@ public class DataCenterSpec {
     @Expose
     private Boolean snitchPreferLocal = true;
 
+    /**
+     * PVC spec
+     */
     @SerializedName("dataVolumeClaim")
     @Expose
     private V1PersistentVolumeClaimSpec dataVolumeClaim;
