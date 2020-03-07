@@ -19,21 +19,23 @@ import io.kubernetes.client.custom.IntOrString;
 import io.kubernetes.client.models.*;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
-import io.reactivex.Completable;
-import io.reactivex.Single;
+import io.micronaut.scheduling.executor.ExecutorFactory;
+import io.micronaut.scheduling.executor.UserExecutorConfiguration;
+import io.reactivex.*;
 import io.reactivex.schedulers.Schedulers;
 
+import javax.inject.Named;
 import javax.inject.Singleton;
+import java.io.IOException;
+import java.net.MalformedURLException;
 import java.util.*;
-import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Manage reaper deployment
  */
 @Singleton
 public class ReaperPlugin extends AbstractPlugin {
-
-    private String reaperAdminPassword = null; // keep password to avoid secret reloading.
 
     public static final Map<String, String> PODS_SELECTOR = ImmutableMap.of(
             "app.kubernetes.io/managed-by", "elassandra-operator",
@@ -45,14 +47,19 @@ public class ReaperPlugin extends AbstractPlugin {
     public static final int APP_SERVICE_PORT = 8080;      // the webui
     public static final int ADMIN_SERVICE_PORT = 8081;    // the REST API
 
+    public final Scheduler registrationScheduler;
+
     public ReaperPlugin(final ApplicationContext context,
                         K8sResourceUtils k8sResourceUtils,
                         AuthorityManager authorityManager,
                         CoreV1Api coreApi,
                         AppsV1Api appsApi,
                         OperatorConfig operatorConfig,
-                        MeterRegistry meterRegistry) {
-            super(context, k8sResourceUtils, authorityManager, coreApi, appsApi, operatorConfig, meterRegistry);
+                        MeterRegistry meterRegistry,
+                        ExecutorFactory executorFactory,
+                        @Named("reaper") UserExecutorConfiguration userExecutorConfiguration) {
+        super(context, k8sResourceUtils, authorityManager, coreApi, appsApi, operatorConfig, meterRegistry);
+        this.registrationScheduler = Schedulers.from(executorFactory.executorService(userExecutorConfiguration));
     }
 
     public static final CqlKeyspace REAPER_KEYSPACE = new CqlKeyspace("reaper_db", 3) {
@@ -110,7 +117,7 @@ public class ReaperPlugin extends AbstractPlugin {
     }
 
     @Override
-    public Completable reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
+    public Completable reconcile(DataCenter dataCenter) throws ApiException, StrapkopException, IOException {
         if (DataCenterPhase.RUNNING.equals(dataCenter.getStatus().getPhase())) {
             // reconcile reaper pds only of the DC is in running state in order to avoid connection issue on Reaper startup
             return (dataCenter.getSpec().getReaper().getEnabled()) ? createOrReplaceReaperObjects(dataCenter) : delete(dataCenter);
@@ -123,7 +130,7 @@ public class ReaperPlugin extends AbstractPlugin {
     @Override
     public Completable delete(final DataCenter dataCenter) throws ApiException {
         final String reaperLabelSelector = OperatorLabels.toSelector(reaperLabels(dataCenter));
-        return Completable.mergeArray(new Completable[] {
+        return Completable.mergeArray(new Completable[]{
                 k8sResourceUtils.deleteDeployment(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector),
                 k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector),
                 k8sResourceUtils.deleteIngress(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector)
@@ -131,7 +138,6 @@ public class ReaperPlugin extends AbstractPlugin {
             DataCenterStatus status = dataCenter.getStatus();
             status.setReaperPhase(ReaperPhase.ROLE_CREATED); // step back the phase to be in consistent state next time Reaper will be enabled
             REAPER_ROLE.setApplied(false); // mark Role as not applied to create it if the DC is recreated
-            this.reaperAdminPassword = null;
         }));
     }
 
@@ -139,7 +145,7 @@ public class ReaperPlugin extends AbstractPlugin {
      * @return The number of reaper pods depending on ReaperStatus
      */
     private int reaperReplicas(final DataCenter dataCenter) {
-        switch(dataCenter.getStatus().getReaperPhase()) {
+        switch (dataCenter.getStatus().getReaperPhase()) {
             case NONE:
                 return 0;
             case KEYSPACE_CREATED:
@@ -152,7 +158,7 @@ public class ReaperPlugin extends AbstractPlugin {
     }
 
 
-    public Completable createOrReplaceReaperObjects(final DataCenter dataCenter) throws ApiException, StrapkopException {
+    public Completable createOrReplaceReaperObjects(final DataCenter dataCenter) throws ApiException, StrapkopException, IOException {
         final V1ObjectMeta dataCenterMetadata = dataCenter.getMetadata();
         final DataCenterSpec dataCenterSpec = dataCenter.getSpec();
         final DataCenterStatus dataCenterStatus = dataCenter.getStatus();
@@ -182,7 +188,7 @@ public class ReaperPlugin extends AbstractPlugin {
                 .addContainersItem(container);
 
         if (dataCenterSpec.getImagePullSecrets() != null) {
-            for(String secretName : dataCenterSpec.getImagePullSecrets()) {
+            for (String secretName : dataCenterSpec.getImagePullSecrets()) {
                 final V1LocalObjectReference pullSecret = new V1LocalObjectReference().name(secretName);
                 podSpec.addImagePullSecretsItem(pullSecret);
             }
@@ -418,118 +424,103 @@ public class ReaperPlugin extends AbstractPlugin {
             if (datacenterGeneration == null) {
                 throw new StrapkopException(String.format("reaper deployment %s miss the annotation datacenter-generation", meta.getName()));
             }
-
-            if (Objects.equals(Long.parseLong(datacenterGeneration), dataCenterMetadata.getGeneration()) &&
-                    Objects.equals(existingDeployment.getSpec().getReplicas(), deployment.getSpec().getReplicas())) {
-                if (dataCenter.getStatus().getReaperPhase().equals(ReaperPhase.REGISTERED)) {
-                    return Completable.complete();
-                } else {
-                    return Completable.fromCallable(new Callable<DataCenter>() {
-                        /**
-                         * Computes a result, or throws an exception if unable to do so.
-                         *
-                         * @return computed result
-                         * @throws Exception if unable to compute a result
-                         */
-                        @Override
-                        public DataCenter call() throws Exception {
-                            return reconcileReaperRegistration(dataCenter);
-                        }
-                    });
-                }
-            }
         } catch (ApiException e) {
             if (e.getCode() != 404) {
                 throw e;
             }
         }
 
-        return getOrCreateReaperAdminPassword(dataCenter)
-                .flatMap(s -> k8sResourceUtils.createOrReplaceNamespacedService(service))
-                .flatMap(s -> ingress == null ? Single.just(s) : k8sResourceUtils.createOrReplaceNamespacedIngress(ingress).map(i -> s))
-                .flatMap(s -> k8sResourceUtils.createOrReplaceNamespacedDeployment(deployment))
-                .flatMapCompletable(d -> Completable.fromCallable(new Callable<DataCenter>() {
-                    /**
-                     * Computes a result, or throws an exception if unable to do so.
-                     *
-                     * @return computed result
-                     * @throws Exception if unable to compute a result
-                     */
-                    @Override
-                    public DataCenter call() throws Exception {
-                        return reconcileReaperRegistration(dataCenter);
-                    }
-                }));
+        List<CompletableSource> todoList = new ArrayList<>();
+        todoList.add(k8sResourceUtils.createOrReplaceNamespacedDeployment(deployment).ignoreElement());
+        todoList.add(k8sResourceUtils.createOrReplaceNamespacedService(service).ignoreElement());
+        if (ingress != null)
+            todoList.add(k8sResourceUtils.createOrReplaceNamespacedIngress(ingress).ignoreElement());
+
+        return Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()]));
     }
 
     private String reaperSecretName(DataCenter dataCenter) {
         return OperatorNames.dataCenterChildObjectName("%s-reaper", dataCenter);
     }
 
-
-    private Single<V1Secret> getOrCreateReaperAdminPassword(DataCenter dataCenter) throws ApiException {
-        V1ObjectMeta secretMeta = new V1ObjectMeta()
-                .name(reaperSecretName(dataCenter))
-                .namespace(dataCenter.getMetadata().getNamespace())
-                .addOwnerReferencesItem(OperatorNames.ownerReference(dataCenter))
-                .labels(OperatorLabels.cluster(dataCenter.getSpec().getClusterName()));
-
-        return k8sResourceUtils.readOrCreateNamespacedSecret(secretMeta, () -> {
-            V1Secret secret = new V1Secret().metadata(secretMeta);
-            secret.putStringDataItem("reaper.admin_password", UUID.randomUUID().toString());
-            return secret;
-        });
-    }
-
     /**
+     * Called form the ReaperPodHandler when repaer pod is ready.
      * As soon as reaper_db keyspace is created, this function try to ping the reaper api and, if success, register the datacenter.
      * THe registration is done only once. If the datacenter is unregistered by the user, it will not register it again automatically.
      */
-    private DataCenter reconcileReaperRegistration(DataCenter dc) throws StrapkopException, ApiException {
-
+    public Completable registerIfNeeded(DataCenter dc) throws StrapkopException, ApiException, MalformedURLException {
         if (!ReaperPhase.REGISTERED.equals(dc.getStatus().getReaperPhase()) && (
                 (dc.getSpec().getAuthentication().equals(Authentication.NONE) && ReaperPhase.KEYSPACE_CREATED.equals(dc.getStatus().getReaperPhase())) ||
                         !dc.getSpec().getAuthentication().equals(Authentication.NONE) && ReaperPhase.ROLE_CREATED.equals(dc.getStatus().getReaperPhase())
         )) {
-
-            if (reaperAdminPassword == null)
-                reaperAdminPassword = loadReaperAdminPassword(dc);
-
-            try (ReaperClient reaperClient = new ReaperClient(dc, "admin", reaperAdminPassword)) {
-
-                if (!reaperClient.ping().blockingGet()) {
-                    logger.info("reaper is not ready before registration, waiting");
-                }
-                else {
-                    reaperClient.registerCluster()
-                            .observeOn(Schedulers.io())
-                            .subscribeOn(Schedulers.io())
-                            .blockingGet();
-                    dc.getStatus().setReaperPhase(ReaperPhase.REGISTERED);
-                    logger.info("registered dc={} in cassandra-reaper", dc.getMetadata().getName());
-                }
-            }
-            catch (Exception e) {
-                dc.getStatus().setLastMessage(e.getMessage());
-                logger.error("error while registering dc={} in cassandra-reaper", dc.getMetadata().getName(), e);
-            }
+            ReaperClient reaperClient = new ReaperClient(dc, this.registrationScheduler);
+            return loadReaperAdminPassword(dc)
+                    .observeOn(Schedulers.io())
+                    .subscribeOn(Schedulers.io())
+                    .flatMap(password ->
+                            reaperClient.registerCluster("admin", password)
+                            .retryWhen((Flowable<Throwable> f) -> f.take(9).delay(21, TimeUnit.SECONDS))
+                    )
+                    .flatMapCompletable(bool -> {
+                        if (bool) {
+                            dc.getStatus().setReaperPhase(ReaperPhase.REGISTERED);
+                            logger.info("dc={} cassandra-reaper registred ", dc.id());
+                            return registerScheduledRepair(dc);
+                        }
+                        return Completable.complete();
+                    })
+                    .doFinally(() -> {
+                        if (reaperClient != null) {
+                            try {
+                                reaperClient.close();
+                            } catch (Throwable t) {
+                            }
+                        }
+                    })
+                    .doOnError(e -> {
+                        dc.getStatus().setLastMessage(e.getMessage());
+                        logger.error("datacenter={} error while registering in cassandra-reaper", dc.id(), e);
+                    });
         }
-        return dc;
+        return Completable.complete();
     }
 
     // TODO: cache cluster secret to avoid loading secret again and again
-    private String loadReaperAdminPassword(DataCenter dc) throws ApiException, StrapkopException {
+    private Single<String> loadReaperAdminPassword(DataCenter dc) throws ApiException, StrapkopException {
         final String secretName = reaperSecretName(dc);
-        final V1Secret secret = coreApi.readNamespacedSecret(secretName,
-                dc.getMetadata().getNamespace(),
-                null,
-                null,
-                null);
-        final byte[] password = secret.getData().get("reaper.admin_password");
-        if (password == null) {
-            throw new StrapkopException(String.format("secret %s does not contain reaper.admin_password", secretName));
-        }
-        return new String(password);
+        return k8sResourceUtils.readNamespacedSecret(dc.getMetadata().getNamespace(), secretName)
+                .map(secret -> {
+                    final byte[] password = secret.getData().get("reaper.admin_password");
+                    if (password == null) {
+                        throw new StrapkopException(String.format("secret %s does not contain reaper.admin_password", secretName));
+                    }
+                    return new String(password);
+                });
     }
 
+    public Completable registerScheduledRepair(DataCenter dc) throws MalformedURLException, ApiException {
+        ReaperClient reaperClient = new ReaperClient(dc, this.registrationScheduler);
+        return loadReaperAdminPassword(dc)
+                .observeOn(Schedulers.io())
+                .subscribeOn(Schedulers.io())
+                .flatMapCompletable(password -> {
+                    List<CompletableSource> todoList = new ArrayList<>();
+                    for(ReaperScheduledRepair reaperScheduledRepair : dc.getSpec().getReaper().getReaperScheduledRepairs()) {
+                        todoList.add(reaperClient.registerScheduledRepair("admin", password, reaperScheduledRepair));
+                    }
+                    return Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()]));
+                })
+                .doFinally(() -> {
+                    if (reaperClient != null) {
+                        try {
+                            reaperClient.close();
+                        } catch (Throwable t) {
+                        }
+                    }
+                })
+                .doOnError(e -> {
+                    dc.getStatus().setLastMessage(e.getMessage());
+                    logger.error("datacenter={} error while registering scheduled repair", dc.id(), e);
+                });
+    }
 }
