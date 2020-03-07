@@ -601,7 +601,11 @@ public class DataCenterUpdateAction {
                         // before scaling, if at least a pod is NORMAL, update keyspaces and roles if needed
                         todo = this.cqlKeyspaceManager.reconcileKeyspaces(dataCenter, cqlSessionHandler)
                                 .andThen(this.cqlRoleManager.reconcileRole(dataCenter, cqlSessionHandler))
-                                .andThen(this.cqlLicenseManager.verifyLicense(dataCenter, cqlSessionHandler))
+                                // Disable License check because elastic_admin [_datacenregroup] is sometime created after creating the elassandra_operator role.
+                                // => elassandra_operator cannot read the keyspace (role is granted for existing keyspaces at the creation  time)
+                                // => cannot check license when running cassandra only
+                                // => elastic_admin.license should not be in elastic_admin_datacentergroup.license....
+                                //.andThen(this.cqlLicenseManager.verifyLicense(dataCenter, cqlSessionHandler))
                                 .doFinally(new Action() {
                                     @Override
                                     public void run() throws Exception {
@@ -2177,10 +2181,10 @@ public class DataCenterUpdateAction {
                                     " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"beta.kubernetes.io/instance-type\"}}'| awk '!/<no value>/ { print $0 }' > /nodeinfo/instance-type " +
                                     " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"storagetier\"}}' | awk '!/<no value>/ { print $0 }' > /nodeinfo/storagetier " +
                                     // try to extract ExternalIP first
-                                    ((dataCenterSpec.getHostPortEnabled()) ? " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o jsonpath='{.status.addresses[?(@.type==\"ExternalIP\")].address}' > /nodeinfo/public-ip " : "") +
+                                    ((dataCenterSpec.getHostPortEnabled() || dataCenterSpec.getHostNetworkEnabled()) ? " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o jsonpath='{.status.addresses[?(@.type==\"ExternalIP\")].address}' > /nodeinfo/public-ip " : "") +
                                     // if ExternalIP isn't set, try to extract public ip annotation
-                                    ((dataCenterSpec.getHostPortEnabled()) ? " && ((PUB_IP=`cat /nodeinfo/public-ip` && test \"$PUB_IP\" = \"\" && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"kubernetes.strapdata.com/public-ip\"}}' | awk '!/<no value>/ { print $0 }' > /nodeinfo/public-ip) || true ) " : "") +
-                                    ((dataCenterSpec.getHostPortEnabled()) ? " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}' > /nodeinfo/node-ip " : "") +
+                                    ((dataCenterSpec.getHostPortEnabled() || dataCenterSpec.getHostNetworkEnabled()) ? " && ((PUB_IP=`cat /nodeinfo/public-ip` && test \"$PUB_IP\" = \"\" && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"kubernetes.strapdata.com/public-ip\"}}' | awk '!/<no value>/ { print $0 }' > /nodeinfo/public-ip) || true ) " : "") +
+                                    ((dataCenterSpec.getHostPortEnabled() || dataCenterSpec.getHostNetworkEnabled()) ? " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}' > /nodeinfo/node-ip " : "") +
                                     " && grep ^ /nodeinfo/* " +
                                     // here we create the CRD for ExternalDNS in order to register the Seed as DNS A Record (only node 0 of each rack is registered
                                     (updateDns ? " && ((IDX=`echo $POD_NAME | sed -r 's/^.*-0$/0/g' ` && test \"$IDX\" = \"0\" &&" +
