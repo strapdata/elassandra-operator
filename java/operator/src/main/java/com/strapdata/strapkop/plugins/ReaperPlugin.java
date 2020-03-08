@@ -171,6 +171,31 @@ public class ReaperPlugin extends AbstractPlugin {
                 .labels(labels)
                 .putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, dataCenter.getMetadata().getGeneration().toString());
 
+        // abort deployment replacement if it is already up to date (according to the annotation datacenter-generation and to spec.replicas)
+        // this is important because otherwise it generate a "larsen" : deployment replace -> k8s event -> reconciliation -> deployment replace...
+        Boolean deployRepear = true;
+        try {
+            final V1Deployment existingDeployment = appsApi.readNamespacedDeployment(meta.getName(), meta.getNamespace(), null, null, null);
+            final String reaperDatacenterGeneration = existingDeployment.getMetadata().getAnnotations().get(OperatorLabels.DATACENTER_GENERATION);
+
+            if (reaperDatacenterGeneration == null) {
+                throw new StrapkopException(String.format("reaper deployment %s miss the annotation datacenter-generation", meta.getName()));
+            }
+
+            if (reaperDatacenterGeneration.equals(dataCenter.getMetadata().getAnnotations().get(OperatorLabels.DATACENTER_GENERATION))) {
+                deployRepear = false;
+            }
+        } catch (ApiException e) {
+            if (e.getCode() != 404) {
+                throw e;
+            }
+        }
+
+        // no need to update repear deployment, already deployed with the current datacenter-generation annotation
+        if (!deployRepear)
+            return Completable.complete();
+
+
         final V1Container container = new V1Container();
 
         // Create an accumulator for JAVA_OPTS
@@ -415,21 +440,7 @@ public class ReaperPlugin extends AbstractPlugin {
             ingress = null;
         }
 
-        // abort deployment replacement if it is already up to date (according to the annotation datacenter-generation and to spec.replicas)
-        // this is important because otherwise it generate a "larsen" : deployment replace -> k8s event -> reconciliation -> deployment replace...
-        try {
-            final V1Deployment existingDeployment = appsApi.readNamespacedDeployment(meta.getName(), meta.getNamespace(), null, null, null);
-            final String datacenterGeneration = existingDeployment.getMetadata().getAnnotations().get(OperatorLabels.DATACENTER_GENERATION);
-
-            if (datacenterGeneration == null) {
-                throw new StrapkopException(String.format("reaper deployment %s miss the annotation datacenter-generation", meta.getName()));
-            }
-        } catch (ApiException e) {
-            if (e.getCode() != 404) {
-                throw e;
-            }
-        }
-
+        // deploy manifests in parallel
         List<CompletableSource> todoList = new ArrayList<>();
         todoList.add(k8sResourceUtils.createOrReplaceNamespacedDeployment(deployment).ignoreElement());
         todoList.add(k8sResourceUtils.createOrReplaceNamespacedService(service).ignoreElement());
