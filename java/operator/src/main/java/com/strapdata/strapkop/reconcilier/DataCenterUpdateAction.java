@@ -1741,7 +1741,8 @@ public class DataCenterUpdateAction {
 
             // https://kubernetes.io/fr/docs/concepts/services-networking/dns-pod-service/#politique-dns-du-pod
             if (dataCenterSpec.getHostNetworkEnabled()) {
-                podSpec.setDnsPolicy("ClusterFirstWithHostNet");
+                podSpec.setHostNetwork(true);
+                podSpec.setDnsPolicy("ClusterFirstWithHostNet");    // allow service DNS resolution
             }
 
             if (dataCenterSpec.getSsl()) {
