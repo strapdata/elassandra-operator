@@ -7,7 +7,6 @@ import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.cassandra.Block;
 import com.strapdata.strapkop.model.k8s.cassandra.BlockReason;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
-import com.strapdata.strapkop.model.k8s.task.ReplicationTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
 import com.strapdata.strapkop.model.k8s.task.TaskStatus;
@@ -309,19 +308,18 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
         return Completable.complete();
     }
 
-    public Completable initializePodMapWithKnownStatus(Task task, DataCenter dc) {
-        if (ReplicationTaskSpec.Action.ADD.equals(task.getSpec().getReplication().getAction())) {
-            for (Map.Entry<String, ElassandraNodeStatus> entry : elassandraNodeStatusCache.entrySet().stream()
-                    .filter(e -> e.getKey().getNamespace().equals(dc.getMetadata().getNamespace()) &&
-                            e.getKey().getCluster().equals(dc.getSpec().getClusterName()) &&
-                            e.getKey().getDataCenter().equals(dc.getSpec().getDatacenterName()))
-                    .collect(Collectors.toMap(e -> e.getKey().getName(), e -> e.getValue()))
-                    .entrySet()
-            ) {
-                if (!entry.getValue().equals(ElassandraNodeStatus.UNKNOWN)) {
-                    // only add reachable nodes (usually UNKNWON is used for unreachable or non bootstrapped node)
-                    task.getStatus().getPods().put(entry.getKey(), TaskPhase.WAITING);
-                }
+    // a possible implementation of initializePodMap
+    public Completable initializePodMapWithUnknownStatus(Task task, DataCenter dc) {
+        for (Map.Entry<String, ElassandraNodeStatus> entry : elassandraNodeStatusCache.entrySet().stream()
+                .filter(e -> e.getKey().getNamespace().equals(dc.getMetadata().getNamespace()) &&
+                        e.getKey().getCluster().equals(dc.getSpec().getClusterName()) &&
+                        e.getKey().getDataCenter().equals(dc.getSpec().getDatacenterName()))
+                .collect(Collectors.toMap(e -> e.getKey().getName(), e -> e.getValue()))
+                .entrySet()
+        ) {
+            if (!entry.getValue().equals(ElassandraNodeStatus.UNKNOWN)) {
+                // only add reachable nodes (usually UNKNWON is used for unreachable or non bootstrapped node)
+                task.getStatus().getPods().put(entry.getKey(), TaskPhase.WAITING);
             }
         }
         return Completable.complete();

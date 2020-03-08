@@ -85,6 +85,6 @@ public final class CleanupTaskReconcilier extends TaskReconcilier {
 
     @Override
     public Completable initializePodMap(Task task, DataCenter dc) {
-        return initializePodMapWithKnownStatus(task, dc);
+        return initializePodMapWithUnknownStatus(task, dc);
     }
 }
