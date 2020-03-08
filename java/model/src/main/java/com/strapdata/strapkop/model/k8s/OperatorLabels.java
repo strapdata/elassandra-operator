@@ -10,6 +10,8 @@ import java.util.Map;
 public final class OperatorLabels {
     public static final String POD = "statefulset.kubernetes.io/pod-name";
     public static final String ZONE = "failure-domain.beta.kubernetes.io/zone";
+    public static final String REGION = "failure-domain.beta.kubernetes.io/region";
+    public static final String INSTANCE_TYPE = "beta.kubernetes.io/instance-type";
     public static final String APP = "app";
 
 
