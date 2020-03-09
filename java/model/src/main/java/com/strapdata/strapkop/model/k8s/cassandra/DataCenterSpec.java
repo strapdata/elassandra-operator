@@ -190,6 +190,12 @@ public class DataCenterSpec {
     @Expose
     private Boolean hostNetworkEnabled = false;
 
+    /**
+     * Enable external LoadBalancer for each Elassandra node.
+     */
+    @SerializedName("nodeLoadBalancerEnabled")
+    @Expose
+    private Boolean nodeLoadBalancerEnabled = false;
 
     /**
      * Enable elasticsearch service
@@ -371,6 +377,7 @@ public class DataCenterSpec {
         acc.add(privilegedSupported);
         acc.add(hostNetworkEnabled);
         acc.add(hostPortEnabled);
+        acc.add(nodeLoadBalancerEnabled);
         acc.add(nativePort);
         acc.add(storagePort);
         acc.add(sslStoragePort);

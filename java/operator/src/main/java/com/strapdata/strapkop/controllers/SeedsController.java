@@ -65,7 +65,7 @@ public class SeedsController {
                 k8sResourceUtils.listNamespacedStatefulSets(namespace, null, OperatorLabels.toSelector(OperatorLabels.datacenter(dataCenter)))
                         .forEach(statefulSet -> {
                                 if (statefulSet != null && statefulSet.getStatus() != null && statefulSet.getStatus().getCurrentReplicas() != null && statefulSet.getStatus().getCurrentReplicas() > 0) {
-                                    String podName = OperatorNames.podName(dataCenter, statefulSet.getMetadata().getLabels().get(OperatorLabels.RACK), 0);
+                                    String podName = OperatorNames.podName(dataCenter, Integer.parseInt(statefulSet.getMetadata().getLabels().get(OperatorLabels.RACKINDEX)), 0);
                                     // retreive pod node IP
                                     final String labelSelector = OperatorLabels.toSelector(ImmutableMap.of(OperatorLabels.POD, podName));
                                     try {

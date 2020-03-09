@@ -14,13 +14,16 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 public class RackStatus {
-    
+
+    /**
+     * Rack name (or availability zone name)
+     */
     @SerializedName("name")
     @Expose
     private String name;
 
     /**
-     * Rack index starting at 0
+     * Rack index starting at 0 (Build form the DataCenterStatus.zones)
      */
     @SerializedName("index")
     @Expose
