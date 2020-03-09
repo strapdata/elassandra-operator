@@ -165,11 +165,12 @@ public class ReaperPlugin extends AbstractPlugin {
 
         final Map<String, String> labels = reaperLabels(dataCenter);
 
+        String datacenterGeneration = dataCenter.getMetadata().getGeneration().toString();
         final V1ObjectMeta meta = new V1ObjectMeta()
                 .name(reaperName(dataCenter))
                 .namespace(dataCenterMetadata.getNamespace())
                 .labels(labels)
-                .putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, dataCenter.getMetadata().getGeneration().toString());
+                .putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, datacenterGeneration);
 
         // abort deployment replacement if it is already up to date (according to the annotation datacenter-generation and to spec.replicas)
         // this is important because otherwise it generate a "larsen" : deployment replace -> k8s event -> reconciliation -> deployment replace...
@@ -182,7 +183,7 @@ public class ReaperPlugin extends AbstractPlugin {
                 throw new StrapkopException(String.format("reaper deployment %s miss the annotation datacenter-generation", meta.getName()));
             }
 
-            if (reaperDatacenterGeneration.equals(dataCenter.getMetadata().getAnnotations().get(OperatorLabels.DATACENTER_GENERATION))) {
+            if (reaperDatacenterGeneration.equals(datacenterGeneration)) {
                 deployRepear = false;
             }
         } catch (ApiException e) {
