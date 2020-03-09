@@ -1,0 +1,34 @@
+plugins {
+    id 'java'
+    id 'java-library'
+    id 'maven-publish'
+}
+
+tasks.withType(JavaCompile) {
+    options.compilerArgs += '-Xlint:none'
+}
+
+dependencies {
+    compile(group: 'com.datastax.cassandra', name:'cassandra-driver-core', version: '3.7.1')
+}
+
+jar {
+}
+
+repositories {
+    mavenLocal()
+}
+
+artifacts {
+    archives jar
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            groupId 'com.strapdata.strapkop'
+            artifactId 'driver-addons'
+            from components.java
+        }
+    }
+}

@@ -22,20 +22,20 @@ public class ElassandraNodeStatusCache extends Cache<ElassandraPod, ElassandraNo
         return ElassandraNodeStatus.NORMAL.equals(getOrDefault(pod, ElassandraNodeStatus.UNKNOWN));
     }
 
-    public long countNodesInStateForRack(String rack, ElassandraNodeStatus status) {
-        Objects.requireNonNull(rack, "rack parameter is null");
+    public long countNodesInStateForRack(Integer rackIndex, ElassandraNodeStatus status) {
+        Objects.requireNonNull(rackIndex, "rackIndex parameter is null");
         Objects.requireNonNull(status, "status parameter is null");
         long result =  this.entrySet().stream()
-                .filter(e -> rack.equals(e.getKey().getRack()))
+                .filter(e -> rackIndex.equals(e.getKey().getRackIndex()))
                 .filter(e -> status.equals(e.getValue()))
                 .count();
         return result;
     }
 
-    public Optional<ElassandraPod> getLastBootstrappedNodesForRack(String rack) {
-        Objects.requireNonNull(rack, "rack parameter is null");
+    public Optional<ElassandraPod> getLastBootstrappedNodesForRack(Integer rackIndex) {
+        Objects.requireNonNull(rackIndex, "rackIndex parameter is null");
         Optional<ElassandraPod> pod = this.entrySet().stream()
-                .filter(e -> rack.equals(e.getKey().getRack()))
+                .filter(e -> rackIndex.equals(e.getKey().getRackIndex()))
                 .filter(e -> ElassandraNodeStatus.NORMAL.equals(e.getValue()))
                 .sorted(new Comparator<Entry<ElassandraPod, ElassandraNodeStatus>>() {
                     @Override

@@ -39,6 +39,13 @@ public class OperatorNames {
                         + "-" + rack);
     }
 
+    public static String rackChildObjectIndex(final String nameFormat, final DataCenter dataCenter, final int rackIndex) {
+        return String.format(nameFormat,
+                "elassandra-" + dataCenter.getSpec().getClusterName()
+                        + "-" + dataCenter.getSpec().getDatacenterName()
+                        + "-" + rackIndex);
+    }
+
     public static String clusterSecret(final DataCenter dataCenter) {
         return OperatorNames.clusterChildObjectName("%s", dataCenter);
     }
@@ -79,12 +86,12 @@ public class OperatorNames {
         return OperatorNames.rackChildObjectName("%s", dataCenter, rack);
     }
 
-    public static String stsName(final DataCenter dataCenter, final String rack) {
-        return OperatorNames.rackChildObjectName("%s", dataCenter, rack);
+    public static String stsName(final DataCenter dataCenter, final int rack) {
+        return OperatorNames.rackChildObjectIndex("%s", dataCenter, rack);
     }
 
-    public static String podName(final DataCenter dataCenter, final String rack, int podIndex) {
-        return OperatorNames.rackChildObjectName("%s-" + podIndex, dataCenter, rack);
+    public static String podName(final DataCenter dataCenter, final int rack, int podIndex) {
+        return OperatorNames.rackChildObjectIndex("%s-" + podIndex, dataCenter, rack);
     }
 
     public static String podFqdn(final DataCenter dc, final String podName) {

@@ -7,10 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Wither;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 @Data
 @Wither
@@ -91,11 +88,18 @@ public class DataCenterStatus {
     private String currentTask = null;
 
     /**
-     * State of cassandra racks.
+     * Ordered availability zones
+     */
+    @SerializedName("zones")
+    @Expose
+    private List<String> zones = new ArrayList<>();
+
+    /**
+     * State of cassandra racks by zone index.
      */
     @SerializedName("rackStatuses")
     @Expose
-    private Map<String, RackStatus> rackStatuses = new HashMap<>();
+    private Map<Integer, RackStatus> rackStatuses = new HashMap<>();
 
     /**
      * Cassandra reaper status

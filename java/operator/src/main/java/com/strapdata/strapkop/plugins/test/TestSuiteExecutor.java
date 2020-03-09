@@ -291,7 +291,7 @@ public abstract class TestSuiteExecutor {
         }
 
         // a parked DC must have all replicas marked as parked
-        Map<String, RackStatus> rackStatuses = dc.getStatus().getRackStatuses();
+        Map<Integer, RackStatus> rackStatuses = dc.getStatus().getRackStatuses();
         assertEquals("Parked rack should have parked replicas", dc.getSpec().getReplicas(),
                 rackStatuses.values().stream()
                         .map(rackStatus -> rackStatus.getParkedReplicas())

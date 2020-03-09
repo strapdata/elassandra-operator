@@ -67,6 +67,7 @@ ES_USE_INTERNAL_ADDRESS=""
 BROADCAST_ADDRESS="$POD_IP"
 BROADCAST_RPC_ADDRESS="$POD_IP"
 
+
 if [ -f "/nodeinfo/node-ip" ] && [ -s "/nodeinfo/node-ip" ]; then
     NODE_IP=$(cat /nodeinfo/node-ip)
     BROADCAST_ADDRESS=$NODE_IP
@@ -80,6 +81,14 @@ if [ -f "/nodeinfo/public-ip" ] && [ -s "/nodeinfo/public-ip" ]; then
    BROADCAST_ADDRESS=$PUBLIC_IP
    ES_USE_INTERNAL_ADDRESS="-Des.use_internal_address=true"
 fi
+
+if [ -f "/nodeinfo/public-name" ] && [ -s "/nodeinfo/public-name" ]; then
+    PUBLIC_NAME=$(cat /nodeinfo/public-name)
+    BROADCAST_ADDRESS="$PUBLIC_NAME"
+    BROADCAST_RPC_ADDRESS="$PUBLIC_NAME"
+    ES_USE_INTERNAL_ADDRESS="-Des.use_internal_address=true"
+fi
+
 
 # Define broadcast address
 echo "broadcast_address: $BROADCAST_ADDRESS" > /etc/cassandra/cassandra.yaml.d/002-broadcast_address.yaml

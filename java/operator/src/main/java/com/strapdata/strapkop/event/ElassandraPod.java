@@ -27,7 +27,7 @@ public class ElassandraPod {
     private String parent;
     // rack & ssl not always initialize and this object is define as a key in ElassandraPod cache, exclude these fields
     @EqualsAndHashCode.Exclude
-    private String rack;
+    private int rackIndex;
 
     @EqualsAndHashCode.Exclude
     private boolean ssl = false;
@@ -37,14 +37,14 @@ public class ElassandraPod {
 
     final static Pattern podNamePattern = Pattern.compile("elassandra-([\\w]+)-([\\w]+)-([\\w-]+)-([\\d]+)");
 
-    public ElassandraPod(final DataCenter dc, final String rack, final int index) {
-        this.setName(OperatorNames.podName(dc, rack, index))
-                .setFqdn(OperatorNames.podFqdn(dc, OperatorNames.podName(dc, rack, index)))
+    public ElassandraPod(final DataCenter dc, final int rackIndex, final int index) {
+        this.setName(OperatorNames.podName(dc, rackIndex, index))
+                .setFqdn(OperatorNames.podFqdn(dc, OperatorNames.podName(dc, rackIndex, index)))
                 .setCluster(dc.getSpec().getClusterName())
                 .setDataCenter(dc.getSpec().getDatacenterName())
                 .setParent(dc.getMetadata().getName())
                 .setNamespace(dc.getMetadata().getNamespace())
-                .setRack(rack)
+                .setRackIndex(rackIndex)
                 .setSsl(dc.getSpec().getSsl())
                 .setEsPort(dc.getSpec().getElasticsearchPort());
     }
@@ -67,7 +67,7 @@ public class ElassandraPod {
                     labels.get(OperatorLabels.CLUSTER),
                     labels.get(OperatorLabels.DATACENTER),
                     metadata.getName())
-                    .setRack(labels.get(OperatorLabels.RACK));
+                    .setRackIndex(Integer.parseInt(labels.get(OperatorLabels.RACKINDEX)));
         }
         throw new IllegalArgumentException("Pod name=" + metadata.getName() + " does not match expected regular expression");
     }
@@ -75,7 +75,7 @@ public class ElassandraPod {
     public static ElassandraPod fromName(final DataCenter dc, final String podName) {
         Matcher matcher = podNamePattern.matcher(podName);
         if (matcher.matches()) {
-            return new ElassandraPod(dc, matcher.group(3), Integer.parseInt(matcher.group(4)));
+            return new ElassandraPod(dc, Integer.parseInt(matcher.group(3)), Integer.parseInt(matcher.group(4)));
         }
         throw new IllegalArgumentException("Pod name=" + podName + " does not match expected regular expression");
     }
