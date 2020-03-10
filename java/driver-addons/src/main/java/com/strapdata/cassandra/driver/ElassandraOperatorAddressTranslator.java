@@ -14,8 +14,8 @@ import java.util.regex.Pattern;
 
 /**
  * Scan DNS names to build a map of pub IP -> Priv name
- * Private name: elassandra-clusterName-datacenterName-rackIndex-podIndex.serviceName.namespace.svc.cluster.local
- * Public name: cassandra-[externalDns.root]-rackIndex-podIndex.[externalDns.domain]
+ * Private internal name: elassandra-clusterName-datacenterName-rackIndex-podIndex.serviceName.namespace.svc.cluster.local
+ * Public  external name: cassandra-[externalDns.root]-rackIndex-podIndex.[externalDns.domain]
  *
  * CASSANDRA_TRANSLATOR_INTERNAL=
  * CASSANDRA_TRANSLATOR_EXTERNAL=
