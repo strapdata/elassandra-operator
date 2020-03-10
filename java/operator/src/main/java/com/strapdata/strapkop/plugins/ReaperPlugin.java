@@ -326,7 +326,25 @@ public class ReaperPlugin extends AbstractPlugin {
                 .addEnvItem(new V1EnvVar()
                         .name("JWT_SECRET")
                         .value(Base64.getEncoder().encodeToString(dataCenterSpec.getReaper().getJwtSecret().getBytes()))
-                );
+                )
+                .addEnvItem(new V1EnvVar()
+                        .name("REAPER_CASS_ADDRESS_TRANSLATOR_TYPE")
+                        .value("elassandraOperator")
+                )
+                .addEnvItem(new V1EnvVar()
+                        .name("JMX_ADDRESS_TRANSLATOR_TYPE")
+                        .value("elassandraOperator")
+                )
+                .addEnvItem(new V1EnvVar()
+                        .name("CASSANDRA_TRANSLATOR_INTERNAL")
+                        .value("elassandra-"+dataCenterSpec.getClusterName().toLowerCase(Locale.ROOT) +
+                                "-" +dataCenterSpec.getDatacenterName().toLowerCase(Locale.ROOT) + "-0-0")
+                )
+                .addEnvItem(new V1EnvVar()
+                        .name("CASSANDRA_TRANSLATOR_EXTERNAL")
+                        .value("cassandra-" +  dataCenterSpec.getExternalDns().getRoot() + "-0-0." + dataCenterSpec.getExternalDns().getDomain())
+                )
+        ;
 
 
         // reaper with cassandra authentication
