@@ -13,10 +13,7 @@ import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
-import com.strapdata.strapkop.model.k8s.cassandra.Authentication;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenterSpec;
-import com.strapdata.strapkop.model.k8s.cassandra.KibanaSpace;
+import com.strapdata.strapkop.model.k8s.cassandra.*;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
@@ -163,7 +160,8 @@ public class KibanaPlugin extends AbstractPlugin {
      */
     private int kibanaReplicas(final DataCenter dataCenter, KibanaSpace kibanaSpace) {
         Integer version = dataCenter.getSpec().getKibana().getVersion();
-        return (dataCenter.getStatus().getBootstrapped() == true &&
+        return  (dataCenter.getStatus().getPhase().isReady() &&
+                dataCenter.getStatus().getBootstrapped() == true &&
                 dataCenter.getStatus().getKeyspaceManagerStatus().getKeyspaces().contains(kibanaSpace.keyspace(version))) ? kibanaSpace.getReplicas() : 0;
     }
 
