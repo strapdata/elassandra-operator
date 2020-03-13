@@ -8,18 +8,22 @@ import com.strapdata.cassandra.k8s.ElassandraOperatorSeedProviderAndNotifier;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.backup.BackupScheduler;
+import com.strapdata.strapkop.cache.CheckPoint;
 import com.strapdata.strapkop.cache.CheckPointCache;
-import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
+import com.strapdata.strapkop.cache.NodeCache;
 import com.strapdata.strapkop.cql.*;
 import com.strapdata.strapkop.event.ElassandraPod;
+import com.strapdata.strapkop.event.Pod;
+import com.strapdata.strapkop.handler.NodeHandler;
+import com.strapdata.strapkop.handler.StatefulsetHandler;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.cassandra.*;
-import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
+import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.plugins.PluginRegistry;
-import com.strapdata.strapkop.sidecar.SidecarClientFactory;
+import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import com.strapdata.strapkop.ssl.utils.X509CertificateAndPrivateKey;
 import com.strapdata.strapkop.utils.CloudStorageSecretsKeys;
@@ -35,14 +39,11 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
-import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.uri.UriTemplate;
 import io.reactivex.Completable;
 import io.reactivex.CompletableSource;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
 import io.reactivex.functions.Action;
-import io.vavr.collection.Stream;
 import lombok.Data;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.bouncycastle.operator.OperatorCreationException;
@@ -55,7 +56,6 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.security.GeneralSecurityException;
 import java.util.*;
-import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -96,14 +96,12 @@ public class DataCenterUpdateAction {
     private final V1ObjectMeta dataCenterMetadata;
     private final DataCenterSpec dataCenterSpec;
     private final DataCenterStatus dataCenterStatus;
-    private final SidecarClientFactory sidecarClientFactory;
 
     private final CqlRoleManager cqlRoleManager;
     private final CqlLicenseManager cqlLicenseManager;
     private final CqlKeyspaceManager cqlKeyspaceManager;
     private final PluginRegistry pluginRegistry;
-
-    private final CheckPointCache checkPointCache;
+    private final JmxmpElassandraProxy jmxmpElassandraProxy;
 
     private final OperatorConfig operatorConfig;
 
@@ -111,7 +109,11 @@ public class DataCenterUpdateAction {
 
     private final ManifestReaderFactory manifestReaderFactory;
 
-    private final ElassandraNodeStatusCache elassandraNodeStatusCache;
+    private final NodeCache nodeCache;
+    private final CheckPointCache checkPointCache;
+
+    private TreeMap<String, V1StatefulSet> statefulSetTreeMap;
+    private Zones zones;
 
     private final BackupScheduler backupScheduler;
 
@@ -125,13 +127,13 @@ public class DataCenterUpdateAction {
                                   final AuthorityManager authorityManager,
                                   final CqlRoleManager cqlRoleManager,
                                   final CqlKeyspaceManager cqlKeyspaceManager,
-                                  final ElassandraNodeStatusCache elassandraNodeStatusCache,
-                                  final SidecarClientFactory sidecarClientFactory,
+                                  final NodeCache nodeCache,
+                                  final CheckPointCache checkPointCache,
+                                  final JmxmpElassandraProxy jmxmpElassandraProxy,
                                   @Parameter("dataCenter") DataCenter dataCenter,
                                   final CqlLicenseManager cqlLicenseManager,
                                   final ManifestReaderFactory factory,
                                   final OperatorConfig operatorConfig,
-                                  final CheckPointCache checkPointCache,
                                   final BackupScheduler backupScheduler,
                                   final MeterRegistry meterRegistry,
                                   final PluginRegistry pluginRegistry) {
@@ -152,8 +154,9 @@ public class DataCenterUpdateAction {
         this.cqlRoleManager = cqlRoleManager;
         this.cqlLicenseManager = cqlLicenseManager;
         this.cqlKeyspaceManager = cqlKeyspaceManager;
-        this.elassandraNodeStatusCache = elassandraNodeStatusCache;
-        this.sidecarClientFactory = sidecarClientFactory;
+        this.nodeCache = nodeCache;
+
+        this.jmxmpElassandraProxy = jmxmpElassandraProxy;
         if (dataCenter.getStatus() == null) {
             dataCenter.setStatus(new DataCenterStatus());
         }
@@ -178,182 +181,17 @@ public class DataCenterUpdateAction {
         this.pluginRegistry = pluginRegistry;
     }
 
-    /**
-     * Fetch existing statefulsets from k8s api and sort then by zone name
-     *
-     * @return a map of zone name -> statefulset
-     * @throws ApiException      if there is an error with k8s api
-     * @throws StrapkopException if the statefulset has no RACK label or if two statefulsets has the same zone label
-     */
-    public Single<TreeMap<String, V1StatefulSet>> fetchExistingStatefulSetsByZone() throws ApiException, StrapkopException {
-        return Single.fromCallable(new Callable<TreeMap<String, V1StatefulSet>>() {
-            @Override
-            public TreeMap<String, V1StatefulSet> call() throws Exception {
-                final Iterable<V1StatefulSet> statefulSetsIterable = k8sResourceUtils.listNamespacedStatefulSets(
-                        dataCenterMetadata.getNamespace(), null,
-                        OperatorLabels.toSelector(OperatorLabels.datacenter(dataCenter)));
-
-                final TreeMap<String, V1StatefulSet> result = new TreeMap<>();
-
-                for (V1StatefulSet sts : statefulSetsIterable) {
-                    final String zone = sts.getMetadata().getLabels().get(OperatorLabels.RACK);
-
-                    if (zone == null) {
-                        throw new StrapkopException(String.format(Locale.ROOT, "statefulset %s has no RACK label", sts.getMetadata().getName()));
-                    }
-                    if (result.containsKey(zone)) {
-                        throw new StrapkopException(String.format(Locale.ROOT, "two statefulsets in the same zone=%s dc=%s", zone, dataCenter.getMetadata().getName()));
-                    }
-                    result.put(zone, sts);
-                }
-
-                return result;
-            }
-        });
+    public DataCenterUpdateAction setStatefulSetTreeMap(TreeMap<String, V1StatefulSet> statefulSetTreeMap) {
+        this.statefulSetTreeMap = statefulSetTreeMap;
+        this.zones = new Zones(dataCenterStatus, nodeCache.values(), this.statefulSetTreeMap);
+        return this;
     }
 
     /**
-     * Set the unscheduled pod's rack phase = SCHEDULING_PENDING, and dc phase = ERROR
-     * @return
-     * @throws Exception
+     * Init a new datacenter with its first node
      */
-    public Completable switchDataCenterUpdateOff(ElassandraPod unscheduledPod) throws Exception {
-        return fetchExistingStatefulSetsByZone()
-                .flatMapCompletable(existingStsMap -> {
-                    Zones zones = new Zones(dataCenterStatus, this.coreApi, existingStsMap);
-
-                    // 1.lookup for evolving rack
-                    final Map<String, RackStatus> rackStatusByName = new HashMap<>();
-                    RackStatus movingRack = null;
-                    for (RackStatus rackStatus : dataCenterStatus.getRackStatuses().values()) {
-                        rackStatusByName.put(rackStatus.getName(), rackStatus);
-                        if (!rackStatus.getPhase().equals(RackPhase.RUNNING)) {
-                            if (movingRack != null) {
-                                logger.error("datacenter={} Found more than one moving rack=[{},{}]", dataCenter.id(), movingRack.getName(), rackStatus.getName());
-                            }
-
-                            movingRack = rackStatus;
-                            int movingRackIndex = dataCenterStatus.getZones().indexOf(movingRack.getName());
-                            if (movingRack.getPhase().equals(RackPhase.UPDATING) && movingRackIndex == unscheduledPod.getRackIndex()) {
-                                logger.debug("datacenter={} Set rack={} phase={}", dataCenter.id(), movingRack.getName(), RackPhase.SCHEDULING_PENDING);
-                                movingRack.setPhase(RackPhase.SCHEDULING_PENDING);
-                            }
-                        }
-                    }
-                    updateDatacenterStatus(DataCenterPhase.ERROR, zones, rackStatusByName, Optional.of("Unable to schedule Pod " + unscheduledPod.getName()));
-                    return Completable.complete();
-                });
-    }
-
-    public Completable freePodResource(ElassandraPod deletedPod) throws Exception {
-        // delete PVC only if the node was decommissioned to avoid deleting PVC in unexpectedly killed pod during a DC ScaleDown
-        ElassandraNodeStatus podStatus = Optional.ofNullable(elassandraNodeStatusCache.get(deletedPod)).orElse(ElassandraNodeStatus.UNKNOWN);
-        if (ElassandraNodeStatus.DECOMMISSIONED.equals(podStatus)) {
-            switch (dataCenterSpec.getDecommissionPolicy()) {
-                case KEEP_PVC:
-                    break;
-                case BACKUP_AND_DELETE_PVC:
-                    // TODO
-                    break;
-                case DELETE_PVC:
-                    List<V1PersistentVolumeClaim> pvcsToDelete = Stream.ofAll(k8sResourceUtils.listNamespacedPodsPersitentVolumeClaims(
-                            dataCenterMetadata.getNamespace(),
-                            null,
-                            OperatorLabels.toSelector(OperatorLabels.rackIndex(dataCenter, deletedPod.getRackIndex()))))
-                            .filter(pvc -> {
-                                boolean match = pvc.getMetadata().getName().endsWith(deletedPod.getName());
-                                logger.info("PVC {} will be deleted due to pod {} deletion", pvc.getMetadata().getName(), deletedPod.getName());
-                                return match;
-                            }).collect(Collectors.toList());
-
-                    if (pvcsToDelete.size() > 1) {
-                        logger.error("Too many PVC found for deletion, cancel it ! (List of PVC = {})", pvcsToDelete);
-                    } else if (!pvcsToDelete.isEmpty()) {
-                        return k8sResourceUtils.deletePersistentVolumeClaim(pvcsToDelete.get(0));
-                    }
-            }
-        } else {
-            logger.warn("Resources can't be delete for pod={} with status={}", deletedPod.getName(), podStatus);
-        }
-        return Completable.complete();
-    }
-
-    public Completable rollbackDataCenter(Key key) throws Exception {
-        return fetchExistingStatefulSetsByZone()
-                .flatMapCompletable(existingStsMap -> {
-                    Zones zones = new Zones(dataCenterStatus, this.coreApi, existingStsMap);
-
-                    // 1.lookup for unscheduled rack
-                    final Map<String, RackStatus> rackStatusByName = new HashMap<>();
-                    boolean foundUnscheduledRack = false;
-                    for (RackStatus rackStatus : dataCenterStatus.getRackStatuses().values()) {
-                        rackStatusByName.put(rackStatus.getName(), rackStatus);
-                        if (rackStatus.getPhase().equals(RackPhase.SCHEDULING_PENDING)) {
-                            foundUnscheduledRack = true;
-                        }
-                    }
-
-                    if (!foundUnscheduledRack) {
-                        logger.warn("datacenter={} Rollback requested but there are no rack in phase={}. Rollback is cancelled !",
-                                dataCenter.id(), RackPhase.SCHEDULING_PENDING);
-                        return Completable.complete();
-                    }
-
-                    Completable todo = Completable.complete();
-                    if (checkPointCache.getCheckPoint(key).isPresent()) {
-                        final CheckPointCache.CheckPoint checkPoint = checkPointCache.rollbackCheckPoint(key);
-                        logger.info("datacenter={} Try to restore DataCenter configuration with fingerprint '{}' and userConfigMap '{}'",
-                                dataCenter.id(), checkPoint.getCommittedSpec().fingerprint(), checkPoint.getCommittedUserConfigMap());
-
-                        if (checkPoint.getCommittedUserConfigMap() != null) {
-                            logger.trace("ROLLBACK user ConfigMap : {}", dataCenterSpec.getUserConfigMapVolumeSource().getName());
-                            V1ConfigMap previousUserConfig = k8sResourceUtils.readNamespacedConfigMap(dataCenterMetadata.getNamespace(), checkPoint.getCommittedUserConfigMap()).blockingGet();
-                            // override the current ConfigMap with the Previous one
-                            // force the ConfigMap name with the previous one without fingerprint
-                            logger.trace("RESTORE user ConfigMap : {}", checkPoint.getCommittedSpec().getUserConfigMapVolumeSource().getName());
-                            previousUserConfig.getMetadata().setName(checkPoint.getCommittedSpec().getUserConfigMapVolumeSource().getName());
-                            todo = todo.andThen(k8sResourceUtils.createOrReplaceNamespacedConfigMap(previousUserConfig).ignoreElement());
-                        } else {
-                            logger.info("datacenter={} No user ConfigMap to restore", dataCenter.id());
-                        }
-
-                        // restore previous configuration
-                        logger.trace("ROLLBACK DataCenter Spec : {}", dataCenterSpec);
-                        logger.trace("RESTORE DataCenter Spec : {}", checkPoint.getCommittedSpec());
-                        dataCenter.setSpec(checkPoint.getCommittedSpec());
-                        todo = todo.andThen(k8sResourceUtils.updateDataCenter(dataCenter)
-                                .flatMapCompletable((updatedDatacenter) -> {
-                                    // update dc status
-                                    updateDatacenterStatus(updatedDatacenter.getStatus(), DataCenterPhase.ROLLING_BACK, zones, rackStatusByName, Optional.of(""));
-                                    return k8sResourceUtils.updateDataCenterStatus(updatedDatacenter).ignoreElement();
-                                }));
-                    }
-                    // update dc status
-                    updateDatacenterStatus(dataCenterStatus, DataCenterPhase.ROLLING_BACK, zones, rackStatusByName, Optional.of(""));
-                    return todo.andThen(k8sResourceUtils.updateDataCenterStatus(dataCenter).ignoreElement());
-                });
-    }
-
-    /**
-     * Reconcile ONE rack at a time to reach the desired configuration.
-     * 1.check for moving rack until operation is completed.
-     * 2.check for next rack to update.
-     * => Datacenter phase is the phase of the moving rack or RUNNING when there is nothing to do.
-     * => rack operation = { UPDATE, SCALE_UP, SCALE_DOWN, EXECUTE_TASK, FAILED }
-     * => rack state = { NORMAL, UPDATING, SCALING_IP, SCALING_DOWN, EXECUTING_TASK }
-     *
-     * @return
-     * @throws Exception
-     */
-    public Completable reconcileDataCenter() throws Exception {
-        logger.info("datacenter={} Reconciling phase={}", dataCenter.id(), dataCenterStatus.getPhase());
-        meterRegistry.counter("datacenter.reconciliation").increment();
-
-        if (dataCenterSpec.getReplicas() <= 0) {
-            meterRegistry.counter("datacenter.reconciliation.error").increment();
-            throw new StrapkopException(String.format(Locale.ROOT, "dc=%s has an invalid number of replicas", dataCenterMetadata.getName()));
-        }
-
+    public Completable initDatacenter() throws IOException, ApiException {
+        logger.debug("########## datacenter={} new datacenter", dataCenter.id());
         return Single.zip(
                 k8sResourceUtils.createOrReplaceNamespacedService(builder.buildServiceNodes()),
                 k8sResourceUtils.createOrReplaceNamespacedService(builder.buildServiceElasticsearch()),
@@ -419,397 +257,339 @@ public class DataCenterUpdateAction {
                                                         throw new RuntimeException(e);
                                                     }
                                                 });
-                                    }).map(s2 -> passwords);
+                                    });
                 })
-                .flatMap(s4 -> fetchExistingStatefulSetsByZone())
-                .flatMapCompletable(existingStsMap -> {
-                    Zones zones = new Zones(dataCenterStatus, this.coreApi, existingStsMap);
-                    final Map<String, RackStatus> rackStatusByName = new HashMap<>();
+                .flatMap(password -> {
+                    V1Node node = nodeCache.values().iterator().next();
+                    RackStatus rackStatus = new RackStatus()
+                            .withDesiredReplicas(1)
+                            .withParkedReplicas(0)
+                            .withPhase(RackPhase.CREATING)
+                            .withSeedHostId(UUID.randomUUID())
+                            .withIndex(0)
+                            .withName(NodeHandler.getZone(node));
 
-                    // 1.lookup for evolving rack
-                    RackStatus movingRack = null;
-                    for (RackStatus rackStatus : dataCenterStatus.getRackStatuses().values()) {
-                        rackStatusByName.put(rackStatus.getName(), rackStatus);
-                        if (!(rackStatus.getPhase().equals(RackPhase.RUNNING) || rackStatus.getPhase().equals(RackPhase.PARKED))) {
-                            if (movingRack != null)
-                                logger.error("datacenter={} Found more than one moving rack=[{},{}]", dataCenter.id(), movingRack.getName(), rackStatus.getName());
-                            movingRack = rackStatus;
-                        }
-                    }
+                    ConfigMapVolumeMounts configMapVolumeMounts = new ConfigMapVolumeMounts(zones, rackStatus.getName(), rackStatus.getIndex());
+                    rackStatus.setFingerprint(dataCenterSpec.fingerprint() + "-" + configMapVolumeMounts.fingerPrint());
+                    dataCenterStatus.getRackStatuses().put(new Integer(0), rackStatus);
 
-                    ElassandraPod failedPod = null;
-
-                    if (movingRack != null) {
-                        Zone movingZone = zones.zoneMap.get(movingRack.getName());
-                        final int rackIndex = dataCenterStatus.getZones().indexOf(movingRack.getName());
-                        logger.debug("datacenter={} movingRack={} phase={} isReady={} isUpdating={} isScalingUp={} isScalingDown={} firstPodStatus={} lastPodStatus={}",
-                                dataCenter.id(), movingRack.getName(), movingRack.getPhase(), movingZone.isReady(), movingZone.isUpdating(), movingZone.isScalingUp(), movingZone.isScalingDown(),
-                                elassandraNodeStatusCache.get(movingZone.firstPod(dataCenter, rackIndex)), elassandraNodeStatusCache.get(movingZone.lastPod(dataCenter, rackIndex)));
-                        // check is operation is finished ?
-                        switch (movingRack.getPhase()) {
-                            case CREATING:
-                                // first node NORMAL
-                                if (movingZone.isReady() && elassandraNodeStatusCache.isNormal(movingZone.firstPod(dataCenter, rackIndex))) {
-                                    movingRack.setPhase(RackPhase.RUNNING);
-                                    movingRack.setJoinedReplicas(1);
-                                    updateDatacenterStatus(DataCenterPhase.RUNNING, zones, rackStatusByName);
-                                    logger.debug("datacenter={} First node NORMAL of rack={}", dataCenter.id(), movingZone.name);
-                                }
-
-                                commitDataCenterSnapshot(zones);
-                                break;
-                            case UPDATING:
-                                // rolling update done and first node NORMAL
-                                if (!movingZone.isUpdating() && allReplicasRunnning(movingZone)) {
-                                    movingRack.setPhase(RackPhase.RUNNING);
-                                    // force the number of parked replicas to 0 here, not into the unparked method
-                                    rackStatusByName.get(movingRack.getName()).setParkedReplicas(0);
-                                    updateDatacenterStatus(DataCenterPhase.RUNNING, zones, rackStatusByName);
-                                    logger.debug("datacenter={} First node NORMAL after rolling UPDATE in rack={} size={}", dataCenter.id(), movingZone.name, movingZone.size);
-                                }
-
-                                commitDataCenterSnapshot(zones);
-                                break;
-                            case SCALING_UP:
-                                // scale up done and last node NORMAL
-                                if (!movingZone.isScalingUp() && allReplicasRunnning(movingZone)) {
-                                    movingRack.setJoinedReplicas(countJoinedNode(movingZone));
-                                    movingRack.setPhase(RackPhase.RUNNING);
-                                    updateDatacenterStatus(DataCenterPhase.RUNNING, zones, rackStatusByName);
-                                    logger.debug("datacenter={} Last node NORMAL after SCALE_UP in rack={} size={}", dataCenter.id(), movingZone.name, movingZone.size);
-                                }
-
-                                break;
-                            case SCALING_DOWN:
-                                // scale down
-                                if (!movingZone.isScalingDown() && zones.totalCurrentReplicas() == dataCenterSpec.getReplicas()) {
-                                    movingRack.setJoinedReplicas(countJoinedNode(movingZone));
-                                    movingRack.setPhase(RackPhase.RUNNING);
-                                    updateDatacenterStatus(DataCenterPhase.RUNNING, zones, rackStatusByName);
-                                    logger.debug("datacenter={} SCALE_DOWN done in rack={} size={}", dataCenter.id(), movingZone.name, movingZone.size);
-                                } else {
-                                    // have to update the STS here to avoid multiple moving rack...
-                                    Optional<ElassandraPod> decommissionedPod = movingZone.pods(dataCenter, rackIndex).stream()
-                                            .filter((pod) -> elassandraNodeStatusCache.get(pod).equals(ElassandraNodeStatus.DECOMMISSIONED))
-                                            .findFirst();
-
-                                    if (decommissionedPod.isPresent()) {
-                                        V1StatefulSet sts = movingZone.getSts().get();
-                                        // decrease the number of replicas only once... by testing the STS status
-                                        if (sts.getStatus().getUpdatedReplicas() == sts.getStatus().getCurrentReplicas()
-                                                && sts.getStatus().getUpdatedReplicas() == sts.getStatus().getReadyReplicas()) {
-
-                                            sts.getSpec().setReplicas(sts.getSpec().getReplicas() - 1);
-                                            logger.info("datacenter={} Scaling down sts={} to {}, removing pod={}",
-                                                    dataCenter.id(), sts.getMetadata().getName(), sts.getSpec().getReplicas(), decommissionedPod.get());
-
-                                            rackStatusByName.get(movingZone.name).setPhase(RackPhase.SCALING_DOWN);
-                                            updateDatacenterStatus(DataCenterPhase.SCALING_DOWN, zones, rackStatusByName);
-                                            // scale down sts
-                                            logger.debug("datacenter={} SCALE_DOWN started in rack={} size={}, removing pod={} status={}",
-                                                    dataCenter.id(), movingZone.name, movingZone.size, decommissionedPod.get(), elassandraNodeStatusCache.get(decommissionedPod.get()));
-                                            return k8sResourceUtils.replaceNamespacedStatefulSet(sts).ignoreElement();
-                                        }
-                                    }
-                                }
-
-                                break;
-                            case SCHEDULING_PENDING:
-                                logger.warn("datacenter={} rack=[{}] in phase SCHEDULING_PENDING", dataCenter.id(), movingZone.name);
-                                if (movingZone.isReady() && allReplicasRunnning(movingZone)) {
-                                    logger.info("datacenter={} All replicas are running in rack={}, Scheduling issue was resolved, Datacenter is back to stable state",
-                                            dataCenter.id(), movingZone.name);
-                                    movingRack.setPhase(RackPhase.RUNNING);
-                                    updateDatacenterStatus(DataCenterPhase.RUNNING, zones, rackStatusByName);
-
-                                    commitDataCenterSnapshot(zones);
-
-                                } else if (dataCenterStatus.getPhase().equals(DataCenterPhase.ROLLING_BACK)) {
-                                    V1StatefulSet v1StatefulSet = movingZone.getSts().get();
-                                    String rack = v1StatefulSet.getSpec().getTemplate().getMetadata().getLabels().get("rack");
-                                    ConfigMapVolumeMounts configMapVolumeMounts = new ConfigMapVolumeMounts(zones, rack, rackIndex);
-
-                                    // update the config spec fingerprint => Update statefulset having a different fingerprint if PHASE <> SCALE_...
-                                    int replicas = v1StatefulSet.getSpec().getReplicas();
-
-                                    logger.info("dataCenter={} rack={} updated by the rollback", dataCenter.id(), movingZone.name);
-                                    logger.debug("dataCenter={} phase={} -> UPDATING", dataCenter.id(), dataCenterStatus.getPhase());
-
-                                    // rackStatusByName.get(rack).setPhase(RackPhase.UPDATING);
-                                    updateDatacenterStatus(DataCenterPhase.UPDATING, zones, rackStatusByName);
-
-                                    // StatefulSet update will not restart pending pods
-                                    // we have to delete them to take in account the new statefulset configuration
-                                    // https://github.com/kubernetes/kubernetes/issues/67250
-                                    // This deletion step is for now a manual procedure.
-                                    return configMapVolumeMounts.createOrReplaceNamespacedConfigMaps()
-                                            .andThen(builder.buildStatefulSetRack(rack, replicas, configMapVolumeMounts, rackStatusByName.get(rack))
-                                                    .flatMapCompletable(sts -> updateRack(zones, sts, rack, rackStatusByName)));
-                                }
-                                break;
-                            case PARKING:
-                                if (movingZone.isParked()) {
-                                    movingRack.setPhase(RackPhase.PARKED);
-                                    updateDatacenterStatus(zones.parkedDatacenter() ? DataCenterPhase.PARKED : DataCenterPhase.PARKING, zones, rackStatusByName);
-                                    logger.debug("datacenter={} rack={} PARKED", dataCenter.id(), movingZone.name, movingZone.size);
-                                }
-                                break;
-
-                            default:
-                                for (int i = 0; i < movingZone.size; i++) {
-                                    ElassandraPod pod = movingZone.pod(dataCenter, rackIndex, i);
-                                    if (ElassandraNodeStatus.FAILED.equals(elassandraNodeStatusCache.getOrDefault(pod, ElassandraNodeStatus.UNKNOWN))) {
-                                        failedPod = pod;
-                                        movingRack.setPhase(RackPhase.FAILED);
-                                        updateDatacenterStatus(DataCenterPhase.ERROR, zones, rackStatusByName);
-                                        logger.debug("datacenter={} pod={} FAILED in rack={} size={}", dataCenter.id(), pod, movingZone.name, movingZone.size);
-                                        break;
-                                    }
-                                }
-                                logger.debug("datacenter={} phase={} NOP in rack={} size={}", dataCenter.id(), movingRack.getPhase(), movingZone.name, movingZone.size);
-                        }
-                        // if a pod failed to start => set rack phase to FAILED, and authorize config update.
-                        switch (movingRack.getPhase()) {
-                            case RUNNING:
-                            case PARKING:
-                            case FAILED:
-                                break;
-                            default:
-                                logger.debug("datacenter={} Waiting ongoing operation phase={} rack={} size={}",
-                                        dataCenter.id(), movingRack.getPhase(), movingZone.name, movingZone.size);
-                                return Completable.complete();
-                        }
-                    }
-
-                    // check all existing pod are UP and NORMAL before starting a new operation
-                    int totalNormalPod = 0;
-                    for (ElassandraPod pod : enumeratePods(existingStsMap)) {
-                        ElassandraNodeStatus podStatus = Optional
-                                .ofNullable(elassandraNodeStatusCache.get(pod))
-                                .orElse(ElassandraNodeStatus.UNKNOWN);
-                        switch (podStatus) {
-                            case NORMAL:
-                                totalNormalPod++;
-                                break;
-                            default:
-                                logger.info("datacenter={} Pod name={} status={}, delaying operation.", dataCenter.id(), pod.getName(), podStatus);
-                                return Completable.complete();
-                        }
-                    }
-
-                    Completable todo = Completable.complete();
-                    final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
-                    if (totalNormalPod > 0 && dataCenterStatus.getBootstrapped() == true) {
-                        // before scaling, if at least a pod is NORMAL, update keyspaces and roles if needed
-                        todo = this.cqlKeyspaceManager.reconcileKeyspaces(dataCenter, cqlSessionHandler)
-                                .andThen(this.cqlRoleManager.reconcileRole(dataCenter, cqlSessionHandler))
-                                // Disable License check because elastic_admin [_datacenregroup] is sometime created after creating the elassandra_operator role.
-                                // => elassandra_operator cannot read the keyspace (role is granted for existing keyspaces at the creation  time)
-                                // => cannot check license when running cassandra only
-                                // => elastic_admin.license should not be in elastic_admin_datacentergroup.license....
-                                //.andThen(this.cqlLicenseManager.verifyLicense(dataCenter, cqlSessionHandler))
-                                .doFinally(new Action() {
-                                    @Override
-                                    public void run() throws Exception {
-                                        cqlSessionHandler.close();
-                                    }
-                                });
-                    }
-
-                    // look up for the next rack to update if needed.
-                    // if a pod is failed, only update the config in the same rack to avoid a general outage !
-                    for (V1StatefulSet v1StatefulSet : existingStsMap.values()) {
-                        String stsFingerprint = v1StatefulSet.getSpec().getTemplate().getMetadata().getAnnotations().get(OperatorLabels.DATACENTER_FINGERPRINT);
-                        String rack = v1StatefulSet.getSpec().getTemplate().getMetadata().getLabels().get(OperatorLabels.RACK);
-                        int rackIndex = Integer.parseInt(v1StatefulSet.getSpec().getTemplate().getMetadata().getLabels().get(OperatorLabels.RACKINDEX));
-                        ConfigMapVolumeMounts configMapVolumeMounts = new ConfigMapVolumeMounts(zones, rack, rackIndex);
-                        String configFingerprint = configMapVolumeMounts.fingerPrint();
-
-                        // extract DC fingerPrint from STS metadata or return 0 if the entry is missing
-                        final String stsDatacenterFingerprint = Optional.ofNullable(v1StatefulSet.getMetadata().getAnnotations())
-                                .map(annotations -> annotations.get(OperatorLabels.DATACENTER_FINGERPRINT)).orElse("");
-
-                        final RackStatus rackStatus = rackStatusByName.get(rack);
-                        // Trigger an update if ConfigMap fingerprint or DC generation are different
-                        if (rackStatus.isRunning() && (!configFingerprint.equals(stsFingerprint) || !dataCenterSpec.fingerprint().equals(stsDatacenterFingerprint))) {
-                            if (failedPod != null && failedPod.getRackIndex() != rackIndex) {
-                                logger.warn("datacenter={} pod={} FAILED, cannot update other rack={} now, please fix the rackIndex={} before.",
-                                        dataCenter.id(), failedPod, failedPod.getRackIndex(), rack);
-                            } else {
-                                // update the config spec fingerprint => Update statefulset having a different fingerprint if PHASE <> SCALE_...
-                                int replicas = v1StatefulSet.getSpec().getReplicas();
-                                logger.debug("datacenter={} Need to update config fingerprint={} for statefulset={}, rack={}, replicas={}, phase={}",
-                                        dataCenter.id(), configFingerprint, v1StatefulSet.getMetadata().getName(), rack, replicas, dataCenterStatus.getPhase());
-                                logger.debug("dataCenter={} phase={} -> UPDATING rackStatus={}", dataCenter.id(), dataCenterStatus.getPhase(), rackStatus.getName());
-                                rackStatus.setPhase(RackPhase.UPDATING);
-                                updateDatacenterStatus(DataCenterPhase.UPDATING, zones, rackStatusByName);
-                                return todo
-                                        .andThen(configMapVolumeMounts.createOrReplaceNamespacedConfigMaps())
-                                        // updateRack also call prepareDataCenterSnapshot
-                                        .andThen(builder.buildStatefulSetRack(rack, replicas, configMapVolumeMounts, rackStatus)
-                                                .flatMapCompletable(sts -> updateRack(zones, sts, rack, rackStatusByName)));
-                            }
-                        } else if (dataCenterSpec.isParked() && rackStatus.isRunning()) {
-                            // drain if performed by the shutdownHook of the Elassandra Container
-                            return todo.andThen(parkRack(zones, v1StatefulSet, rack, rackStatusByName));
-                        } else if (!dataCenterSpec.isParked() && rackStatus.isParked()) {
-                            return todo.andThen(unparkRack(zones, v1StatefulSet, rack, rackStatusByName));
-                        }
-                    }
-
-                    if (failedPod != null) {
-                        logger.info("datacenter={} pod={} FAILED, cannot scale the datacenter now", dataCenter.id(), failedPod);
-                        return todo;
-                    }
-
-                    if (dataCenterSpec.isParked()) {
-                        logger.info("datacenter={} PARKED, do not try to scale the cluster", dataCenter.id());
-                        return todo;
-                    }
-
-                    if (zones.totalReplicas() == dataCenter.getSpec().getReplicas()) {
-                        // DC reconciled => reconcile plugin and schedule backups.
-                        return todo
-                                .andThen(Completable.mergeArray(pluginRegistry.reconciledAll(dataCenter)))
-                                .andThen(Completable.fromAction(() -> scheduleBackups(zones))); // start backup when plugin are reconcilied.
-                    }
-
-                    if (zones.totalReplicas() < dataCenter.getSpec().getReplicas()) {
-                        Optional<Zone> scaleUpZone = zones.nextToScalueUp();
-                        if (!scaleUpZone.isPresent()) {
-                            logger.warn("datacenter={} Cannot scale up replicas={}/{}, no free node", dataCenter.id(), zones.totalReplicas(), dataCenter.getSpec().getReplicas());
-                            return todo;
-                        }
-
-                        // Scaling UP
-                        Zone zone = scaleUpZone.get();
-                        if (!zone.getSts().isPresent()) {
-                            final boolean firstStateFulSet = DataCenterPhase.CREATING.equals(dataCenterStatus.getPhase());
-                            // create new sts with replicas = 1,
-                            RackStatus rackStatus = new RackStatus()
-                                    .setName(zone.name)
-                                    .setIndex(dataCenterStatus.getZones().indexOf(zone.name))
-                                    .setPhase(RackPhase.CREATING)
-                                    .setSeedHostId(UUID.randomUUID());
-                            rackStatusByName.put(zone.name, rackStatus);
-                            updateDatacenterStatus(DataCenterPhase.SCALING_UP, zones, rackStatusByName);
-                            logger.debug("datacenter={} SCALE_UP started in rack={} size={}", dataCenter.id(), zone.name, zone.size);
-                            ConfigMapVolumeMounts configMapVolumeMounts = new ConfigMapVolumeMounts(zones, zone.name, rackStatus.getIndex());
-                            return todo
-                                    .andThen(configMapVolumeMounts.createOrReplaceNamespacedConfigMaps())
-                                    .andThen(builder.buildStatefulSetRack(zones, zone.getName(), 1, rackStatus)
-                                            .flatMap(sts -> k8sResourceUtils.createNamespacedStatefulSet(sts))
-                                            .map(sts -> {
-                                                // we preserve the DataCenterSpec only for config update, but this is the very first Statefulset creation
-                                                // so we also have to backup the DataCenterSpec.
-                                                if (firstStateFulSet)
-                                                    prepareDataCenterSnapshot(firstStateFulSet ? DataCenterPhase.CREATING : dataCenterStatus.getPhase(), sts);
-                                                return sts;
-                                            }).ignoreElement()
-                                    );
-                        }
-
-                        // +1 on sts replicas
-                        V1StatefulSet sts = zone.getSts().get();
-                        sts.getSpec().setReplicas(sts.getSpec().getReplicas() + 1);
-                        dataCenterStatus.setNeedCleanup(true);
-                        RackStatus rackStatus = rackStatusByName.get(zone.name);
-                        rackStatus.setPhase(RackPhase.SCALING_UP);
-                        updateDatacenterStatus(DataCenterPhase.SCALING_UP, zones, rackStatusByName);
-                        logger.debug("datacenter={} SCALE_UP started in rack={} size={}", dataCenter.id(), zone.name, zone.size);
-                        if (sts.getSpec().getReplicas() > 1) {
-                            // call ConfigMapVolumeMount here to update seeds in case of single rack with multi-nodes
-                            ConfigMapVolumeMounts configMapVolumeMounts = new ConfigMapVolumeMounts(zones, zone.name, rackStatus.getIndex());
-                            todo = todo.andThen(configMapVolumeMounts.createOrReplaceNamespacedConfigMaps());
-                        }
-                        return todo.andThen(k8sResourceUtils.replaceNamespacedStatefulSet(sts).ignoreElement());
-                    }
-
-                    if (zones.totalReplicas() > Math.max(0, dataCenter.getSpec().getReplicas())) {
-                        Optional<Zone> scaleDownZone = zones.nextToScaleDown();
-                        if (!scaleDownZone.isPresent()) {
-                            logger.warn("datacenter={} Cannot scale down, no more replicas", dataCenter.id(), dataCenterMetadata.getName(), dataCenterMetadata.getNamespace());
-                            return todo;
-                        }
-
-                        // scaling DOWN
-                        Zone zone = scaleDownZone.get();
-                        V1StatefulSet sts = zone.getSts().get();
-                        Optional<ElassandraPod> electedElassandraPod = electDecomissioningNode(zone);
-                        if (electedElassandraPod.isPresent() && allReplicasRunnning(zone)) { // decommission a node only if all node of the rack are running in a NORMAL state
-                            ElassandraPod elassandraPod = electedElassandraPod.get();
-                            ElassandraNodeStatus elassandraNodeStatus = elassandraNodeStatusCache.getOrDefault(elassandraPod, ElassandraNodeStatus.UNKNOWN);
-                            // UNKNOWN, STARTING, NORMAL, JOINING, LEAVING, DECOMMISSIONED, MOVING, DRAINING, DRAINED, DOWN;
-                            switch (elassandraNodeStatus) {
-                                case NORMAL:
-                                    // blocking call to decommission, max 5 times, with 2 second delays between each try
-                                    // decommission node
-                                    logger.debug("datacenter={} Adjusting RF and Decommissioning elassandra pod={}", dataCenter.id(), elassandraPod);
-                                    return todo
-                                            .andThen(cqlKeyspaceManager.decreaseRfBeforeScalingDownDc(dataCenter, zones.totalReplicas() - 1, cqlSessionHandler))
-                                            .andThen(Completable.fromAction(() -> {
-                                                // update the DC status after the decreaseRf because decreaseRf test DC phase is RUNNING...
-                                                rackStatusByName.get(zone.name).setPhase(RackPhase.SCALING_DOWN);
-                                                updateDatacenterStatus(DataCenterPhase.SCALING_DOWN, zones, rackStatusByName);
-                                                logger.debug("datacenter={} SCALE_DOWN started in rack={} size={}, decommissioning pod={} status={}",
-                                                        dataCenter.id(), zone.name, zone.size, elassandraPod, elassandraNodeStatus);
-                                            }))
-                                            .andThen(sidecarClientFactory.clientForPod(elassandraPod).decommission()
-                                                    .retryWhen(errors -> errors
-                                                            .zipWith(Flowable.range(1, 5), (n, i) -> i)
-                                                            .flatMap(retryCount -> Flowable.timer(2, TimeUnit.SECONDS))
-                                                    ))
-                                            .doFinally(() -> cqlSessionHandler.close());
-                                case DECOMMISSIONED:
-                                case DRAINED:
-                                case DOWN:
-                                    // decrease the number of replicas only once... by testing the STS status
-                                    if (sts.getStatus().getUpdatedReplicas() == sts.getStatus().getCurrentReplicas()
-                                            && sts.getStatus().getUpdatedReplicas() == sts.getStatus().getReadyReplicas()) {
-
-                                        sts.getSpec().setReplicas(sts.getSpec().getReplicas() - 1);
-                                        logger.info("datacenter={} SCALE_DOWN sts={} to {}, removing pod={}",
-                                                dataCenter.id(), sts.getMetadata().getName(), sts.getSpec().getReplicas(), elassandraPod);
-                                        rackStatusByName.get(zone.name).setPhase(RackPhase.SCALING_DOWN);
-                                        updateDatacenterStatus(DataCenterPhase.SCALING_DOWN, zones, rackStatusByName);
-                                        // scale down sts
-                                        logger.debug("datacenter={} SCALE_DOWN started in rack={} size={}, removing pod={} status={}",
-                                                dataCenter.id(), zone.name, zone.size, elassandraPod, elassandraNodeStatus);
-                                        return todo.andThen(k8sResourceUtils.replaceNamespacedStatefulSet(sts).ignoreElement());
-                                    } else {
-                                        logger.debug("datacenter={} SCALE_DOWN ongoing in rack={} size={}, removing pod={} status={}",
-                                                dataCenter.id(), zone.name, zone.size, elassandraPod, elassandraNodeStatus);
-                                        return todo;
-                                    }
-                                default:
-                                    logger.info("datacenter={} Waiting a valid status to remove pod={} from sts={}",
-                                            dataCenter.id(), elassandraPod, sts.getMetadata().getName());
-                            }
-                        } else {
-                            logger.info("datacenter={} No pod eligible for Decommission from sts={} in namespace={}",
-                                    dataCenter.id(), sts.getMetadata().getName(), dataCenterMetadata.getNamespace());
-                        }
-                    }
-                    return todo;
-                });
-    }
-
-    private int countJoinedNode(Zone movingZone) {
-        int rackIndex = dataCenterStatus.getZones().indexOf(movingZone.getName());
-        return (int) movingZone.pods(dataCenter, rackIndex).stream().filter(pod -> elassandraNodeStatusCache.get(pod).isJoined()).count();
+                    // create first sts or update spec+user cfg or park/unpark, but does not manage scale up/down.
+                    return configMapVolumeMounts.createOrReplaceNamespacedConfigMaps()
+                            // updateRack also call prepareDataCenterSnapshot
+                            .andThen(builder.buildStatefulSetRack(rackStatus, 1, configMapVolumeMounts)
+                                    .flatMap(s -> k8sResourceUtils.createOrReplaceNamespacedStatefulSet(s)));
+                })
+                .ignoreElement();
     }
 
     /**
-     * commit the DataCenterSpec only if all STS use the same datacenter fingerprint
-     *
-     * @param zones
-     * @throws ApiException
+     * Update DC spec, and trigger the next action to the desired state
      */
-    private void commitDataCenterSnapshot(Zones zones) throws ApiException {
-        if (reconciled(zones)) {
-            checkPointCache.commitCheckPoint(new Key(dataCenterMetadata));
-        }
+    public Completable updateDatacenter() throws Exception {
+        logger.debug("########## datacenter={} spec updated fingerprint={}", dataCenter.id(), dataCenter.getSpec().fingerprint());
+        return nextAction();
     }
+
+    /**
+     * Trigger next action when sts reach the desired state
+     */
+    public Completable statefulsetUpdate(V1StatefulSet sts) throws Exception {
+        logger.debug("########## sts={}/{} readyReplicas={}", sts.getMetadata().getName(), sts.getMetadata().getNamespace(), sts.getStatus().getReadyReplicas());
+
+        Integer rackIndex = Integer.parseInt(sts.getMetadata().getLabels().get(OperatorLabels.RACKINDEX));
+        RackStatus rackStatus = dataCenter.getStatus().getRackStatuses().get(rackIndex);
+        rackStatus.setReadyReplicas(sts.getStatus().getReadyReplicas());
+        if (sts.getStatus().getReadyReplicas() <  rackStatus.getDesiredReplicas()) {
+            rackStatus.setPhase(RackPhase.SCALING_UP);
+        } else if (sts.getStatus().getReadyReplicas() > rackStatus.getDesiredReplicas()) {
+            rackStatus.setPhase(RackPhase.SCALING_DOWN);
+        } else {
+            rackStatus.setPhase(RackPhase.RUNNING);
+        }
+
+        // update the DC total ready repliacs
+        int readyReplicas = dataCenter.getStatus().getRackStatuses().values().stream()
+                .map(RackStatus::getReadyReplicas)
+                .reduce(0, (a, b) -> a + b);
+        dataCenterStatus.setReadyReplicas(readyReplicas);
+        logger.debug("datacenter={} dataCenterStatus={}", dataCenter.id(), dataCenterStatus);
+        return nextAction();
+    }
+
+    public Completable taskDone(Task task) throws Exception {
+        logger.debug("########## datacenter={} task={} done", dataCenter.id(), task.id());
+        return nextAction();
+    }
+
+    public Completable unschedulablePod(Pod pod) {
+        logger.debug("########## datacenter={} unschedulable pod={}", dataCenter.id(), pod.id());
+        dataCenterStatus.setLastMessage("Unschedulable pod=" + pod.getName());
+        return Completable.complete();
+    }
+
+
+    public Completable nextAction() throws Exception {
+        if (dataCenterSpec.isParked() && !DataCenterPhase.PARKED.equals(dataCenterStatus.getPhase()))
+            return parkDatacenter();
+
+        if (DataCenterPhase.PARKED.equals(dataCenterStatus.getPhase()) && !dataCenterSpec.isParked())
+            return unparkDatacenter();
+
+        // if datacenter is on error, do nothing
+        if (DataCenterPhase.ERROR.equals(dataCenterStatus.getPhase())) {
+            logger.error("datacenter={} on ERROR, do nothing", dataCenter.id());
+            return Completable.complete();
+        }
+
+        // check all sts have the current fingerprint
+        for(RackStatus rackStatus : dataCenterStatus.getRackStatuses().values()) {
+            V1StatefulSet v1StatefulSet = this.statefulSetTreeMap.get(rackStatus.getName());
+            ConfigMapVolumeMounts configMapVolumeMounts = new ConfigMapVolumeMounts(zones, rackStatus.getName(), rackStatus.getIndex());
+            String currentFingerprint = dataCenterSpec.fingerprint() + "-" + configMapVolumeMounts.fingerPrint();
+            String stsFingerprint = v1StatefulSet.getSpec().getTemplate().getMetadata().getAnnotations().get(OperatorLabels.DATACENTER_FINGERPRINT);
+
+            // Trigger an update if ConfigMap fingerprint or DC generation are different
+            if (!currentFingerprint.equals(stsFingerprint)) {
+                logger.debug("datacenter={} fingerprint={} sts={} fingerprint={} not match", dataCenter.id(), currentFingerprint, v1StatefulSet.getMetadata().getName(), stsFingerprint);
+
+                rackStatus.setPhase(RackPhase.UPDATING);
+                rackStatus.setFingerprint(currentFingerprint);
+
+                int replicas = v1StatefulSet.getSpec().getReplicas();
+                return configMapVolumeMounts.createOrReplaceNamespacedConfigMaps()
+                        // updateRack also call prepareDataCenterSnapshot
+                        .andThen(builder.buildStatefulSetRack(rackStatus, replicas, configMapVolumeMounts).ignoreElement());
+            }
+        }
+
+        // check if all racks STS have reached the desired state, otherwise wait
+        int readyReplicas = 0;
+        for(RackStatus rackStatus : dataCenterStatus.getRackStatuses().values()) {
+            V1StatefulSet v1StatefulSet = this.statefulSetTreeMap.get(rackStatus.getName());
+            readyReplicas += v1StatefulSet.getStatus().getReadyReplicas() == null ? 0 : v1StatefulSet.getStatus().getReadyReplicas();
+            if (!StatefulsetHandler.isStafulSetReady(v1StatefulSet)) {
+                logger.debug("v1StatefulSet={}/{} not ready, waiting", v1StatefulSet.getMetadata().getName(), v1StatefulSet.getMetadata().getNamespace());
+                return Completable.complete();
+            }
+        }
+
+        // keep the successfully applied spec
+        checkPointCache.put(new Key(dataCenterMetadata), new CheckPoint()
+                .withCommittedSpec(dataCenterSpec)
+                .withCommittedUserConfigMap(dataCenterSpec.getUserConfigMapVolumeSource().getName())
+        );
+
+        final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
+
+        // check if need to scale up or down
+        if (zones.totalReplicas() < dataCenter.getSpec().getReplicas())
+            return scaleUpDatacenter();
+        if (zones.totalReplicas() > dataCenter.getSpec().getReplicas())
+            return scaleDownDatacenter(cqlSessionHandler);
+
+        dataCenterStatus.setPhase(DataCenterPhase.RUNNING);
+        Completable todo = Completable.complete();
+
+        // manage roles, keyspaces,
+        if (dataCenterSpec.getReplicas() > 0 && dataCenterStatus.getBootstrapped() == true) {
+            todo = this.cqlKeyspaceManager.reconcileKeyspaces(dataCenter, cqlSessionHandler)
+                    .andThen(this.cqlRoleManager.reconcileRole(dataCenter, cqlSessionHandler))
+                    // Disable License check because elastic_admin [_datacenregroup] is sometime created after creating the elassandra_operator role.
+                    // => elassandra_operator cannot read the keyspace (role is granted for existing keyspaces at the creation  time)
+                    // => cannot check license when running cassandra only
+                    // => elastic_admin.license should not be in elastic_admin_datacentergroup.license....
+                    //.andThen(this.cqlLicenseManager.verifyLicense(dataCenter, cqlSessionHandler))
+                    .doFinally(new Action() {
+                        @Override
+                        public void run() throws Exception {
+                            cqlSessionHandler.close();
+                        }
+                    });
+        }
+
+        // manage plugins
+        if (this.zones.totalReplicas() == dataCenter.getSpec().getReplicas()) {
+            // DC reconciled => reconcile plugin and schedule backups.
+            return todo
+                    .andThen(Completable.mergeArray(pluginRegistry.reconciledAll(dataCenter)))
+                    .andThen(Completable.fromAction(() -> scheduleBackups(zones))); // start backup when plugin are reconcilied.
+        }
+
+        return todo;
+    }
+
+    public Completable parkDatacenter() throws ApiException {
+        List<CompletableSource> todoList = new ArrayList<>();
+        for (V1StatefulSet v1StatefulSet : this.statefulSetTreeMap.values()) {
+            int rackIndex = Integer.parseInt(v1StatefulSet.getMetadata().getLabels().get(OperatorLabels.RACKINDEX));
+            RackStatus rackStatus = dataCenterStatus.getRackStatuses().get(rackIndex);
+            logger.debug("DataCenter={} PARKING rack={}", dataCenter.id(), rackStatus.getName());
+            rackStatus.setParkedReplicas(v1StatefulSet.getSpec().getReplicas());
+            rackStatus.setPhase(RackPhase.PARKED);
+            v1StatefulSet.getSpec().setReplicas(0);
+            todoList.add(k8sResourceUtils.replaceNamespacedStatefulSet(v1StatefulSet).ignoreElement());
+        }
+        return Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()]));
+    }
+
+    public Completable unparkDatacenter() throws ApiException {
+        List<CompletableSource> todoList = new ArrayList<>();
+        for (V1StatefulSet v1StatefulSet : this.statefulSetTreeMap.values()) {
+            int rackIndex = Integer.parseInt(v1StatefulSet.getMetadata().getLabels().get(OperatorLabels.RACKINDEX));
+            RackStatus rackStatus = dataCenterStatus.getRackStatuses().get(rackIndex);
+            logger.debug("DataCenter={} UNPARKING rack={}", dataCenter.id(), rackStatus.getName());
+            rackStatus.setPhase(RackPhase.STARTING);
+            rackStatus.setParkedReplicas(v1StatefulSet.getSpec().getReplicas());
+            rackStatus.setParkedReplicas(0);
+            v1StatefulSet.getSpec().setReplicas(rackStatus.getParkedReplicas());
+            todoList.add(k8sResourceUtils.replaceNamespacedStatefulSet(v1StatefulSet).ignoreElement());
+        }
+        return Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()]));
+    }
+
+    public Completable scaleUpDatacenter() throws Exception {
+        Completable todo = Completable.complete();
+        Optional<Zone> scaleUpZone = zones.nextToScalueUp();
+        if (!scaleUpZone.isPresent()) {
+            logger.warn("datacenter={} Cannot scale up replicas={}/{}, no free node", dataCenter.id(), zones.totalReplicas(), dataCenter.getSpec().getReplicas());
+            return todo;
+        }
+
+        // Scaling UP
+        Zone zone = scaleUpZone.get();
+        logger.debug("Scaling UP zone={}", zone);
+        if (!zone.getSts().isPresent()) {
+            final boolean firstStateFulSet = DataCenterPhase.CREATING.equals(dataCenterStatus.getPhase());
+            // create new sts with replicas = 1,
+            Integer rackIndex = dataCenterStatus.getZones().indexOf(zone.name);
+            RackStatus rackStatus = new RackStatus()
+                    .setName(zone.name)
+                    .setIndex(rackIndex)
+                    .setPhase(RackPhase.CREATING)
+                    .setSeedHostId(UUID.randomUUID())
+                    .withParkedReplicas(0)
+                    .withDesiredReplicas(1);
+            dataCenterStatus.getRackStatuses().putIfAbsent(rackIndex, rackStatus);
+            dataCenterStatus.setPhase(DataCenterPhase.SCALING_UP);
+            logger.debug("datacenter={} SCALE_UP started in rack={} size={}", dataCenter.id(), zone.name, zone.size);
+            ConfigMapVolumeMounts configMapVolumeMounts = new ConfigMapVolumeMounts(zones, zone.name, rackStatus.getIndex());
+            rackStatus.setFingerprint(dataCenterSpec.fingerprint()+"-"+configMapVolumeMounts.fingerPrint());
+            return todo
+                    .andThen(configMapVolumeMounts.createOrReplaceNamespacedConfigMaps())
+                    .andThen(builder.buildStatefulSetRack(zones, rackStatus, 1)
+                            .flatMap(sts -> k8sResourceUtils.createNamespacedStatefulSet(sts))
+                            .ignoreElement()
+                    );
+        }
+
+        // +1 on sts replicas
+        V1StatefulSet sts = zone.getSts().get();
+        sts.getSpec().setReplicas(sts.getSpec().getReplicas() + 1);
+        Integer rackIndex = Integer.parseInt(sts.getMetadata().getAnnotations().get(OperatorLabels.RACKINDEX));
+        dataCenterStatus.setNeedCleanup(true);
+        RackStatus rackStatus = dataCenterStatus.getRackStatuses().get(rackIndex);
+        rackStatus.setPhase(RackPhase.SCALING_UP);
+        logger.debug("datacenter={} SCALE_UP started in rack={} size={}", dataCenter.id(), zone.name, zone.size);
+        // call ConfigMapVolumeMount here to update seeds in case of single rack with multi-nodes
+        ConfigMapVolumeMounts configMapVolumeMounts = new ConfigMapVolumeMounts(zones, zone.name, rackStatus.getIndex());
+        return todo
+                .andThen(configMapVolumeMounts.createOrReplaceNamespacedConfigMaps())
+                .andThen(k8sResourceUtils.replaceNamespacedStatefulSet(sts).ignoreElement());
+    }
+
+    public Completable scaleDownDatacenter(CqlSessionHandler cqlSessionHandler) throws Exception {
+        Completable todo = Completable.complete();
+        Optional<Zone> scaleDownZone = zones.nextToScaleDown();
+        if (!scaleDownZone.isPresent()) {
+            logger.warn("datacenter={} Cannot scale down, no more replicas", dataCenter.id(), dataCenterMetadata.getName(), dataCenterMetadata.getNamespace());
+            return todo;
+        }
+
+        // scaling DOWN
+        Zone zone = scaleDownZone.get();
+        V1StatefulSet sts = zone.getSts().get();
+        Integer rackIndex = Integer.parseInt(sts.getMetadata().getAnnotations().get(OperatorLabels.RACKINDEX));
+        RackStatus rackStatus = dataCenterStatus.getRackStatuses().get(rackIndex);
+        if (dataCenterStatus.getBootstrapped() && dataCenterSpec.getReplicas() > 1) {
+            todo = cqlKeyspaceManager.decreaseRfBeforeScalingDownDc(dataCenter, zones.totalReplicas() - 1, cqlSessionHandler)
+                    .andThen(Completable.fromAction(() -> {
+                        // update the DC status after the decreaseRf because decreaseRf test DC phase is RUNNING...
+                        logger.debug("datacenter={} SCALE_DOWN started in rack={} size={}, decommissioning pod={}-{}",
+                                dataCenter.id(), zone.name, zone.size, sts.getMetadata().getName(), sts.getSpec().getReplicas() - 1);
+                    }))
+                    .andThen(jmxmpElassandraProxy.decomission(new ElassandraPod(dataCenter, rackIndex, sts.getSpec().getReplicas() - 1))
+                            .retryWhen(errors -> errors
+                                    .zipWith(Flowable.range(1, 5), (n, i) -> i)
+                                    .flatMap(retryCount -> Flowable.timer(2, TimeUnit.SECONDS))
+                            ))
+                    .doFinally(() -> cqlSessionHandler.close());
+        }
+        rackStatus.setPhase(RackPhase.SCALING_DOWN);
+        sts.getSpec().setReplicas(sts.getSpec().getReplicas() - 1);
+        return todo.andThen(k8sResourceUtils.replaceNamespacedStatefulSet(sts).ignoreElement());
+    }
+
+
+
+    public Completable rollbackDataCenter(Key key) throws Exception {
+        return Completable.complete();
+        /*
+        return fetchExistingStatefulSetsByZone()
+                .flatMapCompletable(existingStsMap -> {
+                    Zones zones = new Zones(dataCenterStatus, this.coreApi, existingStsMap);
+
+                    // 1.lookup for unscheduled rack
+                    final Map<String, RackStatus> rackStatusByName = new HashMap<>();
+                    boolean foundUnscheduledRack = false;
+                    for (RackStatus rackStatus : dataCenterStatus.getRackStatuses().values()) {
+                        rackStatusByName.put(rackStatus.getName(), rackStatus);
+                        if (rackStatus.getPhase().equals(RackPhase.SCHEDULING_PENDING)) {
+                            foundUnscheduledRack = true;
+                        }
+                    }
+
+                    if (!foundUnscheduledRack) {
+                        logger.warn("datacenter={} Rollback requested but there are no rack in phase={}. Rollback is cancelled !",
+                                dataCenter.id(), RackPhase.SCHEDULING_PENDING);
+                        return Completable.complete();
+                    }
+
+                    Completable todo = Completable.complete();
+                    if (checkPointCache.getCheckPoint(key).isPresent()) {
+                        final CheckPoint checkPoint = checkPointCache.rollbackCheckPoint(key);
+                        logger.info("datacenter={} Try to restore DataCenter configuration with fingerprint={} and userConfigMap={}'",
+                                dataCenter.id(), checkPoint.getCommittedSpec().fingerprint(), checkPoint.getCommittedUserConfigMap());
+
+                        if (checkPoint.getCommittedUserConfigMap() != null) {
+                            logger.trace("ROLLBACK user ConfigMap : {}", dataCenterSpec.getUserConfigMapVolumeSource().getName());
+                            V1ConfigMap previousUserConfig = k8sResourceUtils.readNamespacedConfigMap(dataCenterMetadata.getNamespace(), checkPoint.getCommittedUserConfigMap()).blockingGet();
+                            // override the current ConfigMap with the Previous one
+                            // force the ConfigMap name with the previous one without fingerprint
+                            logger.trace("RESTORE user ConfigMap : {}", checkPoint.getCommittedSpec().getUserConfigMapVolumeSource().getName());
+                            previousUserConfig.getMetadata().setName(checkPoint.getCommittedSpec().getUserConfigMapVolumeSource().getName());
+                            todo = todo.andThen(k8sResourceUtils.createOrReplaceNamespacedConfigMap(previousUserConfig).ignoreElement());
+                        } else {
+                            logger.info("datacenter={} No user ConfigMap to restore", dataCenter.id());
+                        }
+
+                        // restore previous configuration
+                        logger.trace("ROLLBACK DataCenter Spec : {}", dataCenterSpec);
+                        logger.trace("RESTORE DataCenter Spec : {}", checkPoint.getCommittedSpec());
+                        dataCenter.setSpec(checkPoint.getCommittedSpec());
+                        todo = todo.andThen(k8sResourceUtils.updateDataCenter(dataCenter)
+                                .flatMapCompletable((updatedDatacenter) -> {
+                                    // update dc status
+                                    updateDatacenterStatus(updatedDatacenter.getStatus(), DataCenterPhase.ROLLING_BACK, zones, rackStatusByName, Optional.of(""));
+                                    return k8sResourceUtils.updateDataCenterStatus(updatedDatacenter).ignoreElement();
+                                }));
+                    }
+                    // update dc status
+                    updateDatacenterStatus(dataCenterStatus, DataCenterPhase.ROLLING_BACK, zones, rackStatusByName, Optional.of(""));
+                    return todo.andThen(k8sResourceUtils.updateDataCenterStatus(dataCenter).ignoreElement());
+                });
+         */
+    }
+
 
     private void scheduleBackups(Zones zones) {
         if (reconciled(zones)) {
@@ -822,37 +602,19 @@ public class DataCenterUpdateAction {
                 zones.first().isPresent() && zones.first().get().getDataCenterFingerPrint().isPresent();
     }
 
-    private boolean allReplicasRunnning(Zone movingZone) {
-        Integer expectedReplicas = movingZone.sts.get().getSpec().getReplicas();
-        Integer rackIndex = dataCenterStatus.getZones().indexOf(movingZone.getName());
-        return (expectedReplicas == elassandraNodeStatusCache.countNodesInStateForRack(rackIndex, ElassandraNodeStatus.NORMAL));
-    }
 
-    private Optional<ElassandraPod> electDecomissioningNode(Zone movingZone) {
-        Integer rackIndex = dataCenterStatus.getZones().indexOf(movingZone.getName());
-        return elassandraNodeStatusCache.getLastBootstrappedNodesForRack(rackIndex);
-    }
 
-    private void prepareDataCenterSnapshot(DataCenterPhase phase, V1StatefulSet statefulSet) throws ApiException {
-        Optional<String> userConfigmap = Optional.ofNullable(statefulSet)
-                .map((sts) -> sts.getMetadata().getAnnotations().get(OperatorLabels.CONFIGMAP_FINGERPRINT))
-                .flatMap(this::extractUserConfigFingerPrint)
-                .map(fingerprint -> OperatorNames.configMapUniqueName(dataCenterSpec.getUserConfigMapVolumeSource().getName(), fingerprint));
-        checkPointCache.prepareCheckPoint(new Key(dataCenterMetadata), dataCenterSpec, userConfigmap);
-    }
 
-    private Optional<String> extractUserConfigFingerPrint(final String statefulsetFingerPrint) {
-        final String[] fingerprints = statefulsetFingerPrint.split("-");
-        if (fingerprints.length == 2) {
-            return Optional.ofNullable(fingerprints[1]);
-        } else {
-            return Optional.empty();
-        }
-    }
 
-    private boolean restoreRequired(Zones zones, Restore restoreFromBackup) {
-        return zones.totalReplicas() == 0 && restoreFromBackup != null && StringUtils.isNotEmpty(restoreFromBackup.getSnapshotTag());
-    }
+
+
+
+
+
+
+
+
+
 
     public class ConfigMapVolumeMountBuilder {
         public final V1ConfigMap configMap;
@@ -931,7 +693,7 @@ public class DataCenterUpdateAction {
     class ConfigMapVolumeMounts implements Iterable<ConfigMapVolumeMountBuilder> {
         public ConfigMapVolumeMountBuilder specConfig;  // configmap generated from CRD
         public ConfigMapVolumeMountBuilder userConfig;  // user provided configmap
-        public ConfigMapVolumeMountBuilder seedConfig;  // per DC configmap, can be changed without trigering a rolling restart
+        public ConfigMapVolumeMountBuilder seedConfig;  // per DC configmap, can be changed without triggering a rolling restart
         public ConfigMapVolumeMountBuilder rackConfig;  // per rack configmap
 
         public ConfigMapVolumeMounts(Zones zones, String rack, int rackIndex) throws IOException, ApiException {
@@ -1047,8 +809,7 @@ public class DataCenterUpdateAction {
                     .namespace(dataCenterMetadata.getNamespace())
                     .labels(OperatorLabels.rack(dataCenter, rack, rackIndex))
                     .addOwnerReferencesItem(OperatorNames.ownerReference(dataCenter))
-                    .putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, dataCenter.getMetadata().getGeneration().toString())
-                    .putAnnotationsItem(OperatorLabels.DATACENTER_FINGERPRINT, dataCenterSpec.fingerprint());
+                    .putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, dataCenter.getMetadata().getGeneration().toString());
         }
 
         public String clusterChildObjectName(final String nameFormat) {
@@ -1260,15 +1021,22 @@ public class DataCenterUpdateAction {
 
             Set<String> seeds = new HashSet<>();
             for (RackStatus rackStatus : dataCenterStatus.getRackStatuses().values()) {
-                if (rackStatus.getJoinedReplicas() > 0 && dataCenterSpec.getReplicas() > 1)
-                    // also test the nb of expected replicas to avoid crashloopbackup in a single node configuration update
-                    if (dataCenterSpec.getHostNetworkEnabled() || dataCenterSpec.getHostPortEnabled()) {
-                        // seed is external DNS name
-                        seeds.add("cassandra-"+dataCenterSpec.getExternalDns().getRoot()+"-"+rackStatus.getIndex()+"-0."+dataCenterSpec.getExternalDns().getDomain());
-                    } else {
-                        // seed is internal k8s address
-                        seeds.add(new ElassandraPod(dataCenter, rackStatus.getIndex(), 0).getFqdn());
-                    }
+                V1StatefulSet v1StatefulSet = statefulSetTreeMap.get(rackStatus.getName());
+                if (v1StatefulSet == null) {
+                    logger.warn("sts for rack={} not found", rackStatus);
+                } else {
+                    if (v1StatefulSet.getStatus().getReadyReplicas() != null && v1StatefulSet.getStatus().getReadyReplicas() > 0)
+                        // also test the nb of expected replicas to avoid crashloopbackup in a single node configuration update
+                        if ((dataCenterSpec.getHostNetworkEnabled() || dataCenterSpec.getHostPortEnabled()) &&
+                                (dataCenterSpec.getExternalDns() != null &&  dataCenterSpec.getExternalDns().getEnabled() == true &&
+                                        dataCenterSpec.getExternalDns().getRoot() != null && dataCenterSpec.getExternalDns().getDomain() != null)) {
+                            // seed is external DNS name
+                            seeds.add(OperatorNames.externalPodFqdn(dataCenter, rackStatus.getIndex(), 0));
+                        } else {
+                            // seed is internal k8s address
+                            seeds.add(OperatorNames.internalPodFqdn(dataCenter, rackStatus.getIndex(), 0));
+                        }
+                }
             }
 
             Map<String, String> parameters = new HashMap<>();
@@ -1707,16 +1475,16 @@ public class DataCenterUpdateAction {
             return secret;
         }
 
-        public Single<V1StatefulSet> buildStatefulSetRack(Zones zones, String rack, int replicas, RackStatus rackStatus) throws Exception {
-            return buildStatefulSetRack(rack, replicas, new ConfigMapVolumeMounts(zones, rack, rackStatus.getIndex()), rackStatus);
+        public Single<V1StatefulSet> buildStatefulSetRack(Zones zones, RackStatus rackStatus, int replicas) throws Exception {
+            return buildStatefulSetRack(rackStatus, replicas, new ConfigMapVolumeMounts(zones, rackStatus.getName(), rackStatus.getIndex()));
         }
 
-        public Single<V1StatefulSet> buildStatefulSetRack(final String rack, final int replicas, ConfigMapVolumeMounts configMapVolumeMounts, RackStatus rackStatus) throws Exception {
-            final V1ObjectMeta statefulSetMetadata = rackObjectMeta(rack, rackStatus.getIndex(), OperatorNames.stsName(dataCenter, rackStatus.getIndex()));
+        public Single<V1StatefulSet> buildStatefulSetRack(RackStatus rackStatus, int replicas, ConfigMapVolumeMounts configMapVolumeMounts) throws Exception {
+            final V1ObjectMeta statefulSetMetadata = rackObjectMeta(rackStatus.getName(), rackStatus.getIndex(), OperatorNames.stsName(dataCenter, rackStatus.getIndex()));
 
             // create Elassandra container and the associated initContainer to replay commitlogs
-            final V1Container cassandraContainer = buildElassandraContainer(rack, rackStatus.getSeedHostId());
-            final V1Container commitlogInitContainer = buildInitContainerCommitlogReplayer(rack, rackStatus.getSeedHostId());
+            final V1Container cassandraContainer = buildElassandraContainer(rackStatus.getName(), rackStatus.getSeedHostId());
+            final V1Container commitlogInitContainer = buildInitContainerCommitlogReplayer(rackStatus.getName(), rackStatus.getSeedHostId());
 
             if (dataCenterSpec.getPrometheusEnabled()) {
                 cassandraContainer.addPortsItem(new V1ContainerPort().name(PROMETHEUS_PORT_NAME).containerPort(dataCenterSpec.getPrometheusPort()));
@@ -1813,7 +1581,7 @@ public class DataCenterUpdateAction {
             // add node affinity for rack, strict or slack (depends on cloud providers PVC cross-zone support)
             final V1NodeSelectorTerm nodeSelectorTerm = new V1NodeSelectorTerm()
                     .addMatchExpressionsItem(new V1NodeSelectorRequirement()
-                            .key(OperatorLabels.ZONE).operator("In").addValuesItem(rack));
+                            .key(OperatorLabels.ZONE).operator("In").addValuesItem(rackStatus.getName()));
             switch (dataCenterSpec.getPodsAffinityPolicy()) {
                 case STRICT:
                     podSpec.affinity(new V1Affinity()
@@ -1904,11 +1672,12 @@ public class DataCenterUpdateAction {
                 commitlogInitContainer.addArgsItem(opClusterSecretPath);
             }
 
-            final Map<String, String> rackLabels = OperatorLabels.rack(dataCenter, rack, rackStatus.getIndex());
+            final Map<String, String> rackLabels = OperatorLabels.rack(dataCenter, rackStatus.getName(), rackStatus.getIndex());
 
+            String fingerprint = dataCenterSpec.fingerprint() +"-" + configMapVolumeMounts.fingerPrint();
             final V1ObjectMeta templateMetadata = new V1ObjectMeta()
                     .labels(rackLabels)
-                    .putAnnotationsItem(OperatorLabels.CONFIGMAP_FINGERPRINT, configMapVolumeMounts.fingerPrint());
+                    .putAnnotationsItem(OperatorLabels.DATACENTER_FINGERPRINT, fingerprint);
 
             // add prometheus annotations to scrap nodes
             if (dataCenterSpec.getPrometheusEnabled()) {
@@ -1963,19 +1732,18 @@ public class DataCenterUpdateAction {
                     .onErrorResumeNext(t -> {
                         if (t instanceof ApiException) {
                             ApiException e = (ApiException)t;
-                            if (e.getCode() != 404) {
+                            if (e.getCode() != 404)
                                 throw e;
-                            }
                         }
                         V1PersistentVolumeClaimSpec v1PersistentVolumeClaimSpec = dataCenterSpec.getDataVolumeClaim();
-                        String storageClassName = UriTemplate.of(v1PersistentVolumeClaimSpec.getStorageClassName())
-                                .expand(ImmutableMap.of(
-                                        "zone", rackStatus.getName(),
-                                        "index", rackStatus.getIndex()));
-                        v1PersistentVolumeClaimSpec.setStorageClassName(storageClassName);
-                        logger.info("sts={}/{} creating new PVC with storageClassName={}",
-                                statefulSetMetadata.getName(), dataCenterMetadata.getNamespace(), storageClassName);
-
+                        if (v1PersistentVolumeClaimSpec.getStorageClassName() != null) {
+                            String storageClassName = v1PersistentVolumeClaimSpec.getStorageClassName()
+                                    .replace("{zone}", rackStatus.getName())
+                                    .replace("{index}", Integer.toString(rackStatus.getIndex()));
+                            v1PersistentVolumeClaimSpec.setStorageClassName(storageClassName);
+                            logger.info("sts={}/{} creating new PVC with storageClassName={}",
+                                    statefulSetMetadata.getName(), dataCenterMetadata.getNamespace(), storageClassName);
+                        }
                         return Single.just(Arrays.asList(new V1PersistentVolumeClaim()
                                 .metadata(new V1ObjectMeta().name("data-volume"))
                                 .spec(v1PersistentVolumeClaimSpec)));
@@ -2382,12 +2150,7 @@ public class DataCenterUpdateAction {
     public static class Zones implements Iterable<Zone> {
         TreeMap<String, Zone> zoneMap = new TreeMap<>();    // sort racks
 
-        public Zones(DataCenterStatus dataCenterStatus, CoreV1Api coreApi, Map<String, V1StatefulSet> existingStatefulSetsByZone) throws ApiException {
-            this(dataCenterStatus , coreApi.listNode(false, null, null, null, null,
-                    null, null, null, null).getItems(), existingStatefulSetsByZone);
-        }
-
-        public Zones(DataCenterStatus dataCenterStatus, List<V1Node> nodes, Map<String, V1StatefulSet> existingStatefulSetsByZone) {
+        public Zones(DataCenterStatus dataCenterStatus, Collection<V1Node> nodes, TreeMap<String, V1StatefulSet> existingStatefulSetsByZone) {
 
             for (V1Node node : nodes) {
                 String zoneName = node.getMetadata().getLabels().get(OperatorLabels.ZONE);
@@ -2468,89 +2231,6 @@ public class DataCenterUpdateAction {
         public Iterator<Zone> iterator() {
             return zoneMap.values().iterator();
         }
-    }
-
-    public Completable updateRack(Zones zones, V1StatefulSet v1StatefulSet, String rack, Map<String, RackStatus> rackStatusMap) throws ApiException {
-        logger.debug("datacenter={} phase={} UPDATING config of rack={}",
-                dataCenter.id(), dataCenterStatus.getPhase(), rack);
-        updateDatacenterStatus(DataCenterPhase.UPDATING, zones, rackStatusMap);
-        prepareDataCenterSnapshot(dataCenterStatus.getPhase(), v1StatefulSet);
-        return k8sResourceUtils.replaceNamespacedStatefulSet(v1StatefulSet)
-                .flatMapCompletable(sts -> {
-                    if (dataCenterSpec.getHostNetworkEnabled() || dataCenterSpec.getHostPortEnabled())
-                        return Completable.complete();
-
-                    // creates one service LB per Elassandra node
-                    int replicas = sts.getSpec().getReplicas();
-                    List<CompletableSource> todoList = new ArrayList<>(replicas);
-                    RackStatus rackStatus = rackStatusMap.get(rack);
-                    int rackIndex = dataCenterStatus.getZones().indexOf(rackStatus.getName());
-                    for (int i = 0; i < replicas; i++) {
-                        todoList.add(k8sResourceUtils.createNamespacedService(
-                                this.builder.buildSingleNodeServiceLoadBalancer(rack, rackIndex, i, OperatorNames.podName(dataCenter, rackIndex, i)))
-                                .ignoreElement());
-                    }
-                    return Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()]));
-                });
-    }
-
-    public Completable parkRack(Zones zones, V1StatefulSet v1StatefulSet, String rack, Map<String, RackStatus> rackStatusMap) throws ApiException {
-        logger.debug("DataCenter={} phase={} PARKING replica={} rack={}",
-                dataCenter.id(), dataCenterStatus.getPhase(), v1StatefulSet.getSpec().getReplicas(), rack);
-        rackStatusMap.get(rack).setParkedReplicas(v1StatefulSet.getSpec().getReplicas());
-        v1StatefulSet.getSpec().setReplicas(0);
-        rackStatusMap.get(rack).setPhase(RackPhase.PARKING);
-        updateDatacenterStatus(DataCenterPhase.PARKING, zones, rackStatusMap);
-        return k8sResourceUtils.replaceNamespacedStatefulSet(v1StatefulSet).ignoreElement();
-    }
-
-    public Completable unparkRack(Zones zones, V1StatefulSet v1StatefulSet, String rack, Map<String, RackStatus> rackStatusMap) throws ApiException {
-        final int podsToRestore = rackStatusMap.get(rack).getParkedReplicas();
-        logger.debug("DataCenter={} in namespace={} phase={} UPDATING {} pods of rack={}",
-                dataCenterMetadata.getName(), dataCenterMetadata.getNamespace(),
-                dataCenterStatus.getPhase(), podsToRestore, rack);
-        // DO NOT RESET the PARKER replicas here but in at the end of UPDATING phase of the movng rack
-        // in order to avoid invalid ConsistencyLevel computation
-        // rackStatusMap.get(rack).setParkedReplicas(0);
-        rackStatusMap.get(rack).setPhase(RackPhase.UPDATING);
-        v1StatefulSet.getSpec().setReplicas(podsToRestore);
-        updateDatacenterStatus(DataCenterPhase.UPDATING, zones, rackStatusMap);
-        return k8sResourceUtils.replaceNamespacedStatefulSet(v1StatefulSet).ignoreElement();
-    }
-
-    private void updateDatacenterStatus(DataCenterPhase dcPhase, Zones zones, Map<String, RackStatus> rackStatusMap) {
-        updateDatacenterStatus(dcPhase, zones, rackStatusMap, Optional.empty());
-    }
-
-    private void updateDatacenterStatus(DataCenterPhase dcPhase, Zones zones, Map<String, RackStatus> rackStatusMap, Optional<String> lastMeassage) {
-        updateDatacenterStatus(dataCenterStatus, dcPhase, zones, rackStatusMap, lastMeassage);
-    }
-
-    private void updateDatacenterStatus(DataCenterStatus status, DataCenterPhase dcPhase, Zones zones, Map<String, RackStatus> rackStatusMap, Optional<String> lastMeassage) {
-        status.setPhase(dcPhase);
-        status.setRackStatuses(rackStatusMap.entrySet().stream()
-                .collect(Collectors.toMap(e -> dataCenterStatus.getZones().indexOf(e.getKey()), e -> e.getValue())));
-        status.setReplicas(zones.totalReplicas());
-        status.setJoinedReplicas(rackStatusMap.values().stream().collect(Collectors.summingInt(RackStatus::getJoinedReplicas)));
-        status.setReadyReplicas(zones.totalReadyReplicas());
-        lastMeassage.ifPresent((msg) -> status.setLastMessage(msg));
-    }
-
-    /**
-     * Enumerate the list of pods name based on existing statefulsets and .spec.replicas
-     * This does not execute any network operation
-     */
-    private List<ElassandraPod> enumeratePods(TreeMap<String, V1StatefulSet> existingStsMap) {
-        List<ElassandraPod> pods = new ArrayList<>();
-        for (Map.Entry<String, V1StatefulSet> entry : existingStsMap.entrySet()) {
-            String rack = entry.getKey();
-            int rackIndex = dataCenterStatus.getZones().indexOf(rack);
-            V1StatefulSet sts = entry.getValue();
-            for (int i = 0; i < sts.getSpec().getReplicas(); i++) {
-                pods.add(new ElassandraPod(dataCenter, rackIndex, i));
-            }
-        }
-        return pods;
     }
 
     private static String toYamlString(final Object object) {

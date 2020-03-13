@@ -22,7 +22,7 @@ import java.util.Collection;
 
 @Context
 @Infrastructure
-public class DataCenterPipeline extends K8sWatchPipeline<DataCenter, DataCenterList> {
+public class DataCenterPipeline extends K8sWatchPipeline<DataCenter, DataCenterList, Key> {
 
     private final Logger logger = LoggerFactory.getLogger(DataCenterPipeline.class);
     
@@ -30,7 +30,7 @@ public class DataCenterPipeline extends K8sWatchPipeline<DataCenter, DataCenterL
         super(apiClient, new DataCenterAdapter(customObjectsApi, config), cache, config);
     }
     
-    public static class DataCenterAdapter extends K8sWatchResourceAdapter<DataCenter, DataCenterList> {
+    public static class DataCenterAdapter extends K8sWatchResourceAdapter<DataCenter, DataCenterList, Key> {
         
         private final CustomObjectsApi customObjectsApi;
         private final OperatorConfig config;

@@ -1,6 +1,5 @@
 package com.strapdata.strapkop.reconcilier;
 
-import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.cql.CqlKeyspace;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRoleManager;
@@ -41,10 +40,8 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
     private final CqlRoleManager cqlRoleManager;
     private final CqlKeyspaceManager cqlKeyspaceManager;
     private final JmxmpElassandraProxy jmxmpElassandraProxy;
-    private final ElassandraNodeStatusCache elassandraNodeStatusCache;
 
     public ReplicationTaskReconcilier(ReconcilierObserver reconcilierObserver,
-                                      final DataCenterUpdateReconcilier dataCenterUpdateReconcilier,
                                       final K8sResourceUtils k8sResourceUtils,
                                       final CustomObjectsApi customObjectsApi,
                                       final JmxmpElassandraProxy jmxmpElassandraProxy,
@@ -52,13 +49,12 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
                                       final CqlRoleManager cqlRoleManager,
                                       final CqlKeyspaceManager cqlKeyspaceManager,
                                       final MeterRegistry meterRegistry,
-                                      final ElassandraNodeStatusCache elassandraNodeStatusCache) {
-        super(reconcilierObserver, "replication", k8sResourceUtils, meterRegistry, dataCenterUpdateReconcilier, elassandraNodeStatusCache);
+                                      final DataCenterController dataCenterController) {
+        super(reconcilierObserver, "replication", k8sResourceUtils, meterRegistry, dataCenterController);
         this.context = context;
         this.cqlRoleManager = cqlRoleManager;
         this.cqlKeyspaceManager = cqlKeyspaceManager;
         this.jmxmpElassandraProxy = jmxmpElassandraProxy;
-        this.elassandraNodeStatusCache = elassandraNodeStatusCache;
     }
 
     public BlockReason blockReason() {

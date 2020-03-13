@@ -4,7 +4,6 @@ import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
-import com.strapdata.strapkop.reconcilier.DataCenterUpdateReconcilier;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
@@ -16,7 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public abstract class AbstractPlugin implements Plugin {
-    final static Logger logger = LoggerFactory.getLogger(DataCenterUpdateReconcilier.class);
+    final static Logger logger = LoggerFactory.getLogger(AbstractPlugin.class);
 
     final ApplicationContext context;
     final K8sResourceUtils k8sResourceUtils;

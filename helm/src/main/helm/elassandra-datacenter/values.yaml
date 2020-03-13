@@ -13,6 +13,27 @@ image:
   pullPolicy: Always
   pullSecrets: []
 
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+
+dataVolumeClaim:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi
+
+externalDns:
+  enabled: false
+  root: "xxx"
+  domain: "example.com"
+  ttl: 300
+
 kibana:
   enabled: true
   image: "docker.elastic.co/kibana/kibana-oss"
@@ -24,15 +45,9 @@ kibana:
       keyspaces: []
 
 reaper:
-  image: strapdata.azurecr.io/strapdata/cassandra-reaper:1.4.7.1
+  image: strapdata.azurecr.io/strapdata/cassandra-reaper:2.0.2
   enabled: true
   ingressSuffix:
-
-externalDns:
-  enabled: false
-  root: "xxx"
-  domain: "example.com"
-  ttl: 300
 
 # Tell Cassandra to use the local IP address (INTERNAL_IP).
 snitchPreferLocal: false
@@ -51,10 +66,6 @@ managedKeyspaces: {}
 # URL template support {namespace}, {clusterName}, {datacenterName}, {phase}, {replicas}, {readyReplicas}
 webHookUrl:
 
-elasticsearchLoadBalancerEnabled: false
-elasticsearchLoadBalancerIp:
-
-
 # TODO: we do not support unprivileged setup yet
 privilegedSupported: true
 
@@ -62,20 +73,6 @@ privilegedSupported: true
 decommissionPolicy: "DELETE_PVC"
 
 computeJvmMemorySettings: true
-resources:
-  requests:
-    cpu: 500m
-    memory: 1Gi
-  limits:
-    cpu: 1000m
-    memory: 2Gi
-
-dataVolumeClaim:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 500Mi
 
 enterprise:
   enabled: true
@@ -135,22 +132,27 @@ prometheusEnabled: true
 
 elasticsearchEnabled: true
 elasticsearchIngressEnabled: false
+elasticsearchLoadBalancerIp:
+
+elasticsearchPort: 9200
+elasticsearchTransportPort: 9300
+elasticsearchLoadBalancerEnabled: true
+
 
 ssl: true
 authentication: CASSANDRA
 
 hostPortEnabled: true
+hostNetworkEnabled: true
 
 nativePort: 39042
 storagePort: 37000
 sslStoragePort: 37001
 
-elasticsearchPort: 9200
-
-jmxPort: 7199
 jdbPort: 4242
 
 # JMXMP is mandatory
+jmxPort: 7199
 jmxmpEnabled: true
 jmxmpOverSSL: true
 

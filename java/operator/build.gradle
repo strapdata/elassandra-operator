@@ -35,9 +35,8 @@ jib {
         // credHelper = 'osxkeychain'
 
         auth {
-            username = registryUsername
-
-            password = registryPassword
+            username = System.getenv('DOCKER_USERNAME')
+            password = System.getenv('DOCKER_PASSWORD')
         }
     }
     container {
@@ -126,6 +125,7 @@ dependencies {
     compile project(':java:model')
     compile project(':java:backup')
     compile project(':java:k8s-addons')
+    compile project(':java:driver-addons')
 
     testCompile "org.mockito:mockito-core:2.+"
 }

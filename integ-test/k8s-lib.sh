@@ -9,7 +9,7 @@ set -x
 
 HELM_REPO=../helm/src/main/helm
 REGISTRY_SECRET_NAME="strapregistry"
-ELASSANDRA_OPERATOR_TAG="6.2.3.22-SNAPSHOT"
+ELASSANDRA_OPERATOR_TAG="6.8.4.3"
 
 function create_resource_group() {
     az group create -l westeurope -n $RESOURCE_GROUP_NAME
@@ -114,23 +114,58 @@ function init_helm() {
 function install_elassandra_operator() {
     helm install --namespace ${1:-default} --name strapkop \
     --set image.pullSecrets[0]="$REGISTRY_SECRET_NAME" \
-    --set image.tag="$OPERATOR_TAG" \
     $HELM_REPO/elassandra-operator
 }
 
 # Deploy single node cluster in namespace=cluster_name
 # $1 = cluster name
-# $2 = datacenter name
-function install_singlenode_elassandra_datacenter() {
-    helm install --namespace $1 --name ${1:-"cl1"}-${2:-"dc1"} \
+# $2 = cluster
+# $3 = datacenter name
+# $4 = number of nodes
+function install_elassandra_datacenter() {
+    local ns=${1:-"default"}
+    local cl=${2:-"cl1"}
+    local dc=${3:-"dc2"}
+    local sz=${4:-"1"}
+    helm install --namespace "$ns" --name "$cl-$dc" \
     --set image.pullSecrets[0]=$REGISTRY_SECRET_NAME \
-    --set image.tag="$OPERATOR_TAG" \
+    --set externalDns.enabled=false \
     --set reaper.enabled=false \
     --set kibana.enabled=false \
-    --set replicas=1 \
+    --set externalDns.enabled=true,externalDns.root="xxxx.yyyy",externalDns.domain="test.strapkube.com" \
+    --set replicas="$sz" \
     --wait \
     $HELM_REPO/elassandra-datacenter
-    echo "Datacenter $2 deployed in namespace $1"
+    echo "Datacenter $cl-$dc size=$sz deployed in namespace $ns"
+}
+
+function uninstall_elassandra_datacenter() {
+    local cl=${2:-"cl1"}
+    local dc=${3:-"dc1"}
+    helm delete --purge "$cl-$dc"
+    echo "Datacenter $cl-$dc uninstalled"
+}
+
+function scale_elassandra_datacenter() {
+    local cl=${1:-"cl1"}
+    local dc=${2:-"dc1"}
+    local sz=${3:-"1"}
+    helm upgrade  --set replicas="$sz" "$cl-$dc" $HELM_REPO/elassandra-datacenter
+    echo "Datacenter $cl-$dc scale size=$sz"
+}
+
+function park_elassandra_datacenter() {
+    local cl=${1:-"cl1"}
+    local dc=${2:-"dc2"}
+    helm upgrade  --set parked="true" "$cl-$dc" $HELM_REPO/elassandra-datacenter
+    echo "Datacenter $cl-$dc parked"
+}
+
+function unpark_elassandra_datacenter() {
+    local cl=${1:-"cl1"}
+    local dc=${2:-"dc2"}
+    helm upgrade  --set parked="false" "$cl-$dc" $HELM_REPO/elassandra-datacenter
+    echo "Datacenter $cl-$dc unparked"
 }
 
 function deploy_traefik_acme() {
@@ -153,16 +188,6 @@ function deploy_traefik_acme() {
 		--set dashboard.enabled=true,dashboard.domain=traefik.${1:-$DNS_DOMAIN} \
 		stable/traefik
 	echo "done."
-}
-
-# $1 = cluster name
-# $2 = datacenter name
-function install_elassandra_datacenter() {
-    helm install --namespace $NAMESPACE --name ${1:-"cl1"}-${2:-"dc1"} \
-    --set image.pullSecrets[0]=$REGISTRY_SECRET_NAME \
-    --set replicas=3 \
-    --wait \
-    $HELM_REPO/elassandra-datacenter
 }
 
 function create_namespace() {

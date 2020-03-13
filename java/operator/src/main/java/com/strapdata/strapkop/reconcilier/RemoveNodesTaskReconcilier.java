@@ -1,19 +1,22 @@
 package com.strapdata.strapkop.reconcilier;
 
-import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
+import com.google.common.collect.ImmutableMap;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.event.ElassandraPod;
+import com.strapdata.strapkop.event.Pod;
+import com.strapdata.strapkop.handler.ElassandraPodHandler;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
+import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.cassandra.BlockReason;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.task.RemoveNodesTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
-import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CustomObjectsApi;
+import io.kubernetes.client.models.V1Pod;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Infrastructure;
@@ -24,7 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
-import java.util.Optional;
+import java.util.concurrent.Callable;
 
 @Singleton
 @Infrastructure
@@ -36,16 +39,15 @@ public class RemoveNodesTaskReconcilier extends TaskReconcilier {
     private final CqlKeyspaceManager cqlKeyspaceManager;
 
     public RemoveNodesTaskReconcilier(ReconcilierObserver reconcilierObserver,
-                                      final DataCenterUpdateReconcilier dataCenterUpdateReconcilier,
                                       final K8sResourceUtils k8sResourceUtils,
                                       final JmxmpElassandraProxy jmxmpElassandraProxy,
                                       final CustomObjectsApi customObjectsApi,
                                       final ApplicationContext context,
                                       final CqlRoleManager cqlRoleManager,
                                       final CqlKeyspaceManager cqlKeyspaceManager,
-                                      final ElassandraNodeStatusCache elassandraNodeStatusCache,
+                                      final DataCenterController dataCenterController,
                                       final MeterRegistry meterRegistry) {
-        super(reconcilierObserver, "removeNodes", k8sResourceUtils, meterRegistry, dataCenterUpdateReconcilier, elassandraNodeStatusCache);
+        super(reconcilierObserver, "removeNodes", k8sResourceUtils, meterRegistry, dataCenterController);
         this.jmxmpElassandraProxy = jmxmpElassandraProxy;
         this.context = context;
         this.cqlRoleManager = cqlRoleManager;
@@ -75,20 +77,30 @@ public class RemoveNodesTaskReconcilier extends TaskReconcilier {
         }
 
         // remove nodes from the cluster
-        Optional<ElassandraPod> optionalPod = elassandraNodeStatusCache.findFirstPodByStatus(ElassandraNodeStatus.NORMAL);
-        if (optionalPod.isPresent()) {
-            return jmxmpElassandraProxy.removeDcNodes(optionalPod.get(), dcName)
-                    .toSingleDefault(TaskPhase.SUCCEED)
-                    .onErrorResumeNext(throwable -> {
-                        logger.error("datacenter={} task={} Error removing nodes of dc={} on pod={} error:{}",
-                                dc.id(), task.id(), dcName, optionalPod.get(), throwable.getMessage());
-                        task.getStatus().setLastMessage(throwable.getMessage());
-                        return Single.just(TaskPhase.FAILED);
-                    });
-        } else {
-            logger.warn("datacenter={} task={}, no NORMAL pod found to remove dc={}", dc.id(), task.id(), dcName);
+        // search a ready pod
+        final String labelSelector = OperatorLabels.toSelector(ImmutableMap.of(OperatorLabels.PARENT, dc.getMetadata().getName()));
+        return Single.fromCallable(new Callable<ElassandraPod>() {
+            @Override
+            public ElassandraPod call() throws Exception {
+                Iterable<V1Pod> pods = k8sResourceUtils.listNamespacedPods(dc.getMetadata().getNamespace(), labelSelector, labelSelector);
+                for (V1Pod v1Pod : pods) {
+                    Pod pod = new Pod(v1Pod, ElassandraPodHandler.CONTAINER_NAME);
+                    if (pod.isReady()) {
+                        return new ElassandraPod(dc.getMetadata().getNamespace(),
+                                dc.getSpec().getClusterName(),
+                                dc.getSpec().getDatacenterName(),
+                                v1Pod.getMetadata().getName());
+                    }
+                }
+                throw new IllegalStateException("No elassandra pod ready");
+            }
+        }).flatMap(elassandraPod -> jmxmpElassandraProxy.removeDcNodes(elassandraPod, dcName).toSingleDefault(TaskPhase.SUCCEED))
+        .onErrorResumeNext(throwable -> {
+            logger.error("datacenter={} task={} Error removing nodes of dc={} error:{}",
+                    dc.id(), task.id(), dcName, throwable.getMessage());
+            task.getStatus().setLastMessage(throwable.getMessage());
             return Single.just(TaskPhase.FAILED);
-        }
+        });
     }
 
     @Override

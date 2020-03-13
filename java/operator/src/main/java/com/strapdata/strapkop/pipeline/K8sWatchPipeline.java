@@ -1,7 +1,6 @@
 package com.strapdata.strapkop.pipeline;
 
 import com.strapdata.strapkop.OperatorConfig;
-import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.cache.Cache;
 import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.event.K8sWatchEventSource;
@@ -10,19 +9,18 @@ import io.reactivex.Observable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Inject;
 import javax.inject.Named;
 
-public abstract class K8sWatchPipeline<ResourceT, ResourceListT> extends EventPipeline<K8sWatchEvent<ResourceT>> {
+public abstract class K8sWatchPipeline<ResourceT, ResourceListT, K> extends EventPipeline<K8sWatchEvent<ResourceT>> {
 
     private final Logger logger = LoggerFactory.getLogger(K8sWatchPipeline.class);
     
-    private final Cache<Key, ResourceT> cache;
-    private final K8sWatchResourceAdapter<ResourceT, ResourceListT> adapter;
+    private final Cache<K, ResourceT> cache;
+    private final K8sWatchResourceAdapter<ResourceT, ResourceListT, K> adapter;
 
     public K8sWatchPipeline(@Named("apiClient") ApiClient apiClient,
-                            K8sWatchResourceAdapter<ResourceT, ResourceListT> adapter,
-                            Cache<Key, ResourceT> cache,
+                            K8sWatchResourceAdapter<ResourceT, ResourceListT, K> adapter,
+                            Cache<K, ResourceT> cache,
                             OperatorConfig operatorConfig) {
         super(new K8sWatchEventSource<>(apiClient, adapter, operatorConfig));
         this.cache = cache;
@@ -35,7 +33,7 @@ public abstract class K8sWatchPipeline<ResourceT, ResourceListT> extends EventPi
     }
     
     private void updateCache(K8sWatchEvent<ResourceT> event){
-        final Key key = adapter.getKey(event.getResource());
+        final K key = adapter.getKey(event.getResource());
     
         switch (event.getType()) {
             case ADDED:

@@ -28,17 +28,17 @@ import static com.strapdata.strapkop.event.K8sWatchEvent.Type.INITIAL;
  * @param <ResourceListT>
  */
 @SuppressWarnings("UnstableApiUsage")
-public class K8sWatchEventSource<ResourceT, ResourceListT> implements EventSource<K8sWatchEvent<ResourceT>> {
+public class K8sWatchEventSource<ResourceT, ResourceListT, Key> implements EventSource<K8sWatchEvent<ResourceT>> {
     
     private final Logger logger = LoggerFactory.getLogger(K8sWatchEventSource.class);
     
     private final ApiClient watchClient;
-    private final K8sWatchResourceAdapter<ResourceT, ResourceListT> adapter;
+    private final K8sWatchResourceAdapter<ResourceT, ResourceListT, Key> adapter;
     private final Gson gson;
 
     private String lastResourceVersion = null;
 
-    public K8sWatchEventSource(final @Named("watchClient") ApiClient watchClient, final K8sWatchResourceAdapter<ResourceT, ResourceListT> adapter, OperatorConfig config) {
+    public K8sWatchEventSource(final @Named("watchClient") ApiClient watchClient, final K8sWatchResourceAdapter<ResourceT, ResourceListT, Key> adapter, OperatorConfig config) {
         this.watchClient = watchClient;
         watchClient.getHttpClient().setReadTimeout(config.getK8sWatchPeriodInSec(), TimeUnit.SECONDS);
         logger.debug("watchClient read timeout={}", watchClient.getHttpClient().getReadTimeout());
@@ -80,9 +80,7 @@ public class K8sWatchEventSource<ResourceT, ResourceListT> implements EventSourc
         final ResourceListT resourceList = apiResponse.getData();
         logger.info("Fetched {} existing {}", adapter.getListItems(resourceList).size(), adapter.getName());
         lastResourceVersion = adapter.getListMetadata(resourceList).getResourceVersion();
-        return Observable.fromIterable(
-                adapter.getListItems(resourceList)).map(resource -> new K8sWatchEvent<>(INITIAL, resource)
-        );
+        return Observable.fromIterable(adapter.getListItems(resourceList)).map(resource -> new K8sWatchEvent<>(INITIAL, resource, lastResourceVersion));
     }
     
     /**
@@ -104,7 +102,7 @@ public class K8sWatchEventSource<ResourceT, ResourceListT> implements EventSourc
                         // ignore read timeout
                         return;
                     }
-                    logger.warn("Watcher for adapter '{}' receive an error", t);
+                    logger.warn("Watcher for adapter receive an error", t);
                 })
                 .map(this::objectJsonToEvent)
                 .doFinally(watch::close);
@@ -121,7 +119,7 @@ public class K8sWatchEventSource<ResourceT, ResourceListT> implements EventSourc
         ResourceT resource = null;
         
         if (type == ERROR) {
-            logger.error("{} list watch failed with status={}.", adapter.getName(), response.status);
+            logger.error("{} list watch failed with status={}.", adapter.getName(), response);
         } else {
             // TODO: unit test with bad a datacenter CRD causing JsonSyntaxException
             try {
@@ -136,7 +134,8 @@ public class K8sWatchEventSource<ResourceT, ResourceListT> implements EventSourc
 
         K8sWatchEvent<ResourceT> watchEvent = new K8sWatchEvent<ResourceT>()
                 .setType(type)
-                .setResource(resource);
+                .setResource(resource)
+                .setLastResourceVersion(lastResourceVersion);
         logger.trace("new event={} lastResourceVersion={} type={} resource={}", watchEvent, lastResourceVersion, type, resource);
         return watchEvent;
     }

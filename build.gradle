@@ -16,12 +16,6 @@ version = '6.8.4.1'
 
 ext {
   allowInsecureRegistries = true
-  registryUrl = System.getenv("DOCKER_REGISTRY")
-  registryUsername = System.getenv("DOCKER_USERNAME")
-  registryPassword = System.getenv("DOCKER_PASSWORD")
-
-  println "registryUrl=$registryUrl"
-  println "registryUsername=$registryUsername"
 }
 
 configure(subprojects.findAll { it.name.contains("docker") }) {
@@ -46,7 +40,7 @@ def getGitCommitHash = { ->
 }
 
 ext.gitCommitHash = getGitCommitHash()
-ext.latestElassandraVersion = (new File('./docker/supportedElassandraVersions.txt') as String[])[0]
+ext.latestElassandraVersion = (new File("${rootDir}/docker/supportedElassandraVersions.txt") as String[])[0]
 if (!ext.javaElassandraVersion) {
   // the elassandra version used to build k8s-addons (seedProvider, config loader...)
   ext.javaElassandraVersion = ext.latestElassandraVersion

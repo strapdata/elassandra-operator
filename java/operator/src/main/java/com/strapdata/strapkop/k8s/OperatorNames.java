@@ -3,6 +3,7 @@ package com.strapdata.strapkop.k8s;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import io.kubernetes.client.models.V1OwnerReference;
 
+import java.util.Locale;
 import java.util.UUID;
 
 public class OperatorNames {
@@ -95,14 +96,31 @@ public class OperatorNames {
     }
 
     public static String podFqdn(final DataCenter dc, final String podName) {
-        return String.format("%s.%s.%s.svc.cluster.local", podName, OperatorNames.nodesService(dc), dc.getMetadata().getNamespace());
+        return String.format(Locale.ROOT,"%s.%s.%s.svc.cluster.local", podName, OperatorNames.nodesService(dc), dc.getMetadata().getNamespace());
     }
 
     public static String podFqdn(final String namespace, final String clusterName, String dcName, final String podName) {
-        return String.format("%s.%s.%s.svc.cluster.local", podName, dataCenterResource(clusterName, dcName), namespace);
+        return String.format(Locale.ROOT, "%s.%s.%s.svc.cluster.local", podName, dataCenterResource(clusterName, dcName), namespace);
     }
 
-    
+    public static String internalPodFqdn(DataCenter dc, int rackIndex, int podIndex) {
+        return String.format(Locale.ROOT, "elassandra-%s-%s-%d-%d.%s.%s.svc.cluster.local",
+                dc.getSpec().getClusterName().toLowerCase(Locale.ROOT),
+                dc.getSpec().getDatacenterName().toLowerCase(Locale.ROOT),
+                rackIndex,
+                podIndex,
+                OperatorNames.nodesService(dc),
+                dc.getMetadata().getNamespace());
+    }
+
+    public static String externalPodFqdn(DataCenter dc, int rackIndex, int podIndex) {
+        return String.format(Locale.ROOT, "cassandra-%s-%d-%d.%s",
+                dc.getSpec().getExternalDns().getRoot(),
+                rackIndex,
+                podIndex,
+                dc.getSpec().getExternalDns().getDomain());
+    }
+
     public static String generateTaskName(DataCenter dc, String taskType) {
         return OperatorNames.dataCenterChildObjectName("%s-" + taskType + "-" + UUID.randomUUID().toString().substring(0, 8), dc);
     }

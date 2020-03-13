@@ -5,8 +5,7 @@ import com.strapdata.strapkop.model.ClusterKey;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.pipeline.WorkQueues;
-import com.strapdata.strapkop.reconcilier.DataCenterUpdateReconcilier;
-import io.kubernetes.client.ApiException;
+import com.strapdata.strapkop.reconcilier.DataCenterController;
 import io.kubernetes.client.models.V1StatefulSet;
 import org.apache.commons.lang3.ObjectUtils;
 import org.slf4j.Logger;
@@ -19,43 +18,52 @@ import static com.strapdata.strapkop.event.K8sWatchEvent.Type.*;
 
 @Handler
 public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1StatefulSet>> {
-    
+
     private final Logger logger = LoggerFactory.getLogger(StatefulsetHandler.class);
 
     private static final EnumSet<K8sWatchEvent.Type> acceptedEventTypes = EnumSet.of(MODIFIED, INITIAL, DELETED);
 
     private final WorkQueues workQueues;
-    private final DataCenterUpdateReconcilier dataCenterReconcilier;
-    
-    public StatefulsetHandler(WorkQueues workQueue, DataCenterUpdateReconcilier dataCenterReconcilier) {
+    private final DataCenterController dataCenterController;
+
+    public StatefulsetHandler(final WorkQueues workQueue,
+                              final DataCenterController dataCenterController) {
         this.workQueues = workQueue;
-        this.dataCenterReconcilier = dataCenterReconcilier;
+        this.dataCenterController = dataCenterController;
     }
-    
+
+    /**
+     * Update STS status cache and call dc controller if ready.
+     * @param event
+     * @throws Exception
+     */
     @Override
-    public void accept(K8sWatchEvent<V1StatefulSet> event) throws ApiException {
-        if (!acceptedEventTypes.contains(event.getType())) {
-            return ;
-        }
-
+    public void accept(K8sWatchEvent<V1StatefulSet> event) throws Exception {
         final V1StatefulSet sts = event.getResource();
-        logger.debug("StatefulSet event type={} sts={}/{}", event.getType(), sts.getMetadata().getName(), sts.getMetadata().getNamespace());
+        logger.debug("StatefulSet event type={} sts={}/{} status={}",
+                event.getType(), sts.getMetadata().getName(), sts.getMetadata().getNamespace(), sts.getStatus());
 
-        // abort if the sts scaling up/down replicas
-        if (!event.getType().equals(DELETED) &&
-                (!Objects.equals(sts.getStatus().getReplicas(), ObjectUtils.defaultIfNull(sts.getStatus().getReadyReplicas(), 0))
-                || !Objects.equals(ObjectUtils.defaultIfNull(sts.getStatus().getCurrentReplicas(), 0), sts.getStatus().getReplicas()))) {
-            logger.info("sts={}/{} is not ready, skipping", sts.getMetadata().getName(), sts.getMetadata().getNamespace());
-            return ;
+        Key key = new Key(sts.getMetadata().getName(), sts.getMetadata().getNamespace());
+        switch(event.getType()) {
+            case INITIAL:
+            case ADDED:
+            case MODIFIED:
+                if (isStafulSetReady(sts)) {
+                    logger.info("sts={}/{} is ready, triggering a dc statefulsetUpdate", sts.getMetadata().getName(), sts.getMetadata().getNamespace());
+                    final String clusterName = sts.getMetadata().getLabels().get(OperatorLabels.CLUSTER);
+                    workQueues.submit(
+                            new ClusterKey(clusterName, sts.getMetadata().getNamespace()),
+                            dataCenterController.statefulsetUpdate(sts));
+                }
+                break;
+            case ERROR:
+                throw new IllegalStateException("Statefulset error");
+            case DELETED:
         }
-    
-        logger.info("sts={}/{} is ready, triggering a dc reconciliation", sts.getMetadata().getName(), sts.getMetadata().getNamespace());
-        
-        final String dcResourceName = sts.getMetadata().getLabels().get(OperatorLabels.PARENT);
-        final String clusterName = sts.getMetadata().getLabels().get(OperatorLabels.CLUSTER);
-        
-        workQueues.submit(
-                new ClusterKey(clusterName, sts.getMetadata().getNamespace()),
-                dataCenterReconcilier.reconcile((new Key(dcResourceName, sts.getMetadata().getNamespace()))));
+    }
+
+    public static boolean isStafulSetReady(V1StatefulSet sts) {
+        return Objects.equals(sts.getSpec().getReplicas(), ObjectUtils.defaultIfNull(sts.getStatus().getReadyReplicas(), 0)) &&
+                Objects.equals(sts.getStatus().getCurrentRevision(), sts.getStatus().getUpdateRevision());
     }
 }

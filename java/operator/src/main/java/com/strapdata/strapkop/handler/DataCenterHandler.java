@@ -6,8 +6,7 @@ import com.strapdata.strapkop.model.ClusterKey;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.pipeline.WorkQueues;
-import com.strapdata.strapkop.reconcilier.DataCenterDeleteReconcilier;
-import com.strapdata.strapkop.reconcilier.DataCenterUpdateReconcilier;
+import com.strapdata.strapkop.reconcilier.DataCenterController;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.reactivex.Completable;
 import io.reactivex.functions.Action;
@@ -19,21 +18,18 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
     
     private final Logger logger = LoggerFactory.getLogger(DataCenterHandler.class);
     private final WorkQueues workQueues;
-    private final DataCenterUpdateReconcilier dataCenterUpdateReconcilier;
-    private final DataCenterDeleteReconcilier dataCenterDeleteReconcilier;
+    private final DataCenterController dataCenterController;
     private final MeterRegistry meterRegistry;
     private final DataCenterCache dataCenterCache;
 
     private int dataCenterCacheMaxSize = 0;
 
     public DataCenterHandler(final WorkQueues workQueue,
-                             final DataCenterUpdateReconcilier dataCenterUpdateReconcilier,
-                             final DataCenterDeleteReconcilier dataCenterDeleteReconcilier,
+                             final DataCenterController dataCenterController,
                              final DataCenterCache dataCenterCache,
                              final MeterRegistry meterRegistry) {
         this.workQueues = workQueue;
-        this.dataCenterUpdateReconcilier = dataCenterUpdateReconcilier;
-        this.dataCenterDeleteReconcilier = dataCenterDeleteReconcilier;
+        this.dataCenterController = dataCenterController;
         this.dataCenterCache = dataCenterCache;
         this.meterRegistry = meterRegistry;
     }
@@ -51,18 +47,28 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
         };
 
         Completable completable = null;
-        if (event.isUpdate()) {
-            completable = dataCenterUpdateReconcilier.reconcile(key);
-        }
-        else if (event.isDeletion()) {
-            completable = dataCenterDeleteReconcilier.reconcile(dataCenter)
-                    .doOnComplete(new Action() {
-                        @Override
-                        public void run() throws Exception {
-                            dataCenterCache.remove(key);
-                            meterRegistry.gauge("datacenter_cache.current", dataCenterCache.size());
-                        }
-                    });
+        switch(event.getType()) {
+            case ADDED:
+            case INITIAL:
+                completable = dataCenterController.initDatacenter(dataCenter);
+                break;
+            case MODIFIED:
+                completable = dataCenterController.updateDatacenter(dataCenter);
+                break;
+            case DELETED:
+                completable = dataCenterController.deleteDatacenter(dataCenter)
+                        .doOnComplete(new Action() {
+                            @Override
+                            public void run() throws Exception {
+                                dataCenterCache.remove(key);
+                                meterRegistry.gauge("datacenter_cache.current", dataCenterCache.size());
+                            }
+                        });
+                break;
+            case ERROR:
+                throw new IllegalStateException("Datacenter error event");
+            default:
+                throw new UnsupportedOperationException("Unknown event type");
         }
         if (completable != null)
             workQueues.submit(new ClusterKey(event.getResource()), completable);

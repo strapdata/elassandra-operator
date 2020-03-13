@@ -2,7 +2,6 @@ package com.strapdata.strapkop.controllers;
 
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import com.strapdata.strapkop.reconcilier.DataCenterDeleteReconcilier;
 import com.strapdata.strapkop.reconcilier.ReconcilierObserver;
 import io.kubernetes.client.ApiException;
 import io.micronaut.http.HttpStatus;
@@ -32,7 +31,7 @@ public class ShutdownController {
     OperatorConfig operatorConfig;
 
     @Inject
-    DataCenterDeleteReconcilier dataCenterDeleteReconcilier;
+    DataCenterController dataCenterController;
 
     public ShutdownController() {
     }

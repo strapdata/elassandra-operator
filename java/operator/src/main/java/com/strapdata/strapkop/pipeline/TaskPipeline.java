@@ -22,7 +22,7 @@ import java.util.Collection;
 
 @Context
 @Infrastructure
-public class TaskPipeline extends K8sWatchPipeline<Task, TaskList> {
+public class TaskPipeline extends K8sWatchPipeline<Task, TaskList, Key> {
 
     private final Logger logger = LoggerFactory.getLogger(TaskPipeline.class);
     
@@ -30,7 +30,7 @@ public class TaskPipeline extends K8sWatchPipeline<Task, TaskList> {
         super(apiClient, new TaskAdapter(customObjectsApi, config), cache, config);
     }
     
-    public static class TaskAdapter extends K8sWatchResourceAdapter<Task, TaskList> {
+    public static class TaskAdapter extends K8sWatchResourceAdapter<Task, TaskList, Key> {
         
         private final CustomObjectsApi customObjectsApi;
         private final OperatorConfig config;

@@ -54,7 +54,7 @@ public class ReconcilierObserver {
                 count++;
                 meterRegistry.counter("reconciliation.begin").increment();
                 meterRegistry.gauge("reconciliation.current", count);
-                logger.debug("Reconciliation begin, count={}", count);
+                logger.trace("Reconciliation begin, count={}", count);
                 return true;
             } finally {
                 monitor.leave();
@@ -71,7 +71,7 @@ public class ReconcilierObserver {
             count--;
             meterRegistry.counter("reconciliation.end").increment();
             meterRegistry.gauge("reconciliation.current", count);
-            logger.debug("Reconciliation end, count={}", count);
+            logger.trace("Reconciliation end, count={}", count);
         } finally {
             monitor.leave();
         }
@@ -84,7 +84,7 @@ public class ReconcilierObserver {
             meterRegistry.counter("reconciliation.end").increment();
             meterRegistry.counter("reconciliation.failed").increment();
             meterRegistry.gauge("reconciliation.current", count);
-            logger.debug("Reconciliation failed, count={}", count);
+            logger.trace("Reconciliation failed, count={}", count);
         } finally {
             monitor.leave();
         }

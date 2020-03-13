@@ -54,7 +54,7 @@ public class WebHookPlugin extends AbstractPlugin {
         params.put("datacenterName", dataCenter.getSpec().getDatacenterName());
         params.put("phase", dataCenter.getStatus().getPhase().name());
         params.put("readyReplicas", Integer.toString(dataCenter.getStatus().getReadyReplicas()));
-        params.put("replicas", Integer.toString(dataCenter.getStatus().getReplicas()));
+        params.put("replicas", Integer.toString(dataCenter.getSpec().getReplicas()));
         return params;
     }
 

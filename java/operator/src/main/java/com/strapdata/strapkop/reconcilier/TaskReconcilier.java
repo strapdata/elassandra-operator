@@ -1,16 +1,16 @@
 package com.strapdata.strapkop.reconcilier;
 
-import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
+import com.google.common.collect.ImmutableMap;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.cassandra.Block;
 import com.strapdata.strapkop.model.k8s.cassandra.BlockReason;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
 import com.strapdata.strapkop.model.k8s.task.TaskStatus;
-import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
 import io.kubernetes.client.ApiException;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.reactivex.Completable;
@@ -21,7 +21,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
-import java.util.stream.Collectors;
 
 public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier.Action, Task>> {
 
@@ -29,8 +28,7 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
     final K8sResourceUtils k8sResourceUtils;
     final String taskType;
     final MeterRegistry meterRegistry;
-    final DataCenterUpdateReconcilier dataCenterUpdateReconcilier;
-    final ElassandraNodeStatusCache elassandraNodeStatusCache;
+    final DataCenterController dataCenterController;
 
     private volatile int runningTaskCount = 0;
 
@@ -38,15 +36,12 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
                     String taskType,
                     final K8sResourceUtils k8sResourceUtils,
                     final MeterRegistry meterRegistry,
-                    final DataCenterUpdateReconcilier dataCenterUpdateReconcilier,
-                    final ElassandraNodeStatusCache elassandraNodeStatusCache
-                    ) {
+                    final DataCenterController dataCenterController) {
         super(reconcilierObserver);
         this.k8sResourceUtils = k8sResourceUtils;
         this.taskType = taskType;
         this.meterRegistry = meterRegistry;
-        this.dataCenterUpdateReconcilier= dataCenterUpdateReconcilier;
-        this.elassandraNodeStatusCache = elassandraNodeStatusCache;
+        this.dataCenterController = dataCenterController;
     }
     
     enum Action {
@@ -119,13 +114,13 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
                                     .andThen(updateTaskStatus(dc, task, TaskPhase.RUNNING))
                                     .andThen(doTask(task, dc).flatMapCompletable(s -> updateTaskStatus(dc, task, s)))
                                     .andThen(ensureUnlockDc(dc, task))
-                                    .andThen(reconcileDcWhenDone(dc));
+                                    .andThen(reconcileDcWhenDone(dc, task));
                         case RUNNING:
                             return ensureLockDc(task, dc)
                                     .subscribeOn(Schedulers.io())
                                     .andThen(doTask(task, dc).flatMapCompletable(s -> updateTaskStatus(dc, task, s)))
                                     .andThen(ensureUnlockDc(dc, task))
-                                    .andThen(reconcileDcWhenDone(dc));
+                                    .andThen(reconcileDcWhenDone(dc, task));
                         default:
                             // nothing to do
                             logger.debug("task={} phase={} nothing to do", task.id(), task.getStatus().getPhase());
@@ -163,9 +158,9 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
         }
     }
 
-    Completable reconcileDcWhenDone(DataCenter dataCenter) throws ApiException {
+    Completable reconcileDcWhenDone(DataCenter dataCenter, Task task) throws Exception {
         return reconcileDataCenterWhenDone() ?
-                this.dataCenterUpdateReconcilier.reconcile(new Key(dataCenter.getMetadata())) :
+                this.dataCenterController.taskDone(dataCenter, task) :
                 Completable.complete();
     }
 
@@ -310,19 +305,16 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
 
     // a possible implementation of initializePodMap
     public Completable initializePodMapWithUnknownStatus(Task task, DataCenter dc) {
-        for (Map.Entry<String, ElassandraNodeStatus> entry : elassandraNodeStatusCache.entrySet().stream()
-                .filter(e -> e.getKey().getNamespace().equals(dc.getMetadata().getNamespace()) &&
-                        e.getKey().getCluster().equals(dc.getSpec().getClusterName()) &&
-                        e.getKey().getDataCenter().equals(dc.getSpec().getDatacenterName()))
-                .collect(Collectors.toMap(e -> e.getKey().getName(), e -> e.getValue()))
-                .entrySet()
-        ) {
-            if (!entry.getValue().equals(ElassandraNodeStatus.UNKNOWN)) {
-                // only add reachable nodes (usually UNKNWON is used for unreachable or non bootstrapped node)
-                task.getStatus().getPods().put(entry.getKey(), TaskPhase.WAITING);
+        final String labelSelector = OperatorLabels.toSelector(ImmutableMap.of(OperatorLabels.PARENT, dc.getMetadata().getName()));
+        return Completable.fromAction(new io.reactivex.functions.Action() {
+            @Override
+            public void run() throws Exception {
+                k8sResourceUtils.listNamespacedPods(dc.getMetadata().getNamespace(), labelSelector, labelSelector)
+                        .forEach(pod -> {
+                            task.getStatus().getPods().put(pod.getMetadata().getName(), TaskPhase.WAITING);
+                        });
             }
-        }
-        return Completable.complete();
+        });
     }
 
     /**

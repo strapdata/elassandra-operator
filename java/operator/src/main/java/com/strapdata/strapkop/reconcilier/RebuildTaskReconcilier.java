@@ -1,6 +1,5 @@
 package com.strapdata.strapkop.reconcilier;
 
-import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.event.ElassandraPod;
@@ -40,7 +39,6 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
     private final CqlKeyspaceManager cqlKeyspaceManager;
 
     public RebuildTaskReconcilier(ReconcilierObserver reconcilierObserver,
-                                  final DataCenterUpdateReconcilier dataCenterUpdateReconcilier,
                                   final K8sResourceUtils k8sResourceUtils,
                                   final JmxmpElassandraProxy jmxmpElassandraProxy,
                                   final CustomObjectsApi customObjectsApi,
@@ -48,8 +46,8 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
                                   final CqlRoleManager cqlRoleManager,
                                   final CqlKeyspaceManager cqlKeyspaceManager,
                                   final MeterRegistry meterRegistry,
-                                  final ElassandraNodeStatusCache elassandraNodeStatusCache) {
-        super(reconcilierObserver, "rebuild", k8sResourceUtils, meterRegistry, dataCenterUpdateReconcilier, elassandraNodeStatusCache);
+                                  final DataCenterController dataCenterController) {
+        super(reconcilierObserver, "rebuild", k8sResourceUtils, meterRegistry, dataCenterController);
         this.jmxmpElassandraProxy = jmxmpElassandraProxy;
         this.context = context;
         this.cqlRoleManager = cqlRoleManager;

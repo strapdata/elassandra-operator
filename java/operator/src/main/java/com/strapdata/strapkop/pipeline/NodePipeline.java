@@ -2,7 +2,6 @@ package com.strapdata.strapkop.pipeline;
 
 import com.squareup.okhttp.Call;
 import com.strapdata.strapkop.OperatorConfig;
-import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.cache.NodeCache;
 import io.kubernetes.client.ApiClient;
 import io.kubernetes.client.ApiException;
@@ -11,6 +10,8 @@ import io.kubernetes.client.models.V1ListMeta;
 import io.kubernetes.client.models.V1Node;
 import io.kubernetes.client.models.V1NodeList;
 import io.kubernetes.client.models.V1ObjectMeta;
+import io.micronaut.context.annotation.Context;
+import io.micronaut.context.annotation.Infrastructure;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,17 +19,17 @@ import javax.inject.Named;
 import java.lang.reflect.Type;
 import java.util.Collection;
 
-//@Context
-//@Infrastructure
-public class NodePipeline extends K8sWatchPipeline<V1Node, V1NodeList> {
+@Context
+@Infrastructure
+public class NodePipeline extends K8sWatchPipeline<V1Node, V1NodeList, String> {
 
     private final Logger logger = LoggerFactory.getLogger(NodePipeline.class);
 
-    public NodePipeline(ApiClient apiClient, CoreV1Api coreV1Api, NodeCache cache, OperatorConfig config) {
+    public NodePipeline(@Named("apiClient") ApiClient apiClient, CoreV1Api coreV1Api, NodeCache cache, OperatorConfig config) {
         super(apiClient, new NodeAdapter(coreV1Api), cache, config);
     }
     
-    private static class NodeAdapter extends K8sWatchResourceAdapter<V1Node, V1NodeList> {
+    private static class NodeAdapter extends K8sWatchResourceAdapter<V1Node, V1NodeList, String> {
     
         private final CoreV1Api coreV1Api;
     
@@ -54,8 +55,8 @@ public class NodePipeline extends K8sWatchPipeline<V1Node, V1NodeList> {
         }
         
         @Override
-        public Key getKey(V1Node resource) {
-            return new Key(getMetadata(resource));
+        public String getKey(V1Node resource) {
+            return resource.getMetadata().getName();
         }
         
         @Override

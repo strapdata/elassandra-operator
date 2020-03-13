@@ -81,7 +81,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                 }
 
                 // if the last observed replicas and current replicas differ, update keyspaces
-                if (!Optional.ofNullable(dataCenter.getStatus().getKeyspaceManagerStatus().getReplicas()).orElse(0).equals(dataCenter.getStatus().getReplicas())) {
+                if (!Optional.ofNullable(dataCenter.getStatus().getKeyspaceManagerStatus().getReplicas()).orElse(0).equals(dataCenter.getSpec().getReplicas())) {
 
                     // adjust RF for system keyspaces
                     for (CqlKeyspace keyspace : SYSTEM_KEYSPACES) {
@@ -111,7 +111,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                         }
                     }
                     // we set the current replicas in observed replicas to know if we need to update rf map
-                    dataCenter.getStatus().getKeyspaceManagerStatus().setReplicas(dataCenter.getStatus().getReplicas());
+                    dataCenter.getStatus().getKeyspaceManagerStatus().setReplicas(dataCenter.getSpec().getReplicas());
                 }
             }
         });
@@ -253,7 +253,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                                             }
                                         } else {
                                             // RF deacreased
-                                            if (targetRf < dc.getStatus().getReplicas()) {
+                                            if (targetRf < dc.getSpec().getReplicas()) {
                                                 logger.info("datacenter={} Trigger a cleanup for keyspace={} in dc={}", dc.id(), keyspace);
                                                 // TODO: trigger cleanup when RF is manually decrease while DC was RUNNING.
                                                 return k8sResourceUtils.createTask(dc, "cleanup", new Consumer<TaskSpec>() {

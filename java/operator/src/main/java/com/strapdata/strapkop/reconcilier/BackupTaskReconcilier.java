@@ -1,6 +1,5 @@
 package com.strapdata.strapkop.reconcilier;
 
-import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
@@ -39,12 +38,11 @@ public class BackupTaskReconcilier extends TaskReconcilier {
     private final SidecarClientFactory sidecarClientFactory;
     
     public BackupTaskReconcilier(ReconcilierObserver reconcilierObserver,
-                                 final DataCenterUpdateReconcilier dataCenterUpdateReconcilier,
                                  final K8sResourceUtils k8sResourceUtils,
                                  final SidecarClientFactory sidecarClientFactory,
                                  final MeterRegistry meterRegistry,
-                                 final ElassandraNodeStatusCache elassandraNodeStatusCache) {
-        super(reconcilierObserver, "backup", k8sResourceUtils, meterRegistry, dataCenterUpdateReconcilier, elassandraNodeStatusCache);
+                                 final DataCenterController dataCenterController) {
+        super(reconcilierObserver, "backup", k8sResourceUtils, meterRegistry, dataCenterController);
         this.sidecarClientFactory = sidecarClientFactory;
     }
 
