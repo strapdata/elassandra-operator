@@ -56,27 +56,6 @@ public class DataCenterStatus {
     private String cqlStatusMessage = null;
 
     /**
-     * Number of nodes in the datacenter
-     */
-    @SerializedName("replicas")
-    @Expose
-    private Integer replicas = 0;
-
-    /**
-     * Number of UN cassandra nodes in the datacenter
-     */
-    @SerializedName("readyReplicas")
-    @Expose
-    private Integer readyReplicas = 0;
-
-    /**
-     * Number of cassandra joined node in the datacenter
-     */
-    @SerializedName("joinedReplicas")
-    @Expose
-    private Integer joinedReplicas = 0;
-
-    /**
      * Current config map spec fingerprint.
      */
     @SerializedName("configMapFingerPrint")
@@ -95,11 +74,18 @@ public class DataCenterStatus {
     private List<String> zones = new ArrayList<>();
 
     /**
+     * Number of replica ready in the underlying sts.
+     */
+    @SerializedName("readyReplicas")
+    @Expose
+    private Integer readyReplicas = 0;
+
+    /**
      * State of cassandra racks by zone index.
      */
     @SerializedName("rackStatuses")
     @Expose
-    private Map<Integer, RackStatus> rackStatuses = new HashMap<>();
+    private TreeMap<Integer, RackStatus> rackStatuses = new TreeMap<>();
 
     /**
      * Cassandra reaper status
@@ -118,4 +104,5 @@ public class DataCenterStatus {
      */
     @SerializedName("kibanaSpaces")
     private Set<String> kibanaSpaces = new HashSet<>();
+
 }

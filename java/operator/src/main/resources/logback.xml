@@ -11,19 +11,20 @@
 
     <turboFilter class="ch.qos.logback.classic.turbo.DuplicateMessageFilter"/>
 
-    <logger name="com.strapdata.strapkop" level="${LOGBACK_com_strapdata_strapkop:-DEBUG}" />
+    <logger name="com.strapdata.cassanadra.driver" level="${LOGBACK_com_strapdata_cassandra_driver:-DEBUG}" />
+
     <logger name="com.strapdata.strapkop.controllers" level="${LOGBACK_com_strapdata_strapkop_controllers:-DEBUG}" />
-    <logger name="com.strapdata.strapkop.k8s" level="${LOGBACK_com_strapdata_strapkop_k8s:-WARN}" />
-    <logger name="com.strapdata.strapkop.event" level="${LOGBACK_com_strapdata_strapkop_event:-DEBUG}" />
+    <logger name="com.strapdata.strapkop.k8s" level="${LOGBACK_com_strapdata_strapkop_k8s:-DEBUG}" />
+    <logger name="com.strapdata.strapkop.event" level="${LOGBACK_com_strapdata_strapkop_event:-INFO}" />
     <logger name="com.strapdata.strapkop.source" level="${LOGBACK_com_strapdata_strapkop_source:-DEBUG}" />
     <logger name="com.strapdata.strapkop.handler" level="${LOGBACK_com_strapdata_strapkop_handler:-DEBUG}" />
     <logger name="com.strapdata.strapkop.pipeline" level="${LOGBACK_com_strapdata_strapkop_pipeline:-WARN}" />
-    <logger name="com.strapdata.strapkop.sidecar" level="${LOGBACK_com_strapdata_strapkop_sidecar:-DEBUG}" />
-    <logger name="com.strapdata.strapkop.plugins.test" level="${LOGBACK_com_strapdata_strapkop_test:-INFO}" />
+    <logger name="com.strapdata.strapkop.sidecar" level="${LOGBACK_com_strapdata_strapkop_sidecar:-INFO}" />
+    <logger name="com.strapdata.strapkop.plugins" level="${LOGBACK_com_strapdata_strapkop_test:-DEBUG}" />
 
     <logger name="com.strapdata.strapkop.reconcilier" level="${LOGBACK_com_strapdata_strapkop_reconcilier:-DEBUG}" />
 
-    <root level="WARN">
+    <root level="DEBUG">
         <appender-ref ref="STDOUT" />
     </root>
 </configuration>

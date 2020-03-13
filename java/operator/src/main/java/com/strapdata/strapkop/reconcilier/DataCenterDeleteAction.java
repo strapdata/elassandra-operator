@@ -32,11 +32,10 @@ public class DataCenterDeleteAction {
     private final K8sResourceUtils k8sResourceUtils;
     private final CoreV1Api coreV1Api;
     private final DataCenter dataCenter;
-    private final ElassandraNodeStatusCache elassandraNodeStatusCache;
     private final SidecarConnectionCache sidecarConnectionCache;
-    private final PodCache podCache;
     private final StatefulsetCache statefulsetCache;
-    private final DeploymentCache deploymentCache;
+    private final CheckPointCache checkPointCache;
+
     private final CqlKeyspaceManager cqlKeyspaceManager;
     private final CqlRoleManager cqlRoleManager;
     private final CqlLicenseManager cqlLicenseManager;
@@ -46,11 +45,9 @@ public class DataCenterDeleteAction {
     public DataCenterDeleteAction(K8sResourceUtils k8sResourceUtils,
                                   CoreV1Api coreV1Api,
                                   AppsV1Api appsV1Api,
-                                  ElassandraNodeStatusCache elassandraNodeStatusCache,
-                                  SidecarConnectionCache sidecarConnectionCache,
-                                  PodCache podCache,
-                                  DeploymentCache deploymentCache,
-                                  StatefulsetCache statefulsetCache,
+                                  final SidecarConnectionCache sidecarConnectionCache,
+                                  final StatefulsetCache statefulsetCache,
+                                  final CheckPointCache checkPointCache,
                                   CqlKeyspaceManager cqlKeyspaceManager,
                                   CqlRoleManager cqlRoleManager,
                                   final CqlLicenseManager cqlLicenseManager,
@@ -60,10 +57,8 @@ public class DataCenterDeleteAction {
         this.k8sResourceUtils = k8sResourceUtils;
         this.coreV1Api = coreV1Api;
         this.dataCenter = dataCenter;
-        this.elassandraNodeStatusCache = elassandraNodeStatusCache;
         this.sidecarConnectionCache = sidecarConnectionCache;
-        this.podCache = podCache;
-        this.deploymentCache = deploymentCache;
+        this.checkPointCache = checkPointCache;
         this.statefulsetCache = statefulsetCache;
         this.cqlKeyspaceManager = cqlKeyspaceManager;
         this.cqlRoleManager = cqlRoleManager;
@@ -83,11 +78,12 @@ public class DataCenterDeleteAction {
                 CqlSessionSupplier.closeQuietly(cqlSessionSupplier.getSession(dataCenter).blockingGet());
 
                 // cleanup local caches
-                elassandraNodeStatusCache.purgeDataCenter(dataCenter);
+                Key key = new Key(dataCenter.getMetadata().getName(), dataCenter.getMetadata().getNamespace());
+                checkPointCache.remove(key);
                 sidecarConnectionCache.purgeDataCenter(dataCenter);
-                podCache.purgeDataCenter(dataCenter);
-                deploymentCache.purgeDataCenter(dataCenter);
-                statefulsetCache.purgeDataCenter(dataCenter);
+                for(int i = 0; i < dataCenter.getStatus().getZones().size(); i++) {
+                    statefulsetCache.remove(new Key(dataCenter.getMetadata().getName() + "-" + i, dataCenter.getMetadata().getNamespace()));
+                }
 
                 final String labelSelector = OperatorLabels.toSelector(OperatorLabels.datacenter(dataCenter));
 

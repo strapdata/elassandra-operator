@@ -1,0 +1,2 @@
+# Strapkop integration tests
+

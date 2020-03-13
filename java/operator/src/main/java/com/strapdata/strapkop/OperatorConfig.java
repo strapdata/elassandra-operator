@@ -35,22 +35,4 @@ public class OperatorConfig {
      */
     Duration taskRetention = Duration.ofDays(8);
 
-    TestSuiteConfig test = new TestSuiteConfig();
-
-
-    @Getter
-    @ConfigurationProperties("test")
-    public static class TestSuiteConfig {
-
-        boolean enabled = false;
-
-        Platform platform = Platform.LOCAL;
-
-        public static enum Platform {
-            LOCAL,
-            GKE,
-            AZURE
-            // TODO OVH, AWS
-        }
-    }
 }

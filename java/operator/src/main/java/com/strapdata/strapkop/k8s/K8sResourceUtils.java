@@ -232,7 +232,7 @@ public class K8sResourceUtils {
                 () -> appsApi.replaceNamespacedDeployment(deployment.getMetadata().getName(), namespace, deployment, null, null));
     }
 
-    public Single<V1StatefulSet> createOrReplaceNamespacedDeployment(final V1StatefulSet statefulset) throws ApiException {
+    public Single<V1StatefulSet> createOrReplaceNamespacedStatefulSet(final V1StatefulSet statefulset) throws ApiException {
         final String namespace = statefulset.getMetadata().getNamespace();
         return createOrReplaceResource(namespace, statefulset,
                 () -> appsApi.createNamespacedStatefulSet(namespace, statefulset, null, null, null),
@@ -340,7 +340,7 @@ public class K8sResourceUtils {
                 },
                 () -> {
                     V1Secret secret2 = coreApi.createNamespacedSecret(secretObjectMeta.getNamespace(), secretSupplier.get(), null, null, null);
-                    logger.warn("Created namespaced secret={}", secret2.getMetadata().getName());
+                    logger.debug("Created namespaced secret={}", secret2.getMetadata().getName());
                     return secret2;
                 }
         );

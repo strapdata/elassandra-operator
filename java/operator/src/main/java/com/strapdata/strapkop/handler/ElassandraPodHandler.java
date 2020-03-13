@@ -1,26 +1,32 @@
 package com.strapdata.strapkop.handler;
 
-import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
-import com.strapdata.strapkop.event.ElassandraPod;
+import com.google.common.collect.ImmutableMap;
+import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.event.K8sWatchEvent;
+import com.strapdata.strapkop.event.Pod;
+import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.model.ClusterKey;
 import com.strapdata.strapkop.model.Key;
-import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
+import com.strapdata.strapkop.model.k8s.OperatorLabels;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.pipeline.WorkQueues;
-import com.strapdata.strapkop.reconcilier.ElassandraPodDeletedReconcilier;
-import com.strapdata.strapkop.reconcilier.ElassandraPodUnscheduledReconcilier;
+import com.strapdata.strapkop.reconcilier.DataCenterController;
+import io.kubernetes.client.models.V1PersistentVolumeClaim;
 import io.kubernetes.client.models.V1Pod;
 import io.kubernetes.client.models.V1PodCondition;
 import io.micrometer.core.instrument.MeterRegistry;
-import io.vavr.Tuple2;
+import io.reactivex.Completable;
+import io.vavr.collection.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Track Elassandra POD status to update the ElassandraNodeStatusCache that trigger Cassandra status pooling.
+ * When POD is ready => Add ElassandraNodeStatus in status UNKNOWN in the cache to pool Cassandra status
  * When POD is deleted => trigger the ElassandraPodDeletedReconcilier to manage PVC lifecycle
  * When POD is pending => trigger the ElassandraPodUnscheduledReconcilier to manage eventual rollback.
  */
@@ -34,45 +40,44 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
     private static final String POD_FAILED_PHASE = "Failed";
     private static final String POD_UNKNOW_PHASE = "Unknown";
 
+    public static final String CONTAINER_NAME = "elassandra";
+
     private final Logger logger = LoggerFactory.getLogger(ElassandraPodHandler.class);
 
     private final WorkQueues workQueues;
-    private final ElassandraPodUnscheduledReconcilier elassandraPodUnscheduledReconcilier;
-    private final ElassandraPodDeletedReconcilier elassandraPodDeletedReconcilier;
-    private final ElassandraNodeStatusCache elassandraNodeStatusCache;
+    private final DataCenterController dataCenterController;
+    private final DataCenterCache dataCenterCache;
+    private final K8sResourceUtils k8sResourceUtils;
     private final MeterRegistry meterRegistry;
 
-    private Integer elassandraNodeStatusCacheMaxSize = 0;
-
     public ElassandraPodHandler(final WorkQueues workQueue,
-                                final ElassandraPodUnscheduledReconcilier dataCenterUnscheduleReconcilier,
-                                final ElassandraPodDeletedReconcilier dataCenterPodDeletedReconcilier,
-                                final ElassandraNodeStatusCache elassandraNodeStatusCache,
+                                final DataCenterController dataCenterController,
+                                final DataCenterCache dataCenterCache,
+                                final K8sResourceUtils k8sResourceUtils,
                                 final MeterRegistry meterRegistry) {
         this.workQueues = workQueue;
-        this.elassandraPodUnscheduledReconcilier = dataCenterUnscheduleReconcilier;
-        this.elassandraPodDeletedReconcilier = dataCenterPodDeletedReconcilier;
-        this.elassandraNodeStatusCache = elassandraNodeStatusCache;
+        this.dataCenterController = dataCenterController;
+        this.dataCenterCache = dataCenterCache;
+        this.k8sResourceUtils = k8sResourceUtils;
         this.meterRegistry = meterRegistry;
      }
     
     @Override
     public void accept(K8sWatchEvent<V1Pod> event) throws Exception {
-        ElassandraPod pod = ElassandraPod.fromV1Pod(event.getResource());
-        ClusterKey clusterKey = new ClusterKey(pod.getCluster(), pod.getNamespace());
+        V1Pod pod = event.getResource();
+        String parent = Pod.extractLabel(pod, OperatorLabels.PARENT);
+        String clusterName = Pod.extractLabel(pod, OperatorLabels.CLUSTER);
+        String datacenterName = Pod.extractLabel(pod, OperatorLabels.DATACENTER);
+        String podName = pod.getMetadata().getName();
+        String namespace = pod.getMetadata().getNamespace();
 
-        logger.debug("ElassandraPod event type={} pod={}", event.getType(), pod.id());
+        ClusterKey clusterKey = new ClusterKey(clusterName, datacenterName);
+        Key key = new Key(podName, namespace);
+
+        logger.debug("ElassandraPod event type={} pod={}/{}", event.getType(), podName, namespace);
 
         if (event.isUpdate()) {
-            if (POD_RUNNING_PHASE.equalsIgnoreCase(event.getResource().getStatus().getPhase())) {
-                // when Elassandra pod start, put ElassandraNodeStatus in the cache to start status pooling.
-                ElassandraNodeStatus oldStatus = elassandraNodeStatusCache.putIfAbsent(pod, ElassandraNodeStatus.UNKNOWN);
-                logger.debug("Running pod={} ElassandraNodeStatus was={}", pod.id(), oldStatus);
-                if (oldStatus == null) {
-                    this.elassandraNodeStatusCacheMaxSize = Math.max(elassandraNodeStatusCacheMaxSize, this.elassandraNodeStatusCache.size());
-                    this.meterRegistry.gauge("node_status_cache.max", this.elassandraNodeStatusCacheMaxSize);
-                }
-            } else if (POD_PENDING_PHASE.equalsIgnoreCase(event.getResource().getStatus().getPhase())) { // TODO [ELE] add running phase with Error ???
+            if (POD_PENDING_PHASE.equalsIgnoreCase(event.getResource().getStatus().getPhase())) {
                 if (event.getResource().getStatus() != null && event.getResource().getStatus().getConditions() != null) {
                     List<V1PodCondition> conditions = event.getResource().getStatus().getConditions();
                     Optional<V1PodCondition> scheduleFailed = conditions.stream()
@@ -84,27 +89,53 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
                             )
                             .findFirst();
 
-                    logger.debug("Pending pod={} conditions={}", pod.id(), conditions);
-                    if (elassandraNodeStatusCache.remove(pod, ElassandraNodeStatus.UNKNOWN)) {
-                        logger.debug("Pending pod={} => ElassandraNodeStatus removed from cache", pod.id());
-                    };
+                    logger.debug("Pending pod={}/{} conditions={}", podName, namespace, conditions);
                     if (scheduleFailed.isPresent()) {
                         workQueues.submit(
                                 clusterKey,
-                                elassandraPodUnscheduledReconcilier.reconcile(new Tuple2<>(new Key(pod.getParent(), pod.getNamespace()), pod)));
+                                dataCenterController.unschedulablePod(new Pod(pod, CONTAINER_NAME)));
                     }
                 }
             }
         } else if (event.isDeletion()) {
-            if (elassandraNodeStatusCache.remove(pod, ElassandraNodeStatus.UNKNOWN)) {
-                logger.debug("Deleted pod={} => ElassandraNodeStatus removed from cache", pod.id());
-            };
+            DataCenter dc = dataCenterCache.get(new Key(parent, namespace));
             workQueues.submit(
                     clusterKey,
-                    elassandraPodDeletedReconcilier.reconcile(new Tuple2<>(new Key(pod.getParent(), pod.getNamespace()), pod)));
+                    freePodPvc(dc, new Pod(pod, CONTAINER_NAME)));
         }
-
-        this.meterRegistry.gauge("node_status_cache.current", this.elassandraNodeStatusCache.size());
     }
 
+    public Completable freePodPvc(DataCenter dataCenter, Pod deletedPod) throws Exception {
+        // delete PVC only if the node was decommissioned to avoid deleting PVC in unexpectedly killed pod during a DC ScaleDown
+        switch (dataCenter.getSpec().getDecommissionPolicy()) {
+            case KEEP_PVC:
+                break;
+            case BACKUP_AND_DELETE_PVC:
+                // TODO
+                break;
+            case DELETE_PVC:
+                List<V1PersistentVolumeClaim> pvcsToDelete = Stream.ofAll(k8sResourceUtils.listNamespacedPodsPersitentVolumeClaims(
+                        dataCenter.getMetadata().getNamespace(),
+                        null,
+                        OperatorLabels.toSelector(ImmutableMap.of(
+                                OperatorLabels.APP, "elassandra",
+                                OperatorLabels.CLUSTER, deletedPod.getClusterName(),
+                                OperatorLabels.DATACENTER, deletedPod.getDatacenter(),
+                                OperatorLabels.RACK, deletedPod.getRack(),
+                                OperatorLabels.RACKINDEX, Integer.toString(deletedPod.getRackIndex())))
+                ))
+                        .filter(pvc -> {
+                            boolean match = pvc.getMetadata().getName().endsWith(deletedPod.getName());
+                            logger.info("PVC={} will be deleted due to pod={}/{} deletion", pvc.getMetadata().getName(), deletedPod.getName(), deletedPod.getNamespace());
+                            return match;
+                        }).collect(Collectors.toList());
+
+                if (pvcsToDelete.size() > 1) {
+                    logger.error("Too many PVC found for deletion, cancel it ! (List of PVC = {})", pvcsToDelete);
+                } else if (!pvcsToDelete.isEmpty()) {
+                    return k8sResourceUtils.deletePersistentVolumeClaim(pvcsToDelete.get(0));
+                }
+        }
+        return Completable.complete();
+    }
 }

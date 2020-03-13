@@ -7,6 +7,7 @@ import com.datastax.driver.core.policies.DCAwareRoundRobinPolicy;
 import com.datastax.driver.core.policies.LoggingRetryPolicy;
 import com.datastax.driver.core.policies.TokenAwarePolicy;
 import com.google.common.collect.ImmutableList;
+import com.strapdata.cassandra.driver.ElassandraOperatorAddressTranslator;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
@@ -274,10 +275,6 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
     private Cluster createClusterObject(final DataCenter dc, final Optional<CqlRole> optionalCqlRole) throws StrapkopException, ApiException, SSLException, ExecutionException, InterruptedException {
         // check the number of available node to adapt the ConsistencyLevel otherwise creating a DC with more than 1 node (or park a DC) isn't possible
         // because licence can't be checked (UnavailableException: Not enough replicas available for query at consistency LOCAL_QUORUM (2 required but only 1 alive))
-        final long availableNodes = dc.getStatus().getRackStatuses()
-                .values().stream().map(status -> status.getJoinedReplicas()).reduce(0, Integer::sum);
-        final long parkedNodes = dc.getStatus().getRackStatuses()
-                .values().stream().map(status -> status.getParkedReplicas()).reduce(0, Integer::sum);
 
         // TODO: updateConnection remote seeds as contact point
         final Cluster.Builder builder = Cluster.builder()
@@ -289,6 +286,13 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                                 .withLocalDc(dc.getSpec().getDatacenterName())
                                 .build()))
                 .withRetryPolicy(new LoggingRetryPolicy(StrapkopRetryPolicy.INSTANCE));
+
+        if (dc.getSpec().getHostNetworkEnabled() || dc.getSpec().getHostPortEnabled()) {
+            // if cluster has public broadcast IPs, the translator retreive internal k8s IP addresses
+            builder.withAddressTranslator(new ElassandraOperatorAddressTranslator(
+                    OperatorNames.internalPodFqdn(dc, 0, 0),
+                    OperatorNames.externalPodFqdn(dc, 0, 0)));
+        }
 
         // add remote seeds to contact points to be able to adjust RF of system keyspace before starting the first local node.
         /***** Local DC connection ONLY *******
@@ -315,7 +319,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
         */
 
         // contact local nodes is bootstrapped or first DC in the cluster
-        boolean hasSeedBootstrapped = dc.getStatus().getRackStatuses().values().stream().anyMatch(s -> s.getJoinedReplicas() > 0);
+        boolean hasSeedBootstrapped = dc.getStatus().getBootstrapped();
         if (hasSeedBootstrapped ||
                 ((dc.getSpec().getRemoteSeeds() == null || dc.getSpec().getRemoteSeeds().isEmpty()) && (dc.getSpec().getRemoteSeeders() == null || dc.getSpec().getRemoteSeeders().isEmpty()))) {
             String contactPoint = OperatorNames.nodesService(dc) + "." + dc.getMetadata().getNamespace() + ".svc.cluster.local";

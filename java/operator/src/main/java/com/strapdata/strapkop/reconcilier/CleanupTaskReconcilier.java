@@ -1,13 +1,11 @@
 package com.strapdata.strapkop.reconcilier;
 
-import com.strapdata.strapkop.cache.ElassandraNodeStatusCache;
 import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.model.k8s.cassandra.BlockReason;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
-import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
 import io.kubernetes.client.ApiException;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -34,13 +32,11 @@ public final class CleanupTaskReconcilier extends TaskReconcilier {
     private final JmxmpElassandraProxy jmxmpElassandraProxy;
     
     public CleanupTaskReconcilier(ReconcilierObserver reconcilierObserver,
-                                  final DataCenterUpdateReconcilier dataCenterUpdateReconcilier,
                                   final K8sResourceUtils k8sResourceUtils,
                                   final JmxmpElassandraProxy jmxmpElassandraProxy,
-                                  final WorkQueues workQueue,
                                   final MeterRegistry meterRegistry,
-                                  final ElassandraNodeStatusCache elassandraNodeStatusCache) {
-        super(reconcilierObserver,"cleanup", k8sResourceUtils, meterRegistry, dataCenterUpdateReconcilier, elassandraNodeStatusCache);
+                                  final DataCenterController dataCenterController) {
+        super(reconcilierObserver,"cleanup", k8sResourceUtils, meterRegistry, dataCenterController);
         this.jmxmpElassandraProxy = jmxmpElassandraProxy;
     }
 

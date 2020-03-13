@@ -22,10 +22,9 @@ public class PluginRegistry {
 
     public PluginRegistry(final ReaperPlugin reaperPlugin,
                           final KibanaPlugin kibanaPlugin,
-                          final TestSuitePlugin testPlugin,
                           final ManagedKeyspacePlugin managedKeyspacePlugin,
                           final WebHookPlugin webHookPlugin) {
-        this.plugins = ImmutableList.of(reaperPlugin, kibanaPlugin, testPlugin, managedKeyspacePlugin, webHookPlugin);
+        this.plugins = ImmutableList.of(reaperPlugin, kibanaPlugin, managedKeyspacePlugin, webHookPlugin);
     }
 
     public List<Plugin> plugins() {

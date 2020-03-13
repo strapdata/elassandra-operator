@@ -37,18 +37,33 @@ public class RackStatus {
     private RackPhase phase = RackPhase.CREATING;
 
     /**
-     * Number of joined nodes.
+     * Datacenter spec and user configmap fingerprint
      */
-    @SerializedName("joinedReplicas")
+    @SerializedName("fingerprint")
     @Expose
-    private Integer joinedReplicas = 0;
+    private String fingerprint = null;
 
     /**
-     * Number of parked pods.
+     * Number of replica desired in the underlying sts.
+     */
+    @SerializedName("desiredReplicas")
+    @Expose
+    private Integer desiredReplicas = 0;
+
+    /**
+     * Number of replica ready in the underlying sts.
+     */
+    @SerializedName("readyReplicas")
+    @Expose
+    private Integer readyReplicas = 0;
+
+    /**
+     * Number of parked pods (size of the sts when not parked).
      */
     @SerializedName("parkedReplicas")
     @Expose
     private Integer parkedReplicas = 0;
+
     /**
      * Host id of the seed node in the rack.
      */

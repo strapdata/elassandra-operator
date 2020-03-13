@@ -26,6 +26,7 @@ public class K8sWatchEvent<ResourceT> {
 
     private Type type;
     private ResourceT resource;
+    private String lastResourceVersion = null;
 
     public boolean isUpdate() {
         return creationEventTypes.contains(this.type);

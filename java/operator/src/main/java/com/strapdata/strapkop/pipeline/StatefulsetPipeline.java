@@ -23,7 +23,7 @@ import java.util.Collection;
 
 @Context
 @Infrastructure
-public class StatefulsetPipeline extends K8sWatchPipeline<V1StatefulSet, V1StatefulSetList> {
+public class StatefulsetPipeline extends K8sWatchPipeline<V1StatefulSet, V1StatefulSetList, Key> {
 
     private final Logger logger = LoggerFactory.getLogger(StatefulsetPipeline.class);
     
@@ -31,7 +31,7 @@ public class StatefulsetPipeline extends K8sWatchPipeline<V1StatefulSet, V1State
         super(apiClient, new StatefulsetAdapter(appsV1Api, config), cache, config);
     }
     
-    private static class StatefulsetAdapter extends K8sWatchResourceAdapter<V1StatefulSet, V1StatefulSetList> {
+    private static class StatefulsetAdapter extends K8sWatchResourceAdapter<V1StatefulSet, V1StatefulSetList, Key> {
         
         private final AppsV1Api appsV1Api;
         private final OperatorConfig config;

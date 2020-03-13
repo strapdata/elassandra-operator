@@ -35,9 +35,6 @@ ingress:
 #  tls:
 #  - hosts: []
 
-#
-elasticsearchLoadBalancerEnabled: false
-
 nodeSelector: {}
 
 rbacEnable: true

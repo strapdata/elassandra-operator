@@ -30,7 +30,7 @@ public class CqlKeyspace {
                 Single.just(this) :
                 sessionSupplier.getSession(dataCenter)
                     .flatMap(session -> {
-                        int targetRf = Math.max(1, Math.min(rf, dataCenter.getStatus().getReplicas()));
+                        int targetRf = Math.max(1, Math.min(rf, dataCenter.getSpec().getReplicas()));
                         return Single.fromFuture(session.executeAsync(
                                 String.format(Locale.ROOT, "CREATE KEYSPACE IF NOT EXISTS \"%s\" WITH replication = {'class': 'NetworkTopologyStrategy', '%s':'%d'}; ",
                                 name, dataCenter.getSpec().getDatacenterName(), targetRf)));

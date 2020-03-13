@@ -22,6 +22,10 @@
       <module name="strapkop.java.backup.test" target="1.8" />
       <module name="strapkop.java.dns.main" target="8" />
       <module name="strapkop.java.dns.test" target="1.8" />
+      <module name="strapkop.java.drive-addons.main" target="8" />
+      <module name="strapkop.java.drive-addons.test" target="1.8" />
+      <module name="strapkop.java.driver-addons.main" target="8" />
+      <module name="strapkop.java.driver-addons.test" target="1.8" />
       <module name="strapkop.java.k8s-addons.main" target="8" />
       <module name="strapkop.java.k8s-addons.test" target="1.8" />
       <module name="strapkop.java.model.main" target="8" />

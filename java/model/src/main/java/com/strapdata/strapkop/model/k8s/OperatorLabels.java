@@ -36,10 +36,6 @@ public final class OperatorLabels {
     
     public static final String DATACENTER_GENERATION = labelPrefix + "datacenter-generation";
     public static final String DATACENTER_FINGERPRINT = labelPrefix + "datacenter-fingerprint";
-
-    // this annotation is used to store a hash of the config map in the pod so that statefulset trigger a rolling restart
-    // when the config map change
-    public static final String CONFIGMAP_FINGERPRINT = labelPrefix + "configmap-fingerprint";
     
     public static final Map<String, String> MANAGED = ImmutableMap.of(
             "app.kubernetes.io/managed-by", "elassandra-operator"

@@ -1,0 +1,30 @@
+apiVersion: skaffold/v2alpha4
+kind: Config
+metadata:
+  name: strapkop
+build:
+  artifacts:
+  - image: strapdata.azurecr.io/strapdata/elassandra-operator-dev
+    context: java/operator
+    jib:
+      project: java:operator
+      type: gradle
+deploy:
+  helm:
+    releases:
+    - name: dev-elassandra-operator
+      chartPath: helm/src/main/helm/elassandra-operator
+      namespace: default
+      recreatePods: true
+      skipBuildDependencies: true
+      remote: false
+      wait: false
+      version: "0.3.0"
+      values:
+        images: strapdata.azurecr.io/strapdata/elassandra-operator-dev
+profiles:
+  - name: dev
+    activation:
+      - env: MICRONAUT_ENV=dev
+        kubeContext: azure-northeurope-1
+        command: dev
