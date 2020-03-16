@@ -165,38 +165,31 @@ function elassandra_datacenter_wait_running() {
 function park_elassandra_datacenter() {
     local cl=${1:-"cl1"}
     local dc=${2:-"dc2"}
-    helm upgrade  --set parked="true" "$cl-$dc" $HELM_REPO/elassandra-datacenter
+    helm upgrade --reuse-values --set parked="true" "$cl-$dc" $HELM_REPO/elassandra-datacenter
     echo "Datacenter $cl-$dc parked"
 }
 
 function unpark_elassandra_datacenter() {
     local cl=${1:-"cl1"}
     local dc=${2:-"dc2"}
-    helm upgrade  --set parked="false" "$cl-$dc" $HELM_REPO/elassandra-datacenter
+    helm upgrade  --reuse-values --set parked="false" "$cl-$dc" $HELM_REPO/elassandra-datacenter
     echo "Datacenter $cl-$dc unparked"
 }
 
-function deploy_traefik_acme() {
-	echo "Deploying traefik proxy with domain=${1:-$DNS_DOMAIN}"
-	helm install $HELM_DEBUG --name traefik --namespace kube-system \
-		--set rbac.enabled=true,debug.enabled=true \
-		--set ssl.enabled=true,ssl.enforced=true \
-		--set acme.enabled=true,acme.email="vroyer@strapdata.com",acme.storage="acme.json" \
-		--set acme.logging=true,acme.staging=false \
-		--set acme.challengeType="dns-01" \
-		--set acme.caServer="https://acme-v02.api.letsencrypt.org/directory" \
-		--set acme.dnsProvider.name="azure" \
-		--set acme.dnsProvider.azure.AZURE_SUBSCRIPTION_ID="72738c1b-8ae6-4f23-8531-5796fe866f2e" \
-		--set acme.dnsProvider.azure.AZURE_RESOURCE_GROUP="strapcloud.com" \
-		--set acme.dnsProvider.azure.AZURE_CLIENT_ID="55aa320e-f341-4db8-8d3b-e28d1a41cb67" \
-		--set acme.dnsProvider.azure.AZURE_CLIENT_SECRET="5c97ee08-7783-437f-899e-7b4c4e84874c" \
-		--set acme.dnsProvider.azure.AZURE_TENANT_ID="566af820-2f8c-45ac-b975-647d2647b277" \
-		--set acme.domains.enabled=true \
-	    --set acme.domains.domainsList[0].main=*.${1:-$DNS_DOMAIN} \
-		--set dashboard.enabled=true,dashboard.domain=traefik.${1:-$DNS_DOMAIN} \
-		stable/traefik
-	echo "done."
+function downgrade_elassandra_datacenter() {
+    local cl=${1:-"cl1"}
+    local dc=${2:-"dc2"}
+    helm upgrade  --reuse-values --set elassandraImage="strapdata.azurecr.io/strapdata/elassandra-node-dev:6.2.3.26" "$cl-$dc" $HELM_REPO/elassandra-datacenter
+    echo "Datacenter $cl-$dc downgrade to 6.2.3.26"
 }
+
+function add_memory_elassandra_datacenter() {
+    local cl=${1:-"cl1"}
+    local dc=${2:-"dc2"}
+    helm upgrade  --reuse-values --set resources.limits.memory="3Gi" --set "$cl-$dc" $HELM_REPO/elassandra-datacenter
+    echo "Datacenter $cl-$dc update memory to 3Gi"
+}
+
 
 function create_namespace() {
     echo "Creating namespace $1"

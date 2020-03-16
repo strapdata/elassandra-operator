@@ -76,7 +76,6 @@ dependencies {
     compile "io.micronaut.configuration:micronaut-picocli"
 
     compile project(':java:model')
-    compile project(':java:operator')
 
     runtime "ch.qos.logback:logback-classic:1.2.3"
 }

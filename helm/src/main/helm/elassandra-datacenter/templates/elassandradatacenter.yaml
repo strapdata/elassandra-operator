@@ -16,6 +16,7 @@ spec:
   datacenterName: {{ include "elassandra.datacenterName" . | required "Invalid datacenterName : Release name has to be clustername-dcname (in lowercase), datacenterName must match ([0-9a-z]+)" }}
   workload: {{ default "READ_WRITE" .Values.workload }}
   replicas: {{ default "1" .Values.replicas }}
+  parked: {{ default "false" .Values.parked }}
   autoScaleMode: {{ default "MANUAL" .Values.autoScaleMode }}
   elassandraImage: "{{ .Values.image.elassandraRepository }}:{{ .Values.image.tag }}"
   {{- if .Values.webHookUrl }}

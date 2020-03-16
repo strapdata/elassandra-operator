@@ -1,7 +1,9 @@
 package com.strapdata.strapkop.model.k8s.task;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
+import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import io.kubernetes.client.models.V1ObjectMeta;
@@ -54,4 +56,10 @@ public class Task {
     public String id() {
         return metadata.getName()+"/"+metadata.getNamespace();
     }
+
+    @JsonIgnore
+    public String getParent() {
+        return getMetadata().getLabels().get(OperatorLabels.PARENT);
+    }
+
 }

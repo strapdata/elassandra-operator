@@ -175,7 +175,8 @@ public class DataCenterController {
                         reconcilierObserver.failedReconciliationAction();
                     }
                 })
-                .doOnComplete(reconcilierObserver.endReconciliationAction());
+                .doOnComplete(reconcilierObserver.endReconciliationAction())
+                .doFinally(() -> cqlSessionHandler.close());
     }
 
     public Completable taskDone(final DataCenter dc, final Task task) throws Exception {
