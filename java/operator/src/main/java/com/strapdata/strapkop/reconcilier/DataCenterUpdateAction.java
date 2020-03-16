@@ -31,6 +31,7 @@ import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.apis.CustomObjectsApi;
+import io.kubernetes.client.custom.IntOrString;
 import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.models.*;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -260,7 +261,8 @@ public class DataCenterUpdateAction {
                                                 });
                                     });
                 })
-                .flatMap(password -> readUserConfigMap())
+                .flatMap(password -> builder.buildPodDisruptionBudget())    // build one PDB per dc
+                .flatMap(pdb -> readUserConfigMap())
                 .flatMap(optionalUserConfig -> {
                     ConfigMapVolumeMounts configMapVolumeMounts = new ConfigMapVolumeMounts(optionalUserConfig);
 
@@ -280,7 +282,6 @@ public class DataCenterUpdateAction {
                     return configMapVolumeMounts.createOrReplaceNamespacedConfigMaps()
                             // updateRack also call prepareDataCenterSnapshot
                             .andThen(builder.buildStatefulSetRack(rackStatus, configMapVolumeMounts)
-                                    .flatMap(s -> k8sResourceUtils.createOrReplaceNamespacedStatefulSet(s))
                                     .flatMap(s -> k8sResourceUtils.updateDataCenterStatus(dataCenter)));
                 }).ignoreElement();
     }
@@ -291,7 +292,7 @@ public class DataCenterUpdateAction {
      */
     public Completable updateDatacenter() throws Exception {
         String newFingerprint = dataCenter.getSpec().fingerprint();
-        logger.debug("########## datacenter={} spec updated replicas={}", dataCenter.id(), dataCenterSpec.getReplicas());
+        logger.debug("########## datacenter={} spec updated replicas={}/{}", dataCenter.id(), dataCenterStatus.getReadyReplicas(), dataCenterSpec.getReplicas());
         return nextAction(false);
     }
 
@@ -306,7 +307,7 @@ public class DataCenterUpdateAction {
         RackStatus rackStatus = dataCenter.getStatus().getRackStatuses().get(rackIndex);
 
         int stsReadyReplicas = Math.min(sts.getStatus().getReadyReplicas() == null ? 0 : sts.getStatus().getReadyReplicas(), sts.getSpec().getReplicas());
-        rackStatus.setDesiredReplicas(stsReadyReplicas);
+        rackStatus.setReadyReplicas(stsReadyReplicas);
 
         // update the DC total ready repliacs
         int totalReadyReplicas = dataCenter.getStatus().getRackStatuses().values().stream()
@@ -503,7 +504,6 @@ public class DataCenterUpdateAction {
             return todo
                     .andThen(configMapVolumeMounts.createOrReplaceNamespacedConfigMaps())
                     .andThen(builder.buildStatefulSetRack(rackStatus, configMapVolumeMounts)
-                            .flatMap(sts -> k8sResourceUtils.createNamespacedStatefulSet(sts))
                             .flatMap(sts -> k8sResourceUtils.updateDataCenterStatus(dataCenter))
                             .ignoreElement()
                     );
@@ -1496,6 +1496,17 @@ public class DataCenterUpdateAction {
             return secret;
         }
 
+        public Single<V1beta1PodDisruptionBudget> buildPodDisruptionBudget() throws ApiException {
+            final V1ObjectMeta podDisruptionBudgetMetadata = dataCenterObjectMeta(dataCenter.getMetadata().getName());
+            V1beta1PodDisruptionBudget podDisruptionBudget = new V1beta1PodDisruptionBudget()
+                    .metadata(podDisruptionBudgetMetadata)
+                    .spec(new V1beta1PodDisruptionBudgetSpec()
+                            .maxUnavailable(new IntOrString(1))
+                            .selector(new V1LabelSelector().matchLabels(OperatorLabels.datacenter(dataCenter)))
+                    );
+            return k8sResourceUtils.createOrReplaceNamespacedPodDisruptionBudget(podDisruptionBudget);
+        }
+
         public Single<V1StatefulSet> buildStatefulSetRack(RackStatus rackStatus, ConfigMapVolumeMounts configMapVolumeMounts) throws Exception {
             final V1ObjectMeta statefulSetMetadata = rackObjectMeta(rackStatus.getName(), rackStatus.getIndex(), OperatorNames.stsName(dataCenter, rackStatus.getIndex()));
 
@@ -1722,11 +1733,9 @@ public class DataCenterUpdateAction {
                     );
 
             return getPersistentVolumeClaims(statefulSetMetadata, rackStatus)
-                    .map(listVolumClaim -> {
+                    .flatMap(listVolumClaim -> {
                         statefulSetSpec.setVolumeClaimTemplates(listVolumClaim);
-                        return new V1StatefulSet()
-                                .metadata(statefulSetMetadata)
-                                .spec(statefulSetSpec);
+                        return k8sResourceUtils.createOrReplaceNamespacedStatefulSet(new V1StatefulSet().metadata(statefulSetMetadata).spec(statefulSetSpec));
                     });
         }
 

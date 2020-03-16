@@ -45,6 +45,12 @@ rules:
   - configmaps
   - secrets
   verbs: ['*']
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  - poddisruptionbudgets/status
+  verbs: ['get', 'create', 'update', 'delete', 'list']
 - apiGroups: ['']
   resources:
   - pods

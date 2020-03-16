@@ -17,10 +17,7 @@ import com.strapdata.strapkop.model.k8s.task.TaskList;
 import com.strapdata.strapkop.model.k8s.task.TaskSpec;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.ApiResponse;
-import io.kubernetes.client.apis.AppsV1Api;
-import io.kubernetes.client.apis.CoreV1Api;
-import io.kubernetes.client.apis.CustomObjectsApi;
-import io.kubernetes.client.apis.ExtensionsV1beta1Api;
+import io.kubernetes.client.apis.*;
 import io.kubernetes.client.models.*;
 import io.reactivex.Completable;
 import io.reactivex.Single;
@@ -56,6 +53,9 @@ public class K8sResourceUtils {
     
     @Inject
     protected ExtensionsV1beta1Api extensionsV1beta1Api;
+
+    @Inject
+    protected PolicyV1beta1Api policyV1beta1Api;
 
     @FunctionalInterface
     public interface ApiCallable {
@@ -299,6 +299,12 @@ public class K8sResourceUtils {
         );
     }
 
+    public Single<V1beta1PodDisruptionBudget> createOrReplaceNamespacedPodDisruptionBudget(final V1beta1PodDisruptionBudget v1beta1PodDisruptionBudget) throws ApiException {
+        final String namespace = v1beta1PodDisruptionBudget.getMetadata().getNamespace();
+        return createOrReplaceResource(namespace, v1beta1PodDisruptionBudget,
+                () -> policyV1beta1Api.createNamespacedPodDisruptionBudget(namespace, v1beta1PodDisruptionBudget, null, null, null),
+                () -> policyV1beta1Api.replaceNamespacedPodDisruptionBudget(v1beta1PodDisruptionBudget.getMetadata().getName(), namespace, v1beta1PodDisruptionBudget, null, null, null));
+    }
 
     public V1ServiceAccount readNamespacedServiceAccount(final String namespace, final String name) throws ApiException {
             try {
@@ -497,8 +503,14 @@ public class K8sResourceUtils {
         logger.debug("Deleting Deployment namespace={} name={}", metadata.getNamespace(), metadata.getName());
         V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
         return appsApi.deleteNamespacedDeployment(metadata.getName(), metadata.getNamespace(), null, deleteOptions, null, null, null, "Foreground");
-     }
-    
+    }
+
+    public V1Status deletePodDisruptionBudget(final V1ObjectMeta metadata) throws ApiException {
+        logger.debug("Deleting PodDisruptionBudget namespace={} name={}", metadata.getNamespace(), metadata.getName());
+        V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
+        return policyV1beta1Api.deleteNamespacedPodDisruptionBudget(metadata.getName(), metadata.getNamespace(), null, deleteOptions, null, null, null, "Foreground");
+    }
+
     public Completable deleteService(final String name, final String namespace) throws ApiException {
         return deleteResource(() -> {
             V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
@@ -509,9 +521,7 @@ public class K8sResourceUtils {
     public Completable deletePersistentVolumeClaim(final V1PersistentVolumeClaim persistentVolumeClaim) throws ApiException {
         return deleteResource(() -> {
             final V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
-
             final String pvcName = persistentVolumeClaim.getMetadata().getName();
-
             V1Status v1Status = null;
             try {
                 logger.debug("Deleting PVC name={}", pvcName);
@@ -532,7 +542,6 @@ public class K8sResourceUtils {
         }
 
         private Page<T> firstPage;
-
         ResourceListIterable(final Page<T> firstPage) {
             this.firstPage = firstPage;
         }
