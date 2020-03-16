@@ -1,5 +1,6 @@
 package com.strapdata.strapkop.utils;
 
+import io.micronaut.context.annotation.Infrastructure;
 import io.micronaut.discovery.event.ServiceShutdownEvent;
 import io.micronaut.discovery.event.ServiceStartedEvent;
 import io.micronaut.runtime.event.annotation.EventListener;
@@ -18,6 +19,7 @@ import java.util.Map;
 import java.util.Optional;
 
 @Singleton
+@Infrastructure
 public class JmxmpServerProvider {
 
     private static final Logger logger = LoggerFactory.getLogger(JmxmpServerProvider.class);
@@ -43,7 +45,6 @@ public class JmxmpServerProvider {
         jmxServer.start();
 
         logger.info("JMXMP started server="+url.toString());
-        logger.debug("JMXMP env="+env);
     }
 
     public void close() {

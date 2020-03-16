@@ -375,8 +375,10 @@ public class DataCenterSpec {
         acc.add(elasticsearchEnabled);
         acc.add(elasticsearchPort);
         acc.add(privilegedSupported);
-        acc.add(hostNetworkEnabled);
-        acc.add(hostPortEnabled);
+
+
+
+
         acc.add(nodeLoadBalancerEnabled);
         acc.add(nativePort);
         acc.add(storagePort);
@@ -396,6 +398,8 @@ public class DataCenterSpec {
         if (userConfigMapVolumeSource != null) {
             acc.add(userConfigMapVolumeSource);
         }
-        return DigestUtils.sha1Hex(GsonUtils.toJson(acc)).substring(0,7);
+
+        String json = GsonUtils.toJson(acc);
+        return DigestUtils.sha1Hex(json).substring(0,7);
     }
 }

@@ -20,6 +20,7 @@ import io.vavr.collection.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.inject.Inject;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -44,23 +45,20 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
 
     private final Logger logger = LoggerFactory.getLogger(ElassandraPodHandler.class);
 
-    private final WorkQueues workQueues;
-    private final DataCenterController dataCenterController;
-    private final DataCenterCache dataCenterCache;
-    private final K8sResourceUtils k8sResourceUtils;
-    private final MeterRegistry meterRegistry;
+    @Inject
+    WorkQueues workQueues;
 
-    public ElassandraPodHandler(final WorkQueues workQueue,
-                                final DataCenterController dataCenterController,
-                                final DataCenterCache dataCenterCache,
-                                final K8sResourceUtils k8sResourceUtils,
-                                final MeterRegistry meterRegistry) {
-        this.workQueues = workQueue;
-        this.dataCenterController = dataCenterController;
-        this.dataCenterCache = dataCenterCache;
-        this.k8sResourceUtils = k8sResourceUtils;
-        this.meterRegistry = meterRegistry;
-     }
+    @Inject
+    DataCenterController dataCenterController;
+
+    @Inject
+    DataCenterCache dataCenterCache;
+
+    @Inject
+    K8sResourceUtils k8sResourceUtils;
+
+    @Inject
+    MeterRegistry meterRegistry;
     
     @Override
     public void accept(K8sWatchEvent<V1Pod> event) throws Exception {
@@ -119,8 +117,7 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
                         null,
                         OperatorLabels.toSelector(ImmutableMap.of(
                                 OperatorLabels.APP, "elassandra",
-                                OperatorLabels.CLUSTER, deletedPod.getClusterName(),
-                                OperatorLabels.DATACENTER, deletedPod.getDatacenter(),
+                                OperatorLabels.PARENT, deletedPod.getParent(),
                                 OperatorLabels.RACK, deletedPod.getRack(),
                                 OperatorLabels.RACKINDEX, Integer.toString(deletedPod.getRackIndex())))
                 ))

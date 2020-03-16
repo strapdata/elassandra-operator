@@ -8,7 +8,6 @@ plugins {
 
 
 subprojects {
-
   apply plugin: 'java-library'
   apply plugin: "jacoco"
   apply plugin: 'io.spring.dependency-management'
@@ -34,7 +33,9 @@ subprojects {
   dependencies {
     compile group: 'io.vavr', name: 'vavr', version: '0.9.2'
     compile "args4j:args4j:2.33"
-    compile "com.google.guava:guava:27.1-jre"
+    // see https://docs.datastax.com/en/drivers/java/3.4/com/datastax/driver/core/GuavaCompatibility.html
+    compile "com.google.guava:guava:19.0"
+
     //compile group: 'com.google.code.gson', name: 'gson', version: '2.3.1'
     compile group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: '2.9.4'
     compile group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: '2.9.4'
@@ -43,6 +44,7 @@ subprojects {
     compile(group: 'com.datastax.cassandra', name: 'cassandra-driver-core', version: '3.7.1') {
       exclude group: 'com.google.guava', module: 'guava'
     }
+
     compile "io.kubernetes:client-java:6.0.1"
     compile "javax.inject:javax.inject:1"
 

@@ -16,7 +16,9 @@ import com.strapdata.strapkop.model.k8s.cassandra.DataCenterPhase;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.plugins.PluginRegistry;
+import com.strapdata.strapkop.plugins.ReaperPlugin;
 import io.kubernetes.client.ApiException;
+import io.kubernetes.client.models.V1Deployment;
 import io.kubernetes.client.models.V1StatefulSet;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
@@ -49,6 +51,7 @@ public class DataCenterController {
     private final MeterRegistry meterRegistry;
     private final K8sResourceUtils k8sResourceUtils;
     private final ReconcilierObserver reconcilierObserver;
+    private final ReaperPlugin reaperPlugin;
 
     public DataCenterController(final ReconcilierObserver reconcilierObserver,
                                 final ApplicationContext context,
@@ -59,7 +62,8 @@ public class DataCenterController {
                                 final K8sResourceUtils k8sResourceUtils,
                                 final SidecarConnectionCache sidecarConnectionCache,
                                 final TaskCache taskCache,
-                                final MeterRegistry meterRegistry) {
+                                final MeterRegistry meterRegistry,
+                                final ReaperPlugin reaperPlugin) {
         this.reconcilierObserver = reconcilierObserver;
         this.context = context;
         this.k8sResourceUtils = k8sResourceUtils;
@@ -70,6 +74,7 @@ public class DataCenterController {
         this.sidecarConnectionCache = sidecarConnectionCache;
         this.taskCache = taskCache;
         this.meterRegistry = meterRegistry;
+        this.reaperPlugin = reaperPlugin;
     }
 
     public Completable reconcile(DataCenter dataCenter, boolean withLock, Completable action) throws Exception {
@@ -109,8 +114,7 @@ public class DataCenterController {
         return reconcile(dc, false,
                 fetchExistingStatefulSetsByZone(dc)
                         .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dc).setStatefulSetTreeMap(stsMap))
-                .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.initDatacenter())
-                .andThen(k8sResourceUtils.updateDataCenterStatus(dc).ignoreElement()));
+                .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.initDatacenter()));
     }
 
     /**
@@ -120,9 +124,7 @@ public class DataCenterController {
         return reconcile(dc, true,
                 fetchExistingStatefulSetsByZone(dc)
                         .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dc).setStatefulSetTreeMap(stsMap))
-                .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.updateDatacenter())
-                .andThen(Completable.mergeArray(pluginRegistry.reconcileAll(dc)))
-                .andThen(k8sResourceUtils.updateDataCenterStatus(dc).ignoreElement()));
+                .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.updateDatacenter()));
     }
 
     /**
@@ -131,17 +133,21 @@ public class DataCenterController {
      * 1 - apply the desired spec to all sts
      * 2 - scale up/down or park/unpark dc.
      */
-    public Completable statefulsetUpdate(V1StatefulSet sts) throws Exception {
-        final String dcResourceName = sts.getMetadata().getLabels().get(OperatorLabels.PARENT);
-        final Key key = new Key(dcResourceName, sts.getMetadata().getNamespace());
-        DataCenter dc = dataCenterCache.get(key);
+    public Completable statefulsetUpdate(DataCenter dataCenter, V1StatefulSet sts) throws Exception {
+        return reconcile(dataCenter, false,
+                fetchExistingStatefulSetsByZone(dataCenter)
+                        .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dataCenter).setStatefulSetTreeMap(stsMap))
+                .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.statefulsetUpdate(sts)));
+    }
 
-        return reconcile(dc, false,
-                fetchExistingStatefulSetsByZone(dc)
-                        .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dc).setStatefulSetTreeMap(stsMap))
-                .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.statefulsetUpdate(sts))
-                .andThen(Completable.mergeArray(pluginRegistry.reconcileAll(dc)))
-                .andThen(k8sResourceUtils.updateDataCenterStatus(dc).ignoreElement()));
+    public Completable deploymentAvailable(DataCenter dataCenter, V1Deployment deployment) throws Exception {
+        String app = deployment.getMetadata().getLabels().get(OperatorLabels.APP);
+        if ("reaper".equals(app)) {
+            // notify the reaper pligin that deployment is available
+            return reconcile(dataCenter, false, reaperPlugin.reconcile(dataCenter)
+                    .flatMapCompletable(b -> b ? k8sResourceUtils.updateDataCenterStatus(dataCenter).ignoreElement() : Completable.complete()));
+        }
+        return Completable.complete();
     }
 
     public Completable unschedulablePod(Pod pod) throws Exception {
@@ -150,8 +156,7 @@ public class DataCenterController {
 
         return reconcile(dc, false,
                 Single.just(context.createBean(DataCenterUpdateAction.class, dc))
-                        .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.unschedulablePod(pod))
-                        .andThen(k8sResourceUtils.updateDataCenterStatus(dc).ignoreElement()));
+                        .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.unschedulablePod(pod)));
     }
 
     /**
@@ -177,7 +182,6 @@ public class DataCenterController {
         return reconcile(dc, true,
                 Single.just(context.createBean(DataCenterUpdateAction.class, dc))
                         .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.taskDone(task))
-                        .andThen(Completable.mergeArray(pluginRegistry.reconcileAll(dc)))
                         .andThen(k8sResourceUtils.updateDataCenterStatus(dc).ignoreElement()));
     }
 

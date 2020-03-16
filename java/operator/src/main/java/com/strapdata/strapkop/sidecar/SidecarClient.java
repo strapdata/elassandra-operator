@@ -3,7 +3,6 @@ package com.strapdata.strapkop.sidecar;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.strapdata.strapkop.cql.CqlRole;
 import com.strapdata.strapkop.cql.CqlRoleManager;
-import com.strapdata.strapkop.model.backup.BackupArguments;
 import com.strapdata.strapkop.model.sidecar.BackupResponse;
 import com.strapdata.strapkop.model.sidecar.StatusResponse;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
@@ -30,6 +29,7 @@ import javax.annotation.Nullable;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.util.List;
 
 import static io.micronaut.http.HttpRequest.GET;
 import static io.micronaut.http.HttpRequest.POST;
@@ -125,8 +125,8 @@ public class SidecarClient {
         return httpClient.exchange(auth(POST("_nodetool/repair" + qs, ""))).ignoreElements();
     }
 
-    public Single<BackupResponse> backup(BackupArguments backupArguments) {
-        return httpClient.retrieve(auth(POST("_nodetool/snapshot", backupArguments)), BackupResponse.class).singleOrError();
+    public Single<BackupResponse> snapshot(String repository, List<String> keyspaces) {
+        return httpClient.retrieve(auth(POST("_nodetool/snapshot", keyspaces)), BackupResponse.class).singleOrError();
     }
 
     public boolean isRunning() {

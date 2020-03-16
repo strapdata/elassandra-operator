@@ -21,7 +21,7 @@ import java.util.Collection;
 
 @Context
 @Infrastructure
-public class NodePipeline extends K8sWatchPipeline<V1Node, V1NodeList, String> {
+public class NodePipeline extends CachedK8sWatchPipeline<V1Node, V1NodeList, String> {
 
     private final Logger logger = LoggerFactory.getLogger(NodePipeline.class);
 
@@ -50,7 +50,7 @@ public class NodePipeline extends K8sWatchPipeline<V1Node, V1NodeList, String> {
         @Override
         public Call createListApiCall(boolean watch, String resourceVersion) throws ApiException {
             return coreV1Api.listNodeCall(null, null, null, null,
-                    null, null, resourceVersion, null, watch
+                    null, resourceVersion, null, watch
                     , null, null);
         }
         

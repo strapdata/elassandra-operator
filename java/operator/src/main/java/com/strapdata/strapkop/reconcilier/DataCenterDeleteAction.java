@@ -75,7 +75,7 @@ public class DataCenterDeleteAction {
 
                 backupScheduler.cancelBackups(new Key(dataCenter.getMetadata()));
 
-                CqlSessionSupplier.closeQuietly(cqlSessionSupplier.getSession(dataCenter).blockingGet());
+                cqlSessionSupplier.close();
 
                 // cleanup local caches
                 Key key = new Key(dataCenter.getMetadata().getName(), dataCenter.getMetadata().getNamespace());
@@ -113,8 +113,8 @@ public class DataCenterDeleteAction {
 
                 try {
                     // delete secrets
-                    coreV1Api.deleteCollectionNamespacedSecret(dataCenter.getMetadata().getNamespace(), false,
-                            null, null, null, labelSelector, null, null, null, null);
+                    coreV1Api.deleteCollectionNamespacedSecret(dataCenter.getMetadata().getNamespace(), "false",
+                            null, null, labelSelector, null, null, null, null);
                     logger.debug("Deleted Secrets namespace={}", dataCenter.getMetadata().getNamespace());
                 } catch (final JsonSyntaxException e) {
                     logger.debug("Caught JSON exception while deleting Secrets. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);

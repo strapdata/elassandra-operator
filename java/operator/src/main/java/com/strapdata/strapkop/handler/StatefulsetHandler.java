@@ -1,9 +1,11 @@
 package com.strapdata.strapkop.handler;
 
+import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.model.ClusterKey;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.reconcilier.DataCenterController;
 import io.kubernetes.client.models.V1StatefulSet;
@@ -11,26 +13,22 @@ import org.apache.commons.lang3.ObjectUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.EnumSet;
+import javax.inject.Inject;
 import java.util.Objects;
-
-import static com.strapdata.strapkop.event.K8sWatchEvent.Type.*;
 
 @Handler
 public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1StatefulSet>> {
 
     private final Logger logger = LoggerFactory.getLogger(StatefulsetHandler.class);
 
-    private static final EnumSet<K8sWatchEvent.Type> acceptedEventTypes = EnumSet.of(MODIFIED, INITIAL, DELETED);
+    @Inject
+    WorkQueues workQueues;
 
-    private final WorkQueues workQueues;
-    private final DataCenterController dataCenterController;
+    @Inject
+    DataCenterController dataCenterController;
 
-    public StatefulsetHandler(final WorkQueues workQueue,
-                              final DataCenterController dataCenterController) {
-        this.workQueues = workQueue;
-        this.dataCenterController = dataCenterController;
-    }
+    @Inject
+    DataCenterCache dataCenterCache;
 
     /**
      * Update STS status cache and call dc controller if ready.
@@ -49,11 +47,13 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
             case ADDED:
             case MODIFIED:
                 if (isStafulSetReady(sts)) {
-                    logger.info("sts={}/{} is ready, triggering a dc statefulsetUpdate", sts.getMetadata().getName(), sts.getMetadata().getNamespace());
                     final String clusterName = sts.getMetadata().getLabels().get(OperatorLabels.CLUSTER);
+                    DataCenter dataCenter = dataCenterCache.get(new Key(sts.getMetadata().getLabels().get(OperatorLabels.PARENT), sts.getMetadata().getNamespace()));
+                    logger.info("datacenter={} sts={}/{} is ready, triggering a dc statefulsetUpdate",
+                            dataCenter.id(), sts.getMetadata().getName(), sts.getMetadata().getNamespace());
                     workQueues.submit(
                             new ClusterKey(clusterName, sts.getMetadata().getNamespace()),
-                            dataCenterController.statefulsetUpdate(sts));
+                            dataCenterController.statefulsetUpdate(dataCenter, sts));
                 }
                 break;
             case ERROR:

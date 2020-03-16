@@ -1,10 +1,10 @@
 package com.strapdata.strapkop.model.k8s;
 
-import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 
 import java.util.Map;
+import java.util.stream.Collectors;
 
 // should be called OperatorLabelsAndAnnotations...
 public final class OperatorLabels {
@@ -102,6 +102,6 @@ public final class OperatorLabels {
 
     
     public static String toSelector(Map<String, String> labels) {
-        return Joiner.on(',').withKeyValueSeparator('=').join(labels);
+        return labels.entrySet().stream().map(e -> e.getKey()+"="+e.getValue()).collect(Collectors.joining(","));
     }
 }

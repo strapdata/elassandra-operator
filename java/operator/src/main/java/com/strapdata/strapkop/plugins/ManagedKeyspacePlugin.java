@@ -16,7 +16,7 @@ import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
-import io.reactivex.Completable;
+import io.reactivex.Single;
 import org.elasticsearch.common.Strings;
 
 import javax.inject.Singleton;
@@ -75,8 +75,8 @@ public class ManagedKeyspacePlugin extends AbstractPlugin {
      * @param dataCenter
      */
     @Override
-    public Completable reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
-        return Completable.complete();
+    public Single<Boolean> reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
+        return Single.just(false);
     }
 
     /**
@@ -85,8 +85,8 @@ public class ManagedKeyspacePlugin extends AbstractPlugin {
      * @param dataCenter
      */
     @Override
-    public Completable delete(DataCenter dataCenter) throws ApiException {
-        return Completable.complete();
+    public Single<Boolean> delete(DataCenter dataCenter) throws ApiException {
+        return Single.just(false);
     }
 
 

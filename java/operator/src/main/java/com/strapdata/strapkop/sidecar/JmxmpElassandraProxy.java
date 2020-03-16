@@ -20,8 +20,8 @@ import io.micronaut.http.uri.UriTemplate;
 import io.reactivex.Completable;
 import io.reactivex.Single;
 import io.vavr.Tuple2;
-import jmx.org.apache.cassandra.locator.EndpointSnitchInfoMBean;
-import jmx.org.apache.cassandra.service.StorageServiceMBean;
+import org.apache.cassandra.locator.EndpointSnitchInfoMBean;
+import org.apache.cassandra.service.StorageServiceMBean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

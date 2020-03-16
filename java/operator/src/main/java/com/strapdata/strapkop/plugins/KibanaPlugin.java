@@ -2,6 +2,7 @@ package com.strapdata.strapkop.plugins;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.strapdata.strapkop.OperatorConfig;
@@ -13,7 +14,10 @@ import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
-import com.strapdata.strapkop.model.k8s.cassandra.*;
+import com.strapdata.strapkop.model.k8s.cassandra.Authentication;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenterSpec;
+import com.strapdata.strapkop.model.k8s.cassandra.KibanaSpace;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.AppsV1Api;
@@ -53,15 +57,15 @@ public class KibanaPlugin extends AbstractPlugin {
      */
     private static final KibanaSpace DEFAULT_KIBANA_SPACE = new KibanaSpace().withName("").withKeyspaces(ImmutableSet.of("_kibana"));
 
-    private List<KibanaSpace> getKibanaSpaces(final DataCenter dataCenter) {
-        List<KibanaSpace> spaces = dataCenter.getSpec().getKibana().getSpaces();
-        return (spaces.size() == 0) ? ImmutableList.of(DEFAULT_KIBANA_SPACE) : spaces;
+    private Map<String, KibanaSpace> getKibanaSpaces(final DataCenter dataCenter) {
+        Map<String, KibanaSpace> spaces = dataCenter.getSpec().getKibana().getSpaces().stream().collect(Collectors.toMap(KibanaSpace::getName, Function.identity()));
+        return (spaces.size() == 0) ? ImmutableMap.of(DEFAULT_KIBANA_SPACE.getName(), DEFAULT_KIBANA_SPACE) : spaces;
     }
 
     @Override
     public void syncKeyspaces(final CqlKeyspaceManager cqlKeyspaceManager, final DataCenter dataCenter) {
         Integer version = dataCenter.getSpec().getKibana().getVersion();
-        for (KibanaSpace kibana : getKibanaSpaces(dataCenter)) {
+        for (KibanaSpace kibana : getKibanaSpaces(dataCenter).values()) {
             cqlKeyspaceManager.addIfAbsent(dataCenter, kibana.keyspace(version), () -> new CqlKeyspace()
                     .withName(kibana.keyspace(version))
                     .withRf(3)
@@ -72,7 +76,7 @@ public class KibanaPlugin extends AbstractPlugin {
     @Override
     public void syncRoles(final CqlRoleManager cqlRoleManager, final DataCenter dataCenter) {
         Integer version = dataCenter.getSpec().getKibana().getVersion();
-        for (KibanaSpace kibana : getKibanaSpaces(dataCenter)) {
+        for (KibanaSpace kibana : getKibanaSpaces(dataCenter).values()) {
             try {
                 createKibanaSecretIfNotExists(dataCenter, kibana);
                 cqlRoleManager.addIfAbsent(dataCenter, kibana.keyspace(version), () -> new CqlRole()
@@ -105,9 +109,9 @@ public class KibanaPlugin extends AbstractPlugin {
     }
 
 
-    public static Map<String, String> kibanaLabels(DataCenter dataCenter, KibanaSpace space) {
+    public static Map<String, String> kibanaLabels(DataCenter dataCenter, String kibanaSpaceName) {
         final Map<String, String> labels = new HashMap<>(OperatorLabels.datacenter(dataCenter));
-        labels.put("app", space.name()); // overwrite label app
+        labels.put("app", kibanaSpaceName); // overwrite label app
         return labels;
     }
 
@@ -117,36 +121,57 @@ public class KibanaPlugin extends AbstractPlugin {
     }
 
     @Override
-    public Completable reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
+    public Single<Boolean> reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
         // remove deleted kibana spaces
-        Set<String> deployedKibanaSpaces = dataCenter.getStatus().getKibanaSpaces();
-        Map<String, KibanaSpace> kibanaMap = getKibanaSpaces(dataCenter).stream().collect(Collectors.toMap(KibanaSpace::getName, Function.identity()));
-        Completable deleteCompletable = io.reactivex.Observable.fromIterable(Sets.difference(deployedKibanaSpaces, getKibanaSpaces(dataCenter).stream().map(KibanaSpace::getName).collect(Collectors.toSet())))
+        Set<String> deployedKibanaSpaces = dataCenter.getStatus().getKibanaSpaceNames();
+        Map<String, KibanaSpace> desiredKibanaMap = getKibanaSpaces(dataCenter);
+
+        if ((dataCenter.getSpec().getKibana().getEnabled() == false || desiredKibanaMap.size() == 0) &&
+                !deployedKibanaSpaces.isEmpty()) {
+            return delete(dataCenter)
+                    .map(s -> {
+                        dataCenter.getStatus().setKibanaSpaceNames(new HashSet<>());
+                        return true;
+                    });
+        }
+
+        Set<String> deletedSpaces = Sets.difference(deployedKibanaSpaces, desiredKibanaMap.keySet());
+        Completable deleteCompletable = deletedSpaces.isEmpty() ?
+                Completable.complete() :
+                io.reactivex.Observable.fromIterable(deletedSpaces)
                 .flatMapCompletable(spaceToDelete -> {
                     logger.debug("Deleting kibana space={}", spaceToDelete);
-                    dataCenter.getStatus().getKibanaSpaces().remove(spaceToDelete);
-                    return delete(dataCenter, kibanaMap.get(spaceToDelete));
+                    dataCenter.getStatus().getKibanaSpaceNames().remove(spaceToDelete);
+                    return delete(dataCenter, spaceToDelete);
                 });
 
-
-        Completable createCompletable = io.reactivex.Observable.fromIterable(getKibanaSpaces(dataCenter))
+        Set<String> newSpaces = Sets.difference(getKibanaSpaces(dataCenter).keySet(), deployedKibanaSpaces);
+        Completable createCompletable = newSpaces.isEmpty() ?
+                Completable.complete() :
+                io.reactivex.Observable.fromIterable(getKibanaSpaces(dataCenter).values().stream().filter(k -> newSpaces.contains(k.getName())).collect(Collectors.toList()))
                 .flatMapCompletable(kibanaSpace -> {
-                    dataCenter.getStatus().getKibanaSpaces().add(kibanaSpace.getName());
-                    return createOrReplaceReaperObjects(dataCenter, kibanaSpace);
+                    logger.debug("Adding kibana space={}", kibanaSpace);
+                    dataCenter.getStatus().getKibanaSpaceNames().add(kibanaSpace.getName());
+                    return createOrReplaceKibanaObjects(dataCenter, kibanaSpace);
                 });
 
-        return deleteCompletable.andThen(createCompletable);
+        return deleteCompletable.andThen(createCompletable)
+                .toSingleDefault(!deletedSpaces.isEmpty() || !newSpaces.isEmpty())
+                .map(s -> {
+                    dataCenter.getStatus().setKibanaSpaceNames(getKibanaSpaces(dataCenter).keySet());
+                    return s;
+                });
     }
 
     @Override
-    public Completable delete(final DataCenter dataCenter) throws ApiException {
-        return Completable.mergeArray(getKibanaSpaces(dataCenter).stream()
-                .map(kibanaSpace -> delete(dataCenter, kibanaSpace))
-                .toArray(Completable[]::new));
+    public Single<Boolean> delete(final DataCenter dataCenter) throws ApiException {
+        return Completable.mergeArray(getKibanaSpaces(dataCenter).values().stream()
+                .map(kibanaSpace -> delete(dataCenter, kibanaSpace.getName()))
+                .toArray(Completable[]::new)).toSingleDefault(false);
     }
 
-    public Completable delete(final DataCenter dataCenter, KibanaSpace space) {
-        final String kibanaLabelSelector = OperatorLabels.toSelector(kibanaLabels(dataCenter, space));
+    public Completable delete(final DataCenter dataCenter, String kibanaSpaceName) {
+        final String kibanaLabelSelector = OperatorLabels.toSelector(kibanaLabels(dataCenter, kibanaSpaceName));
         return Completable.mergeArray(new Completable[]{
                 k8sResourceUtils.deleteDeployment(dataCenter.getMetadata().getNamespace(), null, kibanaLabelSelector),
                 k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, kibanaLabelSelector),
@@ -156,7 +181,7 @@ public class KibanaPlugin extends AbstractPlugin {
 
 
     /**
-     * @return The number of reaper pods depending on ReaperStatus
+     * @return The number of kibana pods depending on ReaperStatus
      */
     private int kibanaReplicas(final DataCenter dataCenter, KibanaSpace kibanaSpace) {
         Integer version = dataCenter.getSpec().getKibana().getVersion();
@@ -166,12 +191,12 @@ public class KibanaPlugin extends AbstractPlugin {
     }
 
 
-    public Completable createOrReplaceReaperObjects(final DataCenter dataCenter, KibanaSpace space) throws ApiException, StrapkopException {
+    public Completable createOrReplaceKibanaObjects(final DataCenter dataCenter, KibanaSpace space) throws ApiException, StrapkopException {
         final V1ObjectMeta dataCenterMetadata = dataCenter.getMetadata();
         final DataCenterSpec dataCenterSpec = dataCenter.getSpec();
         final Integer version = dataCenter.getSpec().getKibana().getVersion();
 
-        final Map<String, String> labels = kibanaLabels(dataCenter, space);
+        final Map<String, String> labels = kibanaLabels(dataCenter, space.getName());
 
         final V1ObjectMeta meta = new V1ObjectMeta()
                 .name(kibanaNameDc(dataCenter, space))
@@ -321,21 +346,20 @@ public class KibanaPlugin extends AbstractPlugin {
                     if (!Strings.isNullOrEmpty(dataCenterSpec.getKibana().getIngressSuffix())) {
                         String kibanaHost = space.name() + "-" + dataCenterSpec.getKibana().getIngressSuffix();
                         logger.info("Creating kibana ingress for host={}", kibanaHost);
-                        final V1beta1Ingress ingress = new V1beta1Ingress()
+                        final ExtensionsV1beta1Ingress ingress = new ExtensionsV1beta1Ingress()
                                 .metadata(meta)
-                                .spec(new V1beta1IngressSpec()
-                                        .addRulesItem(new V1beta1IngressRule()
-                                                .host(kibanaHost)
-                                                .http(new V1beta1HTTPIngressRuleValue()
-                                                        .addPathsItem(new V1beta1HTTPIngressPath()
-                                                                .path("/")
-                                                                .backend(new V1beta1IngressBackend()
-                                                                        .serviceName(meta.getName())
-                                                                        .servicePort(new IntOrString(5601)))
-                                                        )
-                                                )
+                                .spec(new ExtensionsV1beta1IngressSpec()
+                                        .addRulesItem(new ExtensionsV1beta1IngressRule()
+                                                    .host(kibanaHost)
+                                                    .http(new ExtensionsV1beta1HTTPIngressRuleValue()
+                                                            .addPathsItem(new ExtensionsV1beta1HTTPIngressPath()
+                                                                    .path("/")
+                                                                    .backend(new ExtensionsV1beta1IngressBackend()
+                                                                            .serviceName(meta.getName())
+                                                                            .servicePort(new IntOrString(5601)))
+                                                            ))
                                         )
-                                        .addTlsItem(new V1beta1IngressTLS()
+                                        .addTlsItem(new ExtensionsV1beta1IngressTLS()
                                                 .addHostsItem(kibanaHost)
                                         )
                                 );

@@ -92,11 +92,6 @@ public class ElassandraOperatorSeedProvider implements org.apache.cassandra.loca
 
         final List<InetAddress> seedAddresses = new ArrayList<>();
 
-        if (seeds.length == 0 && remoteSeeds.length == 0 && remoteSeeders.length == 0) {
-            // fallback to the local broadcast address for the first node
-            seeds = new String[]{InetAddresses.toAddrString(DatabaseDescriptor.getBroadcastAddress())};
-        }
-
         logger.info("seeds={} remote_seeds={} remote_seeders={}", Arrays.toString(seeds), Arrays.toString(remoteSeeds), Arrays.toString(remoteSeeders));
 
         for (String s : seeds) {
@@ -105,6 +100,12 @@ public class ElassandraOperatorSeedProvider implements org.apache.cassandra.loca
             } catch (final UnknownHostException e) {
                 logger.warn("Unable to resolve k8s service {}.", s, e);
             }
+        }
+
+        String podName = System.getenv("POD_NAME");
+        if (seeds.length == 0 && podName != null && podName.endsWith("-0")) {
+            logger.debug("Add broadcast_address={}", DatabaseDescriptor.getBroadcastAddress());
+            seedAddresses.add(DatabaseDescriptor.getBroadcastAddress());
         }
 
         for (String s : remoteSeeds) {

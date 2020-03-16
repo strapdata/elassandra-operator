@@ -2,10 +2,6 @@ package com.strapdata.strapkop.reconcilier;
 
 import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import com.strapdata.strapkop.k8s.OperatorNames;
-import com.strapdata.strapkop.model.backup.BackupArguments;
-import com.strapdata.strapkop.model.backup.CloudStorageSecret;
-import com.strapdata.strapkop.model.backup.CommonBackupArguments;
 import com.strapdata.strapkop.model.k8s.cassandra.BlockReason;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.task.BackupTaskSpec;
@@ -24,8 +20,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
-import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -73,20 +67,13 @@ public class BackupTaskReconcilier extends TaskReconcilier {
         // TODO: better backup with sstableloader and progress tracking
         // right now it just call the backup api on every nodes sidecar in parallel
         final BackupTaskSpec backupSpec = task.getSpec().getBackup();
-        final CloudStorageSecret cloudSecret = k8sResourceUtils.readAndValidateStorageSecret(task.getMetadata().getNamespace(), backupSpec.getSecretRef(), backupSpec.getProvider());
 
         return Observable.fromIterable(pods)
                 .subscribeOn(Schedulers.io())
                 .flatMapSingle(pod -> {
-                    final BackupArguments backupArguments = generateBackupArguments(
-                            task.getMetadata().getName(),
-                            backupSpec,
-                            OperatorNames.dataCenterResource(task.getSpec().getCluster(), task.getSpec().getDatacenter()),
-                            pod,
-                            cloudSecret);
 
                     return sidecarClientFactory.clientForPod(ElassandraPod.fromName(dc, pod))
-                            .backup(backupArguments)
+                            .snapshot(backupSpec.getRepository(), backupSpec.getKeyspaces())
                             .map(backupResponse -> {
                                 logger.debug("Received backupSpec response with status = {}", backupResponse.getStatus());
                                 boolean success = backupResponse.getStatus().equalsIgnoreCase("success");
@@ -100,28 +87,6 @@ public class BackupTaskReconcilier extends TaskReconcilier {
     }
 
 
-    public static BackupArguments generateBackupArguments(final String tag, BackupTaskSpec backupSpec, final String datacenter,
-                                                          final String pod, final CloudStorageSecret cloudCredentials) {
-        BackupArguments backupArguments = new BackupArguments();
-        backupArguments.cassandraConfigDirectory = Paths.get("/etc/cassandra/");
-        backupArguments.cassandraDirectory = Paths.get("/var/lib/cassandra/");
-        backupArguments.sharedContainerPath = Paths.get("/tmp"); // elassandra can't run as root
-        backupArguments.snapshotTag = tag;
-        backupArguments.storageProvider = backupSpec.getProvider();
-        backupArguments.backupBucket = backupSpec.getBucket();
-        backupArguments.keyspaceRegex = backupSpec.getKeyspaceRegex();
-        if (backupSpec.getKeyspaces() != null) {
-            backupArguments.keyspaces = new ArrayList<>(backupSpec.getKeyspaces());
-        }
-        backupArguments.offlineSnapshot = false;
-        backupArguments.account = "";
-        backupArguments.secret = "";
-        backupArguments.clusterId = datacenter;
-        backupArguments.backupId = pod;
-        backupArguments.speed = CommonBackupArguments.Speed.LUDICROUS;
-        backupArguments.cloudCredentials = cloudCredentials;
-        return backupArguments;
-    }
 
     @Override
     public Completable initializePodMap(Task task, DataCenter dc) {
