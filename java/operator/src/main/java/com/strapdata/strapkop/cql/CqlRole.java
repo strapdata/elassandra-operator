@@ -87,6 +87,8 @@ public class CqlRole implements Cloneable {
 
     boolean applied;
 
+
+
     /**
      * Grant statements applied after the role is created
      */

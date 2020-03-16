@@ -7,6 +7,8 @@ import io.kubernetes.client.models.V1Node;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.inject.Inject;
+
 /**
  * Do nothing handler for k8s nodes
  */
@@ -15,12 +17,9 @@ public class NodeHandler extends TerminalHandler<K8sWatchEvent<V1Node>> {
 
     private final Logger logger = LoggerFactory.getLogger(NodeHandler.class);
 
-    private final NodeCache nodeCache;
+    @Inject
+    NodeCache nodeCache;
 
-    public NodeHandler(final NodeCache nodeCache) {
-        this.nodeCache = nodeCache;
-    }
-    
     @Override
     public void accept(K8sWatchEvent<V1Node> event) throws Exception {
         final V1Node node = event.getResource();

@@ -19,6 +19,7 @@ import io.micronaut.http.client.RxHttpClient;
 import io.micronaut.http.uri.UriTemplate;
 import io.reactivex.Completable;
 import io.reactivex.Flowable;
+import io.reactivex.Single;
 import org.elasticsearch.common.Strings;
 
 import javax.inject.Singleton;
@@ -91,7 +92,7 @@ public class WebHookPlugin extends AbstractPlugin {
      * @param dataCenter
      */
     @Override
-    public Completable delete(DataCenter dataCenter) throws ApiException {
+    public Single<Boolean> delete(DataCenter dataCenter) throws ApiException {
         if (!Strings.isNullOrEmpty(dataCenter.getSpec().getWebHookUrl())) {
             try {
                 String uri = UriTemplate.of(dataCenter.getSpec().getWebHookUrl()).expand(buildParams(dataCenter));
@@ -104,12 +105,13 @@ public class WebHookPlugin extends AbstractPlugin {
                             logger.info("DELETE {}={}", uri, httpStatus.getCode());
                             return httpStatus;
                         })
-                        .ignoreElement();
+                        .ignoreElement()
+                        .toSingleDefault(false);
             } catch (Exception e) {
                 logger.error("Unexpected exception", e);
             }
         }
-        return Completable.complete();
+        return Single.just(false);
     }
 
 
@@ -151,8 +153,8 @@ public class WebHookPlugin extends AbstractPlugin {
      * @param dataCenter
      */
     @Override
-    public Completable reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
-        return Completable.complete();
+    public Single<Boolean> reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
+        return Single.just(false);
     }
 
 }

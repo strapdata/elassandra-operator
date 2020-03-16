@@ -11,3 +11,5 @@ install_elassandra_operator
 install_elassandra_datacenter default cl1 dc1 1
 
 scale_elassandra_datacenter cl1 dc1 2
+
+scale_elassandra_datacenter cl1 dc1 3

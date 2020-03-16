@@ -23,7 +23,7 @@ import java.util.Collection;
 
 @Context
 @Infrastructure
-public class StatefulsetPipeline extends K8sWatchPipeline<V1StatefulSet, V1StatefulSetList, Key> {
+public class StatefulsetPipeline extends CachedK8sWatchPipeline<V1StatefulSet, V1StatefulSetList, Key> {
 
     private final Logger logger = LoggerFactory.getLogger(StatefulsetPipeline.class);
     
@@ -54,8 +54,7 @@ public class StatefulsetPipeline extends K8sWatchPipeline<V1StatefulSet, V1State
         @Override
         public Call createListApiCall(boolean watch, String resourceVersion) throws ApiException {
             return appsV1Api.listNamespacedStatefulSetCall(config.getNamespace(),
-                    null, null, null,
-                    null, OperatorLabels.toSelector(OperatorLabels.MANAGED),
+                    null, null, null, OperatorLabels.toSelector(OperatorLabels.MANAGED),
                     null, resourceVersion, null, watch, null, null);
         }
         

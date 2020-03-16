@@ -28,7 +28,7 @@ public class CqlSessionHandler implements CqlSessionSupplier {
     public Single<Session> getSession(DataCenter dataCenter) throws Exception {
         return (session != null) ?
             Single.just(session) :
-            cqlRoleManager.connect(dataCenter)
+            cqlRoleManager.connect(dataCenter, dataCenter.getStatus())
                 .map(tuple -> {
                     this.cluster = tuple._1;
                     this.session = tuple._2;
@@ -36,12 +36,11 @@ public class CqlSessionHandler implements CqlSessionSupplier {
                 });
     }
 
-    public void close() throws Exception {
+    @Override
+    public void close() {
         logger.debug("Closing cluster={}", cluster == null ? null : cluster.getClusterName());
-        CqlSessionSupplier.closeQuietly(session);
-        CqlSessionSupplier.closeQuietly(cluster);
-        // reset cluster & session because getSession maybe call on the same instance
-        // after a close
+        if (cluster != null)
+            cluster.closeAsync();
         cluster = null;
         session = null;
     }

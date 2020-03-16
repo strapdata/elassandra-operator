@@ -27,9 +27,6 @@ public class OperatorConfig {
     @Nullable
     int k8sWatchPeriodInSec = 200;
 
-    @Nullable
-    int elassandraNodeWatchPeriodInSec = 30;
-
     /**
      * Terminated task retention
      */

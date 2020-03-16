@@ -1,0 +1,5 @@
+profile: cli
+defaultPackage: com.strapdata.strapkop
+---
+testFramework: junit
+sourceLanguage: java

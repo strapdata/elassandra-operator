@@ -25,9 +25,9 @@ public class RegisterHandlers implements Preflight<Void> {
     public Void call() throws Exception {
         bind(DataCenterPipeline.class, DataCenterHandler.class);
         bind(StatefulsetPipeline.class, StatefulsetHandler.class);
+        bind(DeploymentPipeline.class, DeploymentHandler.class);
         bind(NodePipeline.class, NodeHandler.class);
         bind(TaskPipeline.class, TaskHandler.class);
-        bind(ReaperPodPipeline.class, ReaperPodHandler.class);
         return null;
     }
     

@@ -5,6 +5,7 @@ import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Wither;
 
@@ -19,6 +20,7 @@ import java.util.Set;
 @Wither
 @AllArgsConstructor
 @NoArgsConstructor
+@EqualsAndHashCode
 public class KibanaSpace {
 
     private static final String KIBANA_INDEX_PREFIX = ".kibana";

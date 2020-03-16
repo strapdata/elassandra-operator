@@ -2,7 +2,6 @@ package com.strapdata.strapkop.model.k8s.task;
 
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
-import com.strapdata.strapkop.model.backup.StorageProvider;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -17,17 +16,9 @@ import java.util.List;
 @NoArgsConstructor
 @ToString
 public class BackupTaskSpec  {
-    @SerializedName("provider")
+    @SerializedName("repository")
     @Expose
-    private StorageProvider provider;
-
-    @SerializedName("bucket")
-    @Expose
-    private String bucket;
-
-    @SerializedName("secretRef")
-    @Expose
-    private String secretRef;
+    private String repository;
 
     @SerializedName("keyspaceRegex")
     @Expose

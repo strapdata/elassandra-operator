@@ -63,7 +63,6 @@ tasks.jibDockerBuild.dependsOn project(':java:backup').jar
 tasks.jibDockerBuild.dependsOn project(':java:model').jar
 
 compileJava {
-
     sourceCompatibility = 1.8
     targetCompatibility = 1.8
     options.encoding = 'UTF-8'
@@ -111,12 +110,9 @@ dependencies {
 
     compile "io.micronaut:micronaut-security-jwt"
 
-    compile "io.kubernetes:client-java:4.0.0"
+    compile "io.kubernetes:client-java:6.0.1"
     compile "javax.inject:javax.inject:1"
     runtime "ch.qos.logback:logback-classic:1.2.3"
-    compile group: 'com.google.guava', name: 'guava', version: '23.0'
-
-    compile "com.datastax.cassandra:cassandra-driver-core:3.7.1"
 
     compile("com.strapdata.elasticsearch.plugin.enterprise:strapdata-license:$javaElassandraVersion") {
         exclude group: 'com.strapdata.elasticsearch', module: 'elasticsearch'

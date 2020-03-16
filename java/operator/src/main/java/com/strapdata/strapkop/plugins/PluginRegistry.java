@@ -3,6 +3,7 @@ package com.strapdata.strapkop.plugins;
 import com.google.common.collect.ImmutableList;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import io.reactivex.Completable;
+import io.reactivex.Single;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,7 +36,7 @@ public class PluginRegistry {
         List<Completable> pluginCompletables = new ArrayList<>();
         for (Plugin plugin : plugins) {
             try {
-                pluginCompletables.add(plugin.delete(dc)
+                pluginCompletables.add(plugin.delete(dc).ignoreElement()
                         .onErrorResumeNext(t -> {
                             logger.warn("plugin={} delete failed, error={}", plugin.getClass().getName(), t.toString());
                             return Completable.complete();
@@ -47,48 +48,27 @@ public class PluginRegistry {
         return Completable.mergeArray(pluginCompletables.toArray(new Completable[pluginCompletables.size()]));
     }
 
-    public Completable[] reconcileAll(DataCenter dc) {
-        List<Completable> pluginCompletables = new ArrayList<>();
+    public Single<Boolean> reconcileAll(DataCenter dc) {
+        List<Single<Boolean>> pluginSingles = new ArrayList<>();
         for (Plugin plugin : plugins) {
             if (!dc.getSpec().isParked() || plugin.reconcileOnParkState()) {
                 try {
-                    if (plugin.isActive(dc))
-                        pluginCompletables.add(plugin.reconcile(dc)
-                                .onErrorResumeNext(t -> {
-                                    logger.warn("plugin={} reconcile failed, error={}", plugin.getClass().getName(), t.toString());
-                                    return Completable.complete();
-                                }));
-                    else
-                        pluginCompletables.add(plugin.delete(dc)
-                                .onErrorResumeNext(t -> {
-                                    logger.warn("plugin={} delete failed, error={}", plugin.getClass().getName(), t.toString());
-                                    return Completable.complete();
-                                }));
+                    pluginSingles.add(plugin.reconcile(dc)
+                            .onErrorResumeNext(t -> {
+                                logger.warn("plugin={} reconcile failed, error={}", plugin.getClass().getName(), t.toString());
+                                return Single.just(true);
+                            }));
                 } catch (Exception e) {
                     logger.error("Plugin class=" + plugin.getClass().getSimpleName() + " reconciliation failed:", e);
                 }
             }
         }
-        return pluginCompletables.toArray(new Completable[pluginCompletables.size()]);
-    }
-
-    public Completable[] reconciledAll(DataCenter dc) {
-        List<Completable> pluginCompletables = new ArrayList<>();
-        for (Plugin plugin : plugins) {
-            if (!dc.getSpec().isParked() || plugin.reconcileOnParkState()) {
-                try {
-                    if (plugin.isActive(dc))
-                        pluginCompletables.add(
-                                plugin.reconciled(dc)
-                                        .onErrorResumeNext(t -> {
-                                            logger.warn("plugin={} reconcilied failed, error={}", plugin.getClass().getName(), t.toString());
-                                            return Completable.complete();
-                                        }));
-                } catch (Exception e) {
-                    logger.error("Plugin class=" + plugin.getClass().getSimpleName() + " reconciled failed:", e);
-                }
+        return Single.zip(pluginSingles, (Object[] results) -> {
+            boolean result = false;
+            for(Object r : results) {
+                result = result || (Boolean)r;
             }
-        }
-        return pluginCompletables.toArray(new Completable[pluginCompletables.size()]);
+            return result;
+        });
     }
 }

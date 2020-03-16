@@ -2,6 +2,7 @@ package com.strapdata.strapkop.pipeline;
 
 import com.squareup.okhttp.Call;
 import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskList;
 import com.strapdata.strapkop.OperatorConfig;
@@ -22,7 +23,7 @@ import java.util.Collection;
 
 @Context
 @Infrastructure
-public class TaskPipeline extends K8sWatchPipeline<Task, TaskList, Key> {
+public class TaskPipeline extends CachedK8sWatchPipeline<Task, TaskList, Key> {
 
     private final Logger logger = LoggerFactory.getLogger(TaskPipeline.class);
     
@@ -52,9 +53,9 @@ public class TaskPipeline extends K8sWatchPipeline<Task, TaskList, Key> {
     
         @Override
         public Call createListApiCall(boolean watch, String resourceVersion) throws ApiException {
-            return customObjectsApi.listNamespacedCustomObjectCall("stable.strapdata.com", "v1",
-                    config.getNamespace(), "elassandratasks", null, null,
-                    resourceVersion, watch, null, null);
+            return customObjectsApi.listNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, Task.VERSION,
+                    config.getNamespace(), Task.PLURAL, null, null, null,
+                    resourceVersion, null, watch, null, null);
         }
   
         @Override

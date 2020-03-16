@@ -88,21 +88,20 @@ public class DataCenterStatus {
     private TreeMap<Integer, RackStatus> rackStatuses = new TreeMap<>();
 
     /**
-     * Cassandra reaper status
-     */
-    @SerializedName("reaperPhase")
-    private ReaperPhase reaperPhase = ReaperPhase.NONE;
-
-    /**
      * keyspace manager status
      */
     @SerializedName("keyspaceManagerStatus")
     private KeyspaceManagerStatus keyspaceManagerStatus = new KeyspaceManagerStatus();
 
     /**
-     * Kibana deployed spaces
+     * Kibana deployed space names
      */
-    @SerializedName("kibanaSpaces")
-    private Set<String> kibanaSpaces = new HashSet<>();
+    @SerializedName("kibanaSpaceNames")
+    private Set<String> kibanaSpaceNames = new HashSet<>();
 
+    /**
+     * Cassandra reaper status
+     */
+    @SerializedName("reaperPhase")
+    private ReaperPhase reaperPhase = ReaperPhase.NONE;
 }

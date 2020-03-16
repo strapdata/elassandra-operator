@@ -79,6 +79,7 @@ public class ElassandraOperatorAddressTranslator implements AddressTranslator {
                 String privateName = internalMatcher.group(1) + "-" + rack + "-" + pod + "." + internalMatcher.group(4);
                 pubInetToPrvName.put(publicIp, privateName);
                 logger.debug("Adding pubIp="+publicIp+" prvName="+ privateName);
+                pod++;
             } else {
                 if (pod == 0) {
                     // No node in this rack => stop
@@ -87,15 +88,21 @@ public class ElassandraOperatorAddressTranslator implements AddressTranslator {
                 rack++;
                 pod = 0;
             }
-            pod++;
         }
         logger.debug("scan="+pubInetToPrvName);
     }
 
     InetAddress resolve(String name) {
+        long start = System.currentTimeMillis();
         try {
-            return InetAddress.getByName(name);
+            logger.trace("resolving name={}", name);
+            InetAddress addr = InetAddress.getByName(name);
+            long end = System.currentTimeMillis();
+            logger.trace("name={} ip={} resolved in {}ms", name, addr.getHostAddress(), end-start);
+            return addr;
         } catch (UnknownHostException e) {
+            long end = System.currentTimeMillis();
+            logger.trace("name={} not resolved in {}ms", name, end-start);
             return null;
         }
     }

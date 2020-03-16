@@ -117,6 +117,10 @@ function install_elassandra_operator() {
     $HELM_REPO/elassandra-operator
 }
 
+function uninstall_elassandra_operator() {
+    helm delete --purge strapkop
+}
+
 # Deploy single node cluster in namespace=cluster_name
 # $1 = cluster name
 # $2 = cluster
@@ -129,9 +133,9 @@ function install_elassandra_datacenter() {
     local sz=${4:-"1"}
     helm install --namespace "$ns" --name "$cl-$dc" \
     --set image.pullSecrets[0]=$REGISTRY_SECRET_NAME \
-    --set externalDns.enabled=false \
     --set reaper.enabled=false \
-    --set kibana.enabled=false \
+    --set kibana.enabled=true \
+    --set sslStoragePort="38001" \
     --set externalDns.enabled=true,externalDns.root="xxxx.yyyy",externalDns.domain="test.strapkube.com" \
     --set replicas="$sz" \
     --wait \
@@ -150,8 +154,12 @@ function scale_elassandra_datacenter() {
     local cl=${1:-"cl1"}
     local dc=${2:-"dc1"}
     local sz=${3:-"1"}
-    helm upgrade  --set replicas="$sz" "$cl-$dc" $HELM_REPO/elassandra-datacenter
+    helm upgrade --reuse-values --set replicas="$sz" "$cl-$dc" $HELM_REPO/elassandra-datacenter
     echo "Datacenter $cl-$dc scale size=$sz"
+}
+
+function elassandra_datacenter_wait_running() {
+    kb get elassandradatacenters elassandra-cl1-dc1 -o yaml -o jsonpath="{.status.phase}"
 }
 
 function park_elassandra_datacenter() {
