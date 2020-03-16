@@ -1,8 +1,8 @@
 package com.strapdata.strapkop.reconcilier;
 
 import com.google.common.collect.ImmutableMap;
+import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.cassandra.Block;
@@ -29,19 +29,21 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
     final String taskType;
     final MeterRegistry meterRegistry;
     final DataCenterController dataCenterController;
-
+    final DataCenterCache dataCenterCache;
     private volatile int runningTaskCount = 0;
 
     TaskReconcilier(ReconcilierObserver reconcilierObserver,
                     String taskType,
                     final K8sResourceUtils k8sResourceUtils,
                     final MeterRegistry meterRegistry,
-                    final DataCenterController dataCenterController) {
+                    final DataCenterController dataCenterController,
+                    final DataCenterCache dataCenterCache) {
         super(reconcilierObserver);
         this.k8sResourceUtils = k8sResourceUtils;
         this.taskType = taskType;
         this.meterRegistry = meterRegistry;
         this.dataCenterController = dataCenterController;
+        this.dataCenterCache = dataCenterCache;
     }
     
     enum Action {
@@ -83,12 +85,10 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
     }
 
     Completable processSubmit(Task task0) throws Exception {
-        return Single.zip(k8sResourceUtils.readTask(task0.getMetadata().getNamespace(), task0.getMetadata().getName()),
-                          fetchDataCenter(task0),
-                (t,dc) -> new Tuple2<>(t,dc))
-                .flatMapCompletable(tuple -> {
-                    DataCenter dc = tuple._2;
-                    Task task = tuple._1.get();
+        return k8sResourceUtils.readTask(task0.getMetadata().getNamespace(), task0.getMetadata().getName())
+                .flatMapCompletable(task1 -> {
+                    Task task = task1.get();
+                    DataCenter dc = dataCenterCache.get(new Key(task.getParent(), task0.getMetadata().getNamespace()));
                     logger.debug("datacenter={} task={} processing", dc.id(), task.id());
 
                     if (task.getStatus() == null)
@@ -207,6 +207,7 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
         return k8sResourceUtils.updateTaskStatus(task).map(o -> phase);
     }
 
+    /*
     Single<DataCenter> fetchDataCenter(final Task task) throws ApiException {
         final Key dcKey =  new Key(
                 OperatorNames.dataCenterResource(task.getSpec().getCluster(), task.getSpec().getDatacenter()),
@@ -214,6 +215,7 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
         );
         return k8sResourceUtils.readDatacenter(dcKey);
     }
+     */
 
     boolean ensureDcIsReady(final Task task, DataCenter dc) {
         if (dc.getStatus() == null) {

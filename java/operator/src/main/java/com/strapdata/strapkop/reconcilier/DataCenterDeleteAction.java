@@ -75,8 +75,6 @@ public class DataCenterDeleteAction {
 
                 backupScheduler.cancelBackups(new Key(dataCenter.getMetadata()));
 
-                cqlSessionSupplier.close();
-
                 // cleanup local caches
                 Key key = new Key(dataCenter.getMetadata().getName(), dataCenter.getMetadata().getNamespace());
                 checkPointCache.remove(key);

@@ -268,7 +268,6 @@ public class DataCenterUpdateAction {
                     V1Node node = nodeCache.values().iterator().next();
                     RackStatus rackStatus = new RackStatus()
                             .withDesiredReplicas(1)
-                            .withParkedReplicas(0)
                             .withPhase(RackPhase.CREATING)
                             .withSeedHostId(UUID.randomUUID())
                             .withIndex(0)
@@ -277,6 +276,7 @@ public class DataCenterUpdateAction {
 
                     dataCenterStatus.getRackStatuses().put(new Integer(0), rackStatus);
                     dataCenterStatus.setPhase(DataCenterPhase.CREATING);
+                    configMapVolumeMounts.setRack(rackStatus);
                     return configMapVolumeMounts.createOrReplaceNamespacedConfigMaps()
                             // updateRack also call prepareDataCenterSnapshot
                             .andThen(builder.buildStatefulSetRack(rackStatus, configMapVolumeMounts)
@@ -299,25 +299,20 @@ public class DataCenterUpdateAction {
      * Trigger next action when sts reach the desired state
      */
     public Completable statefulsetUpdate(V1StatefulSet sts) throws Exception {
-        logger.debug("########## sts={}/{} readyReplicas={}", sts.getMetadata().getName(), sts.getMetadata().getNamespace(), sts.getStatus().getReadyReplicas());
+        logger.debug("########## sts={}/{} replica={}/{}",
+                sts.getMetadata().getName(), sts.getMetadata().getNamespace(), sts.getStatus().getReadyReplicas(), sts.getSpec().getReplicas());
 
         Integer rackIndex = Integer.parseInt(sts.getMetadata().getLabels().get(OperatorLabels.RACKINDEX));
         RackStatus rackStatus = dataCenter.getStatus().getRackStatuses().get(rackIndex);
-        rackStatus.setReadyReplicas(sts.getStatus().getReadyReplicas());
-        int stsReadyReplicas = sts.getStatus().getReadyReplicas() == null ? 0 : sts.getStatus().getReadyReplicas();
-        if (stsReadyReplicas <  rackStatus.getDesiredReplicas()) {
-            rackStatus.setPhase(RackPhase.SCALING_UP);
-        } else if (stsReadyReplicas > rackStatus.getDesiredReplicas()) {
-            rackStatus.setPhase(RackPhase.SCALING_DOWN);
-        } else {
-            rackStatus.setPhase(RackPhase.RUNNING);
-        }
+
+        int stsReadyReplicas = Math.min(sts.getStatus().getReadyReplicas() == null ? 0 : sts.getStatus().getReadyReplicas(), sts.getSpec().getReplicas());
+        rackStatus.setDesiredReplicas(stsReadyReplicas);
 
         // update the DC total ready repliacs
-        int readyReplicas = dataCenter.getStatus().getRackStatuses().values().stream()
+        int totalReadyReplicas = dataCenter.getStatus().getRackStatuses().values().stream()
                 .map(r -> r.getReadyReplicas() == null ? 0 : r.getReadyReplicas())
                 .reduce(0, (a, b) -> a + b);
-        dataCenterStatus.setReadyReplicas(readyReplicas);
+        dataCenterStatus.setReadyReplicas(totalReadyReplicas);
         logger.debug("datacenter={} dataCenterStatus={}", dataCenter.id(), dataCenterStatus);
         return nextAction(true);
     }
@@ -393,7 +388,8 @@ public class DataCenterUpdateAction {
 
                     final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
                     if (zones.totalReplicas() > dataCenter.getSpec().getReplicas())
-                        return scaleDownDatacenter(configMapVolumeMounts, cqlSessionHandler);
+                        return scaleDownDatacenter(configMapVolumeMounts, cqlSessionHandler)
+                                .doFinally(() -> cqlSessionHandler.close());
 
                     boolean doUpdateStatus = updateStatus;
                     if (!DataCenterPhase.RUNNING.equals(dataCenterStatus.getPhase())) {
@@ -405,7 +401,7 @@ public class DataCenterUpdateAction {
                     Single<Boolean> doUpdate = Single.just(doUpdateStatus);
 
                     // manage roles, keyspaces,
-                    if (dataCenterSpec.getReplicas() > 0 && dataCenterStatus.getBootstrapped() == true) {
+                    if (dataCenter.getStatus().getReadyReplicas() > 0 && dataCenterStatus.getBootstrapped() == true) {
                         doUpdate = doUpdate.flatMap(status -> this.cqlKeyspaceManager.reconcileKeyspaces(dataCenter, status, cqlSessionHandler))
                                 .flatMap(status -> this.cqlRoleManager.reconcileRole(dataCenter, status, cqlSessionHandler))
                                 // Disable License check because elastic_admin [_datacenregroup] is sometime created after creating the elassandra_operator role.
@@ -435,7 +431,7 @@ public class DataCenterUpdateAction {
                             return k8sResourceUtils.updateDataCenterStatus(dataCenter).ignoreElement();
                         }
                         return Completable.complete();
-                    });
+                    }).doFinally(() -> cqlSessionHandler.close());
                 });
     }
 
@@ -444,8 +440,7 @@ public class DataCenterUpdateAction {
         for (V1StatefulSet v1StatefulSet : this.statefulSetTreeMap.values()) {
             int rackIndex = Integer.parseInt(v1StatefulSet.getMetadata().getLabels().get(OperatorLabels.RACKINDEX));
             RackStatus rackStatus = dataCenterStatus.getRackStatuses().get(rackIndex);
-            logger.debug("DataCenter={} PARKING rack={}", dataCenter.id(), rackStatus.getName());
-            rackStatus.setParkedReplicas(v1StatefulSet.getSpec().getReplicas());
+            logger.debug("DataCenter={} PARKING rack={}", dataCenter.id(), rackStatus);
             rackStatus.setPhase(RackPhase.PARKED);
             v1StatefulSet.getSpec().setReplicas(0);
             todoList.add(k8sResourceUtils.replaceNamespacedStatefulSet(v1StatefulSet).ignoreElement());
@@ -454,6 +449,7 @@ public class DataCenterUpdateAction {
                 .toSingleDefault(dataCenter)
                 .flatMapCompletable(dataCenter1 -> {
                     dataCenterStatus.setPhase(DataCenterPhase.PARKED);
+                    dataCenterStatus.setReadyReplicas(0);
                     return k8sResourceUtils.updateDataCenterStatus(dataCenter).ignoreElement();
                 });
     }
@@ -463,15 +459,18 @@ public class DataCenterUpdateAction {
         for (V1StatefulSet v1StatefulSet : this.statefulSetTreeMap.values()) {
             int rackIndex = Integer.parseInt(v1StatefulSet.getMetadata().getLabels().get(OperatorLabels.RACKINDEX));
             RackStatus rackStatus = dataCenterStatus.getRackStatuses().get(rackIndex);
-            logger.debug("DataCenter={} UNPARKING rack={}", dataCenter.id(), rackStatus.getName());
             rackStatus.setPhase(RackPhase.STARTING);
-            rackStatus.setParkedReplicas(v1StatefulSet.getSpec().getReplicas());
-            rackStatus.setParkedReplicas(0);
-            v1StatefulSet.getSpec().setReplicas(rackStatus.getParkedReplicas());
+            logger.debug("DataCenter={} UNPARKING rack={}", dataCenter.id(), rackStatus);
+
+            v1StatefulSet.getSpec().setReplicas(rackStatus.getDesiredReplicas());
             todoList.add(k8sResourceUtils.replaceNamespacedStatefulSet(v1StatefulSet).ignoreElement());
         }
         return Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()]))
-                .andThen(k8sResourceUtils.updateDataCenterStatus(dataCenter).ignoreElement());
+                .toSingleDefault(dataCenter)
+                .flatMapCompletable(dataCenter1 -> {
+                    dataCenterStatus.setPhase(DataCenterPhase.STARTING);
+                    return k8sResourceUtils.updateDataCenterStatus(dataCenter).ignoreElement();
+                });
     }
 
     public Completable scaleUpDatacenter(ConfigMapVolumeMounts configMapVolumeMounts) throws Exception {
@@ -494,7 +493,6 @@ public class DataCenterUpdateAction {
                     .setIndex(rackIndex)
                     .setPhase(RackPhase.CREATING)
                     .setSeedHostId(UUID.randomUUID())
-                    .withParkedReplicas(0)
                     .withDesiredReplicas(1)
                     .withFingerprint(configMapVolumeMounts.fingerPrint());
             dataCenterStatus.getRackStatuses().putIfAbsent(rackIndex, rackStatus);
@@ -555,8 +553,7 @@ public class DataCenterUpdateAction {
                             .retryWhen(errors -> errors
                                     .zipWith(Flowable.range(1, 5), (n, i) -> i)
                                     .flatMap(retryCount -> Flowable.timer(2, TimeUnit.SECONDS))
-                            ))
-                    .doFinally(() -> cqlSessionHandler.close());
+                            ));
         }
 
         rackStatus.setDesiredReplicas(sts.getSpec().getReplicas() - 1);
@@ -1235,7 +1232,7 @@ public class DataCenterUpdateAction {
                     logger.warn("Cannot deploy elassandra with less than 1.2Gb heap, please increase your kubernetes memory limits if you are in production environment");
                 }
 
-                final boolean useG1GC = (jvmHeapSizeInMb > 16 * 1024);
+                final boolean useG1GC = (jvmHeapSizeInMb > 12 * 1024);
                 //final StringWriter writer = new StringWriter();
                 StringBuilder jvmGCOptions = new StringBuilder(500);
 

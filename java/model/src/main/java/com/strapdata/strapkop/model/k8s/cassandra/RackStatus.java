@@ -58,13 +58,6 @@ public class RackStatus {
     private Integer readyReplicas = 0;
 
     /**
-     * Number of parked pods (size of the sts when not parked).
-     */
-    @SerializedName("parkedReplicas")
-    @Expose
-    private Integer parkedReplicas = 0;
-
-    /**
      * Host id of the seed node in the rack.
      */
     @SerializedName("seedHostId")

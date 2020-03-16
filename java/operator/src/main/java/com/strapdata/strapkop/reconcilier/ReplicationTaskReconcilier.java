@@ -1,5 +1,6 @@
 package com.strapdata.strapkop.reconcilier;
 
+import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.cql.CqlKeyspace;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRoleManager;
@@ -49,8 +50,9 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
                                       final CqlRoleManager cqlRoleManager,
                                       final CqlKeyspaceManager cqlKeyspaceManager,
                                       final MeterRegistry meterRegistry,
-                                      final DataCenterController dataCenterController) {
-        super(reconcilierObserver, "replication", k8sResourceUtils, meterRegistry, dataCenterController);
+                                      final DataCenterController dataCenterController,
+                                      final DataCenterCache dataCenterCache) {
+        super(reconcilierObserver, "replication", k8sResourceUtils, meterRegistry, dataCenterController, dataCenterCache);
         this.context = context;
         this.cqlRoleManager = cqlRoleManager;
         this.cqlKeyspaceManager = cqlKeyspaceManager;
@@ -72,13 +74,13 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
     @Override
     protected Single<TaskPhase> doTask(final Task task, DataCenter dc) throws Exception {
         final ReplicationTaskSpec replicationTaskSpec = task.getSpec().getReplication();
-        final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
 
         if (Strings.isNullOrEmpty(replicationTaskSpec.getDcName())) {
             logger.warn("datacenter={} task={} dcName not set, ignoring task", dc.id(), task.id());
             return Single.just(TaskPhase.FAILED);
         }
 
+        final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
         switch (replicationTaskSpec.getAction()) {
             case ADD:
                 final Map<String, Integer> replicationMap = new HashMap<>();
@@ -123,7 +125,8 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
                                     dc.id(), task.id(), replicationTaskSpec.getDcName(), throwable.getMessage());
                             task.getStatus().setLastMessage(throwable.getMessage());
                             return Single.just(TaskPhase.FAILED);
-                        }));
+                        }))
+                        .doFinally(() -> cqlSessionHandler.close());
 
             case REMOVE:
                 return this.cqlKeyspaceManager.removeDcFromReplicationMap(dc, replicationTaskSpec.getDcName(), cqlSessionHandler)
@@ -134,8 +137,10 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
                                     dc.id(), task.id(), replicationTaskSpec.getDcName(), throwable.getMessage());
                             task.getStatus().setLastMessage(throwable.getMessage());
                             return Single.just(TaskPhase.FAILED);
-                        });
+                        })
+                        .doFinally(() -> cqlSessionHandler.close());
         }
+        cqlSessionHandler.close(); // close on error
         throw new IllegalArgumentException("Unknwon action");
     }
 

@@ -7,7 +7,7 @@ import picocli.CommandLine.Option;
 @Command(name = "edctl",
         description = "Elassandra Datacenter Cli",
         mixinStandardHelpOptions = true,
-        subcommands = { WaitCommand.class })
+        subcommands = { WatchCommand.class })
 public class Edctl {
 
     @Option(names = {"-v", "--verbose"}, description = "Verbose mode")

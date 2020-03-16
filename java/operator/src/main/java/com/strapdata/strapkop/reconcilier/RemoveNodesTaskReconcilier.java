@@ -1,6 +1,7 @@
 package com.strapdata.strapkop.reconcilier;
 
 import com.google.common.collect.ImmutableMap;
+import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.event.ElassandraPod;
@@ -46,8 +47,9 @@ public class RemoveNodesTaskReconcilier extends TaskReconcilier {
                                       final CqlRoleManager cqlRoleManager,
                                       final CqlKeyspaceManager cqlKeyspaceManager,
                                       final DataCenterController dataCenterController,
+                                      final DataCenterCache dataCenterCache,
                                       final MeterRegistry meterRegistry) {
-        super(reconcilierObserver, "removeNodes", k8sResourceUtils, meterRegistry, dataCenterController);
+        super(reconcilierObserver, "removeNodes", k8sResourceUtils, meterRegistry, dataCenterController, dataCenterCache);
         this.jmxmpElassandraProxy = jmxmpElassandraProxy;
         this.context = context;
         this.cqlRoleManager = cqlRoleManager;

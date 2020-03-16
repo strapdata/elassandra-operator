@@ -1,5 +1,6 @@
 package com.strapdata.strapkop.reconcilier;
 
+import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.model.k8s.cassandra.BlockReason;
@@ -34,8 +35,9 @@ public final class RepairTaskReconcilier extends TaskReconcilier {
                                  final K8sResourceUtils k8sResourceUtils,
                                  final JmxmpElassandraProxy jmxmpElassandraProxy,
                                  final MeterRegistry meterRegistry,
-                                 final DataCenterController dataCenterController) {
-        super(reconcilierObserver,"repair", k8sResourceUtils, meterRegistry, dataCenterController);
+                                 final DataCenterController dataCenterController,
+                                 final DataCenterCache dataCenterCache) {
+        super(reconcilierObserver,"repair", k8sResourceUtils, meterRegistry, dataCenterController, dataCenterCache);
         this.jmxmpElassandraProxy = jmxmpElassandraProxy;
     }
 
