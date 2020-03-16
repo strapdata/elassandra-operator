@@ -95,4 +95,9 @@ public class K8sModule {
     public AppsV1Api provideAppsV1Api() {
         return new AppsV1Api(debuggableApiClient);
     }
+
+    @Bean
+    @Singleton
+    @Named("policyApi")
+    public PolicyV1beta1Api providePolicyV1beta1Api() { return new PolicyV1beta1Api(apiClient); }
 }
