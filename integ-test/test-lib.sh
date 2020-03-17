@@ -133,10 +133,10 @@ function install_elassandra_datacenter() {
     local sz=${4:-"1"}
     helm install --namespace "$ns" --name "$cl-$dc" \
     --set image.pullSecrets[0]=$REGISTRY_SECRET_NAME \
-    --set reaper.enabled=false \
-    --set kibana.enabled=true \
+    --set reaper.enabled="false" \
+    --set kibana.enabled="true" \
     --set sslStoragePort="38001" \
-    --set externalDns.enabled=true,externalDns.root="xxxx.yyyy",externalDns.domain="test.strapkube.com" \
+    --set externalDns.enabled="true",externalDns.root="xxxx.yyyy",externalDns.domain="test.strapkube.com" \
     --set replicas="$sz" \
     --wait \
     $HELM_REPO/elassandra-datacenter

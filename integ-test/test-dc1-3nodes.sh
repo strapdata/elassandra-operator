@@ -14,20 +14,20 @@ source $(dirname $0)/test-lib.sh
 
 
 install_elassandra_datacenter default cl1 dc1 1
-java -jar ../java/edctl/build/libs/edctl.jar watch -p RUNNING
+java -jar ../java/edctl/build/libs/edctl.jar watch --health GREEN
 
 #scale_elassandra_datacenter cl1 dc1 2
-#java -jar ../java/edctl/build/libs/edctl.jar watch -p RUNNING
+#java -jar ../java/edctl/build/libs/edctl.jar watch -p RUNNING -r 2
 
 #scale_elassandra_datacenter cl1 dc1 3
-#java -jar ../java/edctl/build/libs/edctl.jar watch -p RUNNING
+#java -jar ../java/edctl/build/libs/edctl.jar watch -p RUNNING -r 3
 
 park_elassandra_datacenter cl1 dc1
-java -jar ../java/edctl/build/libs/edctl.jar watch -p PARKED
-sleep 3
+java -jar ../java/edctl/build/libs/edctl.jar watch -p PARKED -r 0
+sleep 5
 
 unpark_elassandra_datacenter cl1 dc1
-java -jar ../java/edctl/build/libs/edctl.jar watch -p RUNNING
+java -jar ../java/edctl/build/libs/edctl.jar watch -p RUNNING --health GREEN
 
 exit
 
