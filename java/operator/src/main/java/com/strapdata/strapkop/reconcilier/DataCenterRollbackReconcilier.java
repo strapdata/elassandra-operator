@@ -1,9 +1,8 @@
 package com.strapdata.strapkop.reconcilier;
 
-import com.strapdata.strapkop.model.Key;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenterPhase;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
+import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
 import com.strapdata.strapkop.plugins.PluginRegistry;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CoreV1Api;
@@ -14,7 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
-import java.util.Objects;
+import java.util.Date;
 
 /**
  * Rollback to the last successfully applied dc state.
@@ -48,12 +47,6 @@ public class DataCenterRollbackReconcilier extends Reconcilier<Key> {
                 .flatMapCompletable(dc -> {
                     logger.debug("rollback dc={}/{}", dc.getMetadata().getName(), dc.getMetadata().getNamespace());
 
-                    if (dc.getStatus() != null && !Objects.equals(dc.getStatus().getPhase(), DataCenterPhase.ERROR)) {
-                        logger.debug("Rollback cancelled, the datacenter={}/{} phase={}",
-                                dc.getMetadata().getName(), dc.getMetadata().getNamespace(), dc.getStatus().getPhase());
-                        return Completable.complete();
-                    }
-
                     try {
                         // call the statefullset reconciliation  (before scaling up/down to properly stream data according to the adjusted RF)
                         logger.trace("processing a configuration rollback for {} in thread {}", dc.getMetadata().getName(), Thread.currentThread().getName());
@@ -66,8 +59,8 @@ public class DataCenterRollbackReconcilier extends Reconcilier<Key> {
                             if (dc.getStatus() == null) {
                                 dc.setStatus(new DataCenterStatus());
                             }
-                            dc.getStatus().setPhase(DataCenterPhase.ERROR);
-                            dc.getStatus().setLastMessage(e.getMessage());
+                            dc.getStatus().setLastError(e.toString());
+                            dc.getStatus().setLastErrorTime(new Date());
                             k8sResourceUtils.updateDataCenterStatus(dc);
                         }
                         throw e;

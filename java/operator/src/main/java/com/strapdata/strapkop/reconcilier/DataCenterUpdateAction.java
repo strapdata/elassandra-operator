@@ -270,14 +270,15 @@ public class DataCenterUpdateAction {
                     V1Node node = nodeCache.values().iterator().next();
                     RackStatus rackStatus = new RackStatus()
                             .withDesiredReplicas(1)
-                            .withPhase(RackPhase.CREATING)
+                            .withHealth(Health.RED)
                             .withSeedHostId(UUID.randomUUID())
                             .withIndex(0)
                             .withName(NodeHandler.getZone(node))
                             .withFingerprint(configMapVolumeMounts.fingerPrint());
 
                     dataCenterStatus.getRackStatuses().put(new Integer(0), rackStatus);
-                    dataCenterStatus.setPhase(DataCenterPhase.CREATING);
+                    dataCenterStatus.setHealth(Health.RED);
+                    dataCenterStatus.setPhase(DataCenterPhase.RUNNING);
                     configMapVolumeMounts.setRack(rackStatus);
                     return configMapVolumeMounts.createOrReplaceNamespacedConfigMaps()
                             // updateRack also call prepareDataCenterSnapshot
@@ -300,20 +301,23 @@ public class DataCenterUpdateAction {
      * Trigger next action when sts reach the desired state
      */
     public Completable statefulsetUpdate(V1StatefulSet sts) throws Exception {
+        int stsReadyReplicas = Math.min(sts.getStatus().getReadyReplicas() == null ? 0 : sts.getStatus().getReadyReplicas(), sts.getSpec().getReplicas());
         logger.debug("########## sts={}/{} replica={}/{}",
-                sts.getMetadata().getName(), sts.getMetadata().getNamespace(), sts.getStatus().getReadyReplicas(), sts.getSpec().getReplicas());
+                sts.getMetadata().getName(), sts.getMetadata().getNamespace(), stsReadyReplicas, sts.getSpec().getReplicas());
 
         Integer rackIndex = Integer.parseInt(sts.getMetadata().getLabels().get(OperatorLabels.RACKINDEX));
         RackStatus rackStatus = dataCenter.getStatus().getRackStatuses().get(rackIndex);
 
-        int stsReadyReplicas = Math.min(sts.getStatus().getReadyReplicas() == null ? 0 : sts.getStatus().getReadyReplicas(), sts.getSpec().getReplicas());
         rackStatus.setReadyReplicas(stsReadyReplicas);
+        rackStatus.setHealth(rackStatus.health());
 
         // update the DC total ready repliacs
         int totalReadyReplicas = dataCenter.getStatus().getRackStatuses().values().stream()
                 .map(r -> r.getReadyReplicas() == null ? 0 : r.getReadyReplicas())
                 .reduce(0, (a, b) -> a + b);
         dataCenterStatus.setReadyReplicas(totalReadyReplicas);
+        dataCenterStatus.setHealth(dataCenterStatus.health());
+
         logger.debug("datacenter={} dataCenterStatus={}", dataCenter.id(), dataCenterStatus);
         return nextAction(true);
     }
@@ -325,23 +329,21 @@ public class DataCenterUpdateAction {
 
     public Completable unschedulablePod(Pod pod) throws Exception {
         logger.debug("########## datacenter={} unschedulable pod={}", dataCenter.id(), pod.id());
-        dataCenterStatus.setLastMessage("Unschedulable pod=" + pod.getName());
+        dataCenterStatus.setLastError("Unschedulable pod=" + pod.getName());
+        dataCenterStatus.setLastErrorTime(new Date());
         return nextAction(true);
     }
 
 
     public Completable nextAction(final boolean updateStatus) throws Exception {
-        if (dataCenterSpec.isParked() && !DataCenterPhase.PARKED.equals(dataCenterStatus.getPhase()))
+        if (dataCenterSpec.isParked() && !(DataCenterPhase.PARKED.equals(dataCenterStatus.getPhase())))
             return parkDatacenter();
 
-        if (DataCenterPhase.PARKED.equals(dataCenterStatus.getPhase()) && !dataCenterSpec.isParked())
+        if (!dataCenterSpec.isParked() && (DataCenterPhase.PARKED.equals(dataCenterStatus.getPhase())))
             return unparkDatacenter();
 
-        // if datacenter is on error, do nothing
-        if (DataCenterPhase.ERROR.equals(dataCenterStatus.getPhase())) {
-            logger.error("datacenter={} on ERROR, do nothing", dataCenter.id());
-            return updateStatus ? k8sResourceUtils.updateDataCenterStatus(dataCenter).ignoreElement() : Completable.complete();
-        }
+        if (DataCenterPhase.PARKED.equals(dataCenterStatus.getPhase()) && dataCenterSpec.isParked())
+            return Completable.complete();
 
         // read user config map to check fingerprint
         return readUserConfigMap()
@@ -355,8 +357,9 @@ public class DataCenterUpdateAction {
                         if (!currentFingerprint.equals(stsFingerprint)) {
                             logger.debug("datacenter={} fingerprint={} sts={} fingerprint={} not match", dataCenter.id(), currentFingerprint, v1StatefulSet.getMetadata().getName(), stsFingerprint);
 
-                            rackStatus.setPhase(RackPhase.UPDATING);
                             rackStatus.setFingerprint(currentFingerprint);
+                            dataCenterStatus.setLastAction("Rolling update rack="+rackStatus.getName());
+                            dataCenterStatus.setLastActionTime(new Date());
 
                             configMapVolumeMounts.setRack(rackStatus);
                             return configMapVolumeMounts.createOrReplaceNamespacedConfigMaps()
@@ -442,15 +445,20 @@ public class DataCenterUpdateAction {
             int rackIndex = Integer.parseInt(v1StatefulSet.getMetadata().getLabels().get(OperatorLabels.RACKINDEX));
             RackStatus rackStatus = dataCenterStatus.getRackStatuses().get(rackIndex);
             logger.debug("DataCenter={} PARKING rack={}", dataCenter.id(), rackStatus);
-            rackStatus.setPhase(RackPhase.PARKED);
+            rackStatus.setHealth(Health.UNKNOWN);
             v1StatefulSet.getSpec().setReplicas(0);
             todoList.add(k8sResourceUtils.replaceNamespacedStatefulSet(v1StatefulSet).ignoreElement());
         }
         return Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()]))
                 .toSingleDefault(dataCenter)
+                .flatMap(s -> pluginRegistry.reconcileAll(dataCenter))
+                // remove scheduled backups ?
+                //.flatMap(s -> Completable.fromAction(() -> backupScheduler.scheduleBackups(dataCenter)).toSingleDefault(dataCenter)) // start backup when plugin are reconcilied.
                 .flatMapCompletable(dataCenter1 -> {
                     dataCenterStatus.setPhase(DataCenterPhase.PARKED);
-                    dataCenterStatus.setReadyReplicas(0);
+                    dataCenterStatus.setHealth(Health.RED);
+                    dataCenterStatus.setLastAction("Park datacenter");
+                    dataCenterStatus.setLastActionTime(new Date());
                     return k8sResourceUtils.updateDataCenterStatus(dataCenter).ignoreElement();
                 });
     }
@@ -460,7 +468,7 @@ public class DataCenterUpdateAction {
         for (V1StatefulSet v1StatefulSet : this.statefulSetTreeMap.values()) {
             int rackIndex = Integer.parseInt(v1StatefulSet.getMetadata().getLabels().get(OperatorLabels.RACKINDEX));
             RackStatus rackStatus = dataCenterStatus.getRackStatuses().get(rackIndex);
-            rackStatus.setPhase(RackPhase.STARTING);
+            rackStatus.setHealth(Health.UNKNOWN);
             logger.debug("DataCenter={} UNPARKING rack={}", dataCenter.id(), rackStatus);
 
             v1StatefulSet.getSpec().setReplicas(rackStatus.getDesiredReplicas());
@@ -469,7 +477,9 @@ public class DataCenterUpdateAction {
         return Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()]))
                 .toSingleDefault(dataCenter)
                 .flatMapCompletable(dataCenter1 -> {
-                    dataCenterStatus.setPhase(DataCenterPhase.STARTING);
+                    dataCenterStatus.setPhase(DataCenterPhase.RUNNING);
+                    dataCenterStatus.setLastAction("Unpark datacenter");
+                    dataCenterStatus.setLastActionTime(new Date());
                     return k8sResourceUtils.updateDataCenterStatus(dataCenter).ignoreElement();
                 });
     }
@@ -486,18 +496,18 @@ public class DataCenterUpdateAction {
         Zone zone = scaleUpZone.get();
         logger.debug("Scaling UP zone={}", zone);
         if (!zone.getSts().isPresent()) {
-            final boolean firstStateFulSet = DataCenterPhase.CREATING.equals(dataCenterStatus.getPhase());
             // create new sts with replicas = 1,
             Integer rackIndex = dataCenterStatus.getZones().indexOf(zone.name);
             RackStatus rackStatus = new RackStatus()
                     .setName(zone.name)
                     .setIndex(rackIndex)
-                    .setPhase(RackPhase.CREATING)
+                    .setHealth(Health.UNKNOWN)
                     .setSeedHostId(UUID.randomUUID())
                     .withDesiredReplicas(1)
                     .withFingerprint(configMapVolumeMounts.fingerPrint());
             dataCenterStatus.getRackStatuses().putIfAbsent(rackIndex, rackStatus);
-            dataCenterStatus.setPhase(DataCenterPhase.SCALING_UP);
+            dataCenterStatus.setLastAction("Adding rack="+rackStatus.getName());
+            dataCenterStatus.setLastActionTime(new Date());
             logger.debug("datacenter={} SCALE_UP started in rack={} size={}", dataCenter.id(), zone.name, zone.size);
 
             configMapVolumeMounts.setRack(rackStatus);
@@ -516,9 +526,11 @@ public class DataCenterUpdateAction {
         Integer rackIndex = Integer.parseInt(sts.getMetadata().getLabels().get(OperatorLabels.RACKINDEX));
         RackStatus rackStatus = dataCenterStatus.getRackStatuses().get(rackIndex);
         rackStatus.setDesiredReplicas(sts.getSpec().getReplicas() + 1);
-        rackStatus.setPhase(RackPhase.SCALING_UP);
         logger.debug("datacenter={} SCALE_UP started in rack={} desiredReplicas={}", dataCenter.id(), rackStatus.getName(), rackStatus.getDesiredReplicas());
+
         dataCenterStatus.setNeedCleanup(true);
+        dataCenterStatus.setLastAction("Scale up rack="+rackStatus.getName());
+        dataCenterStatus.setLastActionTime(new Date());
 
         // call ConfigMapVolumeMount here to update seeds in case of single rack with multi-nodes
         configMapVolumeMounts.setRack(rackStatus);
@@ -557,8 +569,10 @@ public class DataCenterUpdateAction {
         }
 
         rackStatus.setDesiredReplicas(sts.getSpec().getReplicas() - 1);
-        rackStatus.setPhase(RackPhase.SCALING_DOWN);
         sts.getSpec().setReplicas(sts.getSpec().getReplicas() - 1);
+
+        dataCenterStatus.setLastAction("Scale down rack="+rackStatus.getName());
+        dataCenterStatus.setLastActionTime(new Date());
 
         configMapVolumeMounts.setRack(rackStatus);
         return todo.andThen(configMapVolumeMounts.createOrReplaceNamespacedConfigMaps()) // update seeds

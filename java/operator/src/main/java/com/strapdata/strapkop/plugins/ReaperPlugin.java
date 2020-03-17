@@ -529,7 +529,8 @@ public class ReaperPlugin extends AbstractPlugin {
                         }
                     })
                     .doOnError(e -> {
-                        dc.getStatus().setLastMessage(e.getMessage());
+                        dc.getStatus().setLastError(e.getMessage());
+                        dc.getStatus().setLastErrorTime(new Date());
                         logger.error("datacenter={} error while registering in cassandra-reaper", dc.id(), e);
                     });
     }
@@ -568,7 +569,8 @@ public class ReaperPlugin extends AbstractPlugin {
                     }
                 })
                 .doOnError(e -> {
-                    dc.getStatus().setLastMessage(e.getMessage());
+                    dc.getStatus().setLastError(e.toString());
+                    dc.getStatus().setLastErrorTime(new Date());
                     logger.error("datacenter={} error while registering scheduled repair", dc.id(), e);
                 });
     }
