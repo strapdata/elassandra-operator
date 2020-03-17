@@ -186,7 +186,12 @@ public class DataCenterUpdateAction {
         return dataCenterSpec.getUserConfigMapVolumeSource() == null ?
                 Single.just(Optional.empty()) :
                 k8sResourceUtils.readNamespacedConfigMap(dataCenterMetadata.getNamespace(), dataCenterSpec.getUserConfigMapVolumeSource().getName())
-                        .map(cfg -> Optional.of(cfg));
+                        .map(cfg -> Optional.of(cfg))
+                .onErrorResumeNext(t -> {
+                    // configmap may be not found
+                    logger.debug("ConfigMap={}/{} not found", dataCenterSpec.getUserConfigMapVolumeSource().getName(), dataCenterMetadata.getNamespace());
+                    return Single.just(Optional.empty());
+                });
     }
 
     /**
@@ -342,8 +347,14 @@ public class DataCenterUpdateAction {
         if (!dataCenterSpec.isParked() && (DataCenterPhase.PARKED.equals(dataCenterStatus.getPhase())))
             return unparkDatacenter();
 
-        if (DataCenterPhase.PARKED.equals(dataCenterStatus.getPhase()) && dataCenterSpec.isParked())
-            return Completable.complete();
+        if (DataCenterPhase.PARKED.equals(dataCenterStatus.getPhase()) && dataCenterSpec.isParked()) {
+            return updateStatus ?
+                    k8sResourceUtils.updateDataCenterStatus(dataCenter).flatMapCompletable(dc -> {
+                        logger.debug("datacenter={} updating status={}", dataCenter.id(), dataCenterStatus);
+                        return Completable.complete();
+                    }) :
+                    Completable.complete();
+        }
 
         // read user config map to check fingerprint
         return readUserConfigMap()
@@ -445,7 +456,7 @@ public class DataCenterUpdateAction {
             int rackIndex = Integer.parseInt(v1StatefulSet.getMetadata().getLabels().get(OperatorLabels.RACKINDEX));
             RackStatus rackStatus = dataCenterStatus.getRackStatuses().get(rackIndex);
             logger.debug("DataCenter={} PARKING rack={}", dataCenter.id(), rackStatus);
-            rackStatus.setHealth(Health.UNKNOWN);
+            rackStatus.setHealth(Health.RED);
             v1StatefulSet.getSpec().setReplicas(0);
             todoList.add(k8sResourceUtils.replaceNamespacedStatefulSet(v1StatefulSet).ignoreElement());
         }
@@ -468,7 +479,6 @@ public class DataCenterUpdateAction {
         for (V1StatefulSet v1StatefulSet : this.statefulSetTreeMap.values()) {
             int rackIndex = Integer.parseInt(v1StatefulSet.getMetadata().getLabels().get(OperatorLabels.RACKINDEX));
             RackStatus rackStatus = dataCenterStatus.getRackStatuses().get(rackIndex);
-            rackStatus.setHealth(Health.UNKNOWN);
             logger.debug("DataCenter={} UNPARKING rack={}", dataCenter.id(), rackStatus);
 
             v1StatefulSet.getSpec().setReplicas(rackStatus.getDesiredReplicas());

@@ -51,24 +51,24 @@ public class PluginRegistry {
     public Single<Boolean> reconcileAll(DataCenter dc) {
         List<Single<Boolean>> pluginSingles = new ArrayList<>();
         for (Plugin plugin : plugins) {
-            if (!dc.getSpec().isParked() || plugin.reconcileOnParkState()) {
-                try {
-                    pluginSingles.add(plugin.reconcile(dc)
-                            .onErrorResumeNext(t -> {
-                                logger.warn("plugin={} reconcile failed, error={}", plugin.getClass().getName(), t.toString());
-                                return Single.just(true);
-                            }));
-                } catch (Exception e) {
-                    logger.error("Plugin class=" + plugin.getClass().getSimpleName() + " reconciliation failed:", e);
-                }
+            try {
+                pluginSingles.add(plugin.reconcile(dc)
+                        .onErrorResumeNext(t -> {
+                            logger.warn("plugin={} reconcile failed, error={}", plugin.getClass().getName(), t.toString());
+                            return Single.just(true);
+                        }));
+            } catch (Exception e) {
+                logger.error("Plugin class=" + plugin.getClass().getSimpleName() + " reconciliation failed:", e);
             }
         }
-        return Single.zip(pluginSingles, (Object[] results) -> {
-            boolean result = false;
-            for(Object r : results) {
-                result = result || (Boolean)r;
-            }
-            return result;
-        });
+        return pluginSingles.size() == 0 ?
+                Single.just(false) :
+                Single.zip(pluginSingles, (Object[] results) -> {
+                    boolean result = false;
+                    for (Object r : results) {
+                        result = result || (Boolean) r;
+                    }
+                    return result;
+                });
     }
 }

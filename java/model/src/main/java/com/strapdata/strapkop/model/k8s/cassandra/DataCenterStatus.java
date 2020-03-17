@@ -128,13 +128,13 @@ public class DataCenterStatus {
 
     public Health health() {
         if (DataCenterPhase.PARKED.equals(this.phase))
-        return Health.RED;
+            return Health.RED;
 
-        long green = rackStatuses.values().stream().filter(r -> Health.GREEN.equals(r.getHealth())).count();
-        long yellowOrRed = rackStatuses.values().stream().filter(r -> !Health.GREEN.equals(r.getHealth())).count();
-        if (yellowOrRed == 0)
+        long green = rackStatuses == null ? 0 : rackStatuses.values().stream().filter(r -> Health.GREEN.equals(r.getHealth())).count();
+        long yellowOrRed = rackStatuses == null ? 0 : rackStatuses.values().stream().filter(r -> !Health.GREEN.equals(r.getHealth())).count();
+        if (green > 0 && yellowOrRed == 0)
             return Health.GREEN;
-        if (yellowOrRed == 1 && green > 0)
+        if (green > 0 && yellowOrRed == 1)
             return Health.YELLOW;
         return Health.RED;
     }

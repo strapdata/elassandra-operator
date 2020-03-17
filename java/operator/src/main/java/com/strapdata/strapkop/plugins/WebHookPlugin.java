@@ -114,15 +114,9 @@ public class WebHookPlugin extends AbstractPlugin {
         return Single.just(false);
     }
 
-
     @Override
     public boolean isActive(final DataCenter dataCenter) {
         return true;
-    }
-
-    @Override
-    public boolean reconcileOnParkState() {
-        return false;
     }
 
     /**

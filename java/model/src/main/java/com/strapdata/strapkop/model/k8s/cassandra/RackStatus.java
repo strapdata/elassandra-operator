@@ -65,9 +65,9 @@ public class RackStatus {
     private UUID seedHostId = UUID.randomUUID();
 
     public Health health() {
-        if (desiredReplicas == readyReplicas)
+        if (readyReplicas != null && desiredReplicas != null && desiredReplicas == readyReplicas)
             return Health.GREEN;
-        if (desiredReplicas - readyReplicas == 1 && readyReplicas > 0)
+        if (readyReplicas != null && readyReplicas > 0 && desiredReplicas != null && desiredReplicas - readyReplicas == 1)
             return Health.YELLOW;
         return Health.RED;
     }
