@@ -25,7 +25,7 @@ public class WatchCommand implements Callable<Integer> {
     DataCenterPhase phase;
 
     @CommandLine.Option(names = {"--health"}, description = "Elassandra datacenter health")
-    Health heath;
+    Health health;
 
     @CommandLine.Option(names = {"-r","--replicas"}, description = "Elassandra datacenter ready replicas")
     Integer readyReplicas;
@@ -35,7 +35,7 @@ public class WatchCommand implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-        System.out.println("Waiting phase="+phase+" heath=" + heath + " replicas="+readyReplicas+" timeout="+timeout+"s");
+        System.out.println("Waiting phase="+phase+" health=" + health + " replicas="+readyReplicas+" timeout="+timeout+"s");
 
         ApiClient client = Config.defaultClient();
         client.getHttpClient().setReadTimeout(timeout, TimeUnit.SECONDS);
@@ -57,10 +57,10 @@ public class WatchCommand implements Callable<Integer> {
             if (phase != null && !phase.equals(item.object.getStatus().getPhase()))
                 conditionMet = false;
 
-            if (heath != null && !heath.equals(item.object.getStatus().getHealth()))
+            if (health != null && !health.equals(item.object.getStatus().getHealth()))
                 conditionMet = false;
 
-            if (readyReplicas != null && ! readyReplicas.equals(item.object.getStatus().getReadyReplicas().equals(heath)))
+            if (readyReplicas != null && ! readyReplicas.equals(item.object.getStatus().getReadyReplicas()))
                 conditionMet = false;
 
             if (conditionMet) {
