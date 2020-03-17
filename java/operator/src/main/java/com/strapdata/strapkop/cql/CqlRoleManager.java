@@ -204,8 +204,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                         dc.getStatus().setCqlStatus(CqlStatus.ERRORED);
                         dc.getStatus().setCqlStatusMessage("Authentication failed with roles=" + r);
                         if (lastException != null) {
-                            logger.warn("datacenter=" + dc.id() + " Authentication failed with roles=" + r + " error:" + lastException.getMessage(), lastException);
-                            throw lastException;
+                            logger.warn("datacenter=" + dc.id() + " Authentication failed with roles=" + r + " error:" + lastException.getMessage());
                         }
                     }
 

@@ -122,12 +122,10 @@ public class KibanaPlugin extends AbstractPlugin {
 
     @Override
     public Single<Boolean> reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
-        // remove deleted kibana spaces
         Set<String> deployedKibanaSpaces = dataCenter.getStatus().getKibanaSpaceNames();
         Map<String, KibanaSpace> desiredKibanaMap = getKibanaSpaces(dataCenter);
 
-        if ((dataCenter.getSpec().getKibana().getEnabled() == false || desiredKibanaMap.size() == 0) &&
-                !deployedKibanaSpaces.isEmpty()) {
+        if ((dataCenter.getSpec().getKibana().getEnabled() == false || desiredKibanaMap.size() == 0 || dataCenter.getSpec().isParked()) && !deployedKibanaSpaces.isEmpty()) {
             return delete(dataCenter)
                     .map(s -> {
                         dataCenter.getStatus().setKibanaSpaceNames(new HashSet<>());
@@ -184,6 +182,9 @@ public class KibanaPlugin extends AbstractPlugin {
      * @return The number of kibana pods depending on ReaperStatus
      */
     private int kibanaReplicas(final DataCenter dataCenter, KibanaSpace kibanaSpace) {
+        if (dataCenter.getSpec().isParked())
+            return 0;
+
         Integer version = dataCenter.getSpec().getKibana().getVersion();
         return  (dataCenter.getStatus().getPhase().isRunning() &&
                 dataCenter.getStatus().getBootstrapped() == true &&

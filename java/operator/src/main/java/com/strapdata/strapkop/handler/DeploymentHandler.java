@@ -46,11 +46,13 @@ public class DeploymentHandler extends TerminalHandler<K8sWatchEvent<V1Deploymen
                 if (isDeploymentAvailable(deployment)) {
                     final String clusterName = deployment.getMetadata().getLabels().get(OperatorLabels.CLUSTER);
                     DataCenter dataCenter = dataCenterCache.get(new Key(deployment.getMetadata().getLabels().get(OperatorLabels.PARENT), deployment.getMetadata().getNamespace()));
-                    logger.info("datacenter={} deployment={}/{} is available, triggering a dc deploymentAvailable",
-                            dataCenter.id(),deployment.getMetadata().getName(), deployment.getMetadata().getNamespace());
-                    workQueues.submit(
-                            new ClusterKey(clusterName, deployment.getMetadata().getNamespace()),
-                            dataCenterController.deploymentAvailable(dataCenter, deployment));
+                    if (dataCenter != null) {
+                        logger.info("datacenter={} deployment={}/{} is available, triggering a dc deploymentAvailable",
+                                dataCenter.id(), deployment.getMetadata().getName(), deployment.getMetadata().getNamespace());
+                        workQueues.submit(
+                                new ClusterKey(clusterName, deployment.getMetadata().getNamespace()),
+                                dataCenterController.deploymentAvailable(dataCenter, deployment));
+                    }
                 }
                 break;
             case ERROR:

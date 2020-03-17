@@ -118,6 +118,13 @@ public class ReaperPlugin extends AbstractPlugin {
 
     @Override
     public Single<Boolean> reconcile(DataCenter dataCenter) throws ApiException, StrapkopException, IOException {
+        if (dataCenter.getSpec().getReaper() == null || !dataCenter.getSpec().getReaper().getEnabled() || dataCenter.getSpec().isParked()) {
+            return delete(dataCenter).map(b -> {
+                dataCenter.getStatus().setReaperPhase(ReaperPhase.NONE);
+                return true;
+            });
+        }
+
         switch(dataCenter.getStatus().getReaperPhase()) {
             case NONE:
                 break;
@@ -126,28 +133,23 @@ public class ReaperPlugin extends AbstractPlugin {
                     break;
                 }
             case ROLE_CREATED: // valid step when authentication is required
-                if (dataCenter.getSpec().getReaper() != null && dataCenter.getSpec().getReaper().getEnabled()) {
+                if (dataCenter.getSpec().getReaper() != null && dataCenter.getSpec().getReaper().getEnabled() && !dataCenter.getSpec().isParked()) {
                     return createOrReplaceReaperObjects(dataCenter).map(b -> {
                                 dataCenter.getStatus().setReaperPhase(ReaperPhase.DEPLOYED);
                                 return true;
                             });
                 }
                 break;
+
             case DEPLOYED:
-                if (dataCenter.getSpec().getReaper() == null || !dataCenter.getSpec().getReaper().getEnabled()) {
-                    return delete(dataCenter).map(b -> {
-                        dataCenter.getStatus().setReaperPhase(dataCenter.getSpec().getAuthentication().equals(Authentication.NONE) ? ReaperPhase.KEYSPACE_CREATED : ReaperPhase.ROLE_CREATED);
-                        return true;
-                    });
-                }
+                break;
+
+            case RUNNING:
                 return register(dataCenter).toSingleDefault(true);
+
             case REGISTERED:
-                if (dataCenter.getSpec().getReaper() == null || !dataCenter.getSpec().getReaper().getEnabled()) {
-                    return delete(dataCenter).map(b -> {
-                        dataCenter.getStatus().setReaperPhase(dataCenter.getSpec().getAuthentication().equals(Authentication.NONE) ? ReaperPhase.KEYSPACE_CREATED : ReaperPhase.ROLE_CREATED);
-                        return true;
-                    });
-                }
+                // TODO: schedule/unschedule repairs
+                break;
         }
         return Single.just(false);
     }
@@ -170,6 +172,9 @@ public class ReaperPlugin extends AbstractPlugin {
      * @return The number of reaper pods depending on ReaperStatus
      */
     private int reaperReplicas(final DataCenter dataCenter) {
+        if (dataCenter.getSpec().isParked())
+            return 0;
+
         switch (dataCenter.getStatus().getReaperPhase()) {
             case NONE:
                 return 0;
@@ -538,14 +543,24 @@ public class ReaperPlugin extends AbstractPlugin {
     // TODO: cache cluster secret to avoid loading secret again and again
     private Single<String> loadReaperAdminPassword(DataCenter dc) throws ApiException, StrapkopException {
         final String secretName = reaperSecretName(dc);
-        return k8sResourceUtils.readNamespacedSecret(dc.getMetadata().getNamespace(), secretName)
-                .map(secret -> {
-                    final byte[] password = secret.getData().get("reaper.admin_password");
-                    if (password == null) {
-                        throw new StrapkopException(String.format("secret %s does not contain reaper.admin_password", secretName));
-                    }
-                    return new String(password);
-                });
+        final V1ObjectMeta secretMetadata = new V1ObjectMeta()
+                .name(secretName)
+                .namespace(dc.getMetadata().getNamespace())
+                .labels(OperatorLabels.datacenter(dc));
+
+        return k8sResourceUtils.readOrCreateNamespacedSecret(secretMetadata, () -> {
+            logger.debug("datacenter={} Creating reaper secret name={}", dc.id(), secretName);
+            return new V1Secret()
+                    .metadata(secretMetadata)
+                    // replace the default cassandra password
+                    .putStringDataItem("reaper.admin_password", UUID.randomUUID().toString());
+        }).map(secret -> {
+            final byte[] password = secret.getData().get("reaper.admin_password");
+            if (password == null) {
+                throw new StrapkopException(String.format("secret %s does not contain reaper.admin_password", secretName));
+            }
+            return new String(password);
+        });
     }
 
     public Completable registerScheduledRepair(DataCenter dc) throws MalformedURLException, ApiException {

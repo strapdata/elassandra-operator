@@ -19,10 +19,6 @@ public interface Plugin {
      */
     boolean isActive(final DataCenter dataCenter);
 
-    default boolean reconcileOnParkState(){
-        return false;
-    };
-
     /**
      * Add/Remove keyspaces to/from the cqlKeyspaceManager for the dataCenter
      */
