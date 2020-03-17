@@ -30,11 +30,11 @@ public class RackStatus {
     private Integer index;
 
     /**
-     * Current rack phase
+     * Current DC heath
      */
-    @SerializedName("phase")
+    @SerializedName("health")
     @Expose
-    private RackPhase phase = RackPhase.CREATING;
+    private Health health = Health.UNKNOWN;
 
     /**
      * Datacenter spec and user configmap fingerprint
@@ -64,11 +64,11 @@ public class RackStatus {
     @Expose
     private UUID seedHostId = UUID.randomUUID();
 
-    public boolean isParked() {
-        return RackPhase.PARKED.equals(phase);
-    }
-
-    public  boolean isRunning() {
-        return RackPhase.RUNNING.equals(phase);
+    public Health health() {
+        if (desiredReplicas == readyReplicas)
+            return Health.GREEN;
+        if (desiredReplicas - readyReplicas == 1 && readyReplicas > 0)
+            return Health.YELLOW;
+        return Health.RED;
     }
 }

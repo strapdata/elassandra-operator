@@ -27,7 +27,14 @@ public class DataCenterStatus {
      */
     @SerializedName("phase")
     @Expose
-    private DataCenterPhase phase = DataCenterPhase.CREATING;
+    private DataCenterPhase phase = DataCenterPhase.RUNNING;
+
+    /**
+     * Current DC heath
+     */
+    @SerializedName("health")
+    @Expose
+    private Health health = Health.UNKNOWN;
 
     @SerializedName("needCleanup")
     @Expose
@@ -40,9 +47,23 @@ public class DataCenterStatus {
     @Expose
     private Boolean bootstrapped = false;
 
-    @SerializedName("lastMessage")
+
+    @SerializedName("lastAction")
     @Expose
-    private String lastMessage = null;
+    private String lastAction = null;
+
+    @SerializedName("lastActionTime")
+    @Expose
+    private Date   lastActionTime = null;
+
+
+    @SerializedName("lastError")
+    @Expose
+    private String lastError = null;
+
+    @SerializedName("lastErrorTime")
+    @Expose
+    private Date   lastErrorTime = null;
 
     /**
      * CQL connection status
@@ -104,4 +125,17 @@ public class DataCenterStatus {
      */
     @SerializedName("reaperPhase")
     private ReaperPhase reaperPhase = ReaperPhase.NONE;
+
+    public Health health() {
+        if (DataCenterPhase.PARKED.equals(this.phase))
+        return Health.RED;
+
+        long green = rackStatuses.values().stream().filter(r -> Health.GREEN.equals(r.getHealth())).count();
+        long yellowOrRed = rackStatuses.values().stream().filter(r -> !Health.GREEN.equals(r.getHealth())).count();
+        if (yellowOrRed == 0)
+            return Health.GREEN;
+        if (yellowOrRed == 1 && green > 0)
+            return Health.YELLOW;
+        return Health.RED;
+    }
 }

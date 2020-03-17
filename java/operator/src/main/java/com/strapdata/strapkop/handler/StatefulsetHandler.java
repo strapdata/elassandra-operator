@@ -49,11 +49,14 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
                 if (isStafulSetReady(sts)) {
                     final String clusterName = sts.getMetadata().getLabels().get(OperatorLabels.CLUSTER);
                     DataCenter dataCenter = dataCenterCache.get(new Key(sts.getMetadata().getLabels().get(OperatorLabels.PARENT), sts.getMetadata().getNamespace()));
-                    logger.info("datacenter={} sts={}/{} is ready, triggering a dc statefulsetUpdate",
+                    logger.info("datacenter={} sts={}/{} is ready, triggering a dc statefulSetUpdate",
                             dataCenter.id(), sts.getMetadata().getName(), sts.getMetadata().getNamespace());
                     workQueues.submit(
                             new ClusterKey(clusterName, sts.getMetadata().getNamespace()),
-                            dataCenterController.statefulsetUpdate(dataCenter, sts));
+                            dataCenterController.statefulsetUpdate(dataCenter, sts)
+                                    .doOnError(t -> {
+                                        logger.warn("datcenter={} statefulSetUpdate failed: {}", dataCenter.id(), t.toString());
+                                    }));
                 }
                 break;
             case ERROR:

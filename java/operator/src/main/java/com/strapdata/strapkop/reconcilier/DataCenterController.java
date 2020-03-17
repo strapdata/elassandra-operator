@@ -12,7 +12,6 @@ import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenterPhase;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.plugins.PluginRegistry;
@@ -29,6 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
+import java.util.Date;
 import java.util.Locale;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
@@ -95,8 +95,8 @@ public class DataCenterController {
                             if (dc.getStatus() == null) {
                                 dc.setStatus(new DataCenterStatus());
                             }
-                            dc.getStatus().setPhase(DataCenterPhase.ERROR);
-                            dc.getStatus().setLastMessage(e.getMessage());
+                            dc.getStatus().setLastError(e.toString());
+                            dc.getStatus().setLastErrorTime(new Date());
                             return k8sResourceUtils.updateDataCenterStatus(dc).flatMapCompletable(o -> { throw e; });
                         }
                         throw e;

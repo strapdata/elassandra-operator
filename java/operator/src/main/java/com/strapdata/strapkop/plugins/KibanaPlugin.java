@@ -185,7 +185,7 @@ public class KibanaPlugin extends AbstractPlugin {
      */
     private int kibanaReplicas(final DataCenter dataCenter, KibanaSpace kibanaSpace) {
         Integer version = dataCenter.getSpec().getKibana().getVersion();
-        return  (dataCenter.getStatus().getPhase().isReady() &&
+        return  (dataCenter.getStatus().getPhase().isRunning() &&
                 dataCenter.getStatus().getBootstrapped() == true &&
                 dataCenter.getStatus().getKeyspaceManagerStatus().getKeyspaces().contains(kibanaSpace.keyspace(version))) ? kibanaSpace.getReplicas() : 0;
     }

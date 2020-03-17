@@ -223,9 +223,6 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
         }
 
         switch(dc.getStatus().getPhase()){
-            case CREATING:
-            case SCALING_UP:
-            case SCALING_DOWN:
             case RUNNING:
                 logger.debug("datacenter={} phase={} ready to run task={}",
                         dc.id(), dc.getStatus().getPhase(), task.id());
