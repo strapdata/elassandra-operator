@@ -53,7 +53,7 @@ public class EventPipeline<DataT> {
                 .subscribeOn(Schedulers.io()) // seems that subscribeOn at this point is important, otherwise watches get executed on the compute scheduler
                 .observeOn(Schedulers.io())
                 .doOnError(throwable -> {
-                    if (!(throwable instanceof RuntimeException) || !skippedExceptions.contains(throwable.getCause().getClass())) {
+                    if (!(throwable instanceof RuntimeException) || (throwable.getCause() != null && !skippedExceptions.contains(throwable.getCause().getClass()))) {
                         logger.debug("error in pipeline {}, recreating the observable in 1 second", this.getClass().getSimpleName(), throwable);
                     }
                 })

@@ -1,0 +1,10 @@
+{
+  "auths": {
+    "strapdata.azurecr.io": {
+      "username": "27f19bd5-4be5-4b31-b250-7e0607fcf5ef",
+      "password": "829cb850-dd68-4600-a0cc-1b2fee22c48e",
+      "email": "vroyer@strapdata.com",
+      "auth": "MjdmMTliZDUtNGJlNS00YjMxLWIyNTAtN2UwNjA3ZmNmNWVmOjgyOWNiODUwLWRkNjgtNDYwMC1hMGNjLTFiMmZlZTIyYzQ4ZQo="
+    }
+  }
+}

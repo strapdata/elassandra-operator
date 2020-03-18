@@ -46,7 +46,10 @@ public class Task {
     
     public static Task fromDataCenter(String name, DataCenter dc) {
         return new Task()
-                .setMetadata(new V1ObjectMeta().name(name).namespace(dc.getMetadata().getNamespace()))
+                .setMetadata(new V1ObjectMeta().name(name)
+                        .namespace(dc.getMetadata().getNamespace())
+                        .labels(OperatorLabels.datacenter(dc))
+                )
                 .setSpec(new TaskSpec()
                         .setCluster(dc.getSpec().getClusterName())
                         .setDatacenter(dc.getSpec().getDatacenterName())

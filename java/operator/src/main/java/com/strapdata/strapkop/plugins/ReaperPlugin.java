@@ -262,6 +262,7 @@ public class ReaperPlugin extends AbstractPlugin {
                 );
 
         // common configuration
+        String contactPoint = OperatorNames.nodesService(dataCenter) + "." + dataCenter.getMetadata().getNamespace() + ".svc.cluster.local";
         container
                 .name("reaper")
                 .image(dataCenterSpec.getReaper().getImage())
@@ -294,14 +295,7 @@ public class ReaperPlugin extends AbstractPlugin {
                         .periodSeconds(10)
                         .timeoutSeconds(5)
                 )
-                .addEnvItem(new V1EnvVar()
-                        .name("REAPER_DATACENTER_AVAILABILITY")
-                        .value("EACH")
-                )
-                .addEnvItem(new V1EnvVar()
-                        .name("REAPER_AUTO_SCHEDULING_ENABLED")
-                        .value("true")
-                )
+                .addEnvItem(new V1EnvVar().name("REAPER_DATACENTER_AVAILABILITY").value("EACH"))
                 .addEnvItem(new V1EnvVar()
                         .name("REAPER_JMX_AUTH_PASSWORD")
                         .valueFrom(new V1EnvVarSource()
@@ -311,14 +305,8 @@ public class ReaperPlugin extends AbstractPlugin {
                                 )
                         )
                 )
-                .addEnvItem(new V1EnvVar()
-                        .name("REAPER_JMX_AUTH_USERNAME")
-                        .value("cassandra")
-                )
-                .addEnvItem(new V1EnvVar()
-                        .name("REAPER_AUTH_USER")
-                        .value("admin")
-                )
+                .addEnvItem(new V1EnvVar().name("REAPER_JMX_AUTH_USERNAME").value("cassandra"))
+                .addEnvItem(new V1EnvVar().name("REAPER_AUTH_USER").value("admin"))
                 .addEnvItem(new V1EnvVar()
                         .name("REAPER_AUTH_PASSWORD")
                         .valueFrom(new V1EnvVarSource()
@@ -328,51 +316,32 @@ public class ReaperPlugin extends AbstractPlugin {
                                 )
                         )
                 )
-                .addEnvItem(new V1EnvVar()
-                        .name("REAPER_STORAGE_TYPE")
-                        .value("cassandra")
-                )
-                .addEnvItem(new V1EnvVar()
-                        .name("REAPER_CASS_CLUSTER_NAME")
-                        .value(dataCenterSpec.getClusterName())
-                )
-                .addEnvItem(new V1EnvVar()
-                        .name("REAPER_CASS_CONTACT_POINTS")
-                        .value("[" + OperatorNames.nodesService(dataCenter) + "]")
-                )
-                .addEnvItem(new V1EnvVar()
-                        .name("REAPER_CASS_PORT")
-                        .value(dataCenterSpec.getNativePort().toString())
-                )
-                .addEnvItem(new V1EnvVar()
-                        .name("REAPER_CASS_KEYSPACE")
-                        .value("reaper_db")
-                )
-                .addEnvItem(new V1EnvVar()
-                        .name("REAPER_CASS_LOCAL_DC")
-                        .value(dataCenterSpec.getDatacenterName())
-                )
-                .addEnvItem(new V1EnvVar()
-                        .name("JWT_SECRET")
-                        .value(Base64.getEncoder().encodeToString(dataCenterSpec.getReaper().getJwtSecret().getBytes()))
-                )
-                .addEnvItem(new V1EnvVar()
-                        .name("REAPER_CASS_ADDRESS_TRANSLATOR_TYPE")
-                        .value("elassandraOperator")
-                )
-                .addEnvItem(new V1EnvVar()
-                        .name("JMX_ADDRESS_TRANSLATOR_TYPE")
-                        .value("elassandraOperator")
-                )
+                .addEnvItem(new V1EnvVar().name("REAPER_STORAGE_TYPE").value("cassandra"))
+                .addEnvItem(new V1EnvVar().name("REAPER_CASS_CLUSTER_NAME").value(dataCenterSpec.getClusterName()))
+                .addEnvItem(new V1EnvVar().name("REAPER_CASS_CONTACT_POINTS").value("[ \"" + contactPoint + "\" ]"))
+                .addEnvItem(new V1EnvVar().name("REAPER_CASS_PORT").value(dataCenterSpec.getNativePort().toString()))
+                .addEnvItem(new V1EnvVar().name("REAPER_CASS_KEYSPACE").value("reaper_db"))
+                .addEnvItem(new V1EnvVar().name("REAPER_CASS_LOCAL_DC").value(dataCenterSpec.getDatacenterName()))
+                .addEnvItem(new V1EnvVar().name("JWT_SECRET").value(Base64.getEncoder().encodeToString(dataCenterSpec.getReaper().getJwtSecret().getBytes())))
+                .addEnvItem(new V1EnvVar().name("REAPER_CASS_ADDRESS_TRANSLATOR_TYPE").value("elassandraOperator"))
+                .addEnvItem(new V1EnvVar().name("JMX_ADDRESS_TRANSLATOR_TYPE").value("elassandraOperator"))
                 .addEnvItem(new V1EnvVar()
                         .name("CASSANDRA_TRANSLATOR_INTERNAL")
                         .value("elassandra-"+dataCenterSpec.getClusterName().toLowerCase(Locale.ROOT) +
-                                "-" +dataCenterSpec.getDatacenterName().toLowerCase(Locale.ROOT) + "-0-0")
+                                "-" +dataCenterSpec.getDatacenterName().toLowerCase(Locale.ROOT) + "-0-0." +
+                                dataCenter.getMetadata().getNamespace() + ".svc.cluster.local" )
                 )
                 .addEnvItem(new V1EnvVar()
                         .name("CASSANDRA_TRANSLATOR_EXTERNAL")
                         .value("cassandra-" +  dataCenterSpec.getExternalDns().getRoot() + "-0-0." + dataCenterSpec.getExternalDns().getDomain())
                 )
+                .addEnvItem(new V1EnvVar().name("REAPER_AUTO_SCHEDULING_ENABLED").value("false"))
+                .addEnvItem(new V1EnvVar().name("REAPER_AUTO_SCHEDULING_INITIAL_DELAY_PERIOD").value("PT60S"))
+                .addEnvItem(new V1EnvVar().name("REAPER_AUTO_SCHEDULING_PERIOD_BETWEEN_POLLS").value("PT10M"))
+                .addEnvItem(new V1EnvVar().name("REAPER_AUTO_SCHEDULING_TIME_BEFORE_FIRST_SCHEDULE").value("PT5M"))
+                .addEnvItem(new V1EnvVar().name("REAPER_AUTO_SCHEDULING_SCHEDULE_SPREAD_PERIOD").value("PT6H"))
+                .addEnvItem(new V1EnvVar().name("REAPER_AUTO_SCHEDULING_EXCLUDED_KEYSPACES").value("[]"))
+                .addEnvItem(new V1EnvVar().name("REAPER_AUTO_SCHEDULING_EXCLUDED_CLUSTERS").value("[]"))
         ;
 
 
@@ -490,6 +459,7 @@ public class ReaperPlugin extends AbstractPlugin {
 
         // deploy manifests in parallel
         List<CompletableSource> todoList = new ArrayList<>();
+        todoList.add(createReaperSecretIfNotExists(dataCenter).ignoreElement());
         todoList.add(k8sResourceUtils.createOrReplaceNamespacedDeployment(deployment).ignoreElement());
         todoList.add(k8sResourceUtils.createOrReplaceNamespacedService(service).ignoreElement());
         if (ingress != null)
@@ -548,18 +518,28 @@ public class ReaperPlugin extends AbstractPlugin {
                 .namespace(dc.getMetadata().getNamespace())
                 .labels(OperatorLabels.datacenter(dc));
 
-        return k8sResourceUtils.readOrCreateNamespacedSecret(secretMetadata, () -> {
-            logger.debug("datacenter={} Creating reaper secret name={}", dc.id(), secretName);
-            return new V1Secret()
-                    .metadata(secretMetadata)
-                    // replace the default cassandra password
-                    .putStringDataItem("reaper.admin_password", UUID.randomUUID().toString());
-        }).map(secret -> {
+        return k8sResourceUtils.readNamespacedSecret(dc.getMetadata().getNamespace(), secretName).map(secret -> {
             final byte[] password = secret.getData().get("reaper.admin_password");
             if (password == null) {
                 throw new StrapkopException(String.format("secret %s does not contain reaper.admin_password", secretName));
             }
             return new String(password);
+        });
+    }
+
+    private Single<V1Secret> createReaperSecretIfNotExists(DataCenter dataCenter) throws ApiException {
+        String reaperSecretName = reaperSecretName(dataCenter);
+        final V1ObjectMeta secretMetadata = new V1ObjectMeta()
+                .name(reaperSecretName)
+                .namespace(dataCenter.getMetadata().getNamespace())
+                .labels(OperatorLabels.datacenter(dataCenter));
+
+        return this.k8sResourceUtils.readOrCreateNamespacedSecret(secretMetadata, () -> {
+            logger.debug("datacenter={} Creating reaper secret name={}", dataCenter.id(), reaperSecretName);
+            return new V1Secret()
+                    .metadata(secretMetadata)
+                    // replace the default cassandra password
+                    .putStringDataItem("reaper.admin_password", UUID.randomUUID().toString());
         });
     }
 
