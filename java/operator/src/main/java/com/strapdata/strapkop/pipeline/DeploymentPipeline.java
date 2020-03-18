@@ -2,7 +2,6 @@ package com.strapdata.strapkop.pipeline;
 
 import com.squareup.okhttp.Call;
 import com.strapdata.strapkop.OperatorConfig;
-import com.strapdata.strapkop.cache.StatefulsetCache;
 import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.event.K8sWatchEventSource;
 import com.strapdata.strapkop.model.Key;
@@ -25,7 +24,7 @@ import java.util.Collection;
 @Infrastructure
 public class DeploymentPipeline extends EventPipeline<K8sWatchEvent<V1Deployment>> {
 
-    public DeploymentPipeline(@Named("apiClient") ApiClient apiClient, StatefulsetCache cache, AppsV1Api appsV1Api, OperatorConfig operatorConfig) {
+    public DeploymentPipeline(@Named("apiClient") ApiClient apiClient, AppsV1Api appsV1Api, OperatorConfig operatorConfig) {
         super(new K8sWatchEventSource<>(apiClient, new DeploymentAdapter(appsV1Api, operatorConfig), operatorConfig));
     }
 
@@ -41,17 +40,17 @@ public class DeploymentPipeline extends EventPipeline<K8sWatchEvent<V1Deployment
 
         @Override
         public Type getResourceType() {
-            return V1StatefulSet.class;
+            return V1Deployment.class;
         }
 
         @Override
         public Type getResourceListType() {
-            return V1StatefulSetList.class;
+            return V1DeploymentList.class;
         }
 
         @Override
         public Call createListApiCall(boolean watch, String resourceVersion) throws ApiException {
-            return appsV1Api.listNamespacedStatefulSetCall(config.getNamespace(),
+            return appsV1Api.listNamespacedDeploymentCall(config.getNamespace(),
                     null, null, null, OperatorLabels.toSelector(OperatorLabels.MANAGED),
                     null, resourceVersion, null, watch, null, null);
         }

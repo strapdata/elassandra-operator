@@ -8,7 +8,6 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.Wither;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Cassandra reaper default configuration.
@@ -31,7 +30,7 @@ public class Reaper {
      */
     @SerializedName("jwtSecret")
     @Expose
-    private String jwtSecret = UUID.randomUUID().toString();
+    private String jwtSecret = null;
 
 
     /**

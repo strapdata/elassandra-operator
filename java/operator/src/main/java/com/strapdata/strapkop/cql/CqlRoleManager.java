@@ -157,7 +157,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                             CqlRole.DEFAULT_CASSANDRA_ROLE
                     );
 
-                    Tuple2<Cluster,Session> tuple = null;
+                    Tuple2<Cluster,Session> rootClusterSession = null;
                     CqlRole connectedRole = null;
                     Exception lastException = null;
                     for (CqlRole role : roles) {
@@ -165,7 +165,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                             logger.debug("datacenter={} Loading secret for role={}", dc.id(), role);
                             role.loadPassword(dc, k8sResourceUtils).blockingGet();
                             logger.debug("datacenter={} Connecting with role={}", dc.id(), role);
-                            tuple = connect(dc, dcStatus, Optional.of(role)).blockingGet();
+                            rootClusterSession = connect(dc, dcStatus, Optional.of(role)).blockingGet();
                             logger.debug("datacenter={} Connected with role={}", dc.id(), connectedRole);
                             connectedRole = role;
                             connectedCqlRoles.put(key(dc), role);
@@ -210,7 +210,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
 
                     if (!connectedRole.username.equals(CqlRole.STRAPKOP_ROLE.username)) {
                         // create+update roles
-                        final Session currentSesssion = tuple._2;
+                        final Session currentSession = rootClusterSession._2;
                         for (CqlRole role : ImmutableList.of(
                                 get(dc, CqlRole.ADMIN_ROLE.username),
                                 get(dc, CqlRole.CASSANDRA_ROLE.username),
@@ -220,7 +220,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                                 role.createOrUpdateRole(dc, k8sResourceUtils, new CqlSessionSupplier() {
                                     @Override
                                     public Single<Session> getSession(DataCenter dc) throws Exception {
-                                        return Single.just(currentSesssion);
+                                        return Single.just(currentSession);
                                     }
 
                                     @Override
@@ -233,17 +233,23 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                             }
                         }
 
-                        // reconnect with strapkop
+                        // reconnect with strapkop and close root session
                         CqlRole strakopRole = get(dc, CqlRole.STRAPKOP_ROLE.username);
                         try {
                             Tuple2<Cluster, Session> strapkopConnection = connect(dc, dcStatus, Optional.of(strakopRole)).blockingGet();
                             connectedCqlRoles.put(key(dc), strakopRole);
+                            try {
+                                logger.debug("Closing root session cluster={}", rootClusterSession._1.getClusterName());
+                                rootClusterSession._1.close();
+                            } catch(Exception e) {
+                                logger.warn("datacenter="+dc.id()+" Failed to close root session:" + e.getMessage(), e);
+                            }
                             return strapkopConnection;
                         } catch(Exception e) {
                             logger.error("datacenter="+dc.id()+" Failed to reconnect with the operator role="+strakopRole+" :"+e.getMessage(), e);
                         }
                     }
-                    return tuple;
+                    return rootClusterSession;
                 }
             });
     }

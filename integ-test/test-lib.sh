@@ -8,6 +8,7 @@
 set -x
 
 HELM_REPO=../helm/src/main/helm
+REGISTRY_CONFIG_FILE="dockerconfig.json"
 REGISTRY_SECRET_NAME="strapregistry"
 ELASSANDRA_OPERATOR_TAG="6.8.4.3"
 
@@ -34,6 +35,10 @@ function create-acr-rbac() {
 
 function create-acr-secret() {
     kubectl create secret docker-registry $REGISTRY_SECRET_NAME --docker-server=https://strapdata.azurecr.io --docker-username="$SPN_CLIENT_ID" --docker-password="$SPN_PW" --docker-email="vroyer@strapdata.com"
+}
+
+function create_registry_pull_secret() {
+    kubectl create secret generic strapregistry --from-file=.dockerconfigjson=$REGISTRY_CONFIG_FILE --type=kubernetes.io/dockerconfigjson
 }
 
 # AKS zone availability (require VM Scale Set) does not allow to add public IPs on nodes because of the standard LB.
@@ -129,7 +134,7 @@ function uninstall_elassandra_operator() {
 function install_elassandra_datacenter() {
     local ns=${1:-"default"}
     local cl=${2:-"cl1"}
-    local dc=${3:-"dc2"}
+    local dc=${3:-"dc1"}
     local sz=${4:-"1"}
     helm install --namespace "$ns" --name "$cl-$dc" \
     --set image.pullSecrets[0]=$REGISTRY_SECRET_NAME \
@@ -164,29 +169,43 @@ function elassandra_datacenter_wait_running() {
 
 function park_elassandra_datacenter() {
     local cl=${1:-"cl1"}
-    local dc=${2:-"dc2"}
+    local dc=${2:-"dc1"}
     helm upgrade --reuse-values --set parked="true" "$cl-$dc" $HELM_REPO/elassandra-datacenter
     echo "Datacenter $cl-$dc parked"
 }
 
 function unpark_elassandra_datacenter() {
     local cl=${1:-"cl1"}
-    local dc=${2:-"dc2"}
-    helm upgrade  --reuse-values --set parked="false" "$cl-$dc" $HELM_REPO/elassandra-datacenter
+    local dc=${2:-"dc1"}
+    helm upgrade --reuse-values --set parked="false" "$cl-$dc" $HELM_REPO/elassandra-datacenter
     echo "Datacenter $cl-$dc unparked"
+}
+
+function reaper_enable() {
+    local cl=${1:-"cl1"}
+    local dc=${2:-"dc1"}
+    helm upgrade --reuse-values --set reaper.enabled="true" "$cl-$dc" $HELM_REPO/elassandra-datacenter
+    echo "Datacenter $cl-$dc reaper enabled"
+}
+
+function reaper_disable() {
+    local cl=${1:-"cl1"}
+    local dc=${2:-"dc1"}
+    helm upgrade --reuse-values --set reaper.enabled="false" "$cl-$dc" $HELM_REPO/elassandra-datacenter
+    echo "Datacenter $cl-$dc reaper disabled"
 }
 
 function downgrade_elassandra_datacenter() {
     local cl=${1:-"cl1"}
-    local dc=${2:-"dc2"}
-    helm upgrade  --reuse-values --set elassandraImage="strapdata.azurecr.io/strapdata/elassandra-node-dev:6.2.3.26" "$cl-$dc" $HELM_REPO/elassandra-datacenter
+    local dc=${2:-"dc1"}
+    helm upgrade --reuse-values --set elassandraImage="strapdata.azurecr.io/strapdata/elassandra-node-dev:6.2.3.26" "$cl-$dc" $HELM_REPO/elassandra-datacenter
     echo "Datacenter $cl-$dc downgrade to 6.2.3.26"
 }
 
 function add_memory_elassandra_datacenter() {
     local cl=${1:-"cl1"}
-    local dc=${2:-"dc2"}
-    helm upgrade  --reuse-values --set resources.limits.memory="3Gi" --set "$cl-$dc" $HELM_REPO/elassandra-datacenter
+    local dc=${2:-"dc1"}
+    helm upgrade --reuse-values --set resources.limits.memory="3Gi" --set "$cl-$dc" $HELM_REPO/elassandra-datacenter
     echo "Datacenter $cl-$dc update memory to 3Gi"
 }
 

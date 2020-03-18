@@ -32,7 +32,7 @@ public class DataCenterSpec {
 
     @SerializedName("workload")
     @Expose
-    private Workload workload = Workload.WRITE;
+    private Workload workload = Workload.READ_WRITE;
 
     /**
      * Number of Cassandra nodes in this data center.
@@ -355,7 +355,7 @@ public class DataCenterSpec {
     @Expose
     private List<ScheduledBackup> scheduledBackups = new ArrayList<>();
 
-    public String fingerprint() {
+    public String elassandraFingerprint() {
         List<Object> acc = new ArrayList<>();
 
         // we exclude :
@@ -369,16 +369,19 @@ public class DataCenterSpec {
         acc.add(elassandraImage);
         acc.add(imagePullPolicy);
         acc.add(imagePullSecrets);
+        acc.add(webHookUrl);
         acc.add(env);
+        acc.add(externalDns);
+        acc.add(snitchPreferLocal);
         acc.add(resources);
         acc.add(prometheusEnabled);
         acc.add(elasticsearchEnabled);
+        acc.add(elasticsearchLoadBalancerEnabled);
+        acc.add(elasticsearchLoadBalancerIp);
+        acc.add(elasticsearchIngressEnabled);
         acc.add(elasticsearchPort);
         acc.add(privilegedSupported);
-
-
-
-
+        acc.add(managedKeyspaces);
         acc.add(nodeLoadBalancerEnabled);
         acc.add(nativePort);
         acc.add(storagePort);
@@ -388,7 +391,6 @@ public class DataCenterSpec {
         acc.add(jmxmpEnabled);
         acc.add(jdbPort);
         acc.add(ssl);
-        acc.add(decommissionPolicy);
         acc.add(authentication);
         acc.add(enterprise);
         acc.add(remoteSeeders);
@@ -400,6 +402,36 @@ public class DataCenterSpec {
         }
 
         String json = GsonUtils.toJson(acc);
-        return DigestUtils.sha1Hex(json).substring(0,7);
+        String digest = DigestUtils.sha1Hex(json).substring(0,7);
+        System.out.println(json+"="+digest);
+        return digest;
+    }
+
+    public String kibanaFingerprint() {
+        List<Object> acc = new ArrayList<>();
+
+        // we exclude :
+        // * Reaper config
+        // * Kibana config
+        // * parked attribute
+        // * scheduledBackups (DC reconciliation is useless in this case, we only want to update Scheduler)
+        acc.add(kibana);
+        String json = GsonUtils.toJson(acc);
+        String digest = DigestUtils.sha1Hex(json).substring(0,7);
+        return digest;
+    }
+
+    public String reaperFingerprint() {
+        List<Object> acc = new ArrayList<>();
+
+        // we exclude :
+        // * Reaper config
+        // * Kibana config
+        // * parked attribute
+        // * scheduledBackups (DC reconciliation is useless in this case, we only want to update Scheduler)
+        acc.add(reaper);
+        String json = GsonUtils.toJson(acc);
+        String digest = DigestUtils.sha1Hex(json).substring(0,7);
+        return digest;
     }
 }

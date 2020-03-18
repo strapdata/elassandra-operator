@@ -42,7 +42,6 @@ import io.reactivex.Completable;
 import io.reactivex.CompletableSource;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
-import io.reactivex.functions.Action;
 import lombok.Data;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.bouncycastle.operator.OperatorCreationException;
@@ -297,7 +296,6 @@ public class DataCenterUpdateAction {
      * Update DC spec, and trigger the next action to the desired state
      */
     public Completable updateDatacenter() throws Exception {
-        String newFingerprint = dataCenter.getSpec().fingerprint();
         logger.debug("########## datacenter={} spec updated replicas={}/{}", dataCenter.id(), dataCenterStatus.getReadyReplicas(), dataCenterSpec.getReplicas());
         return nextAction(false);
     }
@@ -360,13 +358,15 @@ public class DataCenterUpdateAction {
         return readUserConfigMap()
                 .flatMapCompletable(optionalUserConfig -> {
                     ConfigMapVolumeMounts configMapVolumeMounts = new ConfigMapVolumeMounts(optionalUserConfig);
-                    String currentFingerprint = dataCenterSpec.fingerprint() + "-" + configMapVolumeMounts.fingerPrint();
+                    String currentFingerprint = dataCenterSpec.elassandraFingerprint() + "-" + configMapVolumeMounts.fingerPrint();
                     for(RackStatus rackStatus : dataCenterStatus.getRackStatuses().values()) {
                         V1StatefulSet v1StatefulSet = this.statefulSetTreeMap.get(rackStatus.getName());
-                        String stsFingerprint = v1StatefulSet.getSpec().getTemplate().getMetadata().getAnnotations().get(OperatorLabels.DATACENTER_FINGERPRINT);
+                        String stsFingerprint = v1StatefulSet == null ? null : v1StatefulSet.getSpec().getTemplate().getMetadata().getAnnotations().get(OperatorLabels.DATACENTER_FINGERPRINT);
+
                         // Trigger an update if ConfigMap fingerprint or DC generation are different
                         if (!currentFingerprint.equals(stsFingerprint)) {
-                            logger.debug("datacenter={} fingerprint={} sts={} fingerprint={} not match", dataCenter.id(), currentFingerprint, v1StatefulSet.getMetadata().getName(), stsFingerprint);
+                            logger.debug("datacenter={} fingerprint={} sts={} fingerprint={} not match",
+                                    dataCenter.id(), currentFingerprint, v1StatefulSet == null ? null : v1StatefulSet.getMetadata().getName(), stsFingerprint);
 
                             rackStatus.setFingerprint(currentFingerprint);
                             dataCenterStatus.setLastAction("Rolling update rack="+rackStatus.getName());
@@ -418,18 +418,12 @@ public class DataCenterUpdateAction {
                     // manage roles, keyspaces,
                     if (dataCenter.getStatus().getReadyReplicas() > 0 && dataCenterStatus.getBootstrapped() == true) {
                         doUpdate = doUpdate.flatMap(status -> this.cqlKeyspaceManager.reconcileKeyspaces(dataCenter, status, cqlSessionHandler))
-                                .flatMap(status -> this.cqlRoleManager.reconcileRole(dataCenter, status, cqlSessionHandler))
+                                .flatMap(status -> this.cqlRoleManager.reconcileRole(dataCenter, status, cqlSessionHandler));
                                 // Disable License check because elastic_admin [_datacenregroup] is sometime created after creating the elassandra_operator role.
                                 // => elassandra_operator cannot read the keyspace (role is granted for existing keyspaces at the creation  time)
                                 // => cannot check license when running cassandra only
                                 // => elastic_admin.license should not be in elastic_admin_datacentergroup.license....
                                 //.andThen(this.cqlLicenseManager.verifyLicense(dataCenter, cqlSessionHandler))
-                                .doFinally(new Action() {
-                                    @Override
-                                    public void run() throws Exception {
-                                        cqlSessionHandler.close();
-                                    }
-                                });
                     }
 
                     // manage plugins
@@ -511,7 +505,7 @@ public class DataCenterUpdateAction {
             RackStatus rackStatus = new RackStatus()
                     .setName(zone.name)
                     .setIndex(rackIndex)
-                    .setHealth(Health.UNKNOWN)
+                    .setHealth(Health.RED)
                     .setSeedHostId(UUID.randomUUID())
                     .withDesiredReplicas(1)
                     .withFingerprint(configMapVolumeMounts.fingerPrint());
@@ -1726,7 +1720,7 @@ public class DataCenterUpdateAction {
 
             final Map<String, String> rackLabels = OperatorLabels.rack(dataCenter, rackStatus.getName(), rackStatus.getIndex());
 
-            String fingerprint = dataCenterSpec.fingerprint() +"-" + configMapVolumeMounts.fingerPrint();
+            String fingerprint = dataCenterSpec.elassandraFingerprint() + "-" + configMapVolumeMounts.fingerPrint();
             final V1ObjectMeta templateMetadata = new V1ObjectMeta()
                     .labels(rackLabels)
                     .putAnnotationsItem(OperatorLabels.DATACENTER_FINGERPRINT, fingerprint);
