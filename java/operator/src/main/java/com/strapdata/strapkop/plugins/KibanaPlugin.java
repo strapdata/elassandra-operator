@@ -77,26 +77,21 @@ public class KibanaPlugin extends AbstractPlugin {
     public void syncRoles(final CqlRoleManager cqlRoleManager, final DataCenter dataCenter) {
         Integer version = dataCenter.getSpec().getKibana().getVersion();
         for (KibanaSpace kibana : getKibanaSpaces(dataCenter).values()) {
-            try {
-                createKibanaSecretIfNotExists(dataCenter, kibana);
-                cqlRoleManager.addIfAbsent(dataCenter, kibana.keyspace(version), () -> new CqlRole()
-                        .withUsername(kibana.role())
-                        .withSecretKey("kibana.kibana_password")
-                        .withSecretNameProvider(dc -> OperatorNames.clusterChildObjectName("%s-" + kibana.role(), dc))
-                        .withApplied(false)
-                        .withSuperUser(true)
-                        .withLogin(true)
-                        .withGrantStatements(
-                                ImmutableList.of(
-                                        String.format(Locale.ROOT, "GRANT ALL PERMISSIONS ON KEYSPACE \"%s\" TO %s", kibana.keyspace(version), kibana.role()),
-                                        String.format(Locale.ROOT, "INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','cluster:monitor/.*','.*')", kibana.index(version)),
-                                        String.format(Locale.ROOT, "INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','indices:.*','.*')", kibana.index(version))
-                                )
-                        )
-                );
-            } catch (ApiException e) {
-                logger.error("Failed to find or create kibana secret", e);
-            }
+            cqlRoleManager.addIfAbsent(dataCenter, kibana.keyspace(version), () -> new CqlRole()
+                    .withUsername(kibana.role())
+                    .withSecretKey("kibana.kibana_password")
+                    .withSecretNameProvider(dc -> OperatorNames.clusterChildObjectName("%s-" + kibana.role(), dc))
+                    .withApplied(false)
+                    .withSuperUser(true)
+                    .withLogin(true)
+                    .withGrantStatements(
+                            ImmutableList.of(
+                                    String.format(Locale.ROOT, "GRANT ALL PERMISSIONS ON KEYSPACE \"%s\" TO %s", kibana.keyspace(version), kibana.role()),
+                                    String.format(Locale.ROOT, "INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','cluster:monitor/.*','.*')", kibana.index(version)),
+                                    String.format(Locale.ROOT, "INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','indices:.*','.*')", kibana.index(version))
+                            )
+                    )
+            );
         }
     }
 
