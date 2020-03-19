@@ -38,12 +38,10 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
             new CqlKeyspace().withName("system_distributed").withRf(3),
             new CqlKeyspace().withName("system_traces").withRf(3));
 
-    final PluginRegistry pluginRegistry;
     final K8sResourceUtils k8sResourceUtils;
 
-    public CqlKeyspaceManager(final PluginRegistry pluginRegistry, final K8sResourceUtils k8sResourceUtils) {
+    public CqlKeyspaceManager(final K8sResourceUtils k8sResourceUtils) {
         super();
-        this.pluginRegistry = pluginRegistry;
         this.k8sResourceUtils = k8sResourceUtils;
     }
 
@@ -57,7 +55,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
      * @return
      * @throws StrapkopException
      */
-    public Single<Boolean> reconcileKeyspaces(final DataCenter dataCenter, Boolean updateStatus, final CqlSessionSupplier sessionSupplier) {
+    public Single<Boolean> reconcileKeyspaces(final DataCenter dataCenter, Boolean updateStatus, final CqlSessionSupplier sessionSupplier, PluginRegistry pluginRegistry) {
         return Single.just(updateStatus)
                 .map(needDcStatusUpdate -> {
                     for(Plugin plugin : pluginRegistry.plugins()) {

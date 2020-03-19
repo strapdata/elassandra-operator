@@ -117,6 +117,7 @@ public class KibanaPlugin extends AbstractPlugin {
 
     @Override
     public Single<Boolean> reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
+        logger.trace("datacenter={} kibana.spec={}", dataCenter.id(), dataCenter.getSpec().getKibana());
         Set<String> deployedKibanaSpaces = dataCenter.getStatus().getKibanaSpaceNames();
         Map<String, KibanaSpace> desiredKibanaMap = getKibanaSpaces(dataCenter);
 
@@ -217,6 +218,10 @@ public class KibanaPlugin extends AbstractPlugin {
                                 .spec(podSpec)
                         )
                 );
+
+        if (dataCenterSpec.getPriorityClassName() != null) {
+            podSpec.setPriorityClassName(dataCenterSpec.getPriorityClassName());
+        }
 
         if (dataCenterSpec.getImagePullSecrets() != null) {
             for (String secretName : dataCenterSpec.getImagePullSecrets()) {

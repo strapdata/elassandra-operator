@@ -52,7 +52,7 @@ public class ReaperScheduledRepair {
 
     @SerializedName("repairParallelism")
     @Expose
-    private Integer repairParallelism = null;
+    private Integer repairParallelism = 1;
 
     @SerializedName("intensity")
     @Expose

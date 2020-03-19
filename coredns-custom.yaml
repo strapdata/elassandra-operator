@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns-custom
+  namespace: kube-system
+data:
+  hosts.override: |
+    hosts nodes.hosts northeurope.cloudapp.azure.com {
+        40.127.224.166 aks-nodepool1-37464561-0.northeurope.cloudapp.azure.com aks-nodepool1-37464561-0
+        40.127.224.254 aks-nodepool1-37464561-1.northeurope.cloudapp.azure.com aks-nodepool1-37464561-1
+        40.127.225.3   aks-nodepool1-37464561-2.northeurope.cloudapp.azure.com aks-nodepool1-37464561-2
+        fallthrough
+    }
+  dns.server: |
+    test.strapkube.com:53 {
+        errors
+        cache 30
+        forward test.strapkube.com 40.90.4.8 64.4.48.8 13.107.24.8 13.107.160.8
+    }

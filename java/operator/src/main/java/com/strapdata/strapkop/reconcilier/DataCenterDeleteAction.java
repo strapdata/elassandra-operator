@@ -121,7 +121,9 @@ public class DataCenterDeleteAction {
                 }
 
                 // delete Services
-                k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, labelSelector).subscribe();
+                k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, labelSelector)
+                        .onErrorComplete()
+                        .subscribe();
 
                 // delete persistent volume claims
                 switch (dataCenter.getSpec().getDecommissionPolicy()) {

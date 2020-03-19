@@ -47,7 +47,12 @@ public class ReaperPlugin extends AbstractPlugin {
     public static final int APP_SERVICE_PORT = 8080;      // the webui
     public static final int ADMIN_SERVICE_PORT = 8081;    // the REST API
 
+    public static final String REAPER_KEYSPACE_NAME = "reaper_db";
+
     public final Scheduler registrationScheduler;
+
+    private final CqlRoleManager cqlRoleManager;
+    private final CqlKeyspaceManager cqlKeyspaceManager;
 
     public ReaperPlugin(final ApplicationContext context,
                         K8sResourceUtils k8sResourceUtils,
@@ -56,21 +61,17 @@ public class ReaperPlugin extends AbstractPlugin {
                         AppsV1Api appsApi,
                         OperatorConfig operatorConfig,
                         MeterRegistry meterRegistry,
+                        CqlRoleManager cqlRoleManager,
+                        CqlKeyspaceManager cqlKeyspaceManager,
                         ExecutorFactory executorFactory,
                         @Named("reaper") UserExecutorConfiguration userExecutorConfiguration) {
         super(context, k8sResourceUtils, authorityManager, coreApi, appsApi, operatorConfig, meterRegistry);
         this.registrationScheduler = Schedulers.from(executorFactory.executorService(userExecutorConfiguration));
+        this.cqlRoleManager = cqlRoleManager;
+        this.cqlKeyspaceManager = cqlKeyspaceManager;
     }
 
-    public static final CqlKeyspace REAPER_KEYSPACE = new CqlKeyspace("reaper_db", 3) {
-        @Override
-        public Single<CqlKeyspace> createIfNotExistsKeyspace(DataCenter dataCenter, CqlSessionSupplier sessionSupplier) throws Exception {
-            return super.createIfNotExistsKeyspace(dataCenter, sessionSupplier).map(ks -> {
-                dataCenter.getStatus().setReaperPhase(ReaperPhase.KEYSPACE_CREATED);
-                return ks;
-            });
-        }
-    };
+    public static final CqlKeyspace REAPER_KEYSPACE = new CqlKeyspace(REAPER_KEYSPACE_NAME, 3);
 
     @Override
     public void syncKeyspaces(final CqlKeyspaceManager cqlKeyspaceManager, final DataCenter dataCenter) {
@@ -87,13 +88,7 @@ public class ReaperPlugin extends AbstractPlugin {
             .withSuperUser(false)
             .withLogin(true)
             .withApplied(false)
-            .withGrantStatements(ImmutableList.of("GRANT ALL PERMISSIONS ON KEYSPACE reaper_db TO reaper"))
-            .withPostCreateHandler(ReaperPlugin::postCreateReaper);
-
-    public static void postCreateReaper(DataCenter dataCenter, final CqlSessionSupplier sessionSupplier) throws Exception {
-        dataCenter.getStatus().setReaperPhase(ReaperPhase.ROLE_CREATED);
-        logger.debug("reaper role created for dc={}, ReaperStatus=ROLE_CREATED", dataCenter.getMetadata().getName());
-    }
+            .withGrantStatements(ImmutableList.of(String.format(Locale.ROOT, "GRANT ALL PERMISSIONS ON KEYSPACE %s TO reaper", REAPER_KEYSPACE_NAME)));
 
     @Override
     public boolean isActive(final DataCenter dataCenter) {
@@ -118,6 +113,7 @@ public class ReaperPlugin extends AbstractPlugin {
 
     @Override
     public Single<Boolean> reconcile(DataCenter dataCenter) throws ApiException, StrapkopException, IOException {
+        logger.trace("datacenter={} reaper.spec={}", dataCenter.id(), dataCenter.getSpec().getReaper());
         if (dataCenter.getSpec().getReaper() == null || !dataCenter.getSpec().getReaper().getEnabled() || dataCenter.getSpec().isParked()) {
             return delete(dataCenter).map(b -> {
                 dataCenter.getStatus().setReaperPhase(ReaperPhase.NONE);
@@ -127,20 +123,13 @@ public class ReaperPlugin extends AbstractPlugin {
 
         switch(dataCenter.getStatus().getReaperPhase()) {
             case NONE:
-                break;
-            case KEYSPACE_CREATED:
-                if (!dataCenter.getSpec().getAuthentication().equals(Authentication.NONE)) {
-                    break;
-                }
-            case ROLE_CREATED: // valid step when authentication is required
-                if (dataCenter.getSpec().getReaper() != null && dataCenter.getSpec().getReaper().getEnabled() && !dataCenter.getSpec().isParked()) {
+                if (cqlRoleManager.get(dataCenter, REAPER_ROLE.getUsername()).isApplied()) {
                     return createOrReplaceReaperObjects(dataCenter).map(b -> {
-                                dataCenter.getStatus().setReaperPhase(ReaperPhase.DEPLOYED);
-                                return true;
-                            });
+                        dataCenter.getStatus().setReaperPhase(ReaperPhase.DEPLOYED);
+                        return true;
+                    });
                 }
                 break;
-
             case DEPLOYED:
                 break;
 
@@ -161,11 +150,7 @@ public class ReaperPlugin extends AbstractPlugin {
                 k8sResourceUtils.deleteDeployment(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector),
                 k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector),
                 k8sResourceUtils.deleteIngress(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector)
-        }).andThen(Completable.fromAction(() -> {
-            DataCenterStatus status = dataCenter.getStatus();
-            status.setReaperPhase(ReaperPhase.ROLE_CREATED); // step back the phase to be in consistent state next time Reaper will be enabled
-            REAPER_ROLE.setApplied(false); // mark Role as not applied to create it if the DC is recreated
-        })).toSingleDefault(true);
+        }).toSingleDefault(true);
     }
 
     /**
@@ -175,16 +160,7 @@ public class ReaperPlugin extends AbstractPlugin {
         if (dataCenter.getSpec().isParked())
             return 0;
 
-        switch (dataCenter.getStatus().getReaperPhase()) {
-            case NONE:
-                return 0;
-            case KEYSPACE_CREATED:
-                return (dataCenter.getSpec().getAuthentication().equals(Authentication.NONE)) ? 1 : 0;
-            case ROLE_CREATED:
-            case REGISTERED:
-            default:
-                return 1;
-        }
+        return cqlRoleManager.get(dataCenter, REAPER_ROLE.getUsername()).isApplied() ? 1 : 0;
     }
 
 
@@ -249,6 +225,10 @@ public class ReaperPlugin extends AbstractPlugin {
             }
         }
 
+        if (dataCenterSpec.getPriorityClassName() != null) {
+            podSpec.setPriorityClassName(dataCenterSpec.getPriorityClassName());
+        }
+
         final V1Deployment deployment = new V1Deployment()
                 .metadata(meta)
                 .spec(new V1DeploymentSpec()
@@ -266,6 +246,7 @@ public class ReaperPlugin extends AbstractPlugin {
         container
                 .name("reaper")
                 .image(dataCenterSpec.getReaper().getImage())
+                .imagePullPolicy("Always")
                 .terminationMessagePolicy("FallbackToLogsOnError")
                 .addPortsItem(new V1ContainerPort()
                         .name(APP_SERVICE_NAME)
@@ -323,18 +304,7 @@ public class ReaperPlugin extends AbstractPlugin {
                 .addEnvItem(new V1EnvVar().name("REAPER_CASS_KEYSPACE").value("reaper_db"))
                 .addEnvItem(new V1EnvVar().name("REAPER_CASS_LOCAL_DC").value(dataCenterSpec.getDatacenterName()))
                 .addEnvItem(new V1EnvVar().name("JWT_SECRET").value(Base64.getEncoder().encodeToString(dataCenterSpec.getReaper().getJwtSecret().getBytes())))
-                .addEnvItem(new V1EnvVar().name("REAPER_CASS_ADDRESS_TRANSLATOR_TYPE").value("elassandraOperator"))
-                .addEnvItem(new V1EnvVar().name("JMX_ADDRESS_TRANSLATOR_TYPE").value("elassandraOperator"))
-                .addEnvItem(new V1EnvVar()
-                        .name("CASSANDRA_TRANSLATOR_INTERNAL")
-                        .value("elassandra-"+dataCenterSpec.getClusterName().toLowerCase(Locale.ROOT) +
-                                "-" +dataCenterSpec.getDatacenterName().toLowerCase(Locale.ROOT) + "-0-0." +
-                                dataCenter.getMetadata().getNamespace() + ".svc.cluster.local" )
-                )
-                .addEnvItem(new V1EnvVar()
-                        .name("CASSANDRA_TRANSLATOR_EXTERNAL")
-                        .value("cassandra-" +  dataCenterSpec.getExternalDns().getRoot() + "-0-0." + dataCenterSpec.getExternalDns().getDomain())
-                )
+                .addEnvItem(new V1EnvVar().name("REAPER_LOGGING_ROOT_LEVEL").value(dataCenterSpec.getReaper().getLoggingLevel() == null ? "INFO" : dataCenterSpec.getReaper().getLoggingLevel()))
                 .addEnvItem(new V1EnvVar().name("REAPER_AUTO_SCHEDULING_ENABLED").value("false"))
                 .addEnvItem(new V1EnvVar().name("REAPER_AUTO_SCHEDULING_INITIAL_DELAY_PERIOD").value("PT60S"))
                 .addEnvItem(new V1EnvVar().name("REAPER_AUTO_SCHEDULING_PERIOD_BETWEEN_POLLS").value("PT10M"))
@@ -344,6 +314,12 @@ public class ReaperPlugin extends AbstractPlugin {
                 .addEnvItem(new V1EnvVar().name("REAPER_AUTO_SCHEDULING_EXCLUDED_CLUSTERS").value("[]"))
         ;
 
+        if (dataCenterSpec.getExternalDns() != null && dataCenterSpec.getExternalDns().getEnabled() == true) {
+            container
+                    .addEnvItem(new V1EnvVar().name("REAPER_CASS_ADDRESS_TRANSLATOR_ENABLED").value("true"))
+                    .addEnvItem(new V1EnvVar().name("REAPER_CASS_ADDRESS_TRANSLATOR_TYPE").value("kubernetesDnsTranslator"))
+                    .addEnvItem(new V1EnvVar().name("JMX_ADDRESS_TRANSLATOR_TYPE").value("kubernetesDnsTranslator"));
+        }
 
         // reaper with cassandra authentication
         if (!Objects.equals(dataCenterSpec.getAuthentication(), Authentication.NONE)) {
@@ -481,8 +457,8 @@ public class ReaperPlugin extends AbstractPlugin {
     public Completable register(DataCenter dc) throws StrapkopException, ApiException, MalformedURLException {
             ReaperClient reaperClient = new ReaperClient(dc, this.registrationScheduler);
             return loadReaperAdminPassword(dc)
-                    .observeOn(Schedulers.io())
-                    .subscribeOn(Schedulers.io())
+                    .observeOn(registrationScheduler)
+                    .subscribeOn(registrationScheduler)
                     .flatMap(password ->
                             reaperClient.registerCluster("admin", password)
                             .retryWhen((Flowable<Throwable> f) -> f.take(9).delay(21, TimeUnit.SECONDS))
@@ -490,7 +466,7 @@ public class ReaperPlugin extends AbstractPlugin {
                     .flatMapCompletable(bool -> {
                         if (bool) {
                             dc.getStatus().setReaperPhase(ReaperPhase.REGISTERED);
-                            logger.info("dc={} cassandra-reaper registred ", dc.id());
+                            logger.info("dc={} cassandra-reaper registred", dc.id());
                             return registerScheduledRepair(dc);
                         }
                         return Completable.complete();
@@ -504,7 +480,7 @@ public class ReaperPlugin extends AbstractPlugin {
                         }
                     })
                     .doOnError(e -> {
-                        dc.getStatus().setLastError(e.getMessage());
+                        dc.getStatus().setLastError(e.toString());
                         dc.getStatus().setLastErrorTime(new Date());
                         logger.error("datacenter={} error while registering in cassandra-reaper", dc.id(), e);
                     });
@@ -543,14 +519,28 @@ public class ReaperPlugin extends AbstractPlugin {
         });
     }
 
+    // TODO: manage removed scheduled repairs
     public Completable registerScheduledRepair(DataCenter dc) throws MalformedURLException, ApiException {
         ReaperClient reaperClient = new ReaperClient(dc, this.registrationScheduler);
         return loadReaperAdminPassword(dc)
-                .observeOn(Schedulers.io())
-                .subscribeOn(Schedulers.io())
+                .observeOn(registrationScheduler)
+                .subscribeOn(registrationScheduler)
                 .flatMapCompletable(password -> {
                     List<CompletableSource> todoList = new ArrayList<>();
-                    for(ReaperScheduledRepair reaperScheduledRepair : dc.getSpec().getReaper().getReaperScheduledRepairs()) {
+                    Map<String, ReaperScheduledRepair> scheduledRepairMap = new HashMap<>();
+
+                    // repair managed keyspaces
+                    for(CqlKeyspace cqlKeyspace : this.cqlKeyspaceManager.get(dc).values()) {
+                        scheduledRepairMap.put(cqlKeyspace.getName(), new ReaperScheduledRepair()
+                                .withKeyspace(cqlKeyspace.getName())
+                                .withOwner("elassandra-operator"));
+                    }
+                    // add explicit scheduled repair, can ovreride default settings
+                    if (dc.getSpec().getReaper().getReaperScheduledRepairs() != null) {
+                        dc.getSpec().getReaper().getReaperScheduledRepairs().stream().map(s-> scheduledRepairMap.put(s.getKeyspace(), s));
+                    }
+                    logger.debug("Submit scheduledRepair={}", scheduledRepairMap.values());
+                    for(ReaperScheduledRepair reaperScheduledRepair : scheduledRepairMap.values()) {
                         todoList.add(reaperClient.registerScheduledRepair("admin", password, reaperScheduledRepair));
                     }
                     return Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()]));

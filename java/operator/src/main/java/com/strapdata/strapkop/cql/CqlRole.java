@@ -178,10 +178,12 @@ public class CqlRole implements Cloneable {
         return Single.just(this);
     }
 
-    Single<CqlRole> deleteRole(final Session session) throws Exception {
+    Single<CqlRole> deleteRole(DataCenter dataCenter, final Session session) throws Exception {
         logger.debug("Droping role={}", this);
         return Single.fromFuture(session.executeAsync(String.format(Locale.ROOT, "DROP ROLE %s", username)))
-                .map(rs -> this);
+                .map(rs -> {
+                    return this;
+                });
     }
 
     /**

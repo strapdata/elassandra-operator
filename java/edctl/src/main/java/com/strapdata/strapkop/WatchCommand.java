@@ -2,9 +2,7 @@ package com.strapdata.strapkop;
 
 import com.google.common.reflect.TypeToken;
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenterPhase;
-import com.strapdata.strapkop.model.k8s.cassandra.Health;
+import com.strapdata.strapkop.model.k8s.cassandra.*;
 import io.kubernetes.client.ApiClient;
 import io.kubernetes.client.Configuration;
 import io.kubernetes.client.apis.CustomObjectsApi;
@@ -29,6 +27,9 @@ public class WatchCommand implements Callable<Integer> {
 
     @CommandLine.Option(names = {"-r","--replicas"}, description = "Elassandra datacenter ready replicas")
     Integer readyReplicas;
+
+    @CommandLine.Option(names = {"--reaper"}, description = "Elassandra reaper phase")
+    ReaperPhase reaperPhase;
 
     @CommandLine.Option(names = {"-t","--timeout"}, description = "Wait timeout", defaultValue = "600")
     Integer timeout;
@@ -61,6 +62,9 @@ public class WatchCommand implements Callable<Integer> {
                 conditionMet = false;
 
             if (readyReplicas != null && ! readyReplicas.equals(item.object.getStatus().getReadyReplicas()))
+                conditionMet = false;
+
+            if (reaperPhase != null && !reaperPhase.equals(item.object.getStatus().getReaperPhase()))
                 conditionMet = false;
 
             if (conditionMet) {

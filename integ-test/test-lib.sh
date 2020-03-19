@@ -140,7 +140,7 @@ function install_elassandra_datacenter() {
     --set image.pullSecrets[0]=$REGISTRY_SECRET_NAME \
     --set reaper.enabled="false" \
     --set kibana.enabled="true" \
-    --set sslStoragePort="38001" \
+    --set sslStoragePort="38001",jmxPort="35001",prometheusPort="34001" \
     --set externalDns.enabled="true",externalDns.root="xxxx.yyyy",externalDns.domain="test.strapkube.com" \
     --set replicas="$sz" \
     --wait \
@@ -184,7 +184,7 @@ function unpark_elassandra_datacenter() {
 function reaper_enable() {
     local cl=${1:-"cl1"}
     local dc=${2:-"dc1"}
-    helm upgrade --reuse-values --set reaper.enabled="true" "$cl-$dc" $HELM_REPO/elassandra-datacenter
+    helm upgrade --reuse-values --set reaper.enabled="true",reaper.loggingLevel="TRACE" "$cl-$dc" $HELM_REPO/elassandra-datacenter
     echo "Datacenter $cl-$dc reaper enabled"
 }
 

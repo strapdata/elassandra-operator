@@ -30,10 +30,7 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.lang.reflect.Type;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -214,6 +211,7 @@ public class K8sResourceUtils {
                 } catch(ApiException e) {
                     if (e.getCode() == 404) {
                         logger.warn("ConfigMap namespace={} name={} not found", namespace, name);
+                        throw new NoSuchElementException("configmap="+name+"/"+namespace+" not found");
                     }
                     throw e;
                 }
@@ -275,6 +273,9 @@ public class K8sResourceUtils {
                         logger.debug("Replaced namespaced statefulset={} in namespace={}", statefulset.getMetadata().getName(), statefulset.getMetadata().getNamespace());
                         return statefulSet2;
                     } catch (ApiException e) {
+                        if (e.getCode() == 404) {
+                            throw new NoSuchElementException("statefulset="+statefulset.getMetadata().getName()+"/"+namespace+" not found");
+                        }
                         logger.warn("Created namespaced statefulset={} in namespace={} error: {}",
                                 statefulset.getMetadata().getName(), statefulset.getMetadata().getNamespace(), e.getMessage());
                         throw e;
@@ -292,6 +293,7 @@ public class K8sResourceUtils {
                     } catch(ApiException e) {
                         if (e.getCode() == 404) {
                             logger.warn("statefulset namespace={} name={} not found", namespace, name);
+                            throw new NoSuchElementException("statefulset="+name+"/"+namespace+" not found");
                         }
                         throw e;
                     }
@@ -303,7 +305,7 @@ public class K8sResourceUtils {
         final String namespace = v1beta1PodDisruptionBudget.getMetadata().getNamespace();
         return createOrReplaceResource(namespace, v1beta1PodDisruptionBudget,
                 () -> policyV1beta1Api.createNamespacedPodDisruptionBudget(namespace, v1beta1PodDisruptionBudget, null, null, null),
-                () -> policyV1beta1Api.replaceNamespacedPodDisruptionBudget(v1beta1PodDisruptionBudget.getMetadata().getName(), namespace, v1beta1PodDisruptionBudget, null, null, null));
+                () -> v1beta1PodDisruptionBudget); // trick to avoid io.kubernetes.client.ApiException: Unprocessable Entity
     }
 
     public V1ServiceAccount readNamespacedServiceAccount(final String namespace, final String name) throws ApiException {
@@ -316,6 +318,7 @@ public class K8sResourceUtils {
             } catch(ApiException e) {
                 if (e.getCode() == 404) {
                     logger.warn("serviceaccount namespace={} name={} not found", namespace, name);
+                    throw new NoSuchElementException("service="+name+"/"+namespace+" not found");
                 }
                 throw e;
             }
@@ -359,6 +362,7 @@ public class K8sResourceUtils {
                 } catch(ApiException e) {
                     if (e.getCode() == 404) {
                         logger.warn("secret namespace={} name={} not found", namespace, name);
+                        throw new NoSuchElementException("secret="+name+"/"+namespace+" not found");
                     }
                     throw e;
                 }
@@ -491,6 +495,7 @@ public class K8sResourceUtils {
                 } catch (ApiException e) {
                     if (e.getCode() == 404) {
                         logger.warn("elassandradatacenter not found for datacenter={} in namespace={}", metadata.getName(), metadata.getNamespace());
+                        throw new NoSuchElementException("elassandradatacenter="+metadata.getName()+"/"+metadata.getNamespace()+" not found");
                     }
                     throw e;
                 }
@@ -893,6 +898,7 @@ public class K8sResourceUtils {
                 } catch(ApiException e) {
                     if (e.getCode() == 404) {
                         logger.warn("elassandradatacenter not found for datacenter={} in namespace={}", key.name, key.namespace);
+                        throw new NoSuchElementException("elassandradatacenter="+key+" not found");
                     }
                     throw e;
                 }
@@ -929,6 +935,7 @@ public class K8sResourceUtils {
             } catch(ApiException e) {
                 if (e.getCode() == 404) {
                     logger.warn("elassandradatacenter not found for datacenter={} in namespace={}", dc.getMetadata().getName(), dc.getMetadata().getNamespace());
+                    throw new NoSuchElementException("elassandradatacenter="+dc.id()+" not found");
                 }
                 throw e;
             }
@@ -1040,6 +1047,7 @@ public class K8sResourceUtils {
                 } catch (ApiException e) {
                     if (e.getCode() == 404) {
                         logger.warn("elassandratasks not found for task={} in namespace={}", metadata.getName(), metadata.getNamespace());
+                        throw new NoSuchElementException("elassandratasks="+metadata.getName()+"/"+metadata.getNamespace()+" not found");
                     }
                     throw e;
                 }

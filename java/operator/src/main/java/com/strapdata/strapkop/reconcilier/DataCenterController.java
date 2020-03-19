@@ -13,6 +13,7 @@ import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
+import com.strapdata.strapkop.model.k8s.cassandra.ReaperPhase;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.plugins.PluginRegistry;
 import com.strapdata.strapkop.plugins.ReaperPlugin;
@@ -144,8 +145,10 @@ public class DataCenterController {
         String app = deployment.getMetadata().getLabels().get(OperatorLabels.APP);
         if ("reaper".equals(app)) {
             // notify the reaper pligin that deployment is available
-            return reconcile(dataCenter, false, reaperPlugin.reconcile(dataCenter)
-                    .flatMapCompletable(b -> b ? k8sResourceUtils.updateDataCenterStatus(dataCenter).ignoreElement() : Completable.complete()));
+            dataCenter.getStatus().setReaperPhase(ReaperPhase.RUNNING);
+            return reconcile(dataCenter, false,
+                    reaperPlugin.reconcile(dataCenter)
+                    .flatMapCompletable(b -> k8sResourceUtils.updateDataCenterStatus(dataCenter).ignoreElement()));
         }
         return Completable.complete();
     }
