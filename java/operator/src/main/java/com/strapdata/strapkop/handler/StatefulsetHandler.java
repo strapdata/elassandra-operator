@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 
 @Handler
@@ -54,8 +55,9 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
                         workQueues.submit(
                                 new ClusterKey(clusterName, sts.getMetadata().getNamespace()),
                                 dataCenterController.statefulsetUpdate(dataCenter, sts)
-                                        .doOnError(t -> {
+                                        .onErrorComplete(t -> {
                                             logger.warn("datcenter={} statefulSetUpdate failed: {}", dataCenter.id(), t.toString());
+                                            return t instanceof NoSuchElementException;
                                         }));
                     }
                 }

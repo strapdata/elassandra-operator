@@ -7,7 +7,7 @@ import com.datastax.driver.core.policies.DCAwareRoundRobinPolicy;
 import com.datastax.driver.core.policies.LoggingRetryPolicy;
 import com.datastax.driver.core.policies.TokenAwarePolicy;
 import com.google.common.collect.ImmutableList;
-import com.strapdata.cassandra.driver.ElassandraOperatorAddressTranslator;
+import com.strapdata.cassandra.driver.KubernetesDnsAddressTranslator;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
@@ -55,7 +55,6 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
 
     final CoreV1Api coreApi;
     final K8sResourceUtils k8sResourceUtils;
-    final PluginRegistry pluginRegistry;
     final AuthorityManager authorityManager;
 
     Map<String, CqlRole> connectedCqlRoles = new ConcurrentHashMap<>();
@@ -70,13 +69,11 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
 
     public CqlRoleManager(final CoreV1Api coreApi,
                           final K8sResourceUtils k8sResourceUtils,
-                          final AuthorityManager authorityManager,
-                          final PluginRegistry pluginRegistry) {
+                          final AuthorityManager authorityManager) {
         super();
         this.coreApi = coreApi;
         this.k8sResourceUtils = k8sResourceUtils;
         this.authorityManager = authorityManager;
-        this.pluginRegistry = pluginRegistry;
     }
 
     /**
@@ -86,7 +83,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
      * @throws ApiException
      * @throws StrapkopException
      */
-    public Single<Boolean> reconcileRole(DataCenter dataCenter, Boolean status, CqlSessionSupplier sessionSupplier) {
+    public Single<Boolean> reconcileRole(DataCenter dataCenter, Boolean status, CqlSessionSupplier sessionSupplier, PluginRegistry pluginRegistry) {
         return Single.just(status)
                 .map(doUpdateStatus -> {
                     if (Authentication.NONE.equals(dataCenter.getSpec().getAuthentication()))
@@ -287,9 +284,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
 
         if (dc.getSpec().getHostNetworkEnabled() || dc.getSpec().getHostPortEnabled()) {
             // if cluster has public broadcast IPs, the translator retreive internal k8s IP addresses
-            builder.withAddressTranslator(new ElassandraOperatorAddressTranslator(
-                    OperatorNames.internalPodFqdn(dc, 0, 0),
-                    OperatorNames.externalPodFqdn(dc, 0, 0)));
+            builder.withAddressTranslator(new KubernetesDnsAddressTranslator());
         }
 
         // contact local nodes is bootstrapped or first DC in the cluster

@@ -20,7 +20,7 @@
     <logger name="com.strapdata.strapkop.handler" level="${LOGBACK_com_strapdata_strapkop_handler:-DEBUG}" />
     <logger name="com.strapdata.strapkop.pipeline" level="${LOGBACK_com_strapdata_strapkop_pipeline:-WARN}" />
     <logger name="com.strapdata.strapkop.sidecar" level="${LOGBACK_com_strapdata_strapkop_sidecar:-INFO}" />
-    <logger name="com.strapdata.strapkop.plugins" level="${LOGBACK_com_strapdata_strapkop_test:-DEBUG}" />
+    <logger name="com.strapdata.strapkop.plugins" level="${LOGBACK_com_strapdata_strapkop_test:-TRACE}" />
     <logger name="com.strapdata.strapkop.cql" level="${LOGBACK_com_strapdata_strapkop_test:-TRACE}" />
 
     <logger name="com.strapdata.strapkop.reconcilier" level="${LOGBACK_com_strapdata_strapkop_reconcilier:-DEBUG}" />

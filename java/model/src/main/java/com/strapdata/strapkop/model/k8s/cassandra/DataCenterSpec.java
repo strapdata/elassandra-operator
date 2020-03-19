@@ -11,10 +11,7 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.Wither;
 import org.apache.commons.codec.digest.DigestUtils;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 @Data
 @Wither
@@ -80,6 +77,28 @@ public class DataCenterSpec {
     @SerializedName("appServiceAccount")
     @Expose
     private String appServiceAccount;
+
+    /**
+     * Elassandra pods priorityClassName
+     */
+    @SerializedName("priorityClassName")
+    @Expose
+    private String priorityClassName;
+
+    /**
+     * Elassandra additional annotations
+     */
+    @SerializedName("annotations")
+    @Expose
+    private Map<String, String> annotations;
+
+    /**
+     * Elassandra custom Labels
+     */
+    @SerializedName("customLabels")
+    @Expose
+    private Map<String, String> customLabels;
+
     /**
      * List of environment variables to inject in the Cassandra & Sidecar container.
      *
@@ -371,6 +390,10 @@ public class DataCenterSpec {
         acc.add(imagePullSecrets);
         acc.add(webHookUrl);
         acc.add(env);
+        acc.add(annotations);
+        acc.add(customLabels);
+        acc.add(priorityClassName);
+        acc.add(appServiceAccount);
         acc.add(externalDns);
         acc.add(snitchPreferLocal);
         acc.add(resources);

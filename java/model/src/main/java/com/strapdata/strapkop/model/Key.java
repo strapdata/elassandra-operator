@@ -2,13 +2,13 @@ package com.strapdata.strapkop.model;
 
 import io.kubernetes.client.models.V1ObjectMeta;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
+import lombok.ToString;
 
 @Data
+@ToString
 public class Key {
-    public final String namespace;
     public final String name;
+    public final String namespace;
 
     public Key() {
         namespace = null;

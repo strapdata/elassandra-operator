@@ -36,7 +36,7 @@ public class ExternalDns {
     private String root;
 
     /**
-     * Reaper docker image;
+     * External dns domain;
      */
     @SerializedName("domain")
     @Expose

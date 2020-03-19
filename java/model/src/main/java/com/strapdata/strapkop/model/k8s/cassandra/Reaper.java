@@ -42,6 +42,14 @@ public class Reaper {
     private Boolean enabled = false;
 
     /**
+     * Enable Cassandra Reaper support.
+     *
+     */
+    @SerializedName("loggingLevel")
+    @Expose
+    private String loggingLevel = "INFO";
+
+    /**
      * Reaper ingress suffix concatened with "repaer-" and "reaper-admin-"
      * reaper-suffix
      * reaper-admin-suffix

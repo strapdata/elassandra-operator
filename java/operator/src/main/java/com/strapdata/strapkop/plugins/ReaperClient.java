@@ -12,7 +12,6 @@ import io.reactivex.Completable;
 import io.reactivex.Scheduler;
 import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
-import org.elasticsearch.common.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,6 +25,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static io.micronaut.http.HttpRequest.GET;
 import static io.micronaut.http.HttpRequest.POST;
@@ -58,8 +58,7 @@ public class ReaperClient implements Closeable {
      * Register the cluster (the datacenter in fact, because reaper is configured with availability == EACH and local_dc)
      */
     public Single<Boolean> registerCluster(String username, String password) {
-
-        final String seedHost = OperatorNames.nodesService(dataCenter);
+        final String seedHost = OperatorNames.nodesService(dataCenter) + "." + dataCenter.getMetadata().getNamespace() + ".svc.cluster.local";
         final int jmxPort = dataCenter.getSpec().getJmxPort();
         final String url = String.format("/cluster?seedHost=%s&jmxPort=%d", seedHost, jmxPort);
         logger.debug("datacenter={} url={}", dataCenter.id(), url);
@@ -70,19 +69,22 @@ public class ReaperClient implements Closeable {
                         .observeOn(scheduler)
                         .singleOrError()
                         .map(res -> {
-                            logger.debug("datacenter={} reaper registration rc={}", dataCenter.id(), res.getStatus());
-                            return res.getStatus().getCode() == 200;
+                            logger.debug("datacenter={} reaper registration rc={} reason={} ", dataCenter.id(), res.getStatus().getCode(), res.getStatus().getReason());
+                            return res.getStatus().getCode() == 204;
                         }));
     }
 
     public Completable registerScheduledRepair(String username, String password, ReaperScheduledRepair reaperScheduledRepair) {
         String url = "/repair_schedule?clusterName="+ URLEncoder.encode(dataCenter.getSpec().getClusterName()) +
-                "&owner=elassandra-operator";
-
-        if (!Strings.isNullOrEmpty(reaperScheduledRepair.getKeyspace()))
-            url += "&keyspace" + URLEncoder.encode(reaperScheduledRepair.getKeyspace());
-
-        //TODO add all params.
+                ("&keyspace=" + URLEncoder.encode(reaperScheduledRepair.getKeyspace())) +
+                ("&owner=" + URLEncoder.encode(reaperScheduledRepair.getOwner() == null ? "elassandra-operator" : reaperScheduledRepair.getOwner())) +
+                ("&incrementalRepair=" + (reaperScheduledRepair.getIncrementalRepair() != null &&  reaperScheduledRepair.getIncrementalRepair() == true ? "true" : "false")) +
+                ("&scheduleDaysBetween=" + reaperScheduledRepair.getScheduleDaysBetween()) +
+                ("&intensity=" + reaperScheduledRepair.getIntensity()) +
+                ("&incrementalRepair=" + reaperScheduledRepair.getIncrementalRepair()) +
+                ("&repairParallelism=" + reaperScheduledRepair.getRepairParallelism()) +
+                (reaperScheduledRepair.getTables() == null ? "" : "&tables=" + reaperScheduledRepair.getTables().stream().map(URLEncoder::encode).collect(Collectors.joining(","))) +
+                (reaperScheduledRepair.getScheduleTriggerTime() == null ? "" : "&scheduleTriggerTime=" + reaperScheduledRepair.getScheduleTriggerTime());
 
         logger.debug("datacenter={} url={}", dataCenter.id(), url);
 

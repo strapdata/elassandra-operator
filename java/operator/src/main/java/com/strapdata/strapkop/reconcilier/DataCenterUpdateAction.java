@@ -417,8 +417,8 @@ public class DataCenterUpdateAction {
 
                     // manage roles, keyspaces,
                     if (dataCenter.getStatus().getReadyReplicas() > 0 && dataCenterStatus.getBootstrapped() == true) {
-                        doUpdate = doUpdate.flatMap(status -> this.cqlKeyspaceManager.reconcileKeyspaces(dataCenter, status, cqlSessionHandler))
-                                .flatMap(status -> this.cqlRoleManager.reconcileRole(dataCenter, status, cqlSessionHandler));
+                        doUpdate = doUpdate.flatMap(status -> this.cqlKeyspaceManager.reconcileKeyspaces(dataCenter, status, cqlSessionHandler, pluginRegistry))
+                                .flatMap(status -> this.cqlRoleManager.reconcileRole(dataCenter, status, cqlSessionHandler, pluginRegistry));
                                 // Disable License check because elastic_admin [_datacenregroup] is sometime created after creating the elassandra_operator role.
                                 // => elassandra_operator cannot read the keyspace (role is granted for existing keyspaces at the creation  time)
                                 // => cannot check license when running cassandra only
@@ -1438,15 +1438,27 @@ public class DataCenterUpdateAction {
 
             // generate statefulset wildcard certificate in a PKCS12 keystore
             final String wildcardStatefulsetName = "*." + OperatorNames.nodesService(dataCenter) + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local";
-            final String headlessServiceName = OperatorNames.nodesService(dataCenter) + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local";
-            final String elasticsearchServiceName = OperatorNames.elasticsearchService(dataCenter) + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local";
+
+            List<String> dnsNames = new ArrayList<>();
+            if (dataCenterSpec.getExternalDns() != null && dataCenterSpec.getExternalDns().getEnabled() && dataCenterSpec.getExternalDns().getDomain() != null) {
+                dnsNames.add("*." + dataCenterSpec.getExternalDns().getDomain());
+                dnsNames.add("*.svc.cluster.local");
+            } else {
+                final String headlessServiceName = OperatorNames.nodesService(dataCenter) + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local";
+                final String elasticsearchServiceName = OperatorNames.elasticsearchService(dataCenter) + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local";
+                dnsNames.add(wildcardStatefulsetName);
+                dnsNames.add(headlessServiceName);
+                dnsNames.add(elasticsearchServiceName);
+            }
+            dnsNames.add("localhost");
+
             @SuppressWarnings("UnstableApiUsage") final V1Secret certificatesSecret = new V1Secret()
                     .metadata(certificatesMetadata)
                     .putDataItem("keystore.p12",
                             authorityManager.issueCertificateKeystore(
                                     x509CertificateAndPrivateKey,
                                     wildcardStatefulsetName,
-                                    ImmutableList.of(wildcardStatefulsetName, headlessServiceName, elasticsearchServiceName, "localhost"),
+                                    dnsNames,
                                     ImmutableList.of(InetAddresses.forString("127.0.0.1")),
                                     dataCenterMetadata.getName(),
                                     "changeit"
@@ -1607,6 +1619,10 @@ public class DataCenterUpdateAction {
                 );
             }
 
+            if (dataCenterSpec.getPriorityClassName() != null) {
+                podSpec.setPriorityClassName(dataCenterSpec.getPriorityClassName());
+            }
+
             // Add the nodeinfo init container if we have the nodeinfo secret name provided in the env var NODEINFO_SECRET
             // To create such a service account:
             // kubectl create serviceaccount --namespace default nodeinfo
@@ -1724,6 +1740,14 @@ public class DataCenterUpdateAction {
             final V1ObjectMeta templateMetadata = new V1ObjectMeta()
                     .labels(rackLabels)
                     .putAnnotationsItem(OperatorLabels.DATACENTER_FINGERPRINT, fingerprint);
+
+            if (dataCenterSpec.getAnnotations() != null) {
+                dataCenterSpec.getAnnotations().entrySet().stream().map(e -> templateMetadata.putAnnotationsItem(e.getKey(), e.getValue()));
+            }
+            if (dataCenterSpec.getCustomLabels() != null) {
+                dataCenterSpec.getCustomLabels().entrySet().stream().map(e -> templateMetadata.putLabelsItem(e.getKey(), e.getValue()));
+            }
+
 
             // add prometheus annotations to scrap nodes
             if (dataCenterSpec.getPrometheusEnabled()) {
