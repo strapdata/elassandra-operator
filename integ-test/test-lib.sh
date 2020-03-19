@@ -12,6 +12,22 @@ REGISTRY_CONFIG_FILE="dockerconfig.json"
 REGISTRY_SECRET_NAME="strapregistry"
 ELASSANDRA_OPERATOR_TAG="6.8.4.3"
 
+test_start() {
+  set -x
+  set -o pipefail
+  trap finish ERR
+}
+
+test_end() {
+  set +e
+  trap - ERR
+}
+
+finish() {
+  echo "ERROR occurs, test FAILED"
+  exit 1
+}
+
 function create_resource_group() {
     az group create -l westeurope -n $RESOURCE_GROUP_NAME
 }
