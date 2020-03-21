@@ -1,7 +1,9 @@
 package com.strapdata.strapkop.model.k8s.cassandra;
 
 import com.google.gson.annotations.Expose;
+import com.google.gson.annotations.JsonAdapter;
 import com.google.gson.annotations.SerializedName;
+import com.strapdata.strapkop.model.GsonIsoDateAdapter;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -54,6 +56,7 @@ public class DataCenterStatus {
 
     @SerializedName("lastActionTime")
     @Expose
+    @JsonAdapter(GsonIsoDateAdapter.class)
     private Date   lastActionTime = null;
 
 
@@ -63,6 +66,7 @@ public class DataCenterStatus {
 
     @SerializedName("lastErrorTime")
     @Expose
+    @JsonAdapter(GsonIsoDateAdapter.class)
     private Date   lastErrorTime = null;
 
     /**
