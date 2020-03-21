@@ -1,16 +1,21 @@
 package com.strapdata.strapkop.handler;
 
-import com.strapdata.strapkop.cache.NodeCache;
+import com.google.common.collect.ImmutableList;
 import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import io.kubernetes.client.models.V1Node;
+import io.micrometer.core.instrument.ImmutableTag;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.PostConstruct;
 import javax.inject.Inject;
+import java.util.List;
 
 /**
- * Do nothing handler for k8s nodes
+ * Do nothing handler, just log node event (cached by NodePipeline)
  */
 @Handler
 public class NodeHandler extends TerminalHandler<K8sWatchEvent<V1Node>> {
@@ -18,27 +23,39 @@ public class NodeHandler extends TerminalHandler<K8sWatchEvent<V1Node>> {
     private final Logger logger = LoggerFactory.getLogger(NodeHandler.class);
 
     @Inject
-    NodeCache nodeCache;
+    MeterRegistry meterRegistry;
+
+    Long managed = 0L;
+    List<Tag> tags = ImmutableList.of(new ImmutableTag("type", "node"));
+
+    @PostConstruct
+    public void initGauge() {
+        meterRegistry.gauge("k8s.managed",  tags, managed);
+    }
 
     @Override
     public void accept(K8sWatchEvent<V1Node> event) throws Exception {
-        final V1Node node = event.getResource();
-        logger.info("Node type={} node={}", event.getType(), node.getMetadata().getName());
+        logger.info("Node event={}", event);
 
+        final V1Node node;
         switch(event.getType()) {
-            case ADDED:
             case INITIAL:
+            case ADDED:
+                managed++;
+                meterRegistry.counter("k8s.event.added", tags).increment();
             case MODIFIED:
-                V1Node oldNode = this.nodeCache.put(node.getMetadata().getName(), node);
-                logger.debug("update cache node={}", node.getMetadata().getName());
+                if (event.getType().equals(K8sWatchEvent.Type.MODIFIED)) {
+                    meterRegistry.counter("k8s.event.modified", tags).increment();
+                }
                 break;
 
             case DELETED:
-                this.nodeCache.remove(node.getMetadata().getName());
-                logger.debug("remove cache node={}", node.getMetadata().getName());
+                meterRegistry.counter("k8s.event.deleted", tags).increment();
+                managed--;
                 break;
 
             case ERROR:
+                meterRegistry.counter("k8s.event.error", tags).increment();
                 throw new IllegalStateException("node event error");
         }
     }

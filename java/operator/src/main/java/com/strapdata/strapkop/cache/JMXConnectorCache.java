@@ -1,7 +1,10 @@
 package com.strapdata.strapkop.cache;
 
+import com.google.common.collect.ImmutableList;
 import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import io.micrometer.core.instrument.ImmutableTag;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,6 +20,10 @@ import java.util.Objects;
 public class JMXConnectorCache extends Cache<ElassandraPod, JMXConnector> {
     
     private static final Logger logger = LoggerFactory.getLogger(JMXConnectorCache.class);
+
+    JMXConnectorCache(MeterRegistry meterRegistry) {
+        meterRegistry.gaugeMapSize("cache.size", ImmutableList.of(new ImmutableTag("type", "jmx_connector")), this);
+    }
 
     /**
      * Remove all clients that match a given datacenter. Client are closed before removal
