@@ -1,8 +1,11 @@
 package com.strapdata.strapkop.cache;
 
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.google.common.collect.ImmutableList;
 import com.strapdata.strapkop.event.ElassandraPod;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.sidecar.SidecarClient;
+import io.micrometer.core.instrument.ImmutableTag;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,7 +19,11 @@ import java.util.Objects;
 public class SidecarConnectionCache extends Cache<ElassandraPod, SidecarClient> {
     
     private static final Logger logger = LoggerFactory.getLogger(SidecarConnectionCache.class);
-    
+
+    SidecarConnectionCache(MeterRegistry meterRegistry) {
+        meterRegistry.gaugeMapSize("cache.size", ImmutableList.of(new ImmutableTag("type", "sidecar_client")), this);
+    }
+
     /**
      * Remove all clients that match a given datacenter. Client are closed before removal
      */

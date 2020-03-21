@@ -1,5 +1,6 @@
 package com.strapdata.strapkop.handler;
 
+import com.google.common.collect.ImmutableList;
 import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.model.ClusterKey;
@@ -9,14 +10,22 @@ import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.reconcilier.DataCenterController;
 import io.kubernetes.client.models.V1StatefulSet;
+import io.micrometer.core.instrument.ImmutableTag;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tag;
 import org.apache.commons.lang3.ObjectUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.PostConstruct;
 import javax.inject.Inject;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 
+/**
+ * Trigger a DC reconciliation when STS event occurs
+ */
 @Handler
 public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1StatefulSet>> {
 
@@ -31,6 +40,17 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
     @Inject
     DataCenterCache dataCenterCache;
 
+    @Inject
+    MeterRegistry meterRegistry;
+
+    Long managed = 0L;
+    List<Tag> tags = ImmutableList.of(new ImmutableTag("type", "statefulset"));
+
+    @PostConstruct
+    public void initGauge() {
+        meterRegistry.gauge("k8s.managed",  tags, managed);
+    }
+
     /**
      * Update STS status cache and call dc controller if ready.
      * @param event
@@ -38,14 +58,17 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
      */
     @Override
     public void accept(K8sWatchEvent<V1StatefulSet> event) throws Exception {
-        final V1StatefulSet sts = event.getResource();
-        logger.debug("StatefulSet event type={} sts={}/{} status={}",
-                event.getType(), sts.getMetadata().getName(), sts.getMetadata().getNamespace(), sts.getStatus());
-
+        logger.debug("event={}", event);
         switch(event.getType()) {
             case INITIAL:
             case ADDED:
+                meterRegistry.counter("k8s.event.added", tags).increment();
+                managed++;
             case MODIFIED:
+                if (event.getType().equals(K8sWatchEvent.Type.MODIFIED)) {
+                    meterRegistry.counter("k8s.event.modified", tags).increment();
+                }
+                final V1StatefulSet sts = event.getResource();
                 if (isStafulSetReady(sts)) {
                     final String clusterName = sts.getMetadata().getLabels().get(OperatorLabels.CLUSTER);
                     DataCenter dataCenter = dataCenterCache.get(new Key(sts.getMetadata().getLabels().get(OperatorLabels.PARENT), sts.getMetadata().getNamespace()));
@@ -62,9 +85,13 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
                     }
                 }
                 break;
-            case ERROR:
-                throw new IllegalStateException("Statefulset error");
             case DELETED:
+                meterRegistry.counter("k8s.event.deleted", tags).increment();
+                managed--;
+                break;
+            case ERROR:
+                meterRegistry.counter("k8s.event.error", tags).increment();
+                break;
         }
     }
 

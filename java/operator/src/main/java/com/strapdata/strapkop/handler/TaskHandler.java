@@ -10,12 +10,16 @@ import com.strapdata.strapkop.model.k8s.task.TaskSpec;
 import com.strapdata.strapkop.model.k8s.task.TaskStatus;
 import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.reconcilier.*;
+import io.micrometer.core.instrument.ImmutableTag;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tag;
 import io.reactivex.Completable;
 import io.vavr.Tuple;
 import io.vavr.Tuple2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.PostConstruct;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.function.Function;
@@ -36,9 +40,21 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
     private final K8sResourceUtils k8sResourceUtils;
 
     private final List<Tuple2<TaskReconcilier, Function<TaskSpec, Object>>> taskFamily;
-    
+
+
+    private final MeterRegistry meterRegistry;
+
+    Long managed = 0L;
+    List<Tag> tags = ImmutableList.of(new ImmutableTag("type", "task"));
+
+    @PostConstruct
+    public void initGauge() {
+        meterRegistry.gauge("k8s.managed",  tags, managed);
+    }
+
     public TaskHandler(WorkQueues workQueues,
                        OperatorConfig operatorConfig,
+                       MeterRegistry meterRegistry,
                        final K8sResourceUtils k8sResourceUtils,
                        BackupTaskReconcilier backupTaskReconcilier,
                        CleanupTaskReconcilier cleanupTaskReconcilier,
@@ -46,7 +62,7 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
                        ReplicationTaskReconcilier replicationTaskReconcilier,
                        RebuildTaskReconcilier rebuildTaskReconcilier,
                        RemoveNodesTaskReconcilier removeNodesTaskReconcilier) {
-     
+        this.meterRegistry = meterRegistry;
         this.workQueues = workQueues;
         this.operatorConfig = operatorConfig;
         this.k8sResourceUtils = k8sResourceUtils;
@@ -62,41 +78,56 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
     
     @Override
     public void accept(K8sWatchEvent<Task> event) throws Exception {
-        Task task = event.getResource();
-        logger.debug("Task event type={} task={}", event.getType(), task.id());
-        
-        final ClusterKey key = new ClusterKey(
-                event.getResource().getSpec().getCluster(),
-                event.getResource().getMetadata().getNamespace()
-        );
-        
-        final List<Tuple2<TaskReconcilier, Function<TaskSpec, Object>>> candidates = taskFamily.stream()
-                .filter(tuple -> tuple._2.apply(event.getResource().getSpec()) != null)
-                .collect(Collectors.toList());
-        
-        if (candidates.size() != 1) {
-            handleWrongTaskType(event);
-            return ;
-        }
-        
-        if (creationEventTypes.contains(event.getType())) {
-            TaskStatus taskStatus = task.getStatus();
-            if (taskStatus == null || taskStatus.getPhase() == null || !taskStatus.getPhase().isTerminated()) {
-                // execute task
-                workQueues.submit(key, candidates.get(0)._1.prepareSubmitCompletable(event.getResource()));
-            } else {
-                // purge old task.
-                org.joda.time.DateTime creation = task.getMetadata().getCreationTimestamp();
-                long retentionInstant = System.currentTimeMillis() - operatorConfig.getTaskRetention().getSeconds()*1000;
-                if (creation.isBefore(retentionInstant)) {
-                    logger.info("Delete old terminated task={}", task.id());
-                    Completable delete = k8sResourceUtils.deleteTask(task.getMetadata()).ignoreElement();
-                    workQueues.submit(key, delete);
+        logger.debug("Task event={}", event);
+        switch (event.getType()) {
+            case MODIFIED:
+            case ADDED:
+                meterRegistry.counter("k8s.event.deleted", tags).increment();
+                managed++;
+
+            case INITIAL:
+                if (event.getType().equals(K8sWatchEvent.Type.MODIFIED)) {
+                    meterRegistry.counter("k8s.event.modified", tags).increment();
                 }
-            }
-        }
-        else if (deletionEventTypes.contains(event.getType())) {
-            // TODO: implement task cancellation
+
+                Task task = event.getResource();
+                final ClusterKey key = new ClusterKey(
+                        event.getResource().getSpec().getCluster(),
+                        event.getResource().getMetadata().getNamespace()
+                );
+                final List<Tuple2<TaskReconcilier, Function<TaskSpec, Object>>> candidates = taskFamily.stream()
+                        .filter(tuple -> tuple._2.apply(event.getResource().getSpec()) != null)
+                        .collect(Collectors.toList());
+
+                if (candidates.size() != 1) {
+                    handleWrongTaskType(event);
+                    return ;
+                }
+
+                TaskStatus taskStatus = task.getStatus();
+                if (taskStatus == null || taskStatus.getPhase() == null || !taskStatus.getPhase().isTerminated()) {
+                    // execute task
+                    workQueues.submit(key, candidates.get(0)._1.prepareSubmitCompletable(event.getResource()));
+                } else {
+                    // purge old task.
+                    org.joda.time.DateTime creation = task.getMetadata().getCreationTimestamp();
+                    long retentionInstant = System.currentTimeMillis() - operatorConfig.getTaskRetention().getSeconds()*1000;
+                    if (creation.isBefore(retentionInstant)) {
+                        logger.info("Delete old terminated task={}", task.id());
+                        Completable delete = k8sResourceUtils.deleteTask(task.getMetadata()).ignoreElement();
+                        workQueues.submit(key, delete);
+                    }
+                }
+                break;
+
+            case DELETED:
+                // TODO: implement task cancellation
+                meterRegistry.counter("k8s.event.deleted", tags).increment();
+                managed--;
+                break;
+            case ERROR:
+                meterRegistry.counter("k8s.event.error", tags).increment();
+                break;
         }
     }
     

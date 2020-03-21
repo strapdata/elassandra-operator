@@ -1,5 +1,6 @@
 package com.strapdata.strapkop.handler;
 
+import com.google.common.collect.ImmutableList;
 import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.model.ClusterKey;
@@ -9,11 +10,16 @@ import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.reconcilier.DataCenterController;
 import io.kubernetes.client.models.V1Deployment;
+import io.micrometer.core.instrument.ImmutableTag;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tag;
 import org.apache.commons.lang3.ObjectUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.PostConstruct;
 import javax.inject.Inject;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -33,16 +39,31 @@ public class DeploymentHandler extends TerminalHandler<K8sWatchEvent<V1Deploymen
     @Inject
     DataCenterController dataCenterController;
 
+    @Inject
+    MeterRegistry meterRegistry;
+
+    Long managed = 0L;
+    List<Tag> tags = ImmutableList.of(new ImmutableTag("type", "deployment"));
+
+    @PostConstruct
+    public void initGauge() {
+        meterRegistry.gauge("k8s.managed",  tags, managed);
+    }
+
     @Override
     public void accept(K8sWatchEvent<V1Deployment> event) throws Exception {
-        final V1Deployment deployment = event.getResource();
-        logger.debug("Deployment event type={} deployment={}/{} status={}",
-                event.getType(), deployment.getMetadata().getName(), deployment.getMetadata().getNamespace(), deployment.getStatus());
-
+        final V1Deployment deployment;
+        logger.debug("Deployment event={}", event);
         switch(event.getType()) {
             case INITIAL:
             case ADDED:
+                meterRegistry.counter("k8s.event.added", tags).increment();
+                managed++;
             case MODIFIED:
+                if (event.getType().equals(K8sWatchEvent.Type.MODIFIED)) {
+                    meterRegistry.counter("k8s.event.modified", tags).increment();
+                }
+                deployment = event.getResource();
                 if (isDeploymentAvailable(deployment)) {
                     final String clusterName = deployment.getMetadata().getLabels().get(OperatorLabels.CLUSTER);
                     DataCenter dataCenter = dataCenterCache.get(new Key(deployment.getMetadata().getLabels().get(OperatorLabels.PARENT), deployment.getMetadata().getNamespace()));
@@ -55,9 +76,12 @@ public class DeploymentHandler extends TerminalHandler<K8sWatchEvent<V1Deploymen
                     }
                 }
                 break;
-            case ERROR:
-                throw new IllegalStateException("V1Deployment error");
             case DELETED:
+                meterRegistry.counter("k8s.event.deleted", tags).increment();
+                managed--;
+            case ERROR:
+                meterRegistry.counter("k8s.event.error", tags).increment();
+                throw new IllegalStateException("V1Deployment error");
         }
     }
 

@@ -1,5 +1,6 @@
 package com.strapdata.strapkop.handler;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.event.K8sWatchEvent;
@@ -14,12 +15,15 @@ import com.strapdata.strapkop.reconcilier.DataCenterController;
 import io.kubernetes.client.models.V1PersistentVolumeClaim;
 import io.kubernetes.client.models.V1Pod;
 import io.kubernetes.client.models.V1PodCondition;
+import io.micrometer.core.instrument.ImmutableTag;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tag;
 import io.reactivex.Completable;
 import io.vavr.collection.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import java.util.List;
 import java.util.Optional;
@@ -59,47 +63,76 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
 
     @Inject
     MeterRegistry meterRegistry;
-    
+
+    Long managed = 0L;
+    List<Tag> tags = ImmutableList.of(new ImmutableTag("type", "pod"));
+
+    @PostConstruct
+    public void initGauge() {
+        meterRegistry.gauge("k8s.managed",  tags, managed);
+    }
+
     @Override
     public void accept(K8sWatchEvent<V1Pod> event) throws Exception {
-        V1Pod pod = event.getResource();
-        String parent = Pod.extractLabel(pod, OperatorLabels.PARENT);
-        String clusterName = Pod.extractLabel(pod, OperatorLabels.CLUSTER);
-        String datacenterName = Pod.extractLabel(pod, OperatorLabels.DATACENTER);
-        String podName = pod.getMetadata().getName();
-        String namespace = pod.getMetadata().getNamespace();
+        logger.debug("ElassandraPod event={}", event);
+        switch(event.getType()) {
+            case INITIAL:
+            case ADDED:
+                meterRegistry.counter("k8s.event.added", tags).increment();
+                managed++;
 
-        ClusterKey clusterKey = new ClusterKey(clusterName, datacenterName);
-        Key key = new Key(podName, namespace);
+            case MODIFIED:
+                if (event.getType().equals(K8sWatchEvent.Type.MODIFIED)) {
+                    meterRegistry.counter("k8s.event.modified", tags).increment();
+                }
 
-        logger.debug("ElassandraPod event type={} pod={}/{}", event.getType(), podName, namespace);
+                if (POD_PENDING_PHASE.equalsIgnoreCase(event.getResource().getStatus().getPhase())) {
+                    if (event.getResource().getStatus() != null && event.getResource().getStatus().getConditions() != null) {
+                        List<V1PodCondition> conditions = event.getResource().getStatus().getConditions();
+                        Optional<V1PodCondition> scheduleFailed = conditions.stream()
+                                .filter((condition) ->
+                                        // Pod failed, so restart will probably go to an endless restart loop
+                                        ("PodScheduled".equals(condition.getType()) && "False".equals(condition.getStatus()) ||
+                                                // pod not scheduled
+                                                "Unschedulable".equals(condition.getType()))
+                                )
+                                .findFirst();
 
-        if (event.isUpdate()) {
-            if (POD_PENDING_PHASE.equalsIgnoreCase(event.getResource().getStatus().getPhase())) {
-                if (event.getResource().getStatus() != null && event.getResource().getStatus().getConditions() != null) {
-                    List<V1PodCondition> conditions = event.getResource().getStatus().getConditions();
-                    Optional<V1PodCondition> scheduleFailed = conditions.stream()
-                            .filter((condition) ->
-                                    // Pod failed, so restart will probably go to an endless restart loop
-                                    ("PodScheduled".equals(condition.getType()) && "False".equals(condition.getStatus()) ||
-                                    // pod not scheduled
-                                    "Unschedulable".equals(condition.getType()))
-                            )
-                            .findFirst();
+                        V1Pod pod = event.getResource();
+                        String parent = Pod.extractLabel(pod, OperatorLabels.PARENT);
+                        String clusterName = Pod.extractLabel(pod, OperatorLabels.CLUSTER);
+                        String datacenterName = Pod.extractLabel(pod, OperatorLabels.DATACENTER);
+                        String podName = pod.getMetadata().getName();
+                        String namespace = pod.getMetadata().getNamespace();
 
-                    logger.debug("Pending pod={}/{} conditions={}", podName, namespace, conditions);
-                    if (scheduleFailed.isPresent()) {
-                        workQueues.submit(
-                                clusterKey,
-                                dataCenterController.unschedulablePod(new Pod(pod, CONTAINER_NAME)));
+                        ClusterKey clusterKey = new ClusterKey(clusterName, datacenterName);
+
+                        logger.debug("Pending pod={}/{} conditions={}", podName, namespace, conditions);
+                        if (scheduleFailed.isPresent()) {
+                            meterRegistry.counter("k8s.pod.unschedulable", tags).increment();
+                            workQueues.submit(
+                                    clusterKey,
+                                    dataCenterController.unschedulablePod(new Pod(pod, CONTAINER_NAME)));
+                        }
                     }
                 }
-            }
-        } else if (event.isDeletion()) {
-            DataCenter dc = dataCenterCache.get(new Key(parent, namespace));
-            workQueues.submit(
-                    clusterKey,
-                    freePodPvc(dc, new Pod(pod, CONTAINER_NAME)));
+            case DELETED:
+                V1Pod pod = event.getResource();
+                String parent = Pod.extractLabel(pod, OperatorLabels.PARENT);
+                String clusterName = Pod.extractLabel(pod, OperatorLabels.CLUSTER);
+                String datacenterName = Pod.extractLabel(pod, OperatorLabels.DATACENTER);
+                String namespace = pod.getMetadata().getNamespace();
+                ClusterKey clusterKey = new ClusterKey(clusterName, datacenterName);
+                DataCenter dc = dataCenterCache.get(new Key(parent, namespace));
+                workQueues.submit(
+                        clusterKey,
+                        freePodPvc(dc, new Pod(pod, CONTAINER_NAME)));
+                meterRegistry.counter("k8s.event.deleted", tags).increment();
+                managed--;
+                break;
+
+            case ERROR:
+                meterRegistry.counter("k8s.event.error", tags).increment();
         }
     }
 

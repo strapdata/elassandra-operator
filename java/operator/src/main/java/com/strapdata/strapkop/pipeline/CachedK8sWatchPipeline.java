@@ -33,15 +33,17 @@ public abstract class CachedK8sWatchPipeline<ResourceT, ResourceListT, K> extend
     }
 
     private void updateCache(K8sWatchEvent<ResourceT> event){
-        final K key = adapter.getKey(event.getResource());
+        final K key;
 
         switch (event.getType()) {
             case ADDED:
             case MODIFIED:
             case INITIAL:
+                key = adapter.getKey(event.getResource());
                 cache.put(key, event.getResource());
                 break;
             case DELETED:
+                key = adapter.getKey(event.getResource());
                 cache.remove(key);
                 break;
             case ERROR:
