@@ -59,10 +59,9 @@ public class DeploymentHandler extends TerminalHandler<K8sWatchEvent<V1Deploymen
             case ADDED:
                 meterRegistry.counter("k8s.event.added", tags).increment();
                 managed++;
+                break;
             case MODIFIED:
-                if (event.getType().equals(K8sWatchEvent.Type.MODIFIED)) {
-                    meterRegistry.counter("k8s.event.modified", tags).increment();
-                }
+                meterRegistry.counter("k8s.event.modified", tags).increment();
                 deployment = event.getResource();
                 if (isDeploymentAvailable(deployment)) {
                     final String clusterName = deployment.getMetadata().getLabels().get(OperatorLabels.CLUSTER);

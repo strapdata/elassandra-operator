@@ -54,11 +54,9 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
                 completable = dataCenterController.initDatacenter(dataCenter);
                 meterRegistry.counter("k8s.event.added", tags).increment();
                 managed++;
-
+                break;
             case MODIFIED:
-                if (event.getType().equals(K8sWatchEvent.Type.MODIFIED)) {
-                    meterRegistry.counter("k8s.event.modified", tags).increment();
-                }
+                meterRegistry.counter("k8s.event.modified", tags).increment();
                 dataCenter = event.getResource();
                 completable = dataCenterController.updateDatacenter(dataCenter);
                 break;

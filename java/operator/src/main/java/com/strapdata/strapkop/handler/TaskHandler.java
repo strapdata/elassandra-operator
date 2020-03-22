@@ -80,12 +80,12 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
     public void accept(K8sWatchEvent<Task> event) throws Exception {
         logger.debug("Task event={}", event);
         switch (event.getType()) {
-            case MODIFIED:
+            case INITIAL:
             case ADDED:
                 meterRegistry.counter("k8s.event.deleted", tags).increment();
                 managed++;
 
-            case INITIAL:
+            case MODIFIED:
                 if (event.getType().equals(K8sWatchEvent.Type.MODIFIED)) {
                     meterRegistry.counter("k8s.event.modified", tags).increment();
                 }
