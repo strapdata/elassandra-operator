@@ -79,6 +79,7 @@ spec:
   {{- end }}
   elasticsearchIngressEnabled: {{ default "false" .Values.elasticsearchIngressEnabled }}
   prometheusEnabled: {{ default "false" .Values.prometheusEnabled }}
+  prometheusPort: {{ default "9500" .Values.prometheusPort }}
 {{- if .Values.reaper }}
   reaper:
     enabled: {{ default "false" .Values.reaper.enabled }}

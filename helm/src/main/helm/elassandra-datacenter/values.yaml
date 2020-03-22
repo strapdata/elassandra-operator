@@ -137,6 +137,7 @@ enterprise:
 #  service_key.json: "XXXXXXXXX"
 
 prometheusEnabled: true
+prometheusPort: 9500
 
 elasticsearchEnabled: true
 elasticsearchIngressEnabled: false
