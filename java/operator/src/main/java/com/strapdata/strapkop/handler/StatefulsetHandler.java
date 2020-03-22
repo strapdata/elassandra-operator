@@ -64,10 +64,9 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
             case ADDED:
                 meterRegistry.counter("k8s.event.added", tags).increment();
                 managed++;
+                break;
             case MODIFIED:
-                if (event.getType().equals(K8sWatchEvent.Type.MODIFIED)) {
-                    meterRegistry.counter("k8s.event.modified", tags).increment();
-                }
+                meterRegistry.counter("k8s.event.modified", tags).increment();
                 final V1StatefulSet sts = event.getResource();
                 if (isStafulSetReady(sts)) {
                     final String clusterName = sts.getMetadata().getLabels().get(OperatorLabels.CLUSTER);

@@ -43,12 +43,10 @@ public class NodeHandler extends TerminalHandler<K8sWatchEvent<V1Node>> {
             case ADDED:
                 managed++;
                 meterRegistry.counter("k8s.event.added", tags).increment();
-            case MODIFIED:
-                if (event.getType().equals(K8sWatchEvent.Type.MODIFIED)) {
-                    meterRegistry.counter("k8s.event.modified", tags).increment();
-                }
                 break;
-
+            case MODIFIED:
+                meterRegistry.counter("k8s.event.modified", tags).increment();
+                break;
             case DELETED:
                 meterRegistry.counter("k8s.event.deleted", tags).increment();
                 managed--;

@@ -292,8 +292,7 @@ public class K8sResourceUtils {
                         return statefulSet2;
                     } catch(ApiException e) {
                         if (e.getCode() == 404) {
-                            logger.warn("statefulset namespace={} name={} not found", namespace, name);
-                            throw new NoSuchElementException("statefulset="+name+"/"+namespace+" not found");
+                            logger.warn("statefulset namespace={}/{} not found", namespace, name);
                         }
                         throw e;
                     }

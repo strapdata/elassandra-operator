@@ -80,12 +80,9 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
             case ADDED:
                 meterRegistry.counter("k8s.event.added", tags).increment();
                 managed++;
-
+                break;
             case MODIFIED:
-                if (event.getType().equals(K8sWatchEvent.Type.MODIFIED)) {
-                    meterRegistry.counter("k8s.event.modified", tags).increment();
-                }
-
+                meterRegistry.counter("k8s.event.modified", tags).increment();
                 if (POD_PENDING_PHASE.equalsIgnoreCase(event.getResource().getStatus().getPhase())) {
                     if (event.getResource().getStatus() != null && event.getResource().getStatus().getConditions() != null) {
                         List<V1PodCondition> conditions = event.getResource().getStatus().getConditions();
