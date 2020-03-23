@@ -7,8 +7,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Wither;
 
-import java.util.UUID;
-
 @Data
 @Wither
 @AllArgsConstructor
@@ -56,13 +54,6 @@ public class RackStatus {
     @SerializedName("readyReplicas")
     @Expose
     private Integer readyReplicas = 0;
-
-    /**
-     * Host id of the seed node in the rack.
-     */
-    @SerializedName("seedHostId")
-    @Expose
-    private UUID seedHostId = UUID.randomUUID();
 
     public Health health() {
         if (readyReplicas != null && desiredReplicas != null && desiredReplicas == readyReplicas)
