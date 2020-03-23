@@ -51,7 +51,7 @@ kibana:
       keyspaces: []
 
 reaper:
-  image: strapdata.azurecr.io/strapdata/cassandra-reaper:2.0.3.1
+  image: strapdata.azurecr.io/strapdata/cassandra-reaper:2.0.3-SNAPSHOT-strapdata
   enabled: true
   jwtSecret: "68d45d8f-419f-429e-8ba0-7b475cba795d"
   ingressSuffix:
