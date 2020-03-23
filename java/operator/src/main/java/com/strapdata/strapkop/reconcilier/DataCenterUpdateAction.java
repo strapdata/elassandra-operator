@@ -275,7 +275,6 @@ public class DataCenterUpdateAction {
                     RackStatus rackStatus = new RackStatus()
                             .withDesiredReplicas(1)
                             .withHealth(Health.RED)
-                            .withSeedHostId(UUID.randomUUID())
                             .withIndex(0)
                             .withName(NodeHandler.getZone(node))
                             .withFingerprint(configMapVolumeMounts.fingerPrint());
@@ -506,7 +505,6 @@ public class DataCenterUpdateAction {
                     .setName(zone.name)
                     .setIndex(rackIndex)
                     .setHealth(Health.RED)
-                    .setSeedHostId(UUID.randomUUID())
                     .withDesiredReplicas(1)
                     .withFingerprint(configMapVolumeMounts.fingerPrint());
             dataCenterStatus.getRackStatuses().putIfAbsent(rackIndex, rackStatus);
@@ -1541,8 +1539,8 @@ public class DataCenterUpdateAction {
             final V1ObjectMeta statefulSetMetadata = rackObjectMeta(rackStatus.getName(), rackStatus.getIndex(), OperatorNames.stsName(dataCenter, rackStatus.getIndex()));
 
             // create Elassandra container and the associated initContainer to replay commitlogs
-            final V1Container cassandraContainer = buildElassandraContainer(rackStatus.getName(), rackStatus.getSeedHostId());
-            final V1Container commitlogInitContainer = buildInitContainerCommitlogReplayer(rackStatus.getName(), rackStatus.getSeedHostId());
+            final V1Container cassandraContainer = buildElassandraContainer(rackStatus.getName());
+            final V1Container commitlogInitContainer = buildInitContainerCommitlogReplayer(rackStatus.getName());
 
             if (dataCenterSpec.getPrometheusEnabled()) {
                 cassandraContainer.addPortsItem(new V1ContainerPort().name(PROMETHEUS_PORT_NAME).containerPort(dataCenterSpec.getPrometheusPort()));
@@ -1826,8 +1824,8 @@ public class DataCenterUpdateAction {
                             .key(secretEntry)));
         }
 
-        private V1Container buildElassandraContainer(String rack, UUID seedHostId) {
-            final V1Container cassandraContainer = buildElassandraBaseContainer("elassandra", rack, seedHostId)
+        private V1Container buildElassandraContainer(String rack) {
+            final V1Container cassandraContainer = buildElassandraBaseContainer("elassandra", rack)
                     .readinessProbe(new V1Probe()
                             .exec(new V1ExecAction()
                                     .addCommandItem("/ready-probe.sh")
@@ -1847,14 +1845,14 @@ public class DataCenterUpdateAction {
             return cassandraContainer;
         }
 
-        private V1Container buildInitContainerCommitlogReplayer(String rack, UUID seedHostId) {
-            return buildElassandraBaseContainer("commitlog-replayer", rack, seedHostId)
+        private V1Container buildInitContainerCommitlogReplayer(String rack) {
+            return buildElassandraBaseContainer("commitlog-replayer", rack)
                     .addEnvItem(new V1EnvVar()
                             .name("STOP_AFTER_COMMILOG_REPLAY")
                             .value("true"));
         }
 
-        private V1Container buildElassandraBaseContainer(String containerName, String rack, UUID seedHostId) {
+        private V1Container buildElassandraBaseContainer(String containerName, String rack) {
             final V1Container cassandraContainer = new V1Container()
                     .name(containerName)
                     .image(dataCenterSpec.getElassandraImage())
@@ -1902,7 +1900,6 @@ public class DataCenterUpdateAction {
                     .addEnvItem(new V1EnvVar().name("POD_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.name"))))
                     .addEnvItem(new V1EnvVar().name("POD_IP").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("status.podIP"))))
                     .addEnvItem(new V1EnvVar().name("NODE_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("spec.nodeName"))))
-                    .addEnvItem(new V1EnvVar().name("SEED_HOST_ID").value(seedHostId.toString()))
                     .addEnvItem(new V1EnvVar().name("CASSANDRA_RACK").value(rack))
                     .addEnvItem(new V1EnvVar().name("CASSANDRA_DATACENTER").value(dataCenterMetadata.getName()))
                     .addEnvItem(new V1EnvVar().name("CASSANDRA_CLUSTER").value(dataCenterSpec.getClusterName()))
