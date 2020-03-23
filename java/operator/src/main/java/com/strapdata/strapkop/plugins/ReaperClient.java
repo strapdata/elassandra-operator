@@ -82,7 +82,7 @@ public class ReaperClient implements Closeable {
                 ("&scheduleDaysBetween=" + reaperScheduledRepair.getScheduleDaysBetween()) +
                 ("&intensity=" + reaperScheduledRepair.getIntensity()) +
                 ("&incrementalRepair=" + reaperScheduledRepair.getIncrementalRepair()) +
-                ("&repairParallelism=" + reaperScheduledRepair.getRepairParallelism()) +
+                ("&repairParallelism=" + reaperScheduledRepair.getRepairParallelism().toString()) +
                 (reaperScheduledRepair.getTables() == null ? "" : "&tables=" + reaperScheduledRepair.getTables().stream().map(URLEncoder::encode).collect(Collectors.joining(","))) +
                 (reaperScheduledRepair.getScheduleTriggerTime() == null ? "" : "&scheduleTriggerTime=" + reaperScheduledRepair.getScheduleTriggerTime());
 
