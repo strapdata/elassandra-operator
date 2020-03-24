@@ -125,7 +125,8 @@ public class ReaperPlugin extends AbstractPlugin {
 
         switch(dataCenter.getStatus().getReaperPhase()) {
             case NONE:
-                if (cqlRoleManager.get(dataCenter, REAPER_ROLE.getUsername()).isApplied()) {
+                CqlRole reaperRole = cqlRoleManager.get(dataCenter, REAPER_ROLE.getUsername());
+                if (reaperRole != null && reaperRole.isApplied()) {
                     return createOrReplaceReaperObjects(dataCenter).map(b -> {
                         dataCenter.getStatus().setReaperPhase(ReaperPhase.DEPLOYED);
                         return true;

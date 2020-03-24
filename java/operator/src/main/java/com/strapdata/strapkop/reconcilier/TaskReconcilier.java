@@ -88,7 +88,7 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
         return k8sResourceUtils.readTask(task0.getMetadata().getNamespace(), task0.getMetadata().getName())
                 .flatMapCompletable(task1 -> {
                     Task task = task1.get();
-                    DataCenter dc = dataCenterCache.get(new Key(task.getParent(), task0.getMetadata().getNamespace()));
+                    DataCenter dc = dataCenterCache.get(new Key(task.getParent(), task.getMetadata().getNamespace()));
                     logger.debug("datacenter={} task={} processing", dc.id(), task.id());
 
                     if (task.getStatus() == null)
@@ -308,7 +308,7 @@ public abstract class TaskReconcilier extends Reconcilier<Tuple2<TaskReconcilier
         return Completable.fromAction(new io.reactivex.functions.Action() {
             @Override
             public void run() throws Exception {
-                k8sResourceUtils.listNamespacedPods(dc.getMetadata().getNamespace(), labelSelector, labelSelector)
+                k8sResourceUtils.listNamespacedPods(dc.getMetadata().getNamespace(), null, labelSelector)
                         .forEach(pod -> {
                             task.getStatus().getPods().put(pod.getMetadata().getName(), TaskPhase.WAITING);
                         });
