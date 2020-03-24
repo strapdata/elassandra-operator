@@ -36,14 +36,16 @@ public final class OperatorLabels {
     
     public static final String DATACENTER_GENERATION = labelPrefix + "datacenter-generation";
     public static final String DATACENTER_FINGERPRINT = labelPrefix + "datacenter-fingerprint";
-    
-    public static final Map<String, String> MANAGED = ImmutableMap.of(
-            "app.kubernetes.io/managed-by", "elassandra-operator"
-    );
+
+    public static final String MANAGED_BY = "app.kubernetes.io/managed-by";
+    public static final String ELASSANDRA_APP = "elassandra";
+    public static final String ELASSANDRA_OPERATOR = "elassandra-operator";
+
+    public static final Map<String, String> MANAGED = ImmutableMap.of(MANAGED_BY, ELASSANDRA_OPERATOR);
 
     public static final Map<String, String> ELASSANDRA_PODS_SELECTOR = ImmutableMap.of(
-            "app.kubernetes.io/managed-by", "elassandra-operator",
-            "app", "elassandra"
+            MANAGED_BY, ELASSANDRA_OPERATOR,
+            "app", ELASSANDRA_APP
     );
 
     private OperatorLabels() {}
@@ -52,7 +54,7 @@ public final class OperatorLabels {
         return ImmutableMap.<String, String>builder()
                 .put(CLUSTER, clusterName)
                 .putAll(MANAGED)
-                .put(APP, "elassandra") // for grafana
+                .put(APP, ELASSANDRA_APP) // for grafana
                 .build();
     }
     
