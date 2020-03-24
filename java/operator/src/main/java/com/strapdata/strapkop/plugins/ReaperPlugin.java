@@ -3,6 +3,7 @@ package com.strapdata.strapkop.plugins;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.cql.*;
@@ -30,6 +31,7 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * Manage reaper deployment
@@ -71,7 +73,7 @@ public class ReaperPlugin extends AbstractPlugin {
         this.cqlKeyspaceManager = cqlKeyspaceManager;
     }
 
-    public static final CqlKeyspace REAPER_KEYSPACE = new CqlKeyspace(REAPER_KEYSPACE_NAME, 3);
+    public static final CqlKeyspace REAPER_KEYSPACE = new CqlKeyspace(REAPER_KEYSPACE_NAME, 3, true);
 
     @Override
     public void syncKeyspaces(final CqlKeyspaceManager cqlKeyspaceManager, final DataCenter dataCenter) {
@@ -529,8 +531,12 @@ public class ReaperPlugin extends AbstractPlugin {
                     List<CompletableSource> todoList = new ArrayList<>();
                     Map<String, ReaperScheduledRepair> scheduledRepairMap = new HashMap<>();
 
-                    // repair managed keyspaces
-                    for(CqlKeyspace cqlKeyspace : this.cqlKeyspaceManager.get(dc).values()) {
+
+                    // repair system + elastic_admin_xxx + managed keyspaces
+                    for(CqlKeyspace cqlKeyspace :
+                            Iterables.concat(
+                                    this.cqlKeyspaceManager.get(dc).values(),
+                                    this.cqlKeyspaceManager.getSystemAndElasticKeyspaces(dc).stream().filter(CqlKeyspace::isRepair).collect(Collectors.toList()))) {
                         scheduledRepairMap.put(cqlKeyspace.getName(), new ReaperScheduledRepair()
                                 .withKeyspace(cqlKeyspace.getName())
                                 .withOwner("elassandra-operator"));

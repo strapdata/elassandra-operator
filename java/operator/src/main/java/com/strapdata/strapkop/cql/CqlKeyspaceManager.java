@@ -34,9 +34,9 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
     private static final Logger logger = LoggerFactory.getLogger(CqlKeyspaceManager.class);
 
     public static final Set<CqlKeyspace> SYSTEM_KEYSPACES = ImmutableSet.of(
-            new CqlKeyspace().withName("system_auth").withRf(3),
-            new CqlKeyspace().withName("system_distributed").withRf(3),
-            new CqlKeyspace().withName("system_traces").withRf(3));
+            new CqlKeyspace().withName("system_auth").withRf(3).withRepair(true),
+            new CqlKeyspace().withName("system_distributed").withRf(3).withRepair(false),
+            new CqlKeyspace().withName("system_traces").withRf(3).withRepair(false));
 
     final K8sResourceUtils k8sResourceUtils;
 
@@ -159,12 +159,17 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
         remove(dataCenter);
     }
 
+    public List<CqlKeyspace> getSystemAndElasticKeyspaces(final DataCenter dataCenter) {
+        List<CqlKeyspace> keyspaces = new ArrayList<>();
+        keyspaces.addAll(SYSTEM_KEYSPACES);
+        keyspaces.add(new CqlKeyspace().setName(elasticAdminKeyspaceName(dataCenter)).setRf(3).setRepair(true));
+        return keyspaces;
+    }
+
     public Completable decreaseRfBeforeScalingDownDc(final DataCenter dataCenter, int targetDcSize, final CqlSessionSupplier sessionSupplier) throws Exception {
         if (dataCenter.getStatus().getPhase().equals(DataCenterPhase.RUNNING) && dataCenter.getStatus().getCqlStatus().equals(CqlStatus.ESTABLISHED))
         {
-            List<CqlKeyspace> keyspaces = new ArrayList<>();
-            keyspaces.addAll(SYSTEM_KEYSPACES);
-            keyspaces.add(new CqlKeyspace().setName(elasticAdminKeyspaceName(dataCenter)).setRf(3));
+            List<CqlKeyspace> keyspaces = getSystemAndElasticKeyspaces(dataCenter);
             if (get(dataCenter) != null)
                 keyspaces.addAll(get(dataCenter).values());
             List<Completable> completables = new ArrayList<>(keyspaces.size());
