@@ -21,6 +21,7 @@ public class CqlKeyspace {
 
     String name;
     int rf;
+    boolean repair;
 
     /**
      * create keyspace if not exists.

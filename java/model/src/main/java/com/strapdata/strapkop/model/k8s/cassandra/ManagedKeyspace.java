@@ -38,6 +38,13 @@ public class ManagedKeyspace {
     private Integer rf = 1;
 
     /**
+     * Automatic repair
+     */
+    @SerializedName("repair")
+    @Expose
+    private Boolean repair = Boolean.FALSE;
+
+    /**
      * CQL Role name, may be null
      */
     @SerializedName("role")
