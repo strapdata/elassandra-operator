@@ -8,6 +8,7 @@ import com.datastax.driver.core.policies.LoggingRetryPolicy;
 import com.datastax.driver.core.policies.TokenAwarePolicy;
 import com.google.common.collect.ImmutableList;
 import com.strapdata.cassandra.driver.KubernetesDnsAddressTranslator;
+import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
@@ -56,6 +57,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
     final CoreV1Api coreApi;
     final K8sResourceUtils k8sResourceUtils;
     final AuthorityManager authorityManager;
+    final OperatorConfig operatorConfig;
 
     Map<String, CqlRole> connectedCqlRoles = new ConcurrentHashMap<>();
 
@@ -69,11 +71,13 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
 
     public CqlRoleManager(final CoreV1Api coreApi,
                           final K8sResourceUtils k8sResourceUtils,
-                          final AuthorityManager authorityManager) {
+                          final AuthorityManager authorityManager,
+                          final OperatorConfig operatorConfig) {
         super();
         this.coreApi = coreApi;
         this.k8sResourceUtils = k8sResourceUtils;
         this.authorityManager = authorityManager;
+        this.operatorConfig = operatorConfig;
     }
 
     /**
@@ -203,6 +207,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                         if (lastException != null) {
                             logger.warn("datacenter=" + dc.id() + " Authentication failed with roles=" + r + " error:" + lastException.getMessage());
                         }
+                        throw lastException;
                     }
 
                     if (!connectedRole.username.equals(CqlRole.STRAPKOP_ROLE.username)) {
@@ -217,6 +222,11 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                                 role.createOrUpdateRole(dc, k8sResourceUtils, new CqlSessionSupplier() {
                                     @Override
                                     public Single<Session> getSession(DataCenter dc) throws Exception {
+                                        return Single.just(currentSession);
+                                    }
+
+                                    @Override
+                                    public Single<Session> getSessionWithSchemaAgreed(DataCenter dataCenter) throws Exception {
                                         return Single.just(currentSession);
                                     }
 
@@ -276,9 +286,18 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                 .withClusterName(dc.getSpec().getClusterName())
                 .withPort(dc.getSpec().getNativePort())
                 .withQueryOptions(new QueryOptions().setConsistencyLevel(ConsistencyLevel.LOCAL_ONE))
+                .withPoolingOptions(new PoolingOptions()
+                        // see https://dzone.com/articles/tuning-datastax-java-driver-for-cassandra
+                        .setConnectionsPerHost(HostDistance.REMOTE, 0, 0)
+                        .setCoreConnectionsPerHost(HostDistance.REMOTE, 0)
+                        .setConnectionsPerHost(HostDistance.LOCAL,1, 1)
+                        .setCoreConnectionsPerHost(HostDistance.LOCAL,1)
+                )
+                .withMaxSchemaAgreementWaitSeconds(operatorConfig.getMaxSchemaAgreementWaitSeconds())
                 .withLoadBalancingPolicy(new TokenAwarePolicy(
                         DCAwareRoundRobinPolicy.builder()
                                 .withLocalDc(dc.getSpec().getDatacenterName())
+                                .withUsedHostsPerRemoteDc(0)
                                 .build()))
                 .withRetryPolicy(new LoggingRetryPolicy(StrapkopRetryPolicy.INSTANCE));
 

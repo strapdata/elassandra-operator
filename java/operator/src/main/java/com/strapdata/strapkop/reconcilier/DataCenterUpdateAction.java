@@ -50,6 +50,7 @@ import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
+import javax.inject.Named;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.security.GeneralSecurityException;
@@ -90,7 +91,17 @@ public class DataCenterUpdateAction {
     private final K8sResourceUtils k8sResourceUtils;
     private final AuthorityManager authorityManager;
 
+    private final long startTime;
+
+    @Named("operation")
+    private final Operation operation;
+
+    @Named("dataCenter")
     private final DataCenter dataCenter;
+
+    private TreeMap<String, V1StatefulSet> statefulSetTreeMap;
+    private Zones zones;
+
     private final V1ObjectMeta dataCenterMetadata;
     private final DataCenterSpec dataCenterSpec;
     private final DataCenterStatus dataCenterStatus;
@@ -108,8 +119,6 @@ public class DataCenterUpdateAction {
     private final NodeCache nodeCache;
     private final CheckPointCache checkPointCache;
 
-    private TreeMap<String, V1StatefulSet> statefulSetTreeMap;
-    private Zones zones;
 
     private final BackupScheduler backupScheduler;
 
@@ -127,6 +136,7 @@ public class DataCenterUpdateAction {
                                   final CheckPointCache checkPointCache,
                                   final JmxmpElassandraProxy jmxmpElassandraProxy,
                                   @Parameter("dataCenter") DataCenter dataCenter,
+                                  @Parameter("operation") Operation operation,
                                   final CqlLicenseManager cqlLicenseManager,
                                   final OperatorConfig operatorConfig,
                                   final BackupScheduler backupScheduler,
@@ -139,6 +149,10 @@ public class DataCenterUpdateAction {
         this.k8sResourceUtils = k8sResourceUtils;
         this.authorityManager = authorityManager;
         this.operatorConfig = operatorConfig;
+
+        this.operation = operation;
+        this.startTime = System.currentTimeMillis();
+        this.operation.setPendingInMs(startTime - operation.getSubmitDate().getTime());
 
         this.dataCenter = dataCenter;
         this.dataCenterMetadata = dataCenter.getMetadata();
@@ -175,6 +189,7 @@ public class DataCenterUpdateAction {
         this.pluginRegistry = pluginRegistry;
     }
 
+    // required to init statefulSetTreeMap
     public DataCenterUpdateAction setStatefulSetTreeMap(TreeMap<String, V1StatefulSet> statefulSetTreeMap) {
         this.statefulSetTreeMap = statefulSetTreeMap;
         this.zones = new Zones(dataCenterStatus, nodeCache.values(), this.statefulSetTreeMap);
@@ -191,6 +206,23 @@ public class DataCenterUpdateAction {
                     logger.debug("ConfigMap={}/{} not found", dataCenterSpec.getUserConfigMapVolumeSource().getName(), dataCenterMetadata.getNamespace());
                     return Single.just(Optional.empty());
                 });
+    }
+
+    public void endOperation(String desc) {
+        operation.setDesc(desc);
+        endOperation();
+    }
+
+    public void endOperation() {
+        long endTime = System.currentTimeMillis();
+        operation.setDurationInMs(endTime - startTime);
+        dataCenterStatus.setCurrentOperation(null);
+        List<Operation> history = dataCenterStatus.getOperationHistory();
+        history.add(0, this.operation);
+        if (history.size() > operatorConfig.getOperationHistoryDepth())
+            history.remove(operatorConfig.getOperationHistoryDepth());
+        dataCenterStatus.setOperationHistory(history);
+        logger.debug("update status datacenterStatus={}", dataCenterStatus);
     }
 
     /**
@@ -286,7 +318,10 @@ public class DataCenterUpdateAction {
                     return configMapVolumeMounts.createOrReplaceNamespacedConfigMaps()
                             // updateRack also call prepareDataCenterSnapshot
                             .andThen(builder.buildStatefulSetRack(rackStatus, configMapVolumeMounts)
-                                    .flatMap(s -> k8sResourceUtils.updateDataCenterStatus(dataCenter)));
+                                    .flatMap(s -> {
+                                        endOperation();
+                                        return k8sResourceUtils.updateDataCenterStatus(dataCenter, dataCenterStatus);
+                                    }));
                 }).ignoreElement();
     }
 
@@ -309,7 +344,6 @@ public class DataCenterUpdateAction {
 
         Integer rackIndex = Integer.parseInt(sts.getMetadata().getLabels().get(OperatorLabels.RACKINDEX));
         RackStatus rackStatus = dataCenter.getStatus().getRackStatuses().get(rackIndex);
-
         rackStatus.setReadyReplicas(stsReadyReplicas);
         rackStatus.setHealth(rackStatus.health());
 
@@ -344,9 +378,9 @@ public class DataCenterUpdateAction {
         if (!dataCenterSpec.isParked() && (DataCenterPhase.PARKED.equals(dataCenterStatus.getPhase())))
             return unparkDatacenter();
 
-        if (DataCenterPhase.PARKED.equals(dataCenterStatus.getPhase()) && dataCenterSpec.isParked()) {
+        if (DataCenterPhase.PARKED.equals(dataCenterStatus.getPhase()) && dataCenterSpec.isParked() && dataCenterStatus.getReadyReplicas() == 0) {
             return updateStatus ?
-                    k8sResourceUtils.updateDataCenterStatus(dataCenter).flatMapCompletable(dc -> {
+                    k8sResourceUtils.updateDataCenterStatus(dataCenter, dataCenterStatus).flatMapCompletable(dc -> {
                         logger.debug("datacenter={} updating status={}", dataCenter.id(), dataCenterStatus);
                         return Completable.complete();
                     }) :
@@ -368,14 +402,15 @@ public class DataCenterUpdateAction {
                                     dataCenter.id(), currentFingerprint, v1StatefulSet == null ? null : v1StatefulSet.getMetadata().getName(), stsFingerprint);
 
                             rackStatus.setFingerprint(currentFingerprint);
-                            dataCenterStatus.setLastAction("Rolling update rack="+rackStatus.getName());
-                            dataCenterStatus.setLastActionTime(new Date());
 
                             configMapVolumeMounts.setRack(rackStatus);
                             return configMapVolumeMounts.createOrReplaceNamespacedConfigMaps()
                                     // updateRack also call prepareDataCenterSnapshot
-                                    .andThen(builder.buildStatefulSetRack(rackStatus, configMapVolumeMounts).ignoreElement())
-                                    .andThen(k8sResourceUtils.updateDataCenterStatus(dataCenter).ignoreElement());
+                                    .andThen(builder.buildStatefulSetRack(rackStatus, configMapVolumeMounts)
+                                            .flatMapCompletable(sts -> {
+                                                endOperation("rolling update rack="+rackStatus.getName());
+                                                return k8sResourceUtils.updateDataCenterStatus(dataCenter, dataCenterStatus).ignoreElement();
+                                            }));
                         }
                     }
 
@@ -386,7 +421,7 @@ public class DataCenterUpdateAction {
                         readyReplicas += v1StatefulSet.getStatus().getReadyReplicas() == null ? 0 : v1StatefulSet.getStatus().getReadyReplicas();
                         if (!StatefulsetHandler.isStafulSetReady(v1StatefulSet)) {
                             logger.debug("v1StatefulSet={}/{} not ready, waiting", v1StatefulSet.getMetadata().getName(), v1StatefulSet.getMetadata().getNamespace());
-                            return updateStatus ? k8sResourceUtils.updateDataCenterStatus(dataCenter).ignoreElement() : Completable.complete();
+                            return updateStatus ? k8sResourceUtils.updateDataCenterStatus(dataCenter, dataCenterStatus).ignoreElement() : Completable.complete();
                         }
                     }
 
@@ -436,7 +471,8 @@ public class DataCenterUpdateAction {
                     return doUpdate.flatMapCompletable(doStatusUpdate -> {
                         if (doStatusUpdate) {
                             logger.debug("datacenter={} updating status={}", dataCenter.id(), dataCenterStatus);
-                            return k8sResourceUtils.updateDataCenterStatus(dataCenter).ignoreElement();
+                            endOperation();
+                            return k8sResourceUtils.updateDataCenterStatus(dataCenter, dataCenterStatus).ignoreElement();
                         }
                         return Completable.complete();
                     }).doFinally(() -> cqlSessionHandler.close());
@@ -461,9 +497,8 @@ public class DataCenterUpdateAction {
                 .flatMapCompletable(dataCenter1 -> {
                     dataCenterStatus.setPhase(DataCenterPhase.PARKED);
                     dataCenterStatus.setHealth(Health.RED);
-                    dataCenterStatus.setLastAction("Park datacenter");
-                    dataCenterStatus.setLastActionTime(new Date());
-                    return k8sResourceUtils.updateDataCenterStatus(dataCenter).ignoreElement();
+                    endOperation("parked");
+                    return k8sResourceUtils.updateDataCenterStatus(dataCenter, dataCenterStatus).ignoreElement();
                 });
     }
 
@@ -481,9 +516,8 @@ public class DataCenterUpdateAction {
                 .toSingleDefault(dataCenter)
                 .flatMapCompletable(dataCenter1 -> {
                     dataCenterStatus.setPhase(DataCenterPhase.RUNNING);
-                    dataCenterStatus.setLastAction("Unpark datacenter");
-                    dataCenterStatus.setLastActionTime(new Date());
-                    return k8sResourceUtils.updateDataCenterStatus(dataCenter).ignoreElement();
+                    endOperation("unparked");
+                    return k8sResourceUtils.updateDataCenterStatus(dataCenter, dataCenterStatus).ignoreElement();
                 });
     }
 
@@ -508,15 +542,16 @@ public class DataCenterUpdateAction {
                     .withDesiredReplicas(1)
                     .withFingerprint(configMapVolumeMounts.fingerPrint());
             dataCenterStatus.getRackStatuses().putIfAbsent(rackIndex, rackStatus);
-            dataCenterStatus.setLastAction("Adding rack="+rackStatus.getName());
-            dataCenterStatus.setLastActionTime(new Date());
             logger.debug("datacenter={} SCALE_UP started in rack={} size={}", dataCenter.id(), zone.name, zone.size);
 
             configMapVolumeMounts.setRack(rackStatus);
             return todo
                     .andThen(configMapVolumeMounts.createOrReplaceNamespacedConfigMaps())
                     .andThen(builder.buildStatefulSetRack(rackStatus, configMapVolumeMounts)
-                            .flatMap(sts -> k8sResourceUtils.updateDataCenterStatus(dataCenter))
+                            .flatMap(sts -> {
+                                endOperation("scale-up rack "+rackStatus.getName());
+                                return k8sResourceUtils.updateDataCenterStatus(dataCenter, dataCenterStatus);
+                            })
                             .ignoreElement()
                     );
         }
@@ -531,15 +566,17 @@ public class DataCenterUpdateAction {
         logger.debug("datacenter={} SCALE_UP started in rack={} desiredReplicas={}", dataCenter.id(), rackStatus.getName(), rackStatus.getDesiredReplicas());
 
         dataCenterStatus.setNeedCleanup(true);
-        dataCenterStatus.setLastAction("Scale up rack="+rackStatus.getName());
-        dataCenterStatus.setLastActionTime(new Date());
 
         // call ConfigMapVolumeMount here to update seeds in case of single rack with multi-nodes
         configMapVolumeMounts.setRack(rackStatus);
         return todo
                 .andThen(configMapVolumeMounts.createOrReplaceNamespacedConfigMaps()) // update seeds
-                .andThen(k8sResourceUtils.replaceNamespacedStatefulSet(sts).ignoreElement())
-                .andThen(k8sResourceUtils.updateDataCenterStatus(dataCenter).ignoreElement());
+                .andThen(k8sResourceUtils.replaceNamespacedStatefulSet(sts)
+                        .flatMap(s -> {
+                            endOperation("scale-up rack "+rackStatus.getName());
+                            return k8sResourceUtils.updateDataCenterStatus(dataCenter, dataCenterStatus);
+                        })
+                        .ignoreElement());
     }
 
     public Completable scaleDownDatacenter(ConfigMapVolumeMounts configMapVolumeMounts, CqlSessionHandler cqlSessionHandler) throws Exception {
@@ -547,7 +584,10 @@ public class DataCenterUpdateAction {
         Optional<Zone> scaleDownZone = zones.nextToScaleDown();
         if (!scaleDownZone.isPresent()) {
             logger.warn("datacenter={} Cannot scale down, no more replicas", dataCenter.id(), dataCenterMetadata.getName(), dataCenterMetadata.getNamespace());
-            return todo;
+            return todo.toSingleDefault(dataCenterStatus).flatMapCompletable(dcs -> {
+                endOperation("scale-down impossible");
+                return k8sResourceUtils.updateDataCenterStatus(dataCenter, dataCenterStatus).ignoreElement();
+            });
         }
 
         // scaling DOWN
@@ -573,13 +613,14 @@ public class DataCenterUpdateAction {
         rackStatus.setDesiredReplicas(sts.getSpec().getReplicas() - 1);
         sts.getSpec().setReplicas(sts.getSpec().getReplicas() - 1);
 
-        dataCenterStatus.setLastAction("Scale down rack="+rackStatus.getName());
-        dataCenterStatus.setLastActionTime(new Date());
-
         configMapVolumeMounts.setRack(rackStatus);
         return todo.andThen(configMapVolumeMounts.createOrReplaceNamespacedConfigMaps()) // update seeds
                 .andThen(k8sResourceUtils.replaceNamespacedStatefulSet(sts).ignoreElement())
-                .andThen(k8sResourceUtils.updateDataCenterStatus(dataCenter).ignoreElement());
+                .toSingleDefault(dataCenterSpec)
+                .flatMapCompletable(s -> {
+                    endOperation("scale-down");
+                    return k8sResourceUtils.updateDataCenterStatus(dataCenter, dataCenterStatus).ignoreElement();
+                });
     }
 
 
@@ -1044,16 +1085,19 @@ public class DataCenterUpdateAction {
             }
 
             Set<String> seeds = new HashSet<>();
-            for (RackStatus rackStatus : dataCenterStatus.getRackStatuses().values()) {
-                V1StatefulSet v1StatefulSet = statefulSetTreeMap.get(rackStatus.getName());
-                if (v1StatefulSet == null) {
-                    logger.warn("sts for rack={} not found", rackStatus);
-                } else {
-                    if (v1StatefulSet.getStatus().getReadyReplicas() != null && v1StatefulSet.getStatus().getReadyReplicas() > 0) {
-                        if (dataCenterSpec.getHostNetworkEnabled() || dataCenterSpec.getHostPortEnabled()) {
-                            seeds.add(OperatorNames.externalPodFqdn(dataCenter, rackStatus.getIndex(), 0));
-                        } else {
-                            seeds.add(OperatorNames.internalPodFqdn(dataCenter, rackStatus.getIndex(), 0));
+            if (dataCenterStatus.getBootstrapped() == true || (remoteSeeds.isEmpty() && remoteSeeders.isEmpty())) {
+                // Add local seeds if DC is boostrapped or alone.
+                for (RackStatus rackStatus : dataCenterStatus.getRackStatuses().values()) {
+                    V1StatefulSet v1StatefulSet = statefulSetTreeMap.get(rackStatus.getName());
+                    if (v1StatefulSet == null) {
+                        logger.warn("sts for rack={} not found", rackStatus);
+                    } else {
+                        if (v1StatefulSet.getStatus().getReadyReplicas() != null && v1StatefulSet.getStatus().getReadyReplicas() > 0) {
+                            if (dataCenterSpec.getHostNetworkEnabled() || dataCenterSpec.getHostPortEnabled()) {
+                                seeds.add(OperatorNames.externalPodFqdn(dataCenter, rackStatus.getIndex(), 0));
+                            } else {
+                                seeds.add(OperatorNames.internalPodFqdn(dataCenter, rackStatus.getIndex(), 0));
+                            }
                         }
                     }
                 }

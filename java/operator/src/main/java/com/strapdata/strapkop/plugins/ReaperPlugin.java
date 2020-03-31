@@ -279,7 +279,7 @@ public class ReaperPlugin extends AbstractPlugin {
                         .periodSeconds(10)
                         .timeoutSeconds(5)
                 )
-                .addEnvItem(new V1EnvVar().name("REAPER_DATACENTER_AVAILABILITY").value("EACH"))
+                .addEnvItem(new V1EnvVar().name("REAPER_DATACENTER_AVAILABILITY").value("LOCAL"))
                 .addEnvItem(new V1EnvVar()
                         .name("REAPER_JMX_AUTH_PASSWORD")
                         .valueFrom(new V1EnvVarSource()

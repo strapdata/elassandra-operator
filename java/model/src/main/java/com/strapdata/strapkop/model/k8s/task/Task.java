@@ -10,6 +10,8 @@ import io.kubernetes.client.models.V1ObjectMeta;
 import lombok.*;
 import lombok.experimental.Wither;
 
+import java.util.Date;
+
 @Data
 @Wither
 @AllArgsConstructor
@@ -42,7 +44,7 @@ public class Task {
 
     @SerializedName("status")
     @Expose
-    private TaskStatus status;
+    private TaskStatus status = new TaskStatus().withStartDate(new Date()).setPhase(TaskPhase.WAITING);
     
     public static Task fromDataCenter(String name, DataCenter dc) {
         return new Task()

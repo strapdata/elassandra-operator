@@ -7,6 +7,7 @@ import com.strapdata.strapkop.model.ClusterKey;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.Operation;
 import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.reconcilier.DataCenterController;
 import io.kubernetes.client.models.V1Deployment;
@@ -19,6 +20,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
+import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 
@@ -69,9 +71,10 @@ public class DeploymentHandler extends TerminalHandler<K8sWatchEvent<V1Deploymen
                     if (dataCenter != null) {
                         logger.info("datacenter={} deployment={}/{} is available, triggering a dc deploymentAvailable",
                                 dataCenter.id(), deployment.getMetadata().getName(), deployment.getMetadata().getNamespace());
+                        Operation op = new Operation().withSubmitDate(new Date()).withDesc("updated deployment="+deployment.getMetadata().getName());
                         workQueues.submit(
                                 new ClusterKey(clusterName, deployment.getMetadata().getNamespace()),
-                                dataCenterController.deploymentAvailable(dataCenter, deployment));
+                                dataCenterController.deploymentAvailable(op, dataCenter, deployment));
                     }
                 }
                 break;

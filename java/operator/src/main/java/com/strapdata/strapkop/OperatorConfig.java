@@ -32,4 +32,13 @@ public class OperatorConfig {
      */
     Duration taskRetention = Duration.ofDays(8);
 
+    /**
+     * operation history depth.
+     */
+    int operationHistoryDepth = 16;
+
+    /**
+     * CQL schema agreement wait in seconds
+     */
+    int maxSchemaAgreementWaitSeconds = 30;
 }

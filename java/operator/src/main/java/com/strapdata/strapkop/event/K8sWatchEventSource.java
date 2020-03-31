@@ -119,7 +119,7 @@ public class K8sWatchEventSource<ResourceT, ResourceListT, Key> implements Event
         ResourceT resource = null;
         
         if (type == ERROR) {
-            logger.error("{} list watch failed with status={}.", adapter.getName(), response);
+            logger.error("{} list watch failed with status={} object={}.", adapter.getName(), response.status, response.object);
         } else {
             // TODO: unit test with bad a datacenter CRD causing JsonSyntaxException
             try {

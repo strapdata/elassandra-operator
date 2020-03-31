@@ -4,9 +4,12 @@ import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.Session;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import io.micronaut.context.annotation.Prototype;
+import io.reactivex.Flowable;
 import io.reactivex.Single;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * Manage CQL session during a reconciliation
@@ -44,4 +47,18 @@ public class CqlSessionHandler implements CqlSessionSupplier {
         cluster = null;
         session = null;
     }
+
+
+    @Override
+    public Single<Session> getSessionWithSchemaAgreed(DataCenter dataCenter) throws Exception {
+        return getSession(dataCenter)
+                .flatMap(s -> {
+                    if (!s.getCluster().getMetadata().checkSchemaAgreement())
+                        throw new IllegalStateException("No schema agreement");
+                    return Single.just(session);
+                })
+                .retryWhen((Flowable<Throwable> f) -> f.take(10).delay(6, TimeUnit.SECONDS));
+    }
+
+
 }

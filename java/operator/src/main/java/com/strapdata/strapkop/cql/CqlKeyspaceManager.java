@@ -2,26 +2,30 @@ package com.strapdata.strapkop.cql;
 
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.Session;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.strapdata.strapkop.StrapkopException;
+import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
+import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.cassandra.CqlStatus;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenterPhase;
-import com.strapdata.strapkop.model.k8s.task.CleanupTaskSpec;
-import com.strapdata.strapkop.model.k8s.task.RepairTaskSpec;
-import com.strapdata.strapkop.model.k8s.task.TaskSpec;
 import com.strapdata.strapkop.plugins.Plugin;
 import com.strapdata.strapkop.plugins.PluginRegistry;
+import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
+import io.kubernetes.client.models.V1Pod;
 import io.reactivex.Completable;
 import io.reactivex.CompletableSource;
+import io.reactivex.Flowable;
 import io.reactivex.Single;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 import java.util.*;
-import java.util.function.Consumer;
+import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -39,10 +43,12 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
             new CqlKeyspace().withName("system_traces").withRf(3).withRepair(false));
 
     final K8sResourceUtils k8sResourceUtils;
+    final JmxmpElassandraProxy jmxmpElassandraProxy;
 
-    public CqlKeyspaceManager(final K8sResourceUtils k8sResourceUtils) {
+    public CqlKeyspaceManager(final K8sResourceUtils k8sResourceUtils, final JmxmpElassandraProxy jmxmpElassandraProxy) {
         super();
         this.k8sResourceUtils = k8sResourceUtils;
+        this.jmxmpElassandraProxy = jmxmpElassandraProxy;
     }
 
     private String elasticAdminKeyspaceName(DataCenter dataCenter) {
@@ -185,8 +191,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
     }
 
     private Completable updateKeyspaceReplicationMap(final DataCenter dc, final String keyspace, int targetRf, final CqlSessionSupplier sessionSupplier) throws Exception {
-        return updateKeyspaceReplicationMap(dc, dc.getSpec().getDatacenterName(), keyspace, targetRf, sessionSupplier, true)
-                .onErrorComplete();
+        return updateKeyspaceReplicationMap(dc, dc.getSpec().getDatacenterName(), keyspace, targetRf, sessionSupplier, true);
     }
 
     /**
@@ -214,7 +219,10 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                     }
                     return Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()]));
                 })
-                .onErrorComplete();
+                .onErrorComplete(t -> {
+                    logger.error("datacenter="+dc.id()+" remove dc="+dcName+" error:", t);
+                    return true;
+                });
     }
 
     /**
@@ -223,7 +231,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
      * @throws StrapkopException
      */
     public Completable updateKeyspaceReplicationMap(final DataCenter dc, String dcName, final String keyspace, int targetRf, final CqlSessionSupplier sessionSupplier, boolean triggerRepairOrCleanup) throws Exception {
-        return sessionSupplier.getSession(dc)
+        return sessionSupplier.getSessionWithSchemaAgreed(dc)
                 .flatMap(session ->
                         Single.fromFuture(session.executeAsync("SELECT keyspace_name, replication FROM system_schema.keyspaces WHERE keyspace_name = ?", keyspace))
                 )
@@ -245,12 +253,26 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                             ));
                     final int currentRf = currentRfMap.getOrDefault(dcName, 0);
                     logger.debug("datacenter={} keyspace={} currentRf={} targetRf={}", dc.id(), keyspace, currentRf, targetRf);
-                    if (currentRf != targetRf) {
-                        currentRfMap.put(dcName, targetRf);
+
+                    // increase sequentially RF by one and repair to avoid quorum read issue (and elassandra_operator login issue)
+                    Completable todo = Completable.complete();
+                    for(int rf = currentRf; rf <= targetRf; rf++) {
+                        currentRfMap.put(dcName, rf);
                         if (currentRfMap.entrySet().stream().filter(e -> e.getValue() > 0).count() > 0) {
-                            return alterKeyspace(dc, sessionSupplier, keyspace, currentRfMap)
+                            todo = todo.andThen(alterKeyspace(dc, sessionSupplier, keyspace, currentRfMap)
                                     .map(s -> {
-                                        logger.debug("datacenter={} ALTER done keyspace={} replicationMap={}", dc.id(), keyspace, currentRfMap);
+                                        logger.debug("datacenter={} ALTER executed keyspace={} replicationMap={}", dc.id(), keyspace, currentRfMap);
+                                        return s;
+                                    })
+                                    // check schema agreement and wait beyond the max schema agreement wait timeout
+                                    .flatMap(s -> {
+                                        if (!s.getCluster().getMetadata().checkSchemaAgreement())
+                                            throw new IllegalStateException("No schema agreement");
+                                        return Single.just(s);
+                                    })
+                                    .retryWhen((Flowable<Throwable> f) -> f.take(20).delay(6, TimeUnit.SECONDS))
+                                    .map(s -> {
+                                        logger.debug("datacenter={} ALTER applied keyspace={} replicationMap={}", dc.id(), keyspace, currentRfMap);
                                         return s;
                                     })
                                     .flatMapCompletable(s -> {
@@ -260,39 +282,43 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                                         if (targetRf > currentRf) {
                                             // RF increased
                                             if (targetRf > 1) {
-                                                logger.info("datacenter={} Trigger a repair for keyspace={}", dc.id(), keyspace);
-                                                // TODO: trigger repair if RF is manually increased while DC was RUNNING (if RF is incremented just before scaling up, streaming propely pull data)
-                                                return k8sResourceUtils.createTask(dc, "repair", new Consumer<TaskSpec>() {
+                                                logger.info("datacenter={} Need a repair for keyspace={}", dc.id(), keyspace);
+                                                final String labelSelector = OperatorLabels.toSelector(ImmutableMap.of(OperatorLabels.PARENT, dc.getMetadata().getName()));
+                                                return Single.fromCallable(new Callable<Iterable<V1Pod>>() {
                                                     @Override
-                                                    public void accept(TaskSpec taskSpec) {
-                                                        taskSpec.setRepair(new RepairTaskSpec().setKeyspace(keyspace));
+                                                    public Iterable<V1Pod> call() throws Exception {
+                                                        return k8sResourceUtils.listNamespacedPods(dc.getMetadata().getNamespace(), null, labelSelector);
                                                     }
-                                                }).ignoreElement();
+                                                }).flatMapCompletable(podList -> {
+                                                    Completable todo2 = Completable.complete();
+                                                    for(V1Pod pod : podList) {
+                                                        logger.debug("Launch repair pod={} keyspace={}", pod.getMetadata().getName(), keyspace);
+                                                        todo2 = todo2.andThen(jmxmpElassandraProxy.repair(ElassandraPod.fromName(dc, pod.getMetadata().getName()), keyspace));
+                                                    }
+                                                    return todo2;
+                                                });
                                             }
                                         } else {
                                             // RF deacreased
                                             if (targetRf < dc.getSpec().getReplicas()) {
-                                                logger.info("datacenter={} Trigger a cleanup for keyspace={} in dc={}", dc.id(), keyspace);
-                                                // TODO: trigger cleanup when RF is manually decrease while DC was RUNNING.
-                                                return k8sResourceUtils.createTask(dc, "cleanup", new Consumer<TaskSpec>() {
-                                                    @Override
-                                                    public void accept(TaskSpec taskSpec) {
-                                                        taskSpec.setCleanup(new CleanupTaskSpec().setKeyspace(keyspace));
-                                                    }
-                                                }).ignoreElement();
+                                                dc.getStatus().getNeedCleanupKeyspaces().add(keyspace);
+                                                logger.info("datacenter={} cleanup required for keyspace={} in dc={}", dc.id(), keyspace);
                                             }
                                         }
                                         return Completable.complete();
-                                    });
+                                    }));
                         }
                     }
-                    return Completable.complete();
+                    return todo;
                 })
-                .onErrorComplete();
+                .onErrorComplete(t -> {
+                    logger.error("datacenter="+dc.id()+" update RF keyspace="+keyspace+" error:", t);
+                    return true;
+                });
     }
 
     private Single<Session> alterKeyspace(final DataCenter dc, final CqlSessionSupplier sessionSupplier, final String name, Map<String, Integer> rfMap) throws Exception {
-        return sessionSupplier.getSession(dc)
+        return sessionSupplier.getSessionWithSchemaAgreed(dc)
                 .flatMap(session -> {
                     final String query = String.format(Locale.ROOT,
                             "ALTER KEYSPACE %s WITH replication = {'class': 'NetworkTopologyStrategy', %s};",

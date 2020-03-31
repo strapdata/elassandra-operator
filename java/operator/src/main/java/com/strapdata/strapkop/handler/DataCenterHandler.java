@@ -6,21 +6,22 @@ import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.model.ClusterKey;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.Operation;
 import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.reconcilier.DataCenterController;
 import io.micrometer.core.instrument.ImmutableTag;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tag;
 import io.reactivex.Completable;
-import io.reactivex.functions.Action;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Date;
 import java.util.List;
 
 @Handler
 public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>> {
-    
+
     private final Logger logger = LoggerFactory.getLogger(DataCenterHandler.class);
     private final WorkQueues workQueues;
     private final DataCenterController dataCenterController;
@@ -38,40 +39,54 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
         this.dataCenterController = dataCenterController;
         this.dataCenterCache = dataCenterCache;
         this.meterRegistry = meterRegistry;
-        meterRegistry.gauge("k8s.managed",  tags, managed);
+        meterRegistry.gauge("k8s.managed", tags, managed);
     }
-    
+
     @Override
     public void accept(K8sWatchEvent<DataCenter> event) throws Exception {
         DataCenter dataCenter;
         logger.debug("DataCenter event={}", event);
 
         Completable completable = null;
-        switch(event.getType()) {
+        switch (event.getType()) {
             case INITIAL:
             case ADDED:
                 dataCenter = event.getResource();
-                completable = dataCenterController.initDatacenter(dataCenter);
-                meterRegistry.counter("k8s.event.added", tags).increment();
-                managed++;
+
+                workQueues.submit(new ClusterKey(event.getResource()),
+                        dataCenterController.initDatacenter(new Operation().withSubmitDate(new Date()).withDesc("dc-added"), dataCenter)
+                                .doOnComplete(() -> {
+                                    managed++;
+                                })
+                                .doFinally(() -> {
+                                    meterRegistry.counter("k8s.event.added", tags).increment();
+                                })
+                );
                 break;
             case MODIFIED:
-                meterRegistry.counter("k8s.event.modified", tags).increment();
                 dataCenter = event.getResource();
-                completable = dataCenterController.updateDatacenter(dataCenter);
+                Operation op = new Operation().withSubmitDate(new Date()).withDesc("dc-modified");
+                workQueues.submit(new ClusterKey(event.getResource()),
+                        dataCenterController.updateDatacenter(new Operation().withSubmitDate(new Date()).withDesc("dc-modified"), dataCenter)
+                                .doFinally(() -> {
+                                    meterRegistry.counter("k8s.event.modified", tags).increment();
+                                })
+                );
                 break;
             case DELETED:
                 dataCenter = event.getResource();
-                completable = dataCenterController.deleteDatacenter(dataCenter)
-                        .doOnComplete(new Action() {
-                            @Override
-                            public void run() throws Exception {
-                                final Key key = new Key(event.getResource().getMetadata());
-                                dataCenterCache.remove(key);
-                            }
-                        });
-                meterRegistry.counter("k8s.event.deleted", tags).increment();
-                managed--;
+                workQueues.submit(new ClusterKey(event.getResource()),
+                        dataCenterController.deleteDatacenter(dataCenter)
+                                .doOnComplete(() -> {
+                                    managed--;
+                                    final Key key = new Key(event.getResource().getMetadata());
+                                    dataCenterCache.remove(key);
+                                    workQueues.dispose(new ClusterKey(event.getResource()));
+                                })
+                                .doFinally(() -> {
+                                    meterRegistry.counter("k8s.event.deleted", tags).increment();
+                                })
+                );
                 break;
             case ERROR:
                 meterRegistry.counter("k8s.event.error", tags).increment();
@@ -79,7 +94,5 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
             default:
                 throw new UnsupportedOperationException("Unknown event type");
         }
-        if (completable != null)
-            workQueues.submit(new ClusterKey(event.getResource()), completable);
     }
 }

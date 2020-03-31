@@ -28,17 +28,20 @@ finish() {
   exit 1
 }
 
+# $1 = $RESOURCE_GROUP_NAME
 function create_resource_group() {
-    az group create -l westeurope -n $RESOURCE_GROUP_NAME
+    az group create -l westeurope -n $1
 }
 
+# $1 = $RESOURCE_GROUP_NAME
 function destroy_resource_group() {
-    az group delete -n $RESOURCE_GROUP_NAME
+    az group delete -n $1
 }
 
+# $1 = $RESOURCE_GROUP_NAME
 # $1 = vnet name
-function create_vnet() {
-    az network vnet create --name vnet0 -g $RESOURCE_GROUP_NAME --address-prefix 10.0.0.0/17 --subnet-name subnet0 --subnet-prefix 10.0.0.0/24
+function create_vnet0() {
+    az network vnet create --name vnet0 -g $1 --address-prefix 10.0.0.0/17 --subnet-name subnet0 --subnet-prefix 10.0.0.0/24
 }
 
 
@@ -109,17 +112,21 @@ function nodes_zone() {
     kubectl get nodes -o wide -L failure-domain.beta.kubernetes.io/zone
 }
 
-# $1 = k8s cluster IDX
+# $1 = RESOURCE_GROUP_NAME
+# $2 = K8S_CLUSTER_NAME
 function destroy_aks_cluster() {
-    az aks delete  --name "${K8S_CLUSTER_NAME}${1}" --resource-group $RESOURCE_GROUP_NAME
+    az aks delete  --name "${2}" --resource-group $1
 }
 
-# $1 = kube index
-function use_k8s_cluster() {
-	 az aks get-credentials --name "${K8S_CLUSTER_NAME}${1}" --resource-group $RESOURCE_GROUP_NAME --output table
-	 kubectl config use-context $NAMESPACE
-	 kubectl config set-context $RESOURCE_GROUP_NAME --cluster=${K8S_CLUSTER_NAME}${1}
+# $1 = RESOURCE_GROUP_NAME
+# $2 = K8S_CLUSTER_NAME
+# $2 = namespace
+function use_aks_cluster() {
+	 az aks get-credentials --name "${2}" --resource-group $1 --output table
+	 kubectl config use-context $3
+	 kubectl config set-context $1 --cluster=${2}
 }
+
 
 
 function init_helm() {

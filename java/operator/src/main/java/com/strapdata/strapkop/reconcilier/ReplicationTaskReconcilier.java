@@ -1,5 +1,6 @@
 package com.strapdata.strapkop.reconcilier;
 
+import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.cql.CqlKeyspace;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
@@ -7,17 +8,20 @@ import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.cql.CqlSessionHandler;
 import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import com.strapdata.strapkop.model.k8s.cassandra.BlockReason;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
 import com.strapdata.strapkop.model.k8s.task.ReplicationTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
 import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CustomObjectsApi;
+import io.kubernetes.client.models.V1Pod;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Infrastructure;
+import io.micronaut.scheduling.executor.ExecutorFactory;
+import io.micronaut.scheduling.executor.UserExecutorConfiguration;
 import io.reactivex.Completable;
 import io.reactivex.CompletableSource;
 import io.reactivex.Single;
@@ -25,9 +29,12 @@ import org.elasticsearch.common.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.inject.Named;
 import javax.inject.Singleton;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Update replication map.
@@ -43,6 +50,7 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
     private final JmxmpElassandraProxy jmxmpElassandraProxy;
 
     public ReplicationTaskReconcilier(ReconcilierObserver reconcilierObserver,
+                                      final OperatorConfig operatorConfig,
                                       final K8sResourceUtils k8sResourceUtils,
                                       final CustomObjectsApi customObjectsApi,
                                       final JmxmpElassandraProxy jmxmpElassandraProxy,
@@ -51,16 +59,15 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
                                       final CqlKeyspaceManager cqlKeyspaceManager,
                                       final MeterRegistry meterRegistry,
                                       final DataCenterController dataCenterController,
-                                      final DataCenterCache dataCenterCache) {
-        super(reconcilierObserver, "replication", k8sResourceUtils, meterRegistry, dataCenterController, dataCenterCache);
+                                      final DataCenterCache dataCenterCache,
+                                      ExecutorFactory executorFactory,
+                                      @Named("tasks") UserExecutorConfiguration userExecutorConfiguration) {
+        super(reconcilierObserver, "replication", operatorConfig, k8sResourceUtils, meterRegistry,
+                dataCenterController, dataCenterCache, executorFactory, userExecutorConfiguration);
         this.context = context;
         this.cqlRoleManager = cqlRoleManager;
         this.cqlKeyspaceManager = cqlKeyspaceManager;
         this.jmxmpElassandraProxy = jmxmpElassandraProxy;
-    }
-
-    public BlockReason blockReason() {
-        return BlockReason.REPLICATION;
     }
 
     /**
@@ -72,12 +79,12 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
      * @throws ApiException
      */
     @Override
-    protected Single<TaskPhase> doTask(final Task task, DataCenter dc) throws Exception {
+    protected Completable doTask(final DataCenter dc, final DataCenterStatus dataCenterStatus, final Task task, Iterable<V1Pod> pods) throws Exception {
         final ReplicationTaskSpec replicationTaskSpec = task.getSpec().getReplication();
 
         if (Strings.isNullOrEmpty(replicationTaskSpec.getDcName())) {
-            logger.warn("datacenter={} task={} dcName not set, ignoring task", dc.id(), task.id());
-            return Single.just(TaskPhase.FAILED);
+            logger.error("datacenter={} task={} dcName not set, ignoring task", dc.id(), task.id());
+            return finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.SUCCEED);
         }
 
         final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
@@ -94,49 +101,40 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
                     todo = todo.andThen(this.cqlKeyspaceManager.updateKeyspaceReplicationMap(dc, replicationTaskSpec.getDcName(), entry.getKey(), Math.min(entry.getValue(), replicationTaskSpec.getDcSize()), cqlSessionHandler, false));
                 }
 
-                final List<String> pods = task.getStatus().getPods().entrySet().stream()
-                        .filter(e -> Objects.equals(e.getValue(), TaskPhase.WAITING))
-                        .map(Map.Entry::getKey)
-                        .collect(Collectors.toList());
-
                 // flush sstables in parallel to stream properly
                 List<CompletableSource> fulshCompletables = new ArrayList<>();
-                for (String pod : pods) {
-                    fulshCompletables.add(jmxmpElassandraProxy.flush(ElassandraPod.fromName(dc, pod), null)
+                for (V1Pod v1Pod : pods) {
+                    fulshCompletables.add(jmxmpElassandraProxy.flush(ElassandraPod.fromV1Pod(v1Pod), null)
                             .toSingleDefault(task)
                             .map(t -> {
                                 // update pod status in memory (no etcd update)
-                                task.getStatus().getPods().put(pod, TaskPhase.SUCCEED);
+                                task.getStatus().getPods().put(v1Pod.getMetadata().getName(), TaskPhase.SUCCEED);
                                 return t;
                             })
                             .ignoreElement()
-                            .onErrorResumeNext(throwable -> {
-                                logger.error("datacenter={} rebuild={} Error while executing flush on source DC pod={}", dc.id(), task.id(), pod, throwable);
-                                return updateTaskPodStatus(dc, task, TaskPhase.RUNNING, pod, TaskPhase.FAILED, throwable.getMessage());
-                            })
                     );
                 }
                 return todo
                         .andThen(Completable.mergeArray(fulshCompletables.toArray(new CompletableSource[fulshCompletables.size()]))
                         .toSingleDefault(TaskPhase.SUCCEED)
-                        .flatMap(phase -> finalizeTaskStatus(dc, task))
+                        .flatMapCompletable(phase -> finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.SUCCEED))
                         .onErrorResumeNext(throwable -> {
                             logger.error("datacenter={} task={} add replication failed, error={}",
                                     dc.id(), task.id(), replicationTaskSpec.getDcName(), throwable.getMessage());
                             task.getStatus().setLastMessage(throwable.getMessage());
-                            return Single.just(TaskPhase.FAILED);
+                            return finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.FAILED);
                         }))
                         .doFinally(() -> cqlSessionHandler.close());
 
             case REMOVE:
                 return this.cqlKeyspaceManager.removeDcFromReplicationMap(dc, replicationTaskSpec.getDcName(), cqlSessionHandler)
                         .toSingleDefault(TaskPhase.SUCCEED)
-                        .flatMap(phase -> finalizeTaskStatus(dc, task))
+                        .flatMapCompletable(phase -> finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.SUCCEED))
                         .onErrorResumeNext(throwable -> {
                             logger.error("datacenter={} task={} remove replication failed, error={}",
                                     dc.id(), task.id(), replicationTaskSpec.getDcName(), throwable.getMessage());
                             task.getStatus().setLastMessage(throwable.getMessage());
-                            return Single.just(TaskPhase.FAILED);
+                            return finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.FAILED);
                         })
                         .doFinally(() -> cqlSessionHandler.close());
         }
@@ -145,7 +143,7 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
     }
 
     @Override
-    public Completable initializePodMap(Task task, DataCenter dc) {
-        return initializePodMapWithUnknownStatus(task, dc);
+    public Single<Iterable<V1Pod>> listPods(Task task, DataCenter dc) {
+        return initializePodMapWithWaitingStatus(task, dc);
     }
 }

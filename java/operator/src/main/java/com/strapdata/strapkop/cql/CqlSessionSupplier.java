@@ -10,9 +10,27 @@ import org.slf4j.LoggerFactory;
 public interface CqlSessionSupplier  {
     final Logger logger = LoggerFactory.getLogger(CqlSessionSupplier.class);
 
+    /**
+     * return a cassandra session
+     * @param dataCenter
+     * @return
+     * @throws Exception
+     */
     Single<Session> getSession(DataCenter dataCenter) throws Exception;
 
+    /**
+     * Return a session with agreed schema, meaning that we can safly update it
+     * @param dataCenter
+     * @return
+     * @throws Exception
+     */
+    Single<Session> getSessionWithSchemaAgreed(DataCenter dataCenter) throws Exception;
+
+    /**
+     * Close cassandra session
+     */
     void close();
+
 
     /*
     static void closeQuietly(Session session) {

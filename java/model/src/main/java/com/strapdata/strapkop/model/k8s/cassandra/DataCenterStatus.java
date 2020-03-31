@@ -17,15 +17,19 @@ import java.util.*;
 @NoArgsConstructor
 public class DataCenterStatus {
 
-    /**
-     * Reconciliation block
-     */
-    @SerializedName("block")
+    @SerializedName("currentOperation")
     @Expose
-    private Block block = new Block();
+    private Operation currentOperation;
 
     /**
-     * Current DC phase
+     * Last 10 operations starting from the last finished one.
+     */
+    @SerializedName("operationHistory")
+    @Expose
+    private List<Operation> operationHistory = new ArrayList();
+
+    /**
+     * Current desired DC phase
      */
     @SerializedName("phase")
     @Expose
@@ -38,9 +42,19 @@ public class DataCenterStatus {
     @Expose
     private Health health = Health.UNKNOWN;
 
+    /**
+     * True after a datacenter scale up.
+     */
     @SerializedName("needCleanup")
     @Expose
     private Boolean needCleanup = false;
+
+    /**
+     * Keyspaces requiring cleanup after RF decrease.
+     */
+    @SerializedName("needCleanupKeyspaces")
+    @Expose
+    private Set<String> needCleanupKeyspaces = new HashSet<>();
 
     /**
      * A datacenter is bootstrapped when at least one node has joined the datacenter.
@@ -48,16 +62,6 @@ public class DataCenterStatus {
     @SerializedName("bootstrapped")
     @Expose
     private Boolean bootstrapped = false;
-
-
-    @SerializedName("lastAction")
-    @Expose
-    private String lastAction = null;
-
-    @SerializedName("lastActionTime")
-    @Expose
-    @JsonAdapter(GsonIsoDateAdapter.class)
-    private Date   lastActionTime = null;
 
 
     @SerializedName("lastError")

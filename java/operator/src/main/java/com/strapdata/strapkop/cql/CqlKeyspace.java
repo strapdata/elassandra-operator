@@ -33,8 +33,8 @@ public class CqlKeyspace {
     public Single<CqlKeyspace> createIfNotExistsKeyspace(final DataCenter dataCenter, final CqlSessionSupplier sessionSupplier) throws Exception {
         return (rf <= 0) ?
                 Single.just(this) :
-                sessionSupplier.getSession(dataCenter)
-                    .flatMap(session -> {
+                sessionSupplier.getSessionWithSchemaAgreed(dataCenter)
+                        .flatMap(session -> {
                         int targetRf = Math.max(1, Math.min(rf, dataCenter.getSpec().getReplicas()));
                         String query = String.format(Locale.ROOT, "CREATE KEYSPACE IF NOT EXISTS \"%s\" WITH replication = {'class': 'NetworkTopologyStrategy', '%s':'%d'}; ",
                                 name, dataCenter.getSpec().getDatacenterName(), targetRf);
