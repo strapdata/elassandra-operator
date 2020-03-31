@@ -8,8 +8,12 @@ micronaut:
         reaper:
             type: FIXED
             number-of-threads: 2
+        tasks:
+            type: FIXED
+            number-of-threads: 8
         status:
             type: WORK_STEALING
+
     router:
         static-resources:
             swagger:

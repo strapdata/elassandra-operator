@@ -7,6 +7,7 @@ import com.strapdata.strapkop.model.ClusterKey;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.Operation;
 import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.reconcilier.DataCenterController;
 import io.kubernetes.client.models.V1StatefulSet;
@@ -19,6 +20,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
+import java.util.Date;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
@@ -74,9 +76,10 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
                     if (dataCenter != null) {
                         logger.info("datacenter={} sts={}/{} is ready, triggering a dc statefulSetUpdate",
                                 dataCenter.id(), sts.getMetadata().getName(), sts.getMetadata().getNamespace());
+                        Operation op = new Operation().withSubmitDate(new Date()).withDesc("updated statefulset="+sts.getMetadata().getName());
                         workQueues.submit(
                                 new ClusterKey(clusterName, sts.getMetadata().getNamespace()),
-                                dataCenterController.statefulsetUpdate(dataCenter, sts)
+                                dataCenterController.statefulsetUpdate(op, dataCenter, sts)
                                         .onErrorComplete(t -> {
                                             logger.warn("datcenter={} statefulSetUpdate failed: {}", dataCenter.id(), t.toString());
                                             return t instanceof NoSuchElementException;

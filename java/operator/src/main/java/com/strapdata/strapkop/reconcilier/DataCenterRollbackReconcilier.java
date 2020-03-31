@@ -61,7 +61,7 @@ public class DataCenterRollbackReconcilier extends Reconcilier<Key> {
                             }
                             dc.getStatus().setLastError(e.toString());
                             dc.getStatus().setLastErrorTime(new Date());
-                            k8sResourceUtils.updateDataCenterStatus(dc);
+                            k8sResourceUtils.updateDataCenterStatus(dc, dc.getStatus());
                         }
                         throw e;
                     }

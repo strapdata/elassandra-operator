@@ -46,6 +46,7 @@ import java.security.SecureRandom;
 import java.security.Security;
 import java.security.cert.X509Certificate;
 import java.util.*;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
@@ -176,6 +177,17 @@ public class JmxmpElassandraProxy {
                 });
     }
 
+    public Single<Tuple2<StorageServiceMBean,JMXConnector>> getMBeanProvider(ElassandraPod pod) throws MalformedURLException {
+        return getMbeanServerConn(pod)
+                .map(jmxConnector -> {
+                    logger.debug("storageServiceMBeanProvider pod={}", pod);
+                    MBeanServerConnection mBeanServerConnection = jmxConnector.getMBeanServerConnection();
+                    StorageServiceMBean storageServiceMBean = JMX.newMBeanProxy(mBeanServerConnection, STORAGE_SERVICE_MBEAN_NAME, StorageServiceMBean.class);
+                    logger.debug("storageServiceMBeanProvider storageServiceMBean={}", storageServiceMBean);
+                    return new Tuple2<>(storageServiceMBean, jmxConnector);
+                });
+    }
+
     public Single<EndpointSnitchInfoMBean> endpointSnitchInfoMBean(ElassandraPod pod) throws MalformedURLException {
         return getMbeanServerConn(pod)
                 .map(jmxConnector -> {
@@ -257,7 +269,15 @@ public class JmxmpElassandraProxy {
                     storageServiceMBean.removeNode(hostId);
                     logger.info("node removed pod={}", pod.id());
                     return storageServiceMBean;
-                }).ignoreElement();
+                })
+                .ignoreElement()
+                .onErrorResumeNext(t -> {
+                    if (t instanceof UnsupportedOperationException) {
+                        logger.info("Cannot remove node={} cause={}, trying to decommission pod={}", hostId, t.getMessage(), pod);
+                        return decomission(pod);
+                    }
+                    return Completable.error(t);
+                });
     }
 
     public Completable removeDcNodes(ElassandraPod pod, String dcName) throws MalformedURLException {
@@ -299,10 +319,38 @@ public class JmxmpElassandraProxy {
                 }).ignoreElement();
     }
 
-    public Completable repair(ElassandraPod pod, String keyspace) throws MalformedURLException {
+    public void repairAsync(final StorageServiceMBean storageServiceMBean, JMXConnector jmxc, final String keyspace, Map<String, String> options) throws IOException
+    {
+        RepairRunner runner = new RepairRunner(storageServiceMBean, keyspace, options);
+        try
+        {
+            jmxc.addConnectionNotificationListener(runner, null, null);
+            storageServiceMBean.addNotificationListener(runner, null, null);
+            runner.run();
+        }
+        catch (Exception e)
+        {
+            throw new IOException(e) ;
+        }
+        finally
+        {
+            try
+            {
+                storageServiceMBean.removeNotificationListener(runner);
+                jmxc.removeConnectionNotificationListener(runner);
+            }
+            catch (Throwable e)
+            {
+                logger.error("Exception occurred during clean-up", e);
+            }
+        }
+    }
+
+    public Completable repairAsync(ElassandraPod pod, String keyspace) throws MalformedURLException {
         return storageServiceMBeanProvider(pod)
                 .map(storageServiceMBean -> {
                     Map<String, String> options = new HashMap<>();
+                    options.put("parallelism", "sequential");
                     options.put("incremental", Boolean.FALSE.toString());
                     options.put("primaryRange", Boolean.TRUE.toString());
                     final List<String> keyspaces = keyspace == null ? storageServiceMBean.getNonLocalStrategyKeyspaces() : ImmutableList.of(keyspace);
@@ -312,6 +360,30 @@ public class JmxmpElassandraProxy {
                     }
                     return storageServiceMBean;
                 }).ignoreElement();
+    }
+
+    // sequential synchronous repair
+    public Completable repair(ElassandraPod pod, String keyspace) throws MalformedURLException {
+        return getMBeanProvider(pod)
+                .flatMapCompletable(tuple -> {
+                    Map<String, String> options = new HashMap<>();
+                    options.put("parallelism", "sequential");
+                    options.put("incremental", Boolean.FALSE.toString());
+                    options.put("primaryRange", Boolean.TRUE.toString());
+                    final List<String> keyspaces = keyspace == null ? tuple._1.getNonLocalStrategyKeyspaces() : ImmutableList.of(keyspace);
+                    Completable todo = Completable.complete();
+                    for (String ks : keyspaces) {
+                        todo = todo.andThen(Completable.fromCallable(new Callable<Object>() {
+                                   @Override
+                                    public Object call() throws Exception {
+                                        repairAsync(tuple._1, tuple._2, keyspace, options);
+                                        return null;
+                                    }
+                                }));
+                        logger.info("Repair requested for keyspace={} pod={}", ks, pod.id());
+                    }
+                    return todo;
+                });
     }
 
     public Completable rebuild(ElassandraPod pod, String srcDcName, String keyspace) throws MalformedURLException {

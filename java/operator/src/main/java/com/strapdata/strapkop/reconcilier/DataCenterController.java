@@ -13,6 +13,7 @@ import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
+import com.strapdata.strapkop.model.k8s.cassandra.Operation;
 import com.strapdata.strapkop.model.k8s.cassandra.ReaperPhase;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.plugins.PluginRegistry;
@@ -78,14 +79,9 @@ public class DataCenterController {
         this.reaperPlugin = reaperPlugin;
     }
 
-    public Completable reconcile(DataCenter dataCenter, boolean withLock, Completable action) throws Exception {
+    public Completable reconcile(DataCenter dataCenter, Completable action) throws Exception {
         return reconcilierObserver.onReconciliationBegin().toSingleDefault(dataCenter)
                 .flatMapCompletable(dc -> {
-                    if (withLock && dc.getStatus() != null && dc.getStatus().getBlock().isLocked()) {
-                        logger.info("datacenter={} Do not reconcile block reasons={} as a task is already being executed ({})",
-                                dc.id(), dc.getStatus().getBlock().getReasons(), dc.getStatus().getCurrentTask());
-                        return Completable.complete();
-                    }
                     try {
                         // call the statefullset reconciliation  (before scaling up/down to properly stream data according to the adjusted RF)
                         logger.trace("datacenter={} processing a DC reconciliation", dc.id());
@@ -98,7 +94,7 @@ public class DataCenterController {
                             }
                             dc.getStatus().setLastError(e.toString());
                             dc.getStatus().setLastErrorTime(new Date());
-                            return k8sResourceUtils.updateDataCenterStatus(dc).flatMapCompletable(o -> { throw e; });
+                            return k8sResourceUtils.updateDataCenterStatus(dc, dc.getStatus()).flatMapCompletable(o -> { throw e; });
                         }
                         throw e;
                     }
@@ -111,20 +107,20 @@ public class DataCenterController {
     /**
      * Called when the DC CRD is updated, involving a rolling update of sts.
      */
-    public Completable initDatacenter(DataCenter dc) throws Exception {
-        return reconcile(dc, false,
+    public Completable initDatacenter(Operation op, DataCenter dc) throws Exception {
+        return reconcile(dc,
                 fetchExistingStatefulSetsByZone(dc)
-                        .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dc).setStatefulSetTreeMap(stsMap))
+                        .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dc, op).setStatefulSetTreeMap(stsMap))
                 .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.initDatacenter()));
     }
 
     /**
      * Called when the DC CRD is updated, involving a rolling update of sts.
      */
-    public Completable updateDatacenter(DataCenter dc) throws Exception {
-        return reconcile(dc, true,
+    public Completable updateDatacenter(Operation op, DataCenter dc) throws Exception {
+        return reconcile(dc,
                 fetchExistingStatefulSetsByZone(dc)
-                        .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dc).setStatefulSetTreeMap(stsMap))
+                        .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dc, op).setStatefulSetTreeMap(stsMap))
                 .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.updateDatacenter()));
     }
 
@@ -134,21 +130,23 @@ public class DataCenterController {
      * 1 - apply the desired spec to all sts
      * 2 - scale up/down or park/unpark dc.
      */
-    public Completable statefulsetUpdate(DataCenter dataCenter, V1StatefulSet sts) throws Exception {
-        return reconcile(dataCenter, false,
+    public Completable statefulsetUpdate(Operation op, DataCenter dataCenter, V1StatefulSet sts) throws Exception {
+        return reconcile(dataCenter,
                 fetchExistingStatefulSetsByZone(dataCenter)
-                        .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dataCenter).setStatefulSetTreeMap(stsMap))
+                        .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dataCenter, op).setStatefulSetTreeMap(stsMap))
                 .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.statefulsetUpdate(sts)));
     }
 
-    public Completable deploymentAvailable(DataCenter dataCenter, V1Deployment deployment) throws Exception {
+    public Completable deploymentAvailable(Operation op, DataCenter dataCenter, V1Deployment deployment) throws Exception {
         String app = deployment.getMetadata().getLabels().get(OperatorLabels.APP);
         if ("reaper".equals(app)) {
             // notify the reaper pligin that deployment is available
             dataCenter.getStatus().setReaperPhase(ReaperPhase.RUNNING);
-            return reconcile(dataCenter, false,
+            return reconcile(dataCenter,
                     reaperPlugin.reconcile(dataCenter)
-                    .flatMapCompletable(b -> k8sResourceUtils.updateDataCenterStatus(dataCenter).ignoreElement()));
+                    .flatMapCompletable(b -> {
+                        return k8sResourceUtils.updateDataCenterStatus(dataCenter, dataCenter.getStatus()).ignoreElement();
+                    }));
         }
         return Completable.complete();
     }
@@ -156,10 +154,13 @@ public class DataCenterController {
     public Completable unschedulablePod(Pod pod) throws Exception {
         final Key key = new Key(pod.getParent(), pod.getNamespace());
         DataCenter dc = dataCenterCache.get(key);
-
-        return reconcile(dc, false,
-                Single.just(context.createBean(DataCenterUpdateAction.class, dc))
-                        .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.unschedulablePod(pod)));
+        Operation op = new Operation().withSubmitDate(new Date()).withDesc("unschedulable pod="+pod.getName());
+        return reconcile(dc,
+                fetchExistingStatefulSetsByZone(dc)
+                        .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dc, op).setStatefulSetTreeMap(stsMap))
+                        .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.unschedulablePod(pod))
+                        .andThen(k8sResourceUtils.updateDataCenterStatus(dc, dc.getStatus()).ignoreElement())
+        );
     }
 
     /**
@@ -183,10 +184,13 @@ public class DataCenterController {
     }
 
     public Completable taskDone(final DataCenter dc, final Task task) throws Exception {
-        return reconcile(dc, true,
-                Single.just(context.createBean(DataCenterUpdateAction.class, dc))
-                        .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.taskDone(task))
-                        .andThen(k8sResourceUtils.updateDataCenterStatus(dc).ignoreElement()));
+        return reconcile(dc,
+                fetchExistingStatefulSetsByZone(dc)
+                        .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dc,
+                                new Operation().withSubmitDate(new Date()).withDesc("dc-after-task-"+task.getMetadata().getName()))
+                        .setStatefulSetTreeMap(stsMap))
+                        .flatMapCompletable(dataCenterUpdateAction ->  dataCenterUpdateAction.taskDone(task))
+                        .andThen(k8sResourceUtils.updateDataCenterStatus(dc, dc.getStatus()).ignoreElement()));
     }
 
     /**

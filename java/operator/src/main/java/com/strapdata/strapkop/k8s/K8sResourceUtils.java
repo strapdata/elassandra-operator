@@ -12,6 +12,7 @@ import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenterList;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskList;
 import com.strapdata.strapkop.model.k8s.task.TaskSpec;
@@ -941,11 +942,11 @@ public class K8sResourceUtils {
         });
     }
 
-    public Single<Object> updateDataCenterStatus(final DataCenter dc) throws ApiException {
+    public Single<Object> updateDataCenterStatus(final DataCenter dc, final DataCenterStatus dcStatus) throws ApiException {
         // read before write to avoid 409 conflict
         return readDatacenter(new Key(dc.getMetadata()))
                 .map(currentDc -> {
-                    currentDc.setStatus(dc.getStatus());
+                    currentDc.setStatus(dcStatus);
                     return currentDc;
                 })
                 .flatMap(currentDc ->
