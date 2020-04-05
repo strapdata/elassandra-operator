@@ -22,10 +22,9 @@ configure(subprojects.findAll { it.name.contains("docker") }) {
   apply plugin: 'com.bmuschko.docker-remote-api'
   docker {
     registryCredentials {
-      url = registryUrl
-      username = registryUsername
-      password = registryPassword
-      email = registryEmail
+      url = project.registryUrl
+      username = project.registryUsername
+      password = project.registryPassword
     }
   }
 }
