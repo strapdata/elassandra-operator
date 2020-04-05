@@ -13,9 +13,9 @@ plugins {
 
 ext {
   allowInsecureRegistries = true
-  registryUrl = project.hasProperty("registryUrl") ? project.ge("registryUrl") : System.getenv("DOCKER_URL")
-  registryUsername = project.hasProperty("registryUsername") ? project.ge("registryUsername") : System.getenv("DOCKER_USERNAME")
-  registryPassword = project.hasProperty("registryPassword") ? project.ge("registryPassword") : System.getenv("DOCKER_PASSWORD")
+  registryUrl = project.hasProperty("registryUrl") ? project.getProperty("registryUrl") : System.getenv("DOCKER_URL")
+  registryUsername = project.hasProperty("registryUsername") ? project.getProperty("registryUsername") : System.getenv("DOCKER_USERNAME")
+  registryPassword = project.hasProperty("registryPassword") ? project.getProperty("registryPassword") : System.getenv("DOCKER_PASSWORD")
 
   println "registryUrl=$registryUrl"
   println "registryUsername=$registryUsername"

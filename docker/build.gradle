@@ -34,20 +34,17 @@ task dockerBuildImage {
 
 task dockerPushImageLatest(type: DockerPushImage) {
   dependsOn 'dockerBuildImage'
-  images = elassandraImageName
-  tag = "latest"
+  images = [ elassandraImageName + ":latest" ]
 }
 
 task dockerPushImageOperatorGitCommitHash(type: DockerPushImage) {
   dependsOn 'dockerBuildImage'
-  images = elassandraImageName
-  tag = project.gitCommitHash
+  images = [ elassandraImageName + ":" + project.gitCommitHash ]
 }
 
 task dockerPushImageElassandraVersion(type: DockerPushImage) {
   dependsOn 'dockerBuildImage'
-  images = elassandraImageName
-  tag = elassandraVersions[0]
+  images = [ elassandraImageName + ":" + elassandraVersions[0] ]
 }
 
 task dockerPushImage {
@@ -61,10 +58,10 @@ elassandraVersions.each { v ->
   task "dockerBuildImage${normalizeVersion(v)}" (type: DockerBuildImage) {
       dependsOn 'copyJar'
       inputDir = file('.')
-      tags.add(elassandraImageName + ":" + v)
+      images.add( elassandraImageName+ ":" + v )
       if (v == elassandraVersions[0]) {
-        tags.add(elassandraImageName + ":" + "latest")
-        tags.add(elassandraImageName + ":" + project.gitCommitHash)
+        images.add(elassandraImageName + ":" + "latest")
+        images.add(elassandraImageName + ":" + project.gitCommitHash)
       }
 
       buildArgs = [
@@ -75,8 +72,7 @@ elassandraVersions.each { v ->
 
   task "dockerPushImage${normalizeVersion(v)}" (type: DockerPushImage) {
     dependsOn "dockerBuildImage${normalizeVersion(v)}"
-    images = elassandraImageName
-    tag = v
+    images = [ elassandraImageName + ":" + v ]
     url = registryUrl
   }
 }
