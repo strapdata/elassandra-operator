@@ -23,11 +23,9 @@ cache:
   - "$HOME/google-cloud-sdk/"
 services:
 - docker
-
 before_install:
-  - echo "{$AZ_PASSWORD}" | docker login -u "${AZ_USERNAME}" --password-stdin https://strapdata.azurecr.io
-  - echo "{$NEXUS_PASSWORD}" | docker login -u "${NEXUS_USERNAME}" --password-stdin https://docker.repo.strapdata.com
-
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin strapdata.azurecr.io
+  - echo "$NEXUS_PASSWORD" | docker login -u "$NEXUS_USERNAME" --password-stdin https://docker.repo.strapdata.com
 install:
 - "./gradlew --version"
 # Installing Helm
@@ -45,10 +43,11 @@ deploy:
     -Dorg.gradle.project.dockerImagePrefix="docker.repo.strapdata.com/strapdata/elassandra-"
     -Dorg.gradle.project.dockerImageSuffix="-dev"
     -Dorg.gradle.project.elassandraParentImage="strapdata/elassandra-enterprise"
+  - ./gradlew publish -PrepoUsername=$NEXUS_USERNAME -PrepoPassword="$NEXUS_PASSWORD"
   on:
     tags: false
     all_branches: true
-    condition: $TRAVIS_BRANCH =~ ^develop-.*
+#    condition: $TRAVIS_BRANCH =~ ^develop-.*
 
 - provider: script
   skip_cleanup: true
@@ -57,11 +56,11 @@ deploy:
     -Dorg.gradle.project.dockerImagePrefix="docker.repo.strapdata.com/strapdata/elassandra-"
     -Dorg.gradle.project.dockerImageSuffix=""
     -Dorg.gradle.project.elassandraParentImage="strapdata/elassandra-enterprise"
-
   - ./gradlew dockerPush -PregistryUsername=$AZ_USERNAME -PregistryPassword=$AZ_PASSWORD
     -Dorg.gradle.project.dockerImagePrefix="strapdata.azurecr.io/strapdata/elassandra-"
     -Dorg.gradle.project.dockerImageSuffix=""
     -Dorg.gradle.project.elassandraParentImage="strapdata/elassandra-enterprise"
+  - ./gradlew publish -PrepoUsername=$NEXUS_USERNAME -PrepoPassword="$NEXUS_PASSWORD"
   # push to GCR.IO done by the marketplace repository
   on:
     tags: true
