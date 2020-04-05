@@ -52,6 +52,13 @@ public class KibanaPlugin extends AbstractPlugin {
         super(context, k8sResourceUtils, authorityManager, coreApi, appsApi, operatorConfig, meterRegistry);
     }
 
+    @Override
+    public  Map<String, String> deploymentLabelSelector(DataCenter dc) {
+        return ImmutableMap.of(OperatorLabels.APP,"kibana",
+                OperatorLabels.PARENT, dc.getMetadata().getName(),
+                OperatorLabels.MANAGED_BY, OperatorLabels.ELASSANDRA_OPERATOR);
+    }
+
     /**
      * Default space with empty name
      */
@@ -106,7 +113,8 @@ public class KibanaPlugin extends AbstractPlugin {
 
     public static Map<String, String> kibanaLabels(DataCenter dataCenter, String kibanaSpaceName) {
         final Map<String, String> labels = new HashMap<>(OperatorLabels.datacenter(dataCenter));
-        labels.put("app", kibanaSpaceName); // overwrite label app
+        labels.put(OperatorLabels.APP, "kibana"); // overwrite label app
+        labels.put("kibana-space", kibanaSpaceName); // overwrite label app
         return labels;
     }
 
@@ -115,45 +123,51 @@ public class KibanaPlugin extends AbstractPlugin {
         return dataCenter.getSpec().getElasticsearchEnabled() && dataCenter.getSpec().getKibana().getEnabled();
     }
 
+
     @Override
     public Single<Boolean> reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
         logger.trace("datacenter={} kibana.spec={}", dataCenter.id(), dataCenter.getSpec().getKibana());
         Set<String> deployedKibanaSpaces = dataCenter.getStatus().getKibanaSpaceNames();
         Map<String, KibanaSpace> desiredKibanaMap = getKibanaSpaces(dataCenter);
 
-        if ((dataCenter.getSpec().getKibana().getEnabled() == false || desiredKibanaMap.size() == 0 || dataCenter.getSpec().isParked()) && !deployedKibanaSpaces.isEmpty()) {
-            return delete(dataCenter)
-                    .map(s -> {
-                        dataCenter.getStatus().setKibanaSpaceNames(new HashSet<>());
-                        return true;
-                    });
-        }
+        return this.listDeployments(dataCenter)
+                .flatMap(deployments -> {
+                    logger.debug("datacenter={} parked={} deployments.size={}", dataCenter.id(), dataCenter.getSpec().isParked(), deployments.size());
+                    if ((dataCenter.getSpec().getKibana().getEnabled() == false || desiredKibanaMap.size() == 0 || dataCenter.getSpec().isParked()) &&
+                            !deployments.isEmpty()) {
+                        return delete(dataCenter)
+                                .map(s -> {
+                                    dataCenter.getStatus().setKibanaSpaceNames(new HashSet<>());
+                                    return true;
+                                });
+                    }
 
-        Set<String> deletedSpaces = Sets.difference(deployedKibanaSpaces, desiredKibanaMap.keySet());
-        Completable deleteCompletable = deletedSpaces.isEmpty() ?
-                Completable.complete() :
-                io.reactivex.Observable.fromIterable(deletedSpaces)
-                .flatMapCompletable(spaceToDelete -> {
-                    logger.debug("Deleting kibana space={}", spaceToDelete);
-                    dataCenter.getStatus().getKibanaSpaceNames().remove(spaceToDelete);
-                    return delete(dataCenter, spaceToDelete);
-                });
+                    Set<String> deletedSpaces = Sets.difference(deployedKibanaSpaces, desiredKibanaMap.keySet());
+                    Completable deleteCompletable = deletedSpaces.isEmpty() ?
+                            Completable.complete() :
+                            io.reactivex.Observable.fromIterable(deletedSpaces)
+                                    .flatMapCompletable(spaceToDelete -> {
+                                        logger.debug("Deleting kibana space={}", spaceToDelete);
+                                        dataCenter.getStatus().getKibanaSpaceNames().remove(spaceToDelete);
+                                        return delete(dataCenter, spaceToDelete);
+                                    });
 
-        Set<String> newSpaces = Sets.difference(getKibanaSpaces(dataCenter).keySet(), deployedKibanaSpaces);
-        Completable createCompletable = newSpaces.isEmpty() ?
-                Completable.complete() :
-                io.reactivex.Observable.fromIterable(getKibanaSpaces(dataCenter).values().stream().filter(k -> newSpaces.contains(k.getName())).collect(Collectors.toList()))
-                .flatMapCompletable(kibanaSpace -> {
-                    logger.debug("Adding kibana space={}", kibanaSpace);
-                    dataCenter.getStatus().getKibanaSpaceNames().add(kibanaSpace.getName());
-                    return createOrReplaceKibanaObjects(dataCenter, kibanaSpace);
-                });
+                    Set<String> newSpaces = Sets.difference(getKibanaSpaces(dataCenter).keySet(), deployedKibanaSpaces);
+                    Completable createCompletable = newSpaces.isEmpty() ?
+                            Completable.complete() :
+                            io.reactivex.Observable.fromIterable(getKibanaSpaces(dataCenter).values().stream().filter(k -> newSpaces.contains(k.getName())).collect(Collectors.toList()))
+                                    .flatMapCompletable(kibanaSpace -> {
+                                        logger.debug("Adding kibana space={}", kibanaSpace);
+                                        dataCenter.getStatus().getKibanaSpaceNames().add(kibanaSpace.getName());
+                                        return createOrReplaceKibanaObjects(dataCenter, kibanaSpace);
+                                    });
 
-        return deleteCompletable.andThen(createCompletable)
-                .toSingleDefault(!deletedSpaces.isEmpty() || !newSpaces.isEmpty())
-                .map(s -> {
-                    dataCenter.getStatus().setKibanaSpaceNames(getKibanaSpaces(dataCenter).keySet());
-                    return s;
+                    return deleteCompletable.andThen(createCompletable)
+                            .toSingleDefault(!deletedSpaces.isEmpty() || !newSpaces.isEmpty())
+                            .map(s -> {
+                                dataCenter.getStatus().setKibanaSpaceNames(getKibanaSpaces(dataCenter).keySet());
+                                return s;
+                            });
                 });
     }
 

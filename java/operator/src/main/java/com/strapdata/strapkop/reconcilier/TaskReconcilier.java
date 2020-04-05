@@ -113,8 +113,9 @@ public abstract class TaskReconcilier extends Reconcilier<Task> {
                 break;
             }
         }
-        taskStatus.setPhase(taskPhase);
-        logger.debug("task={} finalized phase={}", task.id(), taskPhase);
+        final TaskPhase taskPhaseFinal = taskPhase;
+        taskStatus.setPhase(taskPhaseFinal);
+        logger.debug("task={} finalized phase={}", task.id(), taskPhaseFinal);
         return k8sResourceUtils.updateTaskStatus(task)
                 .flatMapCompletable(p -> {
                     if (task.getStatus() == null)
@@ -138,6 +139,10 @@ public abstract class TaskReconcilier extends Reconcilier<Task> {
                         history.remove(operatorConfig.getOperationHistoryDepth());
                     dataCenterStatus.setOperationHistory(history);
 
+                    if (TaskPhase.SUCCEED.equals(taskPhaseFinal)) {
+                        // datacenter is rebuild and ready to use.
+                        dataCenterStatus.setBootstrapped(true);
+                    }
                     logger.debug("update status taskStatus={} datacenterStatus={}", task.getStatus(), dataCenterStatus);
                     return k8sResourceUtils.updateDataCenterStatus(dc, dataCenterStatus).ignoreElement();
                 });

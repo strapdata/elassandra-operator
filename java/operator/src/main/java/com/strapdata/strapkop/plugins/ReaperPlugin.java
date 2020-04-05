@@ -6,7 +6,10 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
-import com.strapdata.strapkop.cql.*;
+import com.strapdata.strapkop.cql.CqlKeyspace;
+import com.strapdata.strapkop.cql.CqlKeyspaceManager;
+import com.strapdata.strapkop.cql.CqlRole;
+import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
@@ -76,6 +79,11 @@ public class ReaperPlugin extends AbstractPlugin {
     public static final CqlKeyspace REAPER_KEYSPACE = new CqlKeyspace(REAPER_KEYSPACE_NAME, 3, true);
 
     @Override
+    public  Map<String, String> deploymentLabelSelector(DataCenter dc) {
+        return reaperLabels(dc);
+    }
+
+    @Override
     public void syncKeyspaces(final CqlKeyspaceManager cqlKeyspaceManager, final DataCenter dataCenter) {
         if (dataCenter.getSpec().getReaper().getEnabled()) {
             cqlKeyspaceManager.addIfAbsent(dataCenter, REAPER_KEYSPACE.getName(), () -> REAPER_KEYSPACE);
@@ -108,42 +116,51 @@ public class ReaperPlugin extends AbstractPlugin {
 
 
     public static Map<String, String> reaperLabels(DataCenter dataCenter) {
-        final Map<String, String> labels = new HashMap<>(OperatorLabels.datacenter(dataCenter));
-        labels.put("app", "reaper"); // overwrite label app
-        return labels;
+        return ImmutableMap.of(
+                OperatorLabels.APP, "reaper",
+                OperatorLabels.MANAGED_BY, OperatorLabels.ELASSANDRA_OPERATOR,
+                OperatorLabels.PARENT, dataCenter.getMetadata().getName()
+        );
     }
 
     @Override
     public Single<Boolean> reconcile(DataCenter dataCenter) throws ApiException, StrapkopException, IOException {
         logger.trace("datacenter={} reaper.spec={}", dataCenter.id(), dataCenter.getSpec().getReaper());
-        if (dataCenter.getSpec().getReaper() == null || !dataCenter.getSpec().getReaper().getEnabled() || dataCenter.getSpec().isParked()) {
-            return delete(dataCenter).map(b -> {
-                dataCenter.getStatus().setReaperPhase(ReaperPhase.NONE);
-                return true;
-            });
-        }
 
-        switch(dataCenter.getStatus().getReaperPhase()) {
-            case NONE:
-                CqlRole reaperRole = cqlRoleManager.get(dataCenter, REAPER_ROLE.getUsername());
-                if (reaperRole != null && reaperRole.isApplied()) {
-                    return createOrReplaceReaperObjects(dataCenter).map(b -> {
-                        dataCenter.getStatus().setReaperPhase(ReaperPhase.DEPLOYED);
-                        return true;
-                    });
-                }
-                break;
-            case DEPLOYED:
-                break;
+        boolean reaperEnabled = dataCenter.getSpec().getReaper() != null && dataCenter.getSpec().getReaper().getEnabled();
+        ReaperPhase reaperPhase = (dataCenter.getStatus().getReaperPhase() == null) ? ReaperPhase.NONE : dataCenter.getStatus().getReaperPhase();
 
-            case RUNNING:
-                return register(dataCenter).toSingleDefault(true);
+        return this.listDeployments(dataCenter)
+                .flatMap(deployments -> {
+                    if ((!reaperEnabled || dataCenter.getSpec().isParked()) && !deployments.isEmpty()) {
+                        return delete(dataCenter).map(b -> {
+                            dataCenter.getStatus().setReaperPhase(ReaperPhase.NONE);
+                            return true;
+                        });
+                    }
 
-            case REGISTERED:
-                // TODO: schedule/unschedule repairs
-                break;
-        }
-        return Single.just(false);
+                    switch(reaperPhase) {
+                        case NONE:
+                            CqlRole reaperRole = cqlRoleManager.get(dataCenter, REAPER_ROLE.getUsername());
+                            if (reaperRole != null && reaperRole.isApplied()) {
+                                return createOrReplaceReaperObjects(dataCenter).map(b -> {
+                                    dataCenter.getStatus().setReaperPhase(ReaperPhase.DEPLOYED);
+                                    return true;
+                                });
+                            }
+                            break;
+                        case DEPLOYED:
+                            break;
+
+                        case RUNNING:
+                            return register(dataCenter).toSingleDefault(true);
+
+                        case REGISTERED:
+                            // TODO: schedule/unschedule repairs
+                            break;
+                    }
+                    return Single.just(false);
+                });
     }
 
     @Override

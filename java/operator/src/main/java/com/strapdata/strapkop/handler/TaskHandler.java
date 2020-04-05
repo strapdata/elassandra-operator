@@ -86,6 +86,7 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
                 );
 
                 TaskStatus taskStatus = task.getStatus();
+                logger.debug("task={} taskStatus={}", task.id(), taskStatus);
                 if (taskStatus == null || taskStatus.getPhase() == null || !taskStatus.getPhase().isTerminated()) {
                     // execute task
                     task = event.getResource();

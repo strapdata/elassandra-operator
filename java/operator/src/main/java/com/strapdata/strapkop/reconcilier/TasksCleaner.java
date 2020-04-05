@@ -1,4 +1,4 @@
-package com.strapdata.strapkop.utils;
+package com.strapdata.strapkop.reconcilier;
 
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.OperatorConfig;
@@ -17,8 +17,8 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 @Singleton
-public class ElassandraTasksCleaner {
-    private static final Logger logger = LoggerFactory.getLogger(ElassandraTasksCleaner.class);
+public class TasksCleaner {
+    private static final Logger logger = LoggerFactory.getLogger(TasksCleaner.class);
     private Timer cleanerThread;
 
     @Inject
@@ -31,7 +31,7 @@ public class ElassandraTasksCleaner {
     @Async
     void onStartup(ServiceStartedEvent event) {
         this.cleanerThread = new Timer("elassandra-tasks-cleaner", true);
-        final long retention = (int) operatorConfig.getTaskRetention().getSeconds();
+        final int retention = (int) operatorConfig.getTaskRetention().getSeconds();
         // start cleaner thread after 60s and execute it every hour
         cleanerThread.schedule(new Cleaner(retention, operatorConfig.getNamespace()), 60_000l, 3_600_000l);
     }
@@ -45,10 +45,10 @@ public class ElassandraTasksCleaner {
     }
 
     private class Cleaner extends TimerTask {
-        private final long retentionInMs;
+        private final int retentionInMs;
         private final String namespace;
 
-        public Cleaner(long retentionInMs, String namespace) {
+        public Cleaner(int retentionInMs, String namespace) {
             this.retentionInMs = retentionInMs;
             this.namespace = namespace;
         }
@@ -58,18 +58,18 @@ public class ElassandraTasksCleaner {
             try {
                 Iterable<Task> tasks = k8sResourceUtils.listNamespacedTask(namespace, null);
                 tasks.forEach((task) -> {
-                    if (task.getMetadata().getCreationTimestamp().plusMillis( (int) retentionInMs).isBeforeNow()) {
-                        logger.debug("Clear terminated task '{}' older than {} ms", task.getMetadata().getName(), retentionInMs);
+                    if (task.getMetadata().getCreationTimestamp().plusMillis(retentionInMs).isBeforeNow()) {
+                        logger.debug("Clearing task '{}' older than {} ms", task.getMetadata().getName(), retentionInMs);
                         // trigger the deletion but not wait the end.
                         try {
                             k8sResourceUtils.deleteTask(task.getMetadata()).subscribe();
                         } catch (ApiException ae) {
-                            logger.info("ElassandraTask cleaner iteration fails on task '{}' due to : {}", task.getMetadata().getName(), ae.getMessage(), ae);
+                            logger.info("cleaner iteration fails on task '{}' due to : {}", task.getMetadata().getName(), ae.getMessage(), ae);
                         }
                     }
                 });
             } catch (Exception e) {
-                logger.info("ElassandraTask cleaner iteration fails due to : {}", e.getMessage(), e);
+                logger.info("cleaner iteration fails due to : {}", e.getMessage(), e);
             }
         }
     }
