@@ -32,26 +32,20 @@ install:
 script:
 - "./gradlew build"
 deploy:
-- provider: script
-  skip_cleanup: true
-  script:
-  - ./gradlew dockerPush -PregistryUsername=$DOCKER_USERNAME -PregistryPassword=$DOCKER_PASSWORD
-    -Dorg.gradle.project.dockerImagePrefix="strapdata.azurecr.io/strapdata/elassandra-"
-    -Dorg.gradle.project.dockerImageSuffix=""
-    -Dorg.gradle.project.elassandraParentImage="strapdata/elassandra-enterprise"
-  - ./gradlew publish -PrepoUsername=$NEXUS_USERNAME -PrepoPassword="$NEXUS_PASSWORD"
-  on:
-    tags: false
-    all_branches: true
+#- provider: script
+#  skip_cleanup: true
+#  script:
+#  - ./gradlew dockerPush -PregistryUsername=$DOCKER_USERNAME -PregistryPassword=$DOCKER_PASSWORD -PregistryUrl=$DOCKER_URL
+#  - ./gradlew publish -PrepoUsername=$NEXUS_USERNAME -PrepoPassword="$NEXUS_PASSWORD"
+#  on:
+#    tags: false
+#    all_branches: true
 #    condition: $TRAVIS_BRANCH =~ ^develop-.*
 
 - provider: script
   skip_cleanup: true
   script:
-  - ./gradlew dockerPush -PregistryUsername=$DOCKER_USERNAME -PregistryPassword=$DOCKER_PASSWORD
-    -Dorg.gradle.project.dockerImagePrefix="strapdata.azurecr.io/strapdata/elassandra-"
-    -Dorg.gradle.project.dockerImageSuffix=""
-    -Dorg.gradle.project.elassandraParentImage="strapdata/elassandra-enterprise"
+  - ./gradlew dockerPush -PregistryUsername=$DOCKER_USERNAME -PregistryPassword=$DOCKER_PASSWORD -PregistryUrl=$DOCKER_URL
   - ./gradlew publish -PrepoUsername=$NEXUS_USERNAME -PrepoPassword="$NEXUS_PASSWORD"
   # push to GCR.IO done by the marketplace repository
   on:
