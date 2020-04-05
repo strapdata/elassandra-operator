@@ -34,19 +34,19 @@ task dockerBuildImage {
 
 task dockerPushImageLatest(type: DockerPushImage) {
   dependsOn 'dockerBuildImage'
-  imageName = elassandraImageName
+  image = elassandraImageName
   tag = "latest"
 }
 
 task dockerPushImageOperatorGitCommitHash(type: DockerPushImage) {
   dependsOn 'dockerBuildImage'
-  imageName = elassandraImageName
+  image = elassandraImageName
   tag = project.gitCommitHash
 }
 
 task dockerPushImageElassandraVersion(type: DockerPushImage) {
   dependsOn 'dockerBuildImage'
-  imageName = elassandraImageName
+  image = elassandraImageName
   tag = elassandraVersions[0]
 }
 
@@ -75,7 +75,7 @@ elassandraVersions.each { v ->
 
   task "dockerPushImage${normalizeVersion(v)}" (type: DockerPushImage) {
     dependsOn "dockerBuildImage${normalizeVersion(v)}"
-    imageName = elassandraImageName
+    image = elassandraImageName
     tag = v
     url = registryUrl
   }
