@@ -30,8 +30,8 @@ publishing {
         maven {
             name = 'strapdata'
             credentials {
-                username = project.repoUsername
-                password = project.repoPassword
+                username = repoUsername
+                password = repoPassword
             }
             if (project.hasProperty("repoUrl")) {
                 url project.getProperty("repoUrl")
