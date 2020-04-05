@@ -26,7 +26,7 @@ public class DataCenterStatus {
      */
     @SerializedName("operationHistory")
     @Expose
-    private List<Operation> operationHistory = new ArrayList();
+    private List<Operation> operationHistory = new ArrayList<>();
 
     /**
      * Current desired DC phase

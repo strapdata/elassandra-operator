@@ -20,6 +20,7 @@ jar {
         configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
     }
 }
+tasks.jar.dependsOn project(':java:model').jar
 
 shadowJar {
     mergeServiceFiles()
