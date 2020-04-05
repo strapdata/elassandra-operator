@@ -3,6 +3,8 @@ plugins {
     id 'application'
     id "io.spring.dependency-management"
     id "com.github.johnrengelman.shadow"
+    id 'com.google.cloud.tools.jib'
+    id "com.gorylenko.gradle-git-properties"
 }
 
 apply plugin:"application"
@@ -21,6 +23,26 @@ jar {
     }
 }
 tasks.jar.dependsOn project(':java:model').jar
+
+jib {
+    from {
+        image = 'openjdk:alpine'
+    }
+    to {
+        image = project.image
+        credHelper = 'osxkeychain'
+        tags = [ project.version ]
+    }
+    container {
+        jvmFlags = ['-Xmx512m',
+                    '-XX:+UnlockExperimentalVMOptions', '-XX:+UseCGroupMemoryLimitForHeap', '-XX:MaxRAMFraction=2',
+                    '-XX:+ExitOnOutOfMemoryError'
+        ]
+        mainClass = mainClassName
+        labels = [ description:'Elassandra Datacenter CLI']
+    }
+}
+tasks.jib.dependsOn project(':java:model').jar
 
 shadowJar {
     mergeServiceFiles()
