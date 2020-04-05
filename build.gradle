@@ -13,15 +13,22 @@ plugins {
 
 ext {
   allowInsecureRegistries = true
+  registryUrl = System.getenv("DOCKER_REGISTRY")
+  registryUsername = System.getenv("DOCKER_USERNAME")
+  registryPassword = System.getenv("DOCKER_PASSWORD")
+
+  println "registryUrl=$registryUrl"
+  println "registryUsername=$registryUsername"
 }
 
 configure(subprojects.findAll { it.name.contains("docker") }) {
   apply plugin: 'com.bmuschko.docker-remote-api'
   docker {
     registryCredentials {
-      url = 'strapdata.azurecr.io'
-      username = project.registryUsername
-      password = project.registryPassword
+      url = registryUrl
+      username = registryUsername
+      password = registryPassword
+      email = registryEmail
     }
   }
 }
