@@ -28,7 +28,6 @@ configure(subprojects.findAll { it.name.contains("docker") }) {
       url = registryUrl
       username = registryUsername
       password = registryPassword
-      email = registryEmail
     }
   }
 }
