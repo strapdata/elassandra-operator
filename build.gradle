@@ -19,6 +19,9 @@ ext {
 
   println "registryUrl=$registryUrl"
   println "registryUsername=$registryUsername"
+
+  repoUsername = project.hasProperty("repoUsername") ? project.getProperty("repoUsername") : System.getenv("NEXUS_USERNAME")
+  repoPassword = project.hasProperty("repoPassword") ? project.getProperty("repoPassword") : System.getenv("NEXUS_PASSWORD")
 }
 
 configure(subprojects.findAll { it.name.contains("docker") }) {
