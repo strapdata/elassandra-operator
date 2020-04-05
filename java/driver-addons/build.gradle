@@ -26,6 +26,22 @@ artifacts {
 }
 
 publishing {
+    repositories {
+        maven {
+            name = 'strapdata'
+            credentials {
+                username = project.repoUsername
+                password = project.repoPassword
+            }
+            if (project.hasProperty("repoUrl")) {
+                url project.getProperty("repoUrl")
+            } else if(project.version.endsWith('-SNAPSHOT')) {
+                url "https://nexus.repo.strapdata.com/repository/maven-snapshots/"
+            } else {
+                url "https://nexus.repo.strapdata.com/repository/maven-releases/"
+            }
+        }
+    }
     publications {
         maven(MavenPublication) {
             groupId 'com.strapdata.strapkop'
