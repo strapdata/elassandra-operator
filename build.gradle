@@ -19,7 +19,7 @@ configure(subprojects.findAll { it.name.contains("docker") }) {
   apply plugin: 'com.bmuschko.docker-remote-api'
   docker {
     registryCredentials {
-      url = project.registryUrl
+      url = 'strapdata.azurecr.io'
       username = project.registryUsername
       password = project.registryPassword
     }
