@@ -1,21 +1,22 @@
 package com.strapdata.strapkop.backup;
 
+import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenterSpec;
 import com.strapdata.strapkop.model.k8s.cassandra.ScheduledBackup;
 import com.strapdata.strapkop.model.k8s.task.BackupTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
-import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import io.kubernetes.client.models.V1ObjectMeta;
 import io.micronaut.scheduling.ScheduledExecutorTaskScheduler;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import static org.mockito.Mockito.*;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import static org.mockito.Mockito.*;
 
 public class TestBackupScheduler extends BackupScheduler {
     private static final String clusterName = "cl1";
@@ -49,8 +50,7 @@ public class TestBackupScheduler extends BackupScheduler {
         ScheduledBackup definition = new ScheduledBackup()
                 .setTagSuffix("mock")
                 .setCron("0/10 * * * * ?") // every ten seconds
-                .setBackup(new BackupTaskSpec()
-                        .setBucket("Test"));
+                .setBackup(new BackupTaskSpec());
         submitBackupTask(dc, definition);
         Thread.sleep(11_000);
         verify(k8sResourceUtils, times(1)).createTask(any(Task.class));
