@@ -1085,6 +1085,30 @@ public class DataCenterUpdateAction {
             }
 
             Set<String> seeds = new HashSet<>();
+            if (dataCenterStatus.getBootstrapped() == false) {
+                if (remoteSeeds.isEmpty() && remoteSeeders.isEmpty()) {
+                    // first node in the first DC is seed
+                    RackStatus rackStatus = dataCenterStatus.getRackStatuses().values().stream()
+                            .filter(r -> r.getIndex() == 0).collect(Collectors.toList()).get(0);
+                    if (dataCenterSpec.getHostNetworkEnabled() || dataCenterSpec.getHostPortEnabled()) {
+                        seeds.add(OperatorNames.externalPodFqdn(dataCenter, rackStatus.getIndex(), 0));
+                    } else {
+                        seeds.add(OperatorNames.internalPodFqdn(dataCenter, rackStatus.getIndex(), 0));
+                    }
+                } else {
+                    // first node, second DC => use remote seeds to stream.
+                }
+            } else {
+                // node-0 of each rack are seeds
+                for (RackStatus rackStatus : dataCenterStatus.getRackStatuses().values()) {
+                    if (dataCenterSpec.getHostNetworkEnabled() || dataCenterSpec.getHostPortEnabled()) {
+                        seeds.add(OperatorNames.externalPodFqdn(dataCenter, rackStatus.getIndex(), 0));
+                    } else {
+                        seeds.add(OperatorNames.internalPodFqdn(dataCenter, rackStatus.getIndex(), 0));
+                    }
+                }
+            }
+
             if (dataCenterStatus.getBootstrapped() == true || (remoteSeeds.isEmpty() && remoteSeeders.isEmpty())) {
                 // Add local seeds if DC is boostrapped or alone.
                 for (RackStatus rackStatus : dataCenterStatus.getRackStatuses().values()) {
@@ -1962,7 +1986,7 @@ public class DataCenterUpdateAction {
                 );
             }
 
-            if (dataCenterSpec.getHostPortEnabled()) {
+            if (dataCenterSpec.getHostPortEnabled() || dataCenterSpec.getHostNetworkEnabled()) {
                 // expose only one storage port on node
                 if (dataCenterSpec.getSsl()) {
                     addPortsItem(cassandraContainer, dataCenterSpec.getSslStoragePort(), "internode-ssl", true);
@@ -2076,7 +2100,7 @@ public class DataCenterUpdateAction {
                                             " && echo \"" + yaml + "\" > /tmp/dns-manifest.yaml " +
                                             " && sed -i \"s#__NODE_IP__#${NODE_IP}#g\" /tmp/dns-manifest.yaml " +
                                             " && sed -i \"s#__POD_INDEX__#${POD_INDEX}#g\" /tmp/dns-manifest.yaml " +
-                                            " && cat /tmp/dns-manifest.yaml && kubectl apply --token=\"$NODEINFO_TOKEN\" -f /tmp/dns-manifest.yaml" :
+                                            " && cat /tmp/dns-manifest.yaml && (kubectl create --token=\"$NODEINFO_TOKEN\" -f /tmp/dns-manifest.yaml || true)" :
                                             "")
                     ))
                     .addVolumeMountsItem(new V1VolumeMount()
@@ -2117,15 +2141,15 @@ public class DataCenterUpdateAction {
 
 
         public int replicas() {
-            return (!sts.isPresent()) ? 0 : Optional.ofNullable(sts.get().getStatus().getReplicas()).orElse(0);
+            return (!sts.isPresent() || sts.get().getSpec().getReplicas() == null) ? 0 : sts.get().getSpec().getReplicas();
         }
 
         public int currentReplicas() {
-            return (!sts.isPresent()) ? 0 : Optional.ofNullable(sts.get().getStatus().getCurrentReplicas()).orElse(0);
+            return (!sts.isPresent() || sts.get().getStatus().getCurrentReplicas() == null) ? 0 : sts.get().getStatus().getCurrentReplicas();
         }
 
         public int readyReplicas() {
-            return (!sts.isPresent()) ? 0 : Optional.ofNullable(sts.get().getStatus().getReadyReplicas()).orElse(0);
+            return (!sts.isPresent() || sts.get().getStatus().getReadyReplicas() == null) ? 0 : sts.get().getStatus().getReadyReplicas();
         }
 
         public int freeNodeCount() {

@@ -634,8 +634,8 @@ public class K8sResourceUtils {
             private final DataCenterList dcList;
 
             private V1DataCenterPage(final String continueToken) throws ApiException {
-                final Call call = customObjectsApi.listClusterCustomObjectCall("stable.strapdata.com", "v1",
-                        "elassandradatacenters", null, null, labelSelector, null, null, null, null, null);
+                final Call call = customObjectsApi.listClusterCustomObjectCall(StrapdataCrdGroup.GROUP, DataCenter.VERSION,
+                        DataCenter.PLURAL, null, null, labelSelector, null, null, null, null, null);
                 final ApiResponse<DataCenterList> apiResponse = customObjectsApi.getApiClient().execute(call, DataCenterList.class);
                 dcList = apiResponse.getData();
             }
@@ -825,7 +825,7 @@ public class K8sResourceUtils {
             private final TaskList taskList;
 
             private TaskPage(final String continueToken) throws ApiException {
-                com.squareup.okhttp.Call call = customObjectsApi.listNamespacedCustomObjectCall("stable.strapdata.com", Task.VERSION, namespace, Task.PLURAL,
+                com.squareup.okhttp.Call call = customObjectsApi.listNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, Task.VERSION, namespace, Task.PLURAL,
                         "false", null, labelSelector, null, null, null, null, null);
                 Type localVarReturnType = new TypeToken<TaskList>(){}.getType();
                 ApiResponse<TaskList> resp = customObjectsApi.getApiClient().execute(call, localVarReturnType);
