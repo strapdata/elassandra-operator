@@ -46,7 +46,6 @@ jib {
                     '-XX:+UnlockExperimentalVMOptions', '-XX:+UseCGroupMemoryLimitForHeap', '-XX:MaxRAMFraction=2',
                     '-XX:+ExitOnOutOfMemoryError',
                     '-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005',
-                    '-Dmicronaut.environments=$MICRONAUT_ENV',
                     '-XshowSettings:vm'
         ]
         mainClass = mainClassName
