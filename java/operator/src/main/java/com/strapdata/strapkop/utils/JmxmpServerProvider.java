@@ -28,7 +28,7 @@ public class JmxmpServerProvider {
 
     public void createJMXMPServer()  throws IOException
     {
-        final int port = Optional.ofNullable(System.getenv("JMXMP_PORT")).map(Integer::parseInt).orElse(7200);
+        final int port = Optional.ofNullable(System.getenv("JMXMP_PORT")).map(Integer::parseInt).orElse(7199);
 
         Map<String, Object> env = new HashMap<>();
         // Mark the JMX server as a permanently exported object. This allows the JVM to exit with the

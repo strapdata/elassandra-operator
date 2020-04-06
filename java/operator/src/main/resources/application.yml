@@ -1,6 +1,8 @@
 micronaut:
+    server:
+        port: 8080
     application:
-        name: operator
+        name: elassandra-operator
     executors:
         authority:
             type: FIXED
