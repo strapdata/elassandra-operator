@@ -58,30 +58,30 @@ public class DeploymentHandler extends TerminalHandler<K8sWatchEvent<V1Deploymen
         logger.debug("Deployment event={}", event);
         switch(event.getType()) {
             case INITIAL:
+                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
+                meterRegistry.counter("k8s.event.init", tags).increment();
+                managed++;
+                reconcileDeploymentIfAvailable(event.getResource());
+                break;
+
             case ADDED:
+                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 meterRegistry.counter("k8s.event.added", tags).increment();
                 managed++;
                 break;
+
             case MODIFIED:
+                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 meterRegistry.counter("k8s.event.modified", tags).increment();
-                deployment = event.getResource();
-                if (isDeploymentAvailable(deployment)) {
-                    final String clusterName = deployment.getMetadata().getLabels().get(OperatorLabels.CLUSTER);
-                    DataCenter dataCenter = dataCenterCache.get(new Key(deployment.getMetadata().getLabels().get(OperatorLabels.PARENT), deployment.getMetadata().getNamespace()));
-                    if (dataCenter != null) {
-                        logger.info("datacenter={} deployment={}/{} is available, triggering a dc deploymentAvailable",
-                                dataCenter.id(), deployment.getMetadata().getName(), deployment.getMetadata().getNamespace());
-                        Operation op = new Operation().withSubmitDate(new Date()).withDesc("updated deployment="+deployment.getMetadata().getName());
-                        workQueues.submit(
-                                new ClusterKey(clusterName, deployment.getMetadata().getNamespace()),
-                                dataCenterController.deploymentAvailable(op, dataCenter, deployment));
-                    }
-                }
+                reconcileDeploymentIfAvailable(event.getResource());
                 break;
+
             case DELETED:
+                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 meterRegistry.counter("k8s.event.deleted", tags).increment();
                 managed--;
             case ERROR:
+                logger.warn("event type={}", event.getType());
                 meterRegistry.counter("k8s.event.error", tags).increment();
                 throw new IllegalStateException("V1Deployment error");
         }
@@ -93,5 +93,21 @@ public class DeploymentHandler extends TerminalHandler<K8sWatchEvent<V1Deploymen
 
     public static boolean isDeploymentAvailable(V1Deployment dep) {
         return ObjectUtils.defaultIfNull(dep.getStatus().getAvailableReplicas(), 0) > 0;
+    }
+
+    // trigger a dc reconciliation when plugin deployments become available (allow reaper to register)
+    public void reconcileDeploymentIfAvailable(V1Deployment deployment) throws Exception {
+        if (isDeploymentAvailable(deployment)) {
+            final String clusterName = deployment.getMetadata().getLabels().get(OperatorLabels.CLUSTER);
+            DataCenter dataCenter = dataCenterCache.get(new Key(deployment.getMetadata().getLabels().get(OperatorLabels.PARENT), deployment.getMetadata().getNamespace()));
+            if (dataCenter != null) {
+                logger.info("datacenter={} deployment={}/{} is available, triggering a dc deploymentAvailable",
+                        dataCenter.id(), deployment.getMetadata().getName(), deployment.getMetadata().getNamespace());
+                Operation op = new Operation().withSubmitDate(new Date()).withDesc("updated deployment="+deployment.getMetadata().getName());
+                workQueues.submit(
+                        new ClusterKey(clusterName, deployment.getMetadata().getNamespace()),
+                        dataCenterController.deploymentAvailable(op, dataCenter, deployment));
+            }
+        }
     }
 }

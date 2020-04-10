@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.Wither;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Cassandra reaper default configuration.
@@ -57,6 +58,13 @@ public class Reaper {
     @SerializedName("ingressSuffix")
     @Expose
     private String ingressSuffix = null;
+
+    /**
+     * Ingress annotations
+     */
+    @SerializedName("ingressAnnotations")
+    @Expose
+    private Map<String, String> ingressAnnotations = null;
 
     @SerializedName("reaperScheduledRepairs")
     @Expose

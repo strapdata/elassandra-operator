@@ -74,14 +74,22 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
 
     @Override
     public void accept(K8sWatchEvent<V1Pod> event) throws Exception {
-        logger.debug("ElassandraPod event={}", event);
+        logger.trace("ElassandraPod event={}", event);
         switch(event.getType()) {
             case INITIAL:
+                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
+                meterRegistry.counter("k8s.event.init", tags).increment();
+                managed++;
+                break;
+
             case ADDED:
+                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 meterRegistry.counter("k8s.event.added", tags).increment();
                 managed++;
                 break;
+
             case MODIFIED:
+                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 meterRegistry.counter("k8s.event.modified", tags).increment();
                 if (POD_PENDING_PHASE.equalsIgnoreCase(event.getResource().getStatus().getPhase())) {
                     if (event.getResource().getStatus() != null && event.getResource().getStatus().getConditions() != null) {
@@ -103,7 +111,6 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
                         String namespace = pod.getMetadata().getNamespace();
 
                         ClusterKey clusterKey = new ClusterKey(clusterName, datacenterName);
-
                         logger.debug("Pending pod={}/{} conditions={}", podName, namespace, conditions);
                         if (scheduleFailed.isPresent()) {
                             meterRegistry.counter("k8s.pod.unschedulable", tags).increment();
@@ -113,7 +120,10 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
                         }
                     }
                 }
+                break;
+
             case DELETED:
+                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 V1Pod pod = event.getResource();
                 String parent = Pod.extractLabel(pod, OperatorLabels.PARENT);
                 String clusterName = Pod.extractLabel(pod, OperatorLabels.CLUSTER);
@@ -129,7 +139,9 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
                 break;
 
             case ERROR:
+                logger.warn("event type={}", event.getType());
                 meterRegistry.counter("k8s.event.error", tags).increment();
+                break;
         }
     }
 

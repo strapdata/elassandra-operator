@@ -44,6 +44,7 @@ kibana:
   enabled: true
   image: "docker.elastic.co/kibana/kibana-oss"
   ingressSuffix:
+  ingressAnnotations: {}
   #tag: 6.8.4
   #version: 1
   spaces:
@@ -55,6 +56,7 @@ reaper:
   enabled: true
   jwtSecret: "68d45d8f-419f-429e-8ba0-7b475cba795d"
   ingressSuffix:
+  ingressAnnotations: {}
   loggingLevel: "INFO"
 
 # Tell Cassandra to use the local IP address (INTERNAL_IP).

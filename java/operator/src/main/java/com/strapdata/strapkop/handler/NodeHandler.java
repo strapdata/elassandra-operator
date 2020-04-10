@@ -35,24 +35,35 @@ public class NodeHandler extends TerminalHandler<K8sWatchEvent<V1Node>> {
 
     @Override
     public void accept(K8sWatchEvent<V1Node> event) throws Exception {
-        logger.info("Node event={}", event);
+        logger.trace("event={}", event);
 
         final V1Node node;
         switch(event.getType()) {
             case INITIAL:
+                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
+                managed++;
+                meterRegistry.counter("k8s.event.init", tags).increment();
+                break;
+
             case ADDED:
+                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 managed++;
                 meterRegistry.counter("k8s.event.added", tags).increment();
                 break;
+
             case MODIFIED:
+                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 meterRegistry.counter("k8s.event.modified", tags).increment();
                 break;
+
             case DELETED:
+                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 meterRegistry.counter("k8s.event.deleted", tags).increment();
                 managed--;
                 break;
 
             case ERROR:
+                logger.warn("event type={}", event.getType());
                 meterRegistry.counter("k8s.event.error", tags).increment();
                 throw new IllegalStateException("node event error");
         }

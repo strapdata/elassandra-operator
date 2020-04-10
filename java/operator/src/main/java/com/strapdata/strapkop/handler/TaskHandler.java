@@ -67,61 +67,44 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
     @Override
     public void accept(K8sWatchEvent<Task> event) throws Exception {
         Task task;
-        logger.debug("Task event={}", event);
+        logger.trace("Task event={}", event);
         switch (event.getType()) {
             case INITIAL:
-            case ADDED:
-                meterRegistry.counter("k8s.event.deleted", tags).increment();
+                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
+                meterRegistry.counter("k8s.event.init", tags).increment();
                 managed++;
+                reconcileTask(event.getResource());
+                break;
+
+            case ADDED:
+                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
+                meterRegistry.counter("k8s.event.added", tags).increment();
+                managed++;
+                reconcileTask(event.getResource());
+                break;
 
             case MODIFIED:
-                if (event.getType().equals(K8sWatchEvent.Type.MODIFIED)) {
-                    meterRegistry.counter("k8s.event.modified", tags).increment();
-                }
-
-                task = event.getResource();
-                final ClusterKey clusterKey = new ClusterKey(
-                        event.getResource().getSpec().getCluster(),
-                        event.getResource().getMetadata().getNamespace()
-                );
-
-                TaskStatus taskStatus = task.getStatus();
-                logger.debug("task={} taskStatus={}", task.id(), taskStatus);
-                if (taskStatus == null || taskStatus.getPhase() == null || !taskStatus.getPhase().isTerminated()) {
-                    // execute task
-                    task = event.getResource();
-                    final Tuple2<Key, String> key = new Tuple2<>(new Key(task.getMetadata().getLabels().get(OperatorLabels.PARENT), task.getMetadata().getNamespace()), task.getMetadata().getName());
-                    Completable completable = taskReconcilierResolver.getTaskReconcilier(task).reconcile(task);
-                    // keep a task ref to cancel it on delete
-                    completable.doFinally(() -> notTerminatedTasks.remove(key));
-                    notTerminatedTasks.put(key, completable.subscribe());
-                    workQueues.submit(clusterKey, completable);
-                } else {
-                    // purge old task.
-                    org.joda.time.DateTime creation = task.getMetadata().getCreationTimestamp();
-                    long retentionInstant = System.currentTimeMillis() - operatorConfig.getTaskRetention().getSeconds()*1000;
-                    if (creation.isBefore(retentionInstant)) {
-                        logger.info("Delete old terminated task={}", task.id());
-                        Completable delete = k8sResourceUtils.deleteTask(task.getMetadata()).ignoreElement();
-                        workQueues.submit(clusterKey, delete);
-                    }
-                }
+                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
+                meterRegistry.counter("k8s.event.modified", tags).increment();
+                reconcileTask(event.getResource());
                 break;
 
             case DELETED: {
-                // TODO: implement task cancellation
-                task = event.getResource();
-                Disposable disposable = notTerminatedTasks.get(new Tuple2<>(new Key(task.getMetadata().getLabels().get(OperatorLabels.PARENT), task.getMetadata().getNamespace()), task.getMetadata().getName()));
-                if (disposable != null) {
-                    logger.debug("task={} cancelled", task.id());
-                    meterRegistry.counter("k8s.event.cancelled", tags).increment();
-                    disposable.dispose();
+                    logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
+                    task = event.getResource();
+                    Disposable disposable = notTerminatedTasks.get(new Tuple2<>(new Key(task.getMetadata().getLabels().get(OperatorLabels.PARENT), task.getMetadata().getNamespace()), task.getMetadata().getName()));
+                    if (disposable != null) {
+                        logger.debug("task={} cancelled", task.id());
+                        meterRegistry.counter("k8s.event.cancelled", tags).increment();
+                        disposable.dispose();
+                    }
+                    meterRegistry.counter("k8s.event.deleted", tags).increment();
+                    managed--;
                 }
-                meterRegistry.counter("k8s.event.deleted", tags).increment();
-                managed--;
-            }
-            break;
+                break;
+
             case ERROR:
+                logger.warn("event type={}", event.getType());
                 meterRegistry.counter("k8s.event.error", tags).increment();
                 break;
         }
@@ -131,5 +114,32 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
         logger.error("wrong task arguments for {}, no task reconcilier found", data.getResource().getMetadata().getName());
         // TODO: write message in task status
     }
-    
+
+    public void reconcileTask(Task task) throws Exception {
+        final ClusterKey clusterKey = new ClusterKey(
+                task.getSpec().getCluster(),
+                task.getMetadata().getNamespace()
+        );
+
+        TaskStatus taskStatus = task.getStatus();
+        logger.debug("task={} taskStatus={}", task.id(), taskStatus);
+        if (taskStatus == null || taskStatus.getPhase() == null || !taskStatus.getPhase().isTerminated()) {
+            // execute task
+            final Tuple2<Key, String> key = new Tuple2<>(new Key(task.getMetadata().getLabels().get(OperatorLabels.PARENT), task.getMetadata().getNamespace()), task.getMetadata().getName());
+            Completable completable = taskReconcilierResolver.getTaskReconcilier(task).reconcile(task);
+            // keep a task ref to cancel it on delete
+            completable.doFinally(() -> notTerminatedTasks.remove(key));
+            notTerminatedTasks.put(key, completable.subscribe());
+            workQueues.submit(clusterKey, completable);
+        } else {
+            // purge old task.
+            org.joda.time.DateTime creation = task.getMetadata().getCreationTimestamp();
+            long retentionInstant = System.currentTimeMillis() - operatorConfig.getTaskRetention().getSeconds()*1000;
+            if (creation.isBefore(retentionInstant)) {
+                logger.info("Delete old terminated task={}", task.id());
+                Completable delete = k8sResourceUtils.deleteTask(task.getMetadata()).ignoreElement();
+                workQueues.submit(clusterKey, delete);
+            }
+        }
+    }
 }

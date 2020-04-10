@@ -88,7 +88,11 @@ spec:
     {{- end }}
     {{- if .Values.reaper.ingressSuffix }}
     ingressSuffix: {{ .Values.reaper.ingressSuffix }}
+    {{- if .Values.reaper.ingressAnnotations }}
+    ingressAnnotations:
+    {{ toYaml .Values.reaper.ingressAnnotations | indent 6 }}
     {{- end }}
+{{- end }}
     jwtSecret: {{ default "68d45d8f-419f-429e-8ba0-7b475cba795d" .Values.reaper.jwtSecret }}
     loggingLevel: {{ default "INFO" .Values.reaper.loggingLevel }}
 {{- end }}
@@ -149,6 +153,10 @@ spec:
     enabled: {{ default "true" .Values.kibana.enabled }}
     {{- if .Values.kibana.ingressSuffix }}
     ingressSuffix: {{ .Values.kibana.ingressSuffix }}
+    {{- end }}
+    {{- if .Values.kibana.ingressAnnotations }}
+    ingressAnnotations:
+    {{ toYaml .Values.kibana.ingressAnnotations | indent 6 }}
     {{- end }}
     {{- if .Values.kibana.image }}
     {{- if .Values.kibana.tag }}

@@ -111,7 +111,13 @@ public class KibanaPlugin extends AbstractPlugin {
     }
 
 
-    public static Map<String, String> kibanaLabels(DataCenter dataCenter, String kibanaSpaceName) {
+    public static Map<String, String> kibanaLabels(DataCenter dataCenter) {
+        final Map<String, String> labels = new HashMap<>(OperatorLabels.datacenter(dataCenter));
+        labels.put(OperatorLabels.APP, "kibana"); // overwrite label app
+        return labels;
+    }
+
+    public static Map<String, String> kibanaSpaceLabels(DataCenter dataCenter, String kibanaSpaceName) {
         final Map<String, String> labels = new HashMap<>(OperatorLabels.datacenter(dataCenter));
         labels.put(OperatorLabels.APP, "kibana"); // overwrite label app
         labels.put("kibana-space", kibanaSpaceName); // overwrite label app
@@ -149,7 +155,7 @@ public class KibanaPlugin extends AbstractPlugin {
                                     .flatMapCompletable(spaceToDelete -> {
                                         logger.debug("Deleting kibana space={}", spaceToDelete);
                                         dataCenter.getStatus().getKibanaSpaceNames().remove(spaceToDelete);
-                                        return delete(dataCenter, spaceToDelete);
+                                        return deleteSpace(dataCenter, spaceToDelete);
                                     });
 
                     Set<String> newSpaces = Sets.difference(getKibanaSpaces(dataCenter).keySet(), deployedKibanaSpaces);
@@ -173,17 +179,20 @@ public class KibanaPlugin extends AbstractPlugin {
 
     @Override
     public Single<Boolean> delete(final DataCenter dataCenter) throws ApiException {
-        return Completable.mergeArray(getKibanaSpaces(dataCenter).values().stream()
-                .map(kibanaSpace -> delete(dataCenter, kibanaSpace.getName()))
-                .toArray(Completable[]::new)).toSingleDefault(false);
+        final String kibanaLabelsSelector = OperatorLabels.toSelector(kibanaLabels(dataCenter));
+        return Completable.mergeArray(new Completable[]{
+                k8sResourceUtils.deleteDeployment(dataCenter.getMetadata().getNamespace(), null, kibanaLabelsSelector),
+                k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, kibanaLabelsSelector),
+                k8sResourceUtils.deleteIngress(dataCenter.getMetadata().getNamespace(), null, kibanaLabelsSelector)
+        }).toSingleDefault(false);
     }
 
-    public Completable delete(final DataCenter dataCenter, String kibanaSpaceName) {
-        final String kibanaLabelSelector = OperatorLabels.toSelector(kibanaLabels(dataCenter, kibanaSpaceName));
+    public Completable deleteSpace(final DataCenter dataCenter, String kibanaSpaceName) {
+        final String kibanaSpaceLabelSelector = OperatorLabels.toSelector(kibanaSpaceLabels(dataCenter, kibanaSpaceName));
         return Completable.mergeArray(new Completable[]{
-                k8sResourceUtils.deleteDeployment(dataCenter.getMetadata().getNamespace(), null, kibanaLabelSelector),
-                k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, kibanaLabelSelector),
-                k8sResourceUtils.deleteIngress(dataCenter.getMetadata().getNamespace(), null, kibanaLabelSelector)
+                k8sResourceUtils.deleteDeployment(dataCenter.getMetadata().getNamespace(), null, kibanaSpaceLabelSelector),
+                k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, kibanaSpaceLabelSelector),
+                k8sResourceUtils.deleteIngress(dataCenter.getMetadata().getNamespace(), null, kibanaSpaceLabelSelector)
         });
     }
 
@@ -207,7 +216,7 @@ public class KibanaPlugin extends AbstractPlugin {
         final DataCenterSpec dataCenterSpec = dataCenter.getSpec();
         final Integer version = dataCenter.getSpec().getKibana().getVersion();
 
-        final Map<String, String> labels = kibanaLabels(dataCenter, space.getName());
+        final Map<String, String> labels = kibanaSpaceLabels(dataCenter, space.getName());
 
         final V1ObjectMeta meta = new V1ObjectMeta()
                 .name(kibanaNameDc(dataCenter, space))
@@ -361,8 +370,17 @@ public class KibanaPlugin extends AbstractPlugin {
                     if (!Strings.isNullOrEmpty(dataCenterSpec.getKibana().getIngressSuffix())) {
                         String kibanaHost = space.name() + "-" + dataCenterSpec.getKibana().getIngressSuffix();
                         logger.info("Creating kibana ingress for host={}", kibanaHost);
+                        final V1ObjectMeta ingressMeta = new V1ObjectMeta()
+                                .name(kibanaNameDc(dataCenter, space))
+                                .namespace(dataCenterMetadata.getNamespace())
+                                .labels(labels)
+                                .putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, dataCenter.getMetadata().getGeneration().toString());
+                        if (dataCenterSpec.getKibana().getIngressAnnotations() != null && !dataCenterSpec.getKibana().getIngressAnnotations().isEmpty()) {
+                            dataCenterSpec.getKibana().getIngressAnnotations().entrySet().stream()
+                                    .map(e -> ingressMeta.putAnnotationsItem(e.getKey(), e.getValue()));
+                        }
                         final ExtensionsV1beta1Ingress ingress = new ExtensionsV1beta1Ingress()
-                                .metadata(meta)
+                                .metadata(ingressMeta)
                                 .spec(new ExtensionsV1beta1IngressSpec()
                                         .addRulesItem(new ExtensionsV1beta1IngressRule()
                                                     .host(kibanaHost)

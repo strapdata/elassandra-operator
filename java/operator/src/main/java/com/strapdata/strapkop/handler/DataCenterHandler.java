@@ -44,15 +44,28 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
 
     @Override
     public void accept(K8sWatchEvent<DataCenter> event) throws Exception {
-        DataCenter dataCenter;
-        logger.debug("DataCenter event={}", event);
+        logger.trace("event={}", event);
 
+        DataCenter dataCenter;
         Completable completable = null;
         switch (event.getType()) {
             case INITIAL:
+                // trigger a dc reconcile on operator start.
+                dataCenter = event.getResource();
+                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
+                workQueues.submit(new ClusterKey(event.getResource()),
+                        dataCenterController.initDatacenter(new Operation().withSubmitDate(new Date()).withDesc("dc-init"), dataCenter)
+                                .doOnComplete(() -> {
+                                    managed++;
+                                })
+                                .doFinally(() -> {
+                                    meterRegistry.counter("k8s.event.init", tags).increment();
+                                }));
+                break;
+
             case ADDED:
                 dataCenter = event.getResource();
-
+                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 workQueues.submit(new ClusterKey(event.getResource()),
                         dataCenterController.initDatacenter(new Operation().withSubmitDate(new Date()).withDesc("dc-added"), dataCenter)
                                 .doOnComplete(() -> {
@@ -63,9 +76,10 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
                                 })
                 );
                 break;
+
             case MODIFIED:
+                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 dataCenter = event.getResource();
-                Operation op = new Operation().withSubmitDate(new Date()).withDesc("dc-modified");
                 workQueues.submit(new ClusterKey(event.getResource()),
                         dataCenterController.updateDatacenter(new Operation().withSubmitDate(new Date()).withDesc("dc-modified"), dataCenter)
                                 .doFinally(() -> {
@@ -73,7 +87,9 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
                                 })
                 );
                 break;
+
             case DELETED:
+                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 dataCenter = event.getResource();
                 workQueues.submit(new ClusterKey(event.getResource()),
                         dataCenterController.deleteDatacenter(dataCenter)
@@ -88,9 +104,12 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
                                 })
                 );
                 break;
+
             case ERROR:
+                logger.warn("event type={}", event.getType());
                 meterRegistry.counter("k8s.event.error", tags).increment();
                 throw new IllegalStateException("Datacenter error event");
+
             default:
                 throw new UnsupportedOperationException("Unknown event type");
         }

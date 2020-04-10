@@ -17,11 +17,11 @@ public class K8sWatchEvent<ResourceT> {
     public static final EnumSet<Type> deletionEventTypes = EnumSet.of(Type.DELETED);
 
     public enum Type {
+        INITIAL,
         ADDED,
         MODIFIED,
         DELETED,
-        ERROR,
-        INITIAL
+        ERROR
     }
 
     private Type type;
