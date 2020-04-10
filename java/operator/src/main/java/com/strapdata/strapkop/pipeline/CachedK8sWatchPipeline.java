@@ -43,10 +43,9 @@ public abstract class CachedK8sWatchPipeline<ResourceT, ResourceListT, K> extend
                 cache.put(key, event.getResource());
                 break;
             case DELETED:
+            case ERROR:
                 key = adapter.getKey(event.getResource());
                 cache.remove(key);
-                break;
-            case ERROR:
                 break;
         }
 

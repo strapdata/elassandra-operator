@@ -414,6 +414,15 @@ public class ReaperPlugin extends AbstractPlugin {
                 );
 
         // create reaper ingress
+        final V1ObjectMeta ingressMeta = new V1ObjectMeta()
+                .name(reaperName(dataCenter))
+                .namespace(dataCenterMetadata.getNamespace())
+                .labels(labels)
+                .putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, datacenterGeneration);
+        if (dataCenterSpec.getReaper().getIngressAnnotations() != null && !dataCenterSpec.getReaper().getIngressAnnotations().isEmpty()) {
+            dataCenterSpec.getReaper().getIngressAnnotations().entrySet().stream()
+                .map(e -> ingressMeta.putAnnotationsItem(e.getKey(), e.getValue()));
+        }
         final ExtensionsV1beta1Ingress ingress;
         if (!Strings.isNullOrEmpty(dataCenterSpec.getReaper().getIngressSuffix())) {
             String baseHostname = dataCenterSpec.getReaper().getIngressSuffix();
@@ -421,7 +430,7 @@ public class ReaperPlugin extends AbstractPlugin {
             String reaperAdminHost = "admin-reaper-" + baseHostname;
             logger.info("Creating reaper ingress for reaperAppHost={} reaperAdminHost={}", reaperAppHost, reaperAdminHost);
             ingress = new ExtensionsV1beta1Ingress()
-                    .metadata(meta)
+                    .metadata(ingressMeta)
                     .spec(new ExtensionsV1beta1IngressSpec()
                             .addRulesItem(new ExtensionsV1beta1IngressRule()
                                     .host(reaperAppHost)

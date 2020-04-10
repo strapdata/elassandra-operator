@@ -9,6 +9,7 @@ import lombok.experimental.Wither;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Cassandra reaper default configuration.
@@ -48,6 +49,13 @@ public class Kibana {
     @SerializedName("ingressSuffix")
     @Expose
     private String ingressSuffix = null;
+
+    /**
+     * Ingress annotations
+     */
+    @SerializedName("ingressAnnotations")
+    @Expose
+    private Map<String, String> ingressAnnotations = null;
 
     /**
      * Kibana upgrade version for Elasticsearch 6.5+

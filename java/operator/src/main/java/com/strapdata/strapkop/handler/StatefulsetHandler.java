@@ -60,38 +60,35 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
      */
     @Override
     public void accept(K8sWatchEvent<V1StatefulSet> event) throws Exception {
-        logger.debug("event={}", event);
+        logger.trace("event={}", event);
         switch(event.getType()) {
             case INITIAL:
+                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
+                meterRegistry.counter("k8s.event.init", tags).increment();
+                managed++;
+                reconcileIfReady(event.getResource());
+                break;
+
             case ADDED:
+                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 meterRegistry.counter("k8s.event.added", tags).increment();
                 managed++;
                 break;
+
             case MODIFIED:
+                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 meterRegistry.counter("k8s.event.modified", tags).increment();
-                final V1StatefulSet sts = event.getResource();
-                if (isStafulSetReady(sts)) {
-                    final String clusterName = sts.getMetadata().getLabels().get(OperatorLabels.CLUSTER);
-                    DataCenter dataCenter = dataCenterCache.get(new Key(sts.getMetadata().getLabels().get(OperatorLabels.PARENT), sts.getMetadata().getNamespace()));
-                    if (dataCenter != null) {
-                        logger.info("datacenter={} sts={}/{} is ready, triggering a dc statefulSetUpdate",
-                                dataCenter.id(), sts.getMetadata().getName(), sts.getMetadata().getNamespace());
-                        Operation op = new Operation().withSubmitDate(new Date()).withDesc("updated statefulset="+sts.getMetadata().getName());
-                        workQueues.submit(
-                                new ClusterKey(clusterName, sts.getMetadata().getNamespace()),
-                                dataCenterController.statefulsetUpdate(op, dataCenter, sts)
-                                        .onErrorComplete(t -> {
-                                            logger.warn("datcenter={} statefulSetUpdate failed: {}", dataCenter.id(), t.toString());
-                                            return t instanceof NoSuchElementException;
-                                        }));
-                    }
-                }
+                reconcileIfReady(event.getResource());
                 break;
+
             case DELETED:
+                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 meterRegistry.counter("k8s.event.deleted", tags).increment();
                 managed--;
                 break;
+
             case ERROR:
+                logger.warn("event type={}", event.getType());
                 meterRegistry.counter("k8s.event.error", tags).increment();
                 break;
         }
@@ -100,5 +97,24 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
     public static boolean isStafulSetReady(V1StatefulSet sts) {
         return Objects.equals(sts.getSpec().getReplicas(), ObjectUtils.defaultIfNull(sts.getStatus().getReadyReplicas(), 0)) &&
                 Objects.equals(sts.getStatus().getCurrentRevision(), sts.getStatus().getUpdateRevision());
+    }
+
+    public void reconcileIfReady(V1StatefulSet sts) throws Exception {
+        if (isStafulSetReady(sts)) {
+            final String clusterName = sts.getMetadata().getLabels().get(OperatorLabels.CLUSTER);
+            DataCenter dataCenter = dataCenterCache.get(new Key(sts.getMetadata().getLabels().get(OperatorLabels.PARENT), sts.getMetadata().getNamespace()));
+            if (dataCenter != null) {
+                logger.info("datacenter={} sts={}/{} is ready, triggering a dc statefulSetUpdate",
+                        dataCenter.id(), sts.getMetadata().getName(), sts.getMetadata().getNamespace());
+                Operation op = new Operation().withSubmitDate(new Date()).withDesc("updated statefulset="+sts.getMetadata().getName());
+                workQueues.submit(
+                        new ClusterKey(clusterName, sts.getMetadata().getNamespace()),
+                        dataCenterController.statefulsetUpdate(op, dataCenter, sts)
+                                .onErrorComplete(t -> {
+                                    logger.warn("datcenter={} statefulSetUpdate failed: {}", dataCenter.id(), t.toString());
+                                    return t instanceof NoSuchElementException;
+                                }));
+            }
+        }
     }
 }
