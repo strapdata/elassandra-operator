@@ -1508,7 +1508,7 @@ public class DataCenterUpdateAction {
             List<String> dnsNames = new ArrayList<>();
             if (dataCenterSpec.getExternalDns() != null && dataCenterSpec.getExternalDns().getEnabled() && dataCenterSpec.getExternalDns().getDomain() != null) {
                 dnsNames.add("*." + dataCenterSpec.getExternalDns().getDomain());
-                dnsNames.add("*." + OperatorNames.elasticsearchService(dataCenter) + "." + dataCenterMetadata.getNamespace()+ ".svc.cluster.local");
+                dnsNames.add(OperatorNames.elasticsearchService(dataCenter) + "." + dataCenterMetadata.getNamespace()+ ".svc.cluster.local");
             } else {
                 final String headlessServiceName = OperatorNames.nodesService(dataCenter) + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local";
                 final String elasticsearchServiceName = OperatorNames.elasticsearchService(dataCenter) + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local";
