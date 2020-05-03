@@ -2024,7 +2024,7 @@ public class DataCenterUpdateAction {
 
         // Nodeinfo init container if NODEINFO_SECRET is available as env var
         private V1Container buildInitContainerNodeInfo(String nodeInfoSecretName, RackStatus rackStatus) {
-            String yaml = null;
+            String dnsEndpointManifest = null;
 
             // check CRD
             if (dataCenterSpec.getExternalDns() != null && dataCenterSpec.getExternalDns().getEnabled()) {
@@ -2041,7 +2041,7 @@ public class DataCenterUpdateAction {
                 int rackIndex = dataCenterStatus.getZones().indexOf(rackStatus.getName());
                 String seedHostname = "cassandra-" + dataCenterSpec.getExternalDns().getRoot() + "-" + rackIndex;
 
-                yaml = "apiVersion: externaldns.k8s.io/v1alpha1 \n" +
+                dnsEndpointManifest = "apiVersion: externaldns.k8s.io/v1alpha1 \n" +
                         "kind: DNSEndpoint\n" +
                         "metadata:\n" +
                         "  name: " + seedHostname + "\n" +
@@ -2062,7 +2062,7 @@ public class DataCenterUpdateAction {
                         "    - __NODE_IP__ ";
 
                 if (logger.isTraceEnabled()) {
-                    logger.trace("Template generated for DNSEndpoint CRD : {}", yaml);
+                    logger.trace("Template generated for DNSEndpoint CRD : {}", dnsEndpointManifest);
                 }
             }
 
@@ -2097,7 +2097,7 @@ public class DataCenterUpdateAction {
                                     (updateDns ?
                                             " && POD_INDEX=$(echo $POD_NAME | awk -F\"-\" '{print $NF}') " +
                                             " && NODE_IP=$(cat /nodeinfo/public-ip) " +
-                                            " && echo \"" + yaml + "\" > /tmp/dns-manifest.yaml " +
+                                            " && echo \"" + dnsEndpointManifest + "\" > /tmp/dns-manifest.yaml " +
                                             " && sed -i \"s#__NODE_IP__#${NODE_IP}#g\" /tmp/dns-manifest.yaml " +
                                             " && sed -i \"s#__POD_INDEX__#${POD_INDEX}#g\" /tmp/dns-manifest.yaml " +
                                             " && cat /tmp/dns-manifest.yaml && (kubectl create --token=\"$NODEINFO_TOKEN\" -f /tmp/dns-manifest.yaml || true)" :
