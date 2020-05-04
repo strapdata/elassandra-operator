@@ -39,16 +39,16 @@ import java.util.function.Supplier;
 @Singleton
 public class K8sResourceUtils {
     private static final Logger logger = LoggerFactory.getLogger(K8sResourceUtils.class);
-    
+
     @Inject
     protected CoreV1Api coreApi;
-    
+
     @Inject
     protected AppsV1Api appsApi;
-    
+
     @Inject
     protected CustomObjectsApi customObjectsApi;
-    
+
     @Inject
     protected ExtensionsV1beta1Api extensionsV1beta1Api;
 
@@ -335,12 +335,12 @@ public class K8sResourceUtils {
         return readOrCreateResource(
                 () -> {
                     V1Secret secret2 = coreApi.readNamespacedSecret(secretObjectMeta.getName(), secretObjectMeta.getNamespace(), null, null, null);
-                        /*
-                        logger.warn("Get namespaced secret={} in namespace={} stringData={} data={}",
-                                secret2.getMetadata().getName(), secret2.getMetadata().getNamespace(),
-                                secret2.getStringData(),
-                                secret2.getData().entrySet().stream().collect(Collectors.toMap(e -> e.getKey(), e -> new String(e.getValue()))));
-                         */
+                    /*
+                    logger.warn("Get namespaced secret={} in namespace={} stringData={} data={}",
+                            secret2.getMetadata().getName(), secret2.getMetadata().getNamespace(),
+                            secret2.getStringData(),
+                            secret2.getData().entrySet().stream().collect(Collectors.toMap(e -> e.getKey(), e -> new String(e.getValue()))));
+                     */
                     return secret2;
                 },
                 () -> {
@@ -522,7 +522,7 @@ public class K8sResourceUtils {
             return coreApi.deleteNamespacedService(name, namespace, null, deleteOptions, null, null, null, "Foreground");
         });
     }
-    
+
     public Completable deletePersistentVolumeClaim(final V1PersistentVolumeClaim persistentVolumeClaim) throws ApiException {
         return deleteResource(() -> {
             final V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");

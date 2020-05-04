@@ -1,5 +1,6 @@
 package com.strapdata.strapkop.preflight;
 
+import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.ApiextensionsV1beta1Api;
 import io.kubernetes.client.models.V1beta1CustomResourceDefinition;
@@ -34,7 +35,7 @@ public class CreateCustomResourceDefinitions implements Preflight<Void> {
     }
 
     private void createCrdFromResource(final String resourceName) throws ApiException, IOException {
-        try (final InputStream resourceStream = CreateCustomResourceDefinitions.class.getResourceAsStream(resourceName);
+        try (final InputStream resourceStream = StrapdataCrdGroup.class.getResourceAsStream(resourceName);
              final InputStreamReader resourceReader = new InputStreamReader(resourceStream);) {
 
             final V1beta1CustomResourceDefinition crdDefinition = Yaml.loadAs(resourceReader, V1beta1CustomResourceDefinition.class);
