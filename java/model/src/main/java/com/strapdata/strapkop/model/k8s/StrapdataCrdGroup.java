@@ -5,11 +5,11 @@ import java.io.InputStream;
 public class StrapdataCrdGroup {
     public static final String GROUP = "stable.strapdata.com";
 
-    public InputStream getDataCenterCrd() {
+    public static InputStream getDataCenterCrd() {
         return StrapdataCrdGroup.class.getResourceAsStream("/datacenter-crd.yaml");
     }
 
-    public InputStream getTaskCrd() {
+    public static InputStream getTaskCrd() {
         return StrapdataCrdGroup.class.getResourceAsStream("/task-crd.yaml");
     }
 }
