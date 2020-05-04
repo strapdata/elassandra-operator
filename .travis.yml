@@ -46,8 +46,8 @@ deploy:
   skip_cleanup: true
   script:
     - ./gradlew dockerPush -PregistryUsername=$DOCKER_USERNAME -PregistryPassword=$DOCKER_PASSWORD -PregistryUrl=$DOCKER_URL
-    - ./gradlew java: -PregistryUsername=$DOCKER_USERNAME -PregistryPassword=$DOCKER_PASSWORD -PregistryUrl=$DOCKER_URL
     - ./gradlew java:edctl:jib -Djib.to.auth.username=$DOCKER_USERNAME -Djib.to.auth.password=$DOCKER_PASSWORD
+    - ./gradlew java:model:publish -PrepoUsername=$NEXUS_USERNAME -PrepoPassword=$NEXUS_PASSWORD
   # push to GCR.IO done by the marketplace repository
   on:
     tags: true
