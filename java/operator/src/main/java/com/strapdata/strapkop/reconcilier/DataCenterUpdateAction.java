@@ -250,17 +250,15 @@ public class DataCenterUpdateAction {
         )
                 .flatMap(clusterSecretMeta -> {
                     // create cluster secret if not exists
-                    final Map<String, String> passwords = new HashMap<>();
-                    passwords.put(CqlRole.KEY_CASSANDRA_PASSWORD, UUID.randomUUID().toString());
-                    passwords.put(CqlRole.KEY_ELASSANDRA_OPERATOR_PASSWORD, UUID.randomUUID().toString());
-                    passwords.put(CqlRole.KEY_ADMIN_PASSWORD, UUID.randomUUID().toString());
-                    passwords.put(KEY_JMX_PASSWORD, UUID.randomUUID().toString());
-                    passwords.put(KEY_SHARED_SECRET, "aaa.shared_secret: " + UUID.randomUUID().toString());
-                    passwords.put(KEY_REAPER_PASSWORD, UUID.randomUUID().toString());
                     return k8sResourceUtils.readOrCreateNamespacedSecret(clusterSecretMeta, () -> {
                         V1Secret secret = new V1Secret().metadata(clusterSecretMeta);
-                        for (Map.Entry<String, String> entry : passwords.entrySet())
-                            secret.putStringDataItem(entry.getKey(), entry.getValue());
+                        secret.putStringDataItem(CqlRole.KEY_CASSANDRA_PASSWORD, UUID.randomUUID().toString());
+                        secret.putStringDataItem(CqlRole.KEY_ELASSANDRA_OPERATOR_PASSWORD, UUID.randomUUID().toString());
+                        secret.putStringDataItem(CqlRole.KEY_ADMIN_PASSWORD, UUID.randomUUID().toString());
+                        secret.putStringDataItem(KEY_JMX_PASSWORD, UUID.randomUUID().toString());
+                        secret.putStringDataItem(KEY_SHARED_SECRET, "aaa.shared_secret: " + UUID.randomUUID().toString());
+                        secret.putStringDataItem(KEY_REAPER_PASSWORD, UUID.randomUUID().toString());
+                        logger.debug("Created new cluster secret={}/{}", clusterSecretMeta.getName(), clusterSecretMeta.getNamespace());
                         return secret;
                     });
                 })
