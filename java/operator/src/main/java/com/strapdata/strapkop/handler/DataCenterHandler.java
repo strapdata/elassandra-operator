@@ -9,6 +9,7 @@ import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.cassandra.Operation;
 import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.reconcilier.DataCenterController;
+import com.strapdata.strapkop.reconcilier.Reconciliable;
 import io.micrometer.core.instrument.ImmutableTag;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tag;
@@ -54,6 +55,7 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
                 dataCenter = event.getResource();
                 logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 workQueues.submit(new ClusterKey(event.getResource()),
+                        Reconciliable.Kind.DATACENTER, event.getType(),
                         dataCenterController.initDatacenter(new Operation().withSubmitDate(new Date()).withDesc("dc-init"), dataCenter)
                                 .doOnComplete(() -> {
                                     managed++;
@@ -67,6 +69,7 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
                 dataCenter = event.getResource();
                 logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 workQueues.submit(new ClusterKey(event.getResource()),
+                        Reconciliable.Kind.DATACENTER, event.getType(),
                         dataCenterController.initDatacenter(new Operation().withSubmitDate(new Date()).withDesc("dc-added"), dataCenter)
                                 .doOnComplete(() -> {
                                     managed++;
@@ -81,6 +84,7 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
                 logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 dataCenter = event.getResource();
                 workQueues.submit(new ClusterKey(event.getResource()),
+                        Reconciliable.Kind.DATACENTER, event.getType(),
                         dataCenterController.updateDatacenter(new Operation().withSubmitDate(new Date()).withDesc("dc-modified"), dataCenter)
                                 .doFinally(() -> {
                                     meterRegistry.counter("k8s.event.modified", tags).increment();
@@ -92,6 +96,7 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
                 logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 dataCenter = event.getResource();
                 workQueues.submit(new ClusterKey(event.getResource()),
+                        Reconciliable.Kind.DATACENTER, event.getType(),
                         dataCenterController.deleteDatacenter(dataCenter)
                                 .doOnComplete(() -> {
                                     managed--;

@@ -3,6 +3,7 @@ package com.strapdata.strapkop.sidecar;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.cache.SidecarConnectionCache;
 import com.strapdata.strapkop.cql.AbstractManager;
+import com.strapdata.strapkop.cql.CqlRole;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.ssl.AuthorityManager;
@@ -21,6 +22,7 @@ import java.io.ByteArrayInputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.concurrent.ExecutionException;
 
 /**
@@ -32,9 +34,9 @@ import java.util.concurrent.ExecutionException;
  */
 @Singleton
 public class SidecarClientFactory {
-    
+
     static final Logger logger = LoggerFactory.getLogger(SidecarClientFactory.class);
-    
+
     private final SidecarConnectionCache sidecarConnectionCache;
     private final AuthorityManager authorityManager;
     private final CqlRoleManager cqlRoleManager;
@@ -48,8 +50,7 @@ public class SidecarClientFactory {
     /**
      * Get a sidecar client from cache or create it
      */
-    public synchronized SidecarClient clientForPod(final ElassandraPod pod) throws MalformedURLException, InterruptedException, ExecutionException, ApiException, SSLException {
-
+    public synchronized SidecarClient clientForPod(final ElassandraPod pod, CqlRole cqlRole) throws MalformedURLException, InterruptedException, ExecutionException, ApiException, SSLException {
         SidecarClient sidecarClient = sidecarConnectionCache.get(pod);
 
         if (sidecarClient != null && sidecarClient.isRunning()) {
@@ -57,11 +58,14 @@ public class SidecarClientFactory {
             return sidecarClient;
         }
 
-        logger.debug("creating sidecar for pod={} in {}/{}", pod.getName(), pod.getDataCenter(), pod.getNamespace());
         URL url = pod.isSsl() ? new URL("https://" + pod.getFqdn() + ":" + pod.getEsPort()) : new URL("http://" + pod.getFqdn() + ":" + pod.getEsPort());
-        sidecarClient = new SidecarClient(url, new DefaultHttpClientConfiguration(), getSSLContext(pod.getNamespace()), cqlRoleManager, AbstractManager.key(pod.getNamespace(),
+        logger.debug("creating sidecar for pod={} in {}/{} url={}", pod.getName(), pod.getDataCenter(), pod.getNamespace(), url.toString());
+        DefaultHttpClientConfiguration httpClientConfiguration = new DefaultHttpClientConfiguration();
+        httpClientConfiguration.setReadTimeout(Duration.ofSeconds(30));
+        sidecarClient = new SidecarClient(url, httpClientConfiguration, getSSLContext(pod.getNamespace()), cqlRoleManager, AbstractManager.key(pod.getNamespace(),
                 pod.getCluster(),
-                AbstractManager.key(pod.getNamespace(), pod.getCluster(), pod.getDataCenter())));
+                AbstractManager.key(pod.getNamespace(), pod.getCluster(), pod.getDataCenter())),
+                cqlRole);
         sidecarConnectionCache.put(pod, sidecarClient);
         return sidecarClient;
     }
@@ -74,15 +78,15 @@ public class SidecarClientFactory {
                 .trustManager(new ByteArrayInputStream(ca.getCertificateChainAsString().getBytes(StandardCharsets.UTF_8)))
                 .build();
     }
-    
+
     /**
      * Remove and close a sidecar client from cache
      */
     public void invalidateClient(ElassandraPod pod, Throwable throwable) {
         logger.debug("invalidating cached sidecar client for pod="+pod.getName(), throwable);
-    
+
         final SidecarClient sidecarClient = sidecarConnectionCache.remove(pod);
-    
+
         if (sidecarClient != null) {
             sidecarClient.close();
         }

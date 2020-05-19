@@ -2,22 +2,28 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 replicas: 1
-autoScaleMode: "MANUAL"
 parked: false
+autoScaleMode: "MANUAL"
+
+image:
+  elassandraRepository: strapdata.azurecr.io/strapdata/elassandra-node-dev
+  tag: 6.8.4.5
+  pullPolicy: Always
+  pullSecrets: []
 
 # STRICT or SLACK
 nodeAffinityPolicy: STRICT
 
-image:
-  elassandraRepository: strapdata.azurecr.io/strapdata/elassandra-node-dev
-  tag: 6.8.4.3
-  pullPolicy: Always
-  pullSecrets: []
+# PVC delete policy, KEEP_PVC or DELETE_PVC
+decommissionPolicy: "DELETE_PVC"
 
 annotations: {}
 customLabels: {}
+
 priorityClassName:
 appServiceAccount:
+# TODO: we do not support unprivileged setup yet
+privilegedSupported: true
 
 resources:
   requests:
@@ -30,10 +36,17 @@ resources:
 dataVolumeClaim:
   accessModes:
     - ReadWriteOnce
+#  storageClassName: standard
   resources:
     requests:
       storage: 500Mi
 
+
+hostPortEnabled: false
+hostNetworkEnabled: false
+
+# When hostNetwork or hostPort is enabled, and k8s node have a public IP address,
+# externalDns publish a DNS name for seed nodes allowing to be joined by remote DCs.
 externalDns:
   enabled: false
   root: "xxx"
@@ -76,11 +89,7 @@ managedKeyspaces: {}
 # URL template support {namespace}, {clusterName}, {datacenterName}, {phase}, {replicas}, {readyReplicas}
 webHookUrl:
 
-# TODO: we do not support unprivileged setup yet
-privilegedSupported: true
 
-# PVC delete policy, KEEP_PVC or DELETE_PVC
-decommissionPolicy: "DELETE_PVC"
 
 computeJvmMemorySettings: true
 
@@ -149,12 +158,8 @@ elasticsearchPort: 9200
 elasticsearchTransportPort: 9300
 elasticsearchLoadBalancerEnabled: true
 
-
 ssl: true
 authentication: CASSANDRA
-
-hostPortEnabled: true
-hostNetworkEnabled: true
 
 nativePort: 39042
 storagePort: 37000

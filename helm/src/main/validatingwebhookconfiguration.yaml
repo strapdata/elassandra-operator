@@ -1,0 +1,29 @@
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingWebhookConfiguration
+metadata:
+  labels:
+    app: {{ template "elassandra-operator.name" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    heritage: {{ .Release.Service }}
+    operator: elassandra
+    release: {{ .Release.Name }}
+  name: {{ template "elassandra-operator.fullname" . }}
+webhooks:
+  - name: "elassandradatacenter-webhook.elassandra.strapdata.com"
+    rules:
+      - apiGroups: ["stable.strapdata.com"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["elassandradatacenters"]
+        scope: "*"
+    clientConfig:
+      service:
+        name: {{ template "elassandra-operator.fullname" . }}
+        namespace: {{ .Release.Namespace }}
+        path: /validation
+        port: 8080
+    admissionReviewVersions: ["v1beta1"]
+    failurePolicy: "Ignore"
+    matchPolicy: "Equivalent"
+    sideEffects: None
+    timeoutSeconds: 10

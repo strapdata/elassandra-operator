@@ -25,7 +25,7 @@ RUN rm -rf /var/lib/cassandra/* /root/.curlrc /root/.cassandra/cqlshrc /etc/cass
 # unfortunalty, this does not work with unpriviledged mode... TODO: we'll have to find a workaround if we want to support unpriviledged setup
 COPY dagi /usr/local/bin/
 # Add openjdk-8-jdk-headless for jstat, but require to disable -XX:+PerfDisableSharedMem
-RUN dagi  cpio libcap2-bin sysstat net-tools iotop dstat htop strace linux-perf && setcap cap_ipc_lock=+ep /bin/bash && setcap cap_sys_resource=+ep /bin/bash
+RUN dagi  cpio libcap2-bin sysstat net-tools iotop dstat htop strace linux-perf uuid-runtime && setcap cap_ipc_lock=+ep /bin/bash && setcap cap_sys_resource=+ep /bin/bash
 
 COPY cassandra /usr/sbin/cassandra
 COPY cassandra.in.sh /usr/share/cassandra/

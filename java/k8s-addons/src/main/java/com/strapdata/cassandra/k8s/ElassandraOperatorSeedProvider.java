@@ -62,6 +62,13 @@ public class ElassandraOperatorSeedProvider implements org.apache.cassandra.loca
         this.encryptionOptions.store_type = getSingleParameter(args, "store_type", "SEEDER_STORE_TYPE", cassandraEncryptionOptions.store_type);
         this.encryptionOptions.algorithm = getSingleParameter(args, "algorithm", "SEEDER_ALGORITHM", cassandraEncryptionOptions.algorithm);
         this.encryptionOptions.protocol = getSingleParameter(args, "protocol", "SEEDER_PROTOCOL", cassandraEncryptionOptions.protocol);
+
+        try {
+            // disable DNS negative caching
+            java.security.Security.setProperty("networkaddress.cache.negative.ttl" , "0");
+        } catch(SecurityException e) {
+            logger.warn("Failed to disable DNS negative caching", e);
+        }
     }
 
     public String[] getParameter(final Map<String, String> args, String paramName, String envVarName) {

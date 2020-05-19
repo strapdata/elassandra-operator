@@ -7,21 +7,21 @@ import io.kubernetes.client.models.V1ListMeta;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.experimental.Wither;
+import lombok.With;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * A List of DataCenter objects
- * 
+ *
  */
 @Data
-@Wither
+@With
 @AllArgsConstructor
 @NoArgsConstructor
 public class DataCenterList {
-    
+
     @SerializedName("apiVersion")
     @Expose
     private String apiVersion;

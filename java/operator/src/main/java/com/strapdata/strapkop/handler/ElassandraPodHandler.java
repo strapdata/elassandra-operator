@@ -12,6 +12,7 @@ import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.reconcilier.DataCenterController;
+import com.strapdata.strapkop.reconcilier.Reconciliable;
 import io.kubernetes.client.models.V1PersistentVolumeClaim;
 import io.kubernetes.client.models.V1Pod;
 import io.kubernetes.client.models.V1PodCondition;
@@ -116,6 +117,7 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
                             meterRegistry.counter("k8s.pod.unschedulable", tags).increment();
                             workQueues.submit(
                                     clusterKey,
+                                    Reconciliable.Kind.ELASSANDRA_POD, K8sWatchEvent.Type.MODIFIED,
                                     dataCenterController.unschedulablePod(new Pod(pod, CONTAINER_NAME)));
                         }
                     }
@@ -133,6 +135,7 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
                 DataCenter dc = dataCenterCache.get(new Key(parent, namespace));
                 workQueues.submit(
                         clusterKey,
+                        Reconciliable.Kind.ELASSANDRA_POD, K8sWatchEvent.Type.DELETED,
                         freePodPvc(dc, new Pod(pod, CONTAINER_NAME)));
                 meterRegistry.counter("k8s.event.deleted", tags).increment();
                 managed--;

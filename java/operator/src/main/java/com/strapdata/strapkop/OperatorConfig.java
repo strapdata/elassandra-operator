@@ -19,6 +19,8 @@ public class OperatorConfig {
     @Nullable
     String namespace;
 
+    Integer jmxmpPort;
+
     /**
      * Operator k8s service name used for callbacks
      */

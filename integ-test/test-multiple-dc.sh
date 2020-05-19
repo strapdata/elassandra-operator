@@ -9,10 +9,10 @@ source $(dirname $0)/test-lib.sh
 
 test_start
 install_elassandra_datacenter default cl1 dc1 1
-java -jar ../java/edctl/build/libs/edctl.jar watch --health GREEN
+java -jar java/edctl/build/libs/edctl.jar watch-dc --health GREEN
 
 install_elassandra_datacenter default cl1 dc2 1
-java -jar ../java/edctl/build/libs/edctl.jar watch --health GREEN
+java -jar java/edctl/build/libs/edctl.jar watch-dc --health GREEN
 
 
 #create_resource_group

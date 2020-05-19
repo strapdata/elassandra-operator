@@ -61,6 +61,7 @@ jackson:
     module-scan: false
 
 operator:
+    jmxmpPort: ${JMXMP_PORT:7199}
     k8sWatchPeriodInSec: ${K8S_WATCH_PERIOD:180}
     elassandraNodeWatchPeriodInSec: ${ELASSANDRA_NODE_WATCH_PERIOD:60}
     namespace: "${OPERATOR_NAMESPACE:}"

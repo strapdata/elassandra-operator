@@ -13,8 +13,8 @@ import picocli.CommandLine;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
-@CommandLine.Command(name = "watch", description = "edctl watch subcommand")
-public class WatchCommand implements Callable<Integer> {
+@CommandLine.Command(name = "watch-dc", description = "edctl watch datacenter subcommand")
+public class WatchDcCommand implements Callable<Integer> {
 
     @CommandLine.Option(names = {"-n","--namespace"}, description = "Kubernetes namespace", defaultValue = "default")
     String namespace;
@@ -36,7 +36,7 @@ public class WatchCommand implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-        System.out.println("Waiting phase="+phase+" health=" + health + " replicas="+readyReplicas+" timeout="+timeout+"s");
+        System.out.println("Waiting datacenter namespace="+namespace+" phase="+phase+" health=" + health + " replicas="+readyReplicas+" timeout="+timeout+"s");
 
         ApiClient client = Config.defaultClient();
         client.getHttpClient().setReadTimeout(timeout, TimeUnit.SECONDS);
@@ -52,7 +52,9 @@ public class WatchCommand implements Callable<Integer> {
         long start = System.currentTimeMillis();
         for (Watch.Response<DataCenter> item : watch) {
             System.out.printf("%s : %s phase=%s heath=%s replicas=%d %n", item.type, item.object.getMetadata().getName(),
-                    item.object.getStatus().getPhase().name(), item.object.getStatus().getHealth().name(), item.object.getStatus().getReadyReplicas());
+                    item.object.getStatus().getPhase().name(),
+                    item.object.getStatus().getHealth().name(),
+                    item.object.getStatus().getReadyReplicas());
             boolean conditionMet = true;
 
             if (phase != null && !phase.equals(item.object.getStatus().getPhase()))

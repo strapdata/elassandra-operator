@@ -16,6 +16,7 @@ import io.kubernetes.client.apis.AppsV1Api;
 import io.kubernetes.client.apis.CoreV1Api;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
+import io.reactivex.Completable;
 import io.reactivex.Single;
 import org.elasticsearch.common.Strings;
 
@@ -38,7 +39,7 @@ public class ManagedKeyspacePlugin extends AbstractPlugin {
     }
 
     @Override
-    public void syncKeyspaces(final CqlKeyspaceManager cqlKeyspaceManager, final DataCenter dataCenter) {
+    public Completable syncKeyspaces(final CqlKeyspaceManager cqlKeyspaceManager, final DataCenter dataCenter) {
         for(ManagedKeyspace managedKeyspace : dataCenter.getSpec().getManagedKeyspaces()) {
             if (!Strings.isNullOrEmpty(managedKeyspace.getKeyspace())) {
                 cqlKeyspaceManager.addIfAbsent(dataCenter, managedKeyspace.getKeyspace(), () -> new CqlKeyspace()
@@ -47,10 +48,11 @@ public class ManagedKeyspacePlugin extends AbstractPlugin {
                 );
             }
         }
+        return Completable.complete();
     }
 
     @Override
-    public void syncRoles(final CqlRoleManager cqlRoleManager, final DataCenter dataCenter) {
+    public Completable syncRoles(final CqlRoleManager cqlRoleManager, final DataCenter dataCenter) {
         for(ManagedKeyspace managedKeyspace : dataCenter.getSpec().getManagedKeyspaces()) {
             if (!Strings.isNullOrEmpty(managedKeyspace.getRole())) {
                 cqlRoleManager.addIfAbsent(dataCenter, managedKeyspace.getRole(), () -> new CqlRole()
@@ -60,13 +62,14 @@ public class ManagedKeyspacePlugin extends AbstractPlugin {
                                     OperatorNames.clusterChildObjectName("%s-keyspaces", dc) : managedKeyspace.getSecretName();
                         })
                         .withSecretKey(Strings.isNullOrEmpty(managedKeyspace.getSecretKey()) ? managedKeyspace.getRole() : managedKeyspace.getSecretKey())
-                        .withApplied(false)
+                        .withReconcilied(false)
                         .withSuperUser(managedKeyspace.getSuperuser())
                         .withLogin(managedKeyspace.getLogin())
                         .withGrantStatements(managedKeyspace.getGrantStatements())
                 );
             }
         }
+        return Completable.complete();
     }
 
     /**

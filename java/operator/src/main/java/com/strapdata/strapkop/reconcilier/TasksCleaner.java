@@ -31,9 +31,9 @@ public class TasksCleaner {
     @Async
     void onStartup(ServiceStartedEvent event) {
         this.cleanerThread = new Timer("elassandra-tasks-cleaner", true);
-        final int retention = (int) operatorConfig.getTaskRetention().getSeconds();
-        // start cleaner thread after 60s and execute it every hour
-        cleanerThread.schedule(new Cleaner(retention, operatorConfig.getNamespace()), 60_000l, 3_600_000l);
+        final int retentionInMs = (int) operatorConfig.getTaskRetention().getSeconds() * 1000;
+        // start cleaner thread after 60s and execute it every retentionInMs/5
+        cleanerThread.schedule(new Cleaner(retentionInMs, operatorConfig.getNamespace()), 60_000l, retentionInMs / 5);
     }
 
     @EventListener

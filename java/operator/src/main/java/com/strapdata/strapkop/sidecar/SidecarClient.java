@@ -45,12 +45,14 @@ public class SidecarClient {
     private RxHttpClient httpClient;
     private CqlRoleManager cqlRoleManager;
     private String dcKey;
+    private CqlRole cqlRole;
 
     public SidecarClient(URL url,
                          HttpClientConfiguration httpClientConfiguration,
                          SslContext sslContext,
                          CqlRoleManager cqlRoleManager,
-                         String dcKey) {
+                         String dcKey,
+                         CqlRole cqlRole) {
         this.httpClient = new DefaultHttpClient(LoadBalancer.fixed(url),
                 httpClientConfiguration,
                 null,
@@ -77,8 +79,7 @@ public class SidecarClient {
      * @return
      */
     public <I> MutableHttpRequest<I> auth(MutableHttpRequest<I> req) {
-        CqlRole cqlRole =  this.cqlRoleManager.connectedCqlRole(dcKey);
-        logger.debug("auth cqlRole={}", cqlRole);
+        logger.debug("auth with cqlRole={}", cqlRole);
         req.basicAuth(cqlRole.getUsername(), cqlRole.getPassword());
         return req;
     }
@@ -104,7 +105,7 @@ public class SidecarClient {
         }
         return httpClient.exchange(auth(POST("_nodetool/remove" + qs, ""))).ignoreElements();
     }
-    
+
     public Completable cleanup(@Nullable String keyspace) throws UnsupportedEncodingException {
         String qs = (keyspace == null) ? "" : "?keyspace=" + URLEncoder.encode(keyspace,"UTF-8");
         return httpClient.exchange(auth(POST("_nodetool/cleanup" +qs, ""))).ignoreElements();
@@ -120,6 +121,25 @@ public class SidecarClient {
         return httpClient.exchange(auth(POST("_nodetool/flush" + qs, ""))).ignoreElements();
     }
 
+    public Completable open(@Nullable String indices) throws UnsupportedEncodingException {
+        String idx = (indices == null) ? "*" : indices;
+        return httpClient.exchange(auth(POST(idx+"/_open", ""))).ignoreElements();
+    }
+
+    public Completable close(@Nullable String indices) throws UnsupportedEncodingException {
+        String idx = (indices == null) ? "*" : indices;
+        return httpClient.exchange(auth(POST(idx + "/_close", ""))).ignoreElements();
+    }
+
+    public Completable updateRouting(@Nullable String indices) throws UnsupportedEncodingException {
+        String idx = (indices == null) ? "" : "/"+indices;
+        return httpClient.exchange(auth(POST(idx + "/_updaterouting", ""))).ignoreElements();
+    }
+
+    public Completable reloadLicense() throws UnsupportedEncodingException {
+        return httpClient.exchange(auth(POST("/_license", ""))).ignoreElements();
+    }
+
     public Completable repairPrimaryRange(@Nullable String keyspace) throws UnsupportedEncodingException {
         String qs = (keyspace == null) ? "" : "?keyspace=" + URLEncoder.encode(keyspace,"UTF-8");
         return httpClient.exchange(auth(POST("_nodetool/repair" + qs, ""))).ignoreElements();
@@ -132,7 +152,7 @@ public class SidecarClient {
     public boolean isRunning() {
         return httpClient.isRunning();
     }
-    
+
     public void close() {
         httpClient.close();
     }

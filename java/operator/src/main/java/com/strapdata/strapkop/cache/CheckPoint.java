@@ -2,10 +2,9 @@ package com.strapdata.strapkop.cache;
 
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenterSpec;
 import lombok.*;
-import lombok.experimental.Wither;
 
 @Data
-@Wither
+@With
 @NoArgsConstructor
 @AllArgsConstructor
 @Getter

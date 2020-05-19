@@ -6,10 +6,10 @@ import com.google.gson.annotations.SerializedName;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.experimental.Wither;
+import lombok.With;
 
 @Data
-@Wither
+@With
 @AllArgsConstructor
 @NoArgsConstructor
 public class Enterprise {
@@ -29,7 +29,7 @@ public class Enterprise {
     @SerializedName("ssl")
     @Expose
     private Boolean ssl = true;
-    
+
     @SerializedName("aaa")
     @Expose
     private Aaa aaa;

@@ -8,13 +8,13 @@ import io.kubernetes.client.models.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.experimental.Wither;
+import lombok.With;
 import org.apache.commons.codec.digest.DigestUtils;
 
 import java.util.*;
 
 @Data
-@Wither
+@With
 @AllArgsConstructor
 @NoArgsConstructor
 public class DataCenterSpec {
@@ -54,7 +54,7 @@ public class DataCenterSpec {
     @SerializedName("autoScaleMode")
     @Expose
     private AutoScaleMode autoScaleMode = AutoScaleMode.MANUAL;
-    
+
     @SerializedName("podAffinityPolicy")
     @Expose
     private PodsAffinityPolicy podsAffinityPolicy = PodsAffinityPolicy.STRICT;
@@ -149,6 +149,13 @@ public class DataCenterSpec {
     @SerializedName("userSecretVolumeSource")
     @Expose
     private V1SecretVolumeSource userSecretVolumeSource;
+
+    /**
+     * Play cassandra commitlogs in a dedicated init container to avoid the liveness timeout endless loop.
+     */
+    @SerializedName("commitlogsInitContainer")
+    @Expose
+    private Boolean commitlogsInitContainer = false;
 
     /**
      * Enable Prometheus support.
@@ -426,7 +433,7 @@ public class DataCenterSpec {
 
         String json = GsonUtils.toJson(acc);
         String digest = DigestUtils.sha1Hex(json).substring(0,7);
-        System.out.println(json+"="+digest);
+        ///System.out.println(json+"="+digest);
         return digest;
     }
 

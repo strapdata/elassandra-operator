@@ -10,6 +10,7 @@ import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.cassandra.Operation;
 import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.reconcilier.DataCenterController;
+import com.strapdata.strapkop.reconcilier.Reconciliable;
 import io.kubernetes.client.models.V1StatefulSet;
 import io.micrometer.core.instrument.ImmutableTag;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -109,6 +110,7 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
                 Operation op = new Operation().withSubmitDate(new Date()).withDesc("updated statefulset="+sts.getMetadata().getName());
                 workQueues.submit(
                         new ClusterKey(clusterName, sts.getMetadata().getNamespace()),
+                        Reconciliable.Kind.STATEFULSET, K8sWatchEvent.Type.MODIFIED,
                         dataCenterController.statefulsetUpdate(op, dataCenter, sts)
                                 .onErrorComplete(t -> {
                                     logger.warn("datcenter={} statefulSetUpdate failed: {}", dataCenter.id(), t.toString());

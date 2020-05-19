@@ -22,9 +22,9 @@ public final class OperatorLabels {
 
     // public static final String labelPrefix = "elassandra-operator.strapdata.com/";
     // no prefix for compatibility with vroyer's grafana dashboard
-    public static final String labelPrefix = "";
+    public static final String labelPrefix = "elassandra.strapdata.com/";
 
-    
+
     public static final String PARENT = labelPrefix + "parent"; // parent datacenter resource name
     public static final String CLUSTER = labelPrefix + "cluster";
     public static final String DATACENTER = labelPrefix + "datacenter";
@@ -33,7 +33,7 @@ public final class OperatorLabels {
 
     // TODO: this is confusing with helm "release" label
     public static final String RELEASE = labelPrefix + "release";
-    
+
     public static final String DATACENTER_GENERATION = labelPrefix + "datacenter-generation";
     public static final String DATACENTER_FINGERPRINT = labelPrefix + "datacenter-fingerprint";
 
@@ -49,7 +49,7 @@ public final class OperatorLabels {
     );
 
     private OperatorLabels() {}
-    
+
     public static Map<String, String> cluster(String clusterName) {
         return ImmutableMap.<String, String>builder()
                 .put(CLUSTER, clusterName)
@@ -57,7 +57,7 @@ public final class OperatorLabels {
                 .put(APP, ELASSANDRA_APP) // for grafana
                 .build();
     }
-    
+
     public static Map<String, String> datacenter(String parent, String clusterName, String dcName) {
         return ImmutableMap.<String, String>builder()
                 .putAll(OperatorLabels.cluster(clusterName))
@@ -65,11 +65,11 @@ public final class OperatorLabels {
                 .put(DATACENTER, dcName)
                 .build();
     }
-    
+
     public static Map<String, String> datacenter(DataCenter dataCenter) {
         return datacenter(dataCenter.getMetadata().getName(), dataCenter.getSpec().getClusterName(), dataCenter.getSpec().getDatacenterName());
     }
-    
+
     public static Map<String, String> rack(DataCenter dataCenter, String rackName, int rackIndex) {
         return ImmutableMap.<String, String>builder()
                 .putAll(datacenter(dataCenter))
@@ -84,7 +84,7 @@ public final class OperatorLabels {
                 .put(RACKINDEX, Integer.toString(rackIndex))
                 .build();
     }
-    
+
     public static Map<String, String> pod(DataCenter dataCenter, String rackName, int rackIndex, String podName) {
         return ImmutableMap.<String, String>builder()
                 .putAll(rack(dataCenter, rackName, rackIndex))
@@ -102,7 +102,7 @@ public final class OperatorLabels {
     }
     */
 
-    
+
     public static String toSelector(Map<String, String> labels) {
         return labels.entrySet().stream().map(e -> e.getKey()+"="+e.getValue()).collect(Collectors.joining(","));
     }

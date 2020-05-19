@@ -1,5 +1,6 @@
 package com.strapdata.strapkop.reconcilier;
 
+import com.google.common.collect.ImmutableList;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
@@ -29,7 +30,11 @@ import org.slf4j.LoggerFactory;
 import javax.inject.Named;
 import javax.inject.Singleton;
 import java.util.Iterator;
+import java.util.List;
 
+/**
+ * Remove all nodes of a remote datacenter.
+ */
 @Singleton
 @Infrastructure
 public class RemoveNodesTaskReconcilier extends TaskReconcilier {
@@ -85,7 +90,8 @@ public class RemoveNodesTaskReconcilier extends TaskReconcilier {
         ElassandraPod pod = ElassandraPod.fromV1Pod(it.next());
 
         return jmxmpElassandraProxy.removeDcNodes(pod, dcName)
-                .toSingleDefault(pod).map(p -> task.getStatus().getPods().put(p.getName(), TaskPhase.SUCCEED))
+                .toSingleDefault(pod)
+                .map(p -> task.getStatus().getPods().put(p.getName(), TaskPhase.SUCCEED))
                 .flatMapCompletable(list -> finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.SUCCEED))
                 .onErrorResumeNext(throwable -> {
                     logger.error("datacenter={} task={} Error removing nodes of dc={} error:{}",
@@ -96,7 +102,8 @@ public class RemoveNodesTaskReconcilier extends TaskReconcilier {
     }
 
     @Override
-    public Single<Iterable<V1Pod>> listPods(Task task, DataCenter dc) {
-        return initializePodMapWithWaitingStatus(task, dc);
+    public Single<List<V1Pod>> init(Task task, DataCenter dc) {
+        return getRunningPods(task, dc).map(pods ->
+                initTaskStatusPodMap(task, pods.size() == 0 ? ImmutableList.of() : ImmutableList.of(pods.get(0))));
     }
 }

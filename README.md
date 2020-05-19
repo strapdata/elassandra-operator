@@ -21,7 +21,16 @@ Publish the docker images (operator + sidecar + latest elassandra):
 ./gradlew dockerPush -PregistryUsername=$DOCKER_USERNAME -PregistryPassword=$DOCKER_PASSWORD -PregistryUrl=$DOCKER_URL
 ```
 
+Publish in local insecure registry
+```bash
+./gradlew dockerPush -PregistryUrl="localhost:5000/" -PregistryInsecure
+```
+
 Build parameters are located in `gradle.properties`.
+
+## Tests
+
+M_K8S_FLAVOR=kind M_INTEG_DIR=scale_up mage integ:run
 
 ## Integration testing
 

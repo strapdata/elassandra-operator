@@ -7,12 +7,12 @@ import com.strapdata.strapkop.model.GsonIsoDateAdapter;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.experimental.Wither;
+import lombok.With;
 
 import java.util.*;
 
 @Data
-@Wither
+@With
 @AllArgsConstructor
 @NoArgsConstructor
 public class DataCenterStatus {
@@ -79,7 +79,7 @@ public class DataCenterStatus {
     @SerializedName("cqlStatus")
     @Expose
     private CqlStatus cqlStatus = CqlStatus.NOT_STARTED;
-    
+
     @SerializedName("cqlStatusMessage")
     @Expose
     private String cqlStatusMessage = null;

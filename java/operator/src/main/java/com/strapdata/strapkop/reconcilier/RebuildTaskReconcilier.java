@@ -13,6 +13,7 @@ import com.strapdata.strapkop.model.k8s.task.RebuildTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
 import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
+import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.models.V1Pod;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -33,6 +34,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Rebuild cassandra DC from a source DC and update routing table for the provided ES indices.
+ */
 @Singleton
 @Infrastructure
 public class RebuildTaskReconcilier extends TaskReconcilier {
@@ -41,11 +45,13 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
     private final ApplicationContext context;
     private final CqlRoleManager cqlRoleManager;
     private final CqlKeyspaceManager cqlKeyspaceManager;
+    private final SidecarClientFactory sidecarClientFactory;
 
     public RebuildTaskReconcilier(ReconcilierObserver reconcilierObserver,
                                   final OperatorConfig operatorConfig,
                                   final K8sResourceUtils k8sResourceUtils,
                                   final JmxmpElassandraProxy jmxmpElassandraProxy,
+                                  final SidecarClientFactory sidecarClientFactory,
                                   final ApplicationContext context,
                                   final CqlRoleManager cqlRoleManager,
                                   final CqlKeyspaceManager cqlKeyspaceManager,
@@ -60,6 +66,7 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
         this.context = context;
         this.cqlRoleManager = cqlRoleManager;
         this.cqlKeyspaceManager = cqlKeyspaceManager;
+        this.sidecarClientFactory = sidecarClientFactory;
     }
 
     /**
@@ -82,7 +89,9 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
         // rebuild in parallel to stream data
         List<CompletableSource> todoList = new ArrayList<>();
         for (V1Pod v1Pod : pods) {
-            ElassandraPod pod = ElassandraPod.fromV1Pod(v1Pod);
+            ElassandraPod pod = ElassandraPod.fromV1Pod(v1Pod)
+                    .setEsPort(dc.getSpec().getElasticsearchPort())
+                    .setSsl(dc.getSpec().getSsl());
             todoList.add(jmxmpElassandraProxy.rebuild(pod, rebuildTaskSpec.getSrcDcName(), null)
                     .toSingleDefault(task)
                     .map(t -> {
@@ -99,13 +108,14 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
                         return Completable.complete();
                     }));
         }
+
         return Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()]))
                 .andThen(finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.SUCCEED));
     }
 
     @Override
-    public Single<Iterable<V1Pod>> listPods(Task task, DataCenter dc) {
-        return initializePodMapWithWaitingStatus(task, dc);
+    public Single<List<V1Pod>> init(Task task, DataCenter dc) {
+        return listAllDcPods(task, dc).map(pods -> initTaskStatusPodMap(task, pods));
     }
 
     /**

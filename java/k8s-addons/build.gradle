@@ -1,6 +1,10 @@
 plugins {
 }
 
+compileJava {
+    options.compilerArgs += '-Xlint:unchecked'
+}
+
 dependencies {
     // TODO: we should build one k8s-addons per supported Elassandra version
     compile group: 'com.strapdata.elasticsearch', name:'elasticsearch', version: javaElassandraVersion

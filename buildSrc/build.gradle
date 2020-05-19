@@ -1,6 +1,7 @@
 apply plugin: 'groovy'
 
 repositories {
+    mavenCentral()
     jcenter()
 }
 
@@ -9,4 +10,5 @@ dependencies {
     compile localGroovy()
     compile 'com.microsoft.azure:azure-storage:8.4.0'
     compile 'com.google.guava:guava:28.1-jre'
+    compile group: 'org.codehaus.plexus', name: 'plexus-utils', version: '2.1'
 }

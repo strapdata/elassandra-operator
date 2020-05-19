@@ -9,8 +9,8 @@ tasks.withType(JavaCompile) {
 }
 
 dependencies {
-    compile 'org.projectlombok:lombok:1.18.4'
-    annotationProcessor "org.projectlombok:lombok:1.18.4"
+    implementation 'org.projectlombok:lombok:1.18.10'
+    annotationProcessor "org.projectlombok:lombok:1.18.10"
 }
 
 jar {

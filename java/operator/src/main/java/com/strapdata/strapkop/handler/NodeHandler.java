@@ -36,8 +36,6 @@ public class NodeHandler extends TerminalHandler<K8sWatchEvent<V1Node>> {
     @Override
     public void accept(K8sWatchEvent<V1Node> event) throws Exception {
         logger.trace("event={}", event);
-
-        final V1Node node;
         switch(event.getType()) {
             case INITIAL:
                 logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());

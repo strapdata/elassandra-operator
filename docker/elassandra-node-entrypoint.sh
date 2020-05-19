@@ -7,7 +7,6 @@ source ./systune.sh
 for config_directory in "$@"
 do
     # k8s configmap volumes are a mess of symlinks -- the find command cleans this up (skip ay dirs starting with ..)
-
     cd "${config_directory}"
     find -L . -name "..*" -prune -o \( -type f -print0 \) |
         cpio -pmdLv0 /etc/cassandra
@@ -89,14 +88,14 @@ if [ -f "/nodeinfo/public-name" ] && [ -s "/nodeinfo/public-name" ]; then
     ES_USE_INTERNAL_ADDRESS="-Des.use_internal_address=true"
 fi
 
-
-# Define broadcast address
+# Define cassandra broadcast address
 echo "broadcast_address: $BROADCAST_ADDRESS" > /etc/cassandra/cassandra.yaml.d/002-broadcast_address.yaml
 echo "broadcast_rpc_address: $BROADCAST_RPC_ADDRESS" > /etc/cassandra/cassandra.yaml.d/002-broadcast_rpc_address.yaml
 
 # Bind elasticsearch transport on POD ip
 echo "transport.bind_host: $POD_IP" > /etc/cassandra/elasticsearch.yml.d/001-transport.yaml
 
+# Manage commit log replay in an init container to workaround readyness timeout
 if [ "x${STOP_AFTER_COMMILOG_REPLAY}" != "x" ]; then
   echo "REQUEST FOR cassandra.stop_after_commitlog_replayed : CassandraDeamon will stop after all commitlog will be replayed"
   export JVM_OPTS="$JVM_OPTS -Dcassandra.stop_after_commitlog_replayed=${STOP_AFTER_COMMILOG_REPLAY} "
