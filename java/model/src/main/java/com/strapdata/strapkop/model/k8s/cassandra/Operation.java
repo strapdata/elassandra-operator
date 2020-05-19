@@ -7,7 +7,7 @@ import com.strapdata.strapkop.model.GsonIsoDateAdapter;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.experimental.Wither;
+import lombok.With;
 
 import java.util.Date;
 
@@ -15,7 +15,7 @@ import java.util.Date;
  * Reconciliation operation started to reach the desired state.
  */
 @Data
-@Wither
+@With
 @AllArgsConstructor
 @NoArgsConstructor
 public class Operation {

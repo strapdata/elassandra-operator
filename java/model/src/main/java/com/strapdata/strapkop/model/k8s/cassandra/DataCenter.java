@@ -8,10 +8,10 @@ import io.kubernetes.client.models.V1ObjectMeta;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.experimental.Wither;
+import lombok.With;
 
 @Data
-@Wither
+@With
 @AllArgsConstructor
 @NoArgsConstructor
 public class DataCenter {
@@ -37,7 +37,7 @@ public class DataCenter {
     @SerializedName("spec")
     @Expose
     private DataCenterSpec spec;
-    
+
     @SerializedName("status")
     @Expose
     private DataCenterStatus status = new DataCenterStatus();

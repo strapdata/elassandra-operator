@@ -22,6 +22,7 @@ import com.strapdata.strapkop.ssl.AuthorityManager;
 import com.strapdata.strapkop.ssl.utils.X509CertificateAndPrivateKey;
 import io.kubernetes.client.ApiException;
 import io.kubernetes.client.apis.CoreV1Api;
+import io.micronaut.context.annotation.Infrastructure;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
@@ -32,13 +33,14 @@ import io.vavr.Tuple2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Singleton;
 import javax.net.ssl.SSLException;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
@@ -49,25 +51,15 @@ import java.util.stream.Collectors;
  *
  * TODO: update password when k8s secret is updated.
  */
-@Singleton
+@Infrastructure
 public class CqlRoleManager extends AbstractManager<CqlRole> {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(CqlRoleManager.class);
 
     final CoreV1Api coreApi;
     final K8sResourceUtils k8sResourceUtils;
     final AuthorityManager authorityManager;
     final OperatorConfig operatorConfig;
-
-    Map<String, CqlRole> connectedCqlRoles = new ConcurrentHashMap<>();
-
-    public CqlRole connectedCqlRole(DataCenter dc) {
-        return this.connectedCqlRoles.getOrDefault(key(dc), CqlRole.DEFAULT_CASSANDRA_ROLE);
-    }
-
-    public CqlRole connectedCqlRole(String dcKey) {
-        return this.connectedCqlRoles.getOrDefault(dcKey, CqlRole.DEFAULT_CASSANDRA_ROLE);
-    }
 
     public CqlRoleManager(final CoreV1Api coreApi,
                           final K8sResourceUtils k8sResourceUtils,
@@ -114,10 +106,17 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                     List<CompletableSource> todoList = new ArrayList<>();
                     if (get(dataCenter) != null) {
                         for (CqlRole role : get(dataCenter).values()) {
-                            if (!role.isApplied()) {
+                            if (!role.isReconcilied()) {
                                 try {
                                     doUpdateStatus = true;
-                                    todoList.add(role.createOrUpdateRole(dataCenter, k8sResourceUtils, sessionSupplier).ignoreElement());
+                                    todoList.add(
+                                            role.createOrUpdateRole(dataCenter, k8sResourceUtils, sessionSupplier)
+                                            .map(r -> {
+                                                // update registry because role seems to be managed by value
+                                                put(dataCenter, r.getUsername(), r);
+                                                return r;
+                                            }).ignoreElement()
+                                    );
                                 } catch (Exception ex) {
                                     logger.error("datacenter={} Cannot load password or apply for role={} error={}",
                                             dataCenter.id(), role.getUsername(), ex.getMessage());
@@ -167,9 +166,8 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                             role.loadPassword(dc, k8sResourceUtils).blockingGet();
                             logger.debug("datacenter={} Connecting with role={}", dc.id(), role);
                             rootClusterSession = connect(dc, dcStatus, Optional.of(role)).blockingGet();
-                            logger.debug("datacenter={} Connected with role={}", dc.id(), connectedRole);
+                            logger.debug("datacenter={} Connected with role={}", dc.id(), role);
                             connectedRole = role;
-                            connectedCqlRoles.put(key(dc), role);
                             break;
                         } catch (AuthenticationException e) {
                             // authentication failed
@@ -244,7 +242,6 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                         CqlRole strakopRole = get(dc, CqlRole.STRAPKOP_ROLE.username);
                         try {
                             Tuple2<Cluster, Session> strapkopConnection = connect(dc, dcStatus, Optional.of(strakopRole)).blockingGet();
-                            connectedCqlRoles.put(key(dc), strakopRole);
                             try {
                                 logger.debug("Closing root session cluster={}", rootClusterSession._1.getClusterName());
                                 rootClusterSession._1.close();

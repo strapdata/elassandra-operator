@@ -5,23 +5,33 @@ import io.reactivex.Single;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.experimental.Wither;
+import lombok.With;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Locale;
 
 @Data
-@Wither
+@With
 @NoArgsConstructor
 @AllArgsConstructor
-public class CqlKeyspace {
+public class CqlKeyspace implements CqlReconciliable {
 
     private static final Logger logger = LoggerFactory.getLogger(CqlKeyspaceManager.class);
 
+    // spec
     String name;
     int rf;
     boolean repair;
+
+    // status
+    boolean reconcilied;
+    int reconcileWithDcSize;     // size of the DC when reconcilied
+
+    @Override
+    public boolean reconcilied() {
+        return reconcilied;
+    }
 
     /**
      * create keyspace if not exists.

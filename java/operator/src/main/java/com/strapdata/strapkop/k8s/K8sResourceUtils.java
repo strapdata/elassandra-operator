@@ -227,6 +227,15 @@ public class K8sResourceUtils {
                 () -> appsApi.replaceNamespacedDeployment(deployment.getMetadata().getName(), namespace, deployment, null, null, null));
     }
 
+    public Single<V1Deployment> updateNamespacedDeployment(final V1Deployment deployment) throws ApiException {
+        return Single.fromCallable(new Callable<V1Deployment>() {
+            @Override
+            public V1Deployment call() throws Exception {
+                return appsApi.replaceNamespacedDeployment(deployment.getMetadata().getName(), deployment.getMetadata().getNamespace(), deployment, null, null, null);
+            }
+        });
+    }
+
     public Single<V1StatefulSet> createOrReplaceNamespacedStatefulSet(final V1StatefulSet statefulset) throws ApiException {
         final String namespace = statefulset.getMetadata().getNamespace();
         return createOrReplaceResource(namespace, statefulset,
@@ -1086,5 +1095,6 @@ public class K8sResourceUtils {
         V1Status status = coreApi.deleteNamespacedPod(podname, namespace, null, v1DeleteOptions, null, null, null, "Foreground");
         return status.getCode() == 200;
     }
+
 
 }

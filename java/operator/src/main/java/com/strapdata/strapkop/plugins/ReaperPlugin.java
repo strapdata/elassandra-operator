@@ -43,8 +43,8 @@ import java.util.stream.Collectors;
 public class ReaperPlugin extends AbstractPlugin {
 
     public static final Map<String, String> PODS_SELECTOR = ImmutableMap.of(
-            "app.kubernetes.io/managed-by", "elassandra-operator",
-            "app", "reaper"
+            OperatorLabels.MANAGED_BY, OperatorLabels.ELASSANDRA_OPERATOR,
+            OperatorLabels.APP, "reaper"
     );
 
     public static final String APP_SERVICE_NAME = "app";
@@ -76,7 +76,7 @@ public class ReaperPlugin extends AbstractPlugin {
         this.cqlKeyspaceManager = cqlKeyspaceManager;
     }
 
-    public static final CqlKeyspace REAPER_KEYSPACE = new CqlKeyspace(REAPER_KEYSPACE_NAME, 3, true);
+    public static final CqlKeyspace REAPER_KEYSPACE = new CqlKeyspace().withName(REAPER_KEYSPACE_NAME).withRf(3).withRepair(true);
 
     @Override
     public  Map<String, String> deploymentLabelSelector(DataCenter dc) {
@@ -84,12 +84,13 @@ public class ReaperPlugin extends AbstractPlugin {
     }
 
     @Override
-    public void syncKeyspaces(final CqlKeyspaceManager cqlKeyspaceManager, final DataCenter dataCenter) {
+    public Completable syncKeyspaces(final CqlKeyspaceManager cqlKeyspaceManager, final DataCenter dataCenter) {
         if (dataCenter.getSpec().getReaper().getEnabled()) {
             cqlKeyspaceManager.addIfAbsent(dataCenter, REAPER_KEYSPACE.getName(), () -> REAPER_KEYSPACE);
         } else {
             cqlKeyspaceManager.remove(dataCenter, REAPER_KEYSPACE.getName());
         }
+        return Completable.complete();
     }
 
     public static final CqlRole REAPER_ROLE = new CqlRole()
@@ -97,7 +98,7 @@ public class ReaperPlugin extends AbstractPlugin {
             .withSecretKey(DataCenterUpdateAction.KEY_REAPER_PASSWORD)
             .withSuperUser(false)
             .withLogin(true)
-            .withApplied(false)
+            .withReconcilied(false)
             .withGrantStatements(ImmutableList.of(String.format(Locale.ROOT, "GRANT ALL PERMISSIONS ON KEYSPACE %s TO reaper", REAPER_KEYSPACE_NAME)));
 
     @Override
@@ -106,8 +107,9 @@ public class ReaperPlugin extends AbstractPlugin {
     }
 
     @Override
-    public void syncRoles(final CqlRoleManager cqlRoleManager, final DataCenter dataCenter) {
+    public Completable syncRoles(final CqlRoleManager cqlRoleManager, final DataCenter dataCenter) {
         cqlRoleManager.addIfAbsent(dataCenter, REAPER_ROLE.getUsername(), () -> REAPER_ROLE.duplicate());
+        return Completable.complete();
     }
 
     public static String reaperName(DataCenter dataCenter) {
@@ -142,7 +144,7 @@ public class ReaperPlugin extends AbstractPlugin {
                     switch(reaperPhase) {
                         case NONE:
                             CqlRole reaperRole = cqlRoleManager.get(dataCenter, REAPER_ROLE.getUsername());
-                            if (reaperRole != null && reaperRole.isApplied()) {
+                            if (reaperRole != null && reaperRole.isReconcilied()) {
                                 return createOrReplaceReaperObjects(dataCenter).map(b -> {
                                     dataCenter.getStatus().setReaperPhase(ReaperPhase.DEPLOYED);
                                     return true;
@@ -180,7 +182,7 @@ public class ReaperPlugin extends AbstractPlugin {
         if (dataCenter.getSpec().isParked())
             return 0;
 
-        return cqlRoleManager.get(dataCenter, REAPER_ROLE.getUsername()).isApplied() ? 1 : 0;
+        return cqlRoleManager.get(dataCenter, REAPER_ROLE.getUsername()).isReconcilied() ? 1 : 0;
     }
 
 
@@ -543,6 +545,7 @@ public class ReaperPlugin extends AbstractPlugin {
             logger.debug("datacenter={} Creating reaper secret name={}", dataCenter.id(), reaperSecretName);
             return new V1Secret()
                     .metadata(secretMetadata)
+                    .type("Opaque")
                     // replace the default cassandra password
                     .putStringDataItem("reaper.admin_password", UUID.randomUUID().toString());
         });

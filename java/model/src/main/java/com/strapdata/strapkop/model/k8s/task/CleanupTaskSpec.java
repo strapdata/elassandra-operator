@@ -2,14 +2,10 @@ package com.strapdata.strapkop.model.k8s.task;
 
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
-import lombok.experimental.Wither;
+import lombok.*;
 
 @Data
-@Wither
+@With
 @AllArgsConstructor
 @NoArgsConstructor
 @ToString
@@ -18,5 +14,12 @@ public class CleanupTaskSpec {
     @SerializedName("keyspace")
     @Expose
     String keyspace;
+
+    /**
+     * Wait interval between node cleanup, 10s by default
+     */
+    @SerializedName("waitIntervalInSec")
+    @Expose
+    Long waitIntervalInSec = 10L;
 }
 

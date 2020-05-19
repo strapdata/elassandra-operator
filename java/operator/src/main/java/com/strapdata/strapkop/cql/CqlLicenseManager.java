@@ -13,12 +13,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
-import java.util.Optional;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 @Singleton
-public class CqlLicenseManager extends AbstractManager<License> implements LicenseVerifierService {
+public class CqlLicenseManager extends AbstractManager<CqlLicense> implements LicenseVerifierService {
 
     private static final Logger logger = LoggerFactory.getLogger(CqlLicenseManager.class);
     private static final String SELECT_STATEMENT = "SELECT * from elastic_admin.licenses";
@@ -28,7 +27,7 @@ public class CqlLicenseManager extends AbstractManager<License> implements Licen
     public Completable verifyLicense(DataCenter dataCenter, CqlSessionHandler sessionHandler) {
         return Single.just(sessionHandler)
                 .flatMap(handler -> sessionHandler.getSession(dataCenter))
-                .map(session -> {
+                .flatMapCompletable(session -> {
                     try {
                         logger.trace(SELECT_STATEMENT);
                         ResultSet rs = session.execute(session.prepare(SELECT_STATEMENT).setConsistencyLevel(ConsistencyLevel.LOCAL_QUORUM).bind());
@@ -38,18 +37,17 @@ public class CqlLicenseManager extends AbstractManager<License> implements Licen
                         logger.debug("datacenter={} license={}", dataCenter.id(), license);
                         if (license == null) {
                             logger.warn("datacenter={} No license found", dataCenter.id());
-                            return Optional.empty();
-                        }
-                        if (license.isExpired()) {
+                            return Completable.complete();
+                        } else if (license.isExpired()) {
                             logger.warn("datacenter={} Expired license={}", dataCenter.id(), license);
-                            return Optional.empty();
+                            return Completable.complete();
+                        } else {
+                            addIfAbsent(dataCenter, LICENSE_KEY, () -> new CqlLicense().withReconcilied(true));
                         }
-                        addIfAbsent(dataCenter, LICENSE_KEY, () -> license);
-                        return Optional.ofNullable(license);
                     } catch(AuthenticationException | NoHostAvailableException e) {
                         logger.warn("datacenter="+dataCenter.id()+" Unable to get the Elassandra License", e);
-                        return Optional.empty();
                     }
-                }).ignoreElement();
+                    return Completable.complete();
+                });
     }
 }

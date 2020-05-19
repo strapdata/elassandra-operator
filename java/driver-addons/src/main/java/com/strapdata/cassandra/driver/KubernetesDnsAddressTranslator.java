@@ -1,5 +1,5 @@
 /*
- * Copyright DataStax, Inc.
+ * Copyright Strapdata, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -98,6 +98,9 @@ public class KubernetesDnsAddressTranslator implements AddressTranslator {
             InetAddress translatedAddress = InetAddress.getByName(hostname);
             logger.debug("Resolved {} to {}", address, translatedAddress);
             return new InetSocketAddress(translatedAddress, socketAddress.getPort());
+        } catch(javax.naming.NameNotFoundException e) {
+            logger.warn("Cannot resolv " + address + ", returning it as-is");
+            return socketAddress;
         } catch (Exception e) {
             logger.warn("Error resolving " + address + ", returning it as-is", e);
             return socketAddress;

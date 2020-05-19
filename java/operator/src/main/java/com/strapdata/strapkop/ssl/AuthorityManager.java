@@ -80,7 +80,7 @@ public class AuthorityManager {
         return getAsync(namespace).get();
     }
 
-    public CompletableFuture<X509CertificateAndPrivateKey> getAsync(String namespace)  {
+    public CompletableFuture<X509CertificateAndPrivateKey> getAsync(String namespace) {
         logger.debug("Get CA for namespace={}", namespace);
         return cache.get(namespace);
     }
@@ -91,6 +91,7 @@ public class AuthorityManager {
 
     /**
      * CA secret with public certificate, mounted by all pods
+     *
      * @return
      */
     public String getPublicCaSecretName() {
@@ -100,6 +101,7 @@ public class AuthorityManager {
 
     /**
      * Public CA files mount path where cacert.pem + truststore.p12 will be visible from pods.
+     *
      * @return
      */
     public String getPublicCaMountPath() {
@@ -109,6 +111,7 @@ public class AuthorityManager {
 
     /**
      * Private CA secret with CA private key, only mounted by the operator
+     *
      * @return
      */
     public String getPrivateCaSecretName() {
@@ -127,7 +130,8 @@ public class AuthorityManager {
     }
 
     /**
-     * Store CA in 2 secrets, a public one with CA Cert, a private one with CA private key.
+     * Store CA in 2 secrets, a public one with the CA Cert, a private one with the CA private key.
+     *
      * @param ca
      * @throws ApiException
      * @throws GeneralSecurityException
@@ -140,6 +144,7 @@ public class AuthorityManager {
                         .name(getPublicCaSecretName())
                         .namespace(namespace)
                         .labels(OperatorLabels.MANAGED))
+                .type("Opaque")
                 .putStringDataItem(SECRET_CACERT_PEM, ca.getCertificateChainAsString())
                 .putDataItem(SECRET_TRUSTSTORE_P12, certManager.generateTruststoreBytes(ca, getCaTrustPass()));
         logger.info("Storing public CA in secret {} in namespace {} secret={}", getPublicCaSecretName(), namespace, publicSecret);
@@ -150,13 +155,14 @@ public class AuthorityManager {
                                     .name(getPrivateCaSecretName())
                                     .namespace(namespace)
                                     .labels(OperatorLabels.MANAGED))
+                            .type("Opaque")
                             .putStringDataItem(SECRET_CA_KEY, ca.getPrivateKeyAsString());
                     logger.info("Storing private CA in secret {} in namespace {}", getPrivateCaSecretName(), namespace);
                     return k8sResourceUtils.createNamespacedSecret(privateSecret).map(s2 -> ca);
                 });
     }
 
-    
+
     private Single<X509CertificateAndPrivateKey> loadOrGenerateCa(String namespace) {
         return k8sResourceUtils.readOptionalNamespacedSecret(namespace, getPublicCaSecretName())
                 .flatMap(caPub -> k8sResourceUtils.readOptionalNamespacedSecret(namespace, getPrivateCaSecretName()).map(caKey -> new Tuple2<>(caPub, caKey)))
@@ -176,6 +182,7 @@ public class AuthorityManager {
 
     /**
      * Issue a child certificate and private key in a PKC12 keystore protected by the provided password.
+     *
      * @param cn
      * @param dnsNames
      * @param ipAddresses
@@ -192,13 +199,11 @@ public class AuthorityManager {
                                            String password) throws GeneralSecurityException, IOException, OperatorCreationException {
         return certManager.generateClientKeystoreBytes(
                 x509CertificateAndPrivateKey,
-            Option.of(getCaKeyPass()),
-            cn,
-            dnsNames,
-            ipAddresses,
-            alias,
-            password);
+                Option.of(getCaKeyPass()),
+                cn,
+                dnsNames,
+                ipAddresses,
+                alias,
+                password);
     }
-
-
 }

@@ -6,6 +6,7 @@ import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
+import com.strapdata.strapkop.model.k8s.task.RepairTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
 import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
@@ -24,6 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 @Singleton
@@ -46,10 +48,11 @@ public final class RepairTaskReconcilier extends TaskReconcilier {
                 dataCenterController, dataCenterCache, executorFactory, userExecutorConfiguration);
         this.jmxmpElassandraProxy = jmxmpElassandraProxy;
     }
-    
+
     @Override
     protected Completable doTask(final DataCenter dc, final DataCenterStatus dataCenterStatus, final Task task, Iterable<V1Pod> pods) throws ApiException {
-        return Observable.zip(Observable.fromIterable(pods), Observable.interval(10, TimeUnit.SECONDS), (pod, timer) -> pod)
+        final RepairTaskSpec repairTaskSpec = task.getSpec().getRepair();
+        return Observable.zip(Observable.fromIterable(pods), Observable.interval(repairTaskSpec.getWaitIntervalInSec(), TimeUnit.SECONDS), (pod, timer) -> pod)
                 .subscribeOn(Schedulers.computation())
                 .flatMapSingle(pod -> jmxmpElassandraProxy.repair(ElassandraPod.fromV1Pod(pod), task.getSpec().getRepair().getKeyspace())
                         .onErrorResumeNext(throwable -> {
@@ -63,7 +66,8 @@ public final class RepairTaskReconcilier extends TaskReconcilier {
     }
 
     // repair PR on all available nodes
-    public Single<Iterable<V1Pod>> listPods(Task task, DataCenter dc) {
-        return initializePodMapWithWaitingStatus(task, dc);
+    @Override
+    public Single<List<V1Pod>> init(Task task, DataCenter dc) {
+        return listAllDcPods(task, dc).map(pods -> initTaskStatusPodMap(task, pods));
     }
 }

@@ -4,7 +4,6 @@ import com.google.gson.JsonSyntaxException;
 import com.strapdata.strapkop.backup.BackupScheduler;
 import com.strapdata.strapkop.cache.*;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
-import com.strapdata.strapkop.cql.CqlLicenseManager;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.cql.CqlSessionSupplier;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
@@ -28,7 +27,7 @@ import org.slf4j.LoggerFactory;
 @Prototype
 public class DataCenterDeleteAction {
     private static final Logger logger = LoggerFactory.getLogger(DataCenterDeleteAction.class);
-    
+
     private final K8sResourceUtils k8sResourceUtils;
     private final CoreV1Api coreV1Api;
     private final DataCenter dataCenter;
@@ -38,7 +37,6 @@ public class DataCenterDeleteAction {
 
     private final CqlKeyspaceManager cqlKeyspaceManager;
     private final CqlRoleManager cqlRoleManager;
-    private final CqlLicenseManager cqlLicenseManager;
     private final BackupScheduler backupScheduler;
     private final MeterRegistry meterRegistry;
 
@@ -50,7 +48,6 @@ public class DataCenterDeleteAction {
                                   final CheckPointCache checkPointCache,
                                   CqlKeyspaceManager cqlKeyspaceManager,
                                   CqlRoleManager cqlRoleManager,
-                                  final CqlLicenseManager cqlLicenseManager,
                                   @Parameter("dataCenter") DataCenter dataCenter,
                                   BackupScheduler backupScheduler,
                                   final MeterRegistry meterRegistry) {
@@ -62,11 +59,10 @@ public class DataCenterDeleteAction {
         this.statefulsetCache = statefulsetCache;
         this.cqlKeyspaceManager = cqlKeyspaceManager;
         this.cqlRoleManager = cqlRoleManager;
-        this.cqlLicenseManager = cqlLicenseManager;
         this.backupScheduler = backupScheduler;
         this.meterRegistry = meterRegistry;
     }
-    
+
     Completable deleteDataCenter(final CqlSessionSupplier cqlSessionSupplier) throws Exception {
         // remove the datacenter from replication maps of managed keyspaces
         return Completable.fromAction(new Action() {
@@ -145,10 +141,9 @@ public class DataCenterDeleteAction {
                         break;
                 }
 
-                // delete tasks
+                // asynchrounous delete tasks
                 k8sResourceUtils.deleteTasks(dataCenter.getMetadata().getNamespace(), null).subscribe();
 
-                cqlLicenseManager.remove(dataCenter);
                 cqlRoleManager.remove(dataCenter);
                 cqlKeyspaceManager.remove(dataCenter);
 

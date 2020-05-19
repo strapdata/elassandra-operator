@@ -7,18 +7,18 @@ import com.strapdata.strapkop.model.GsonIsoDateAdapter;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.experimental.Wither;
+import lombok.With;
 
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
 @Data
-@Wither
+@With
 @AllArgsConstructor
 @NoArgsConstructor
 public class TaskStatus {
-    
+
     @SerializedName("phase")
     @Expose
     private TaskPhase phase = TaskPhase.WAITING;

@@ -12,25 +12,28 @@ plugins {
 }
 
 ext {
-  allowInsecureRegistries = true
+  registryInsecure = project.hasProperty("registryInsecure")
   registryUrl = project.hasProperty("registryUrl") ? project.getProperty("registryUrl") : System.getenv("DOCKER_URL")
   registryUsername = project.hasProperty("registryUsername") ? project.getProperty("registryUsername") : System.getenv("DOCKER_USERNAME")
   registryPassword = project.hasProperty("registryPassword") ? project.getProperty("registryPassword") : System.getenv("DOCKER_PASSWORD")
 
   println "registryUrl=$registryUrl"
+  println "registryInsecure=$registryInsecure"
   println "registryUsername=$registryUsername"
 
   repoUsername = project.hasProperty("repoUsername") ? project.getProperty("repoUsername") : System.getenv("NEXUS_USERNAME")
   repoPassword = project.hasProperty("repoPassword") ? project.getProperty("repoPassword") : System.getenv("NEXUS_PASSWORD")
+  println "repoUsername=$repoUsername"
 }
 
 configure(subprojects.findAll { it.name.contains("docker") }) {
   apply plugin: 'com.bmuschko.docker-remote-api'
   docker {
+
     registryCredentials {
       url = registryUrl
-      username = registryUsername
-      password = registryPassword
+      //username = registryUsername
+      //password = registryPassword
     }
   }
 }
@@ -71,7 +74,7 @@ task dockerBuild {
 }
 
 task dockerPush {
-  dependsOn ':java:operator:jib'
+  dependsOn ':dockerBuild'
   dependsOn ':docker:dockerPushImage'
 }
 
@@ -86,7 +89,7 @@ task dockerPushAllVersions {
 }
 
 // see storage account -> access keys for connectionString
-task uploadLicenseReport(type: com.strapdata.AzureStorageDeployTask) {
+task uploadLicenseReport(type: com.strapdata.gradle.AzureStorageDeployTask) {
   dependsOn generateLicenseReport
   connectionString 'DefaultEndpointsProtocol=https;AccountName=strapdata;AccountKey=R83KvCF2MzZzzFXnqi6yi5MoUgS90/CcPMakbQBSJMpQJSyIBIn13QtfKQm/oC/CDplVKdgn11fEagGlcrpPIA==;EndpointSuffix=core.windows.net'
   container 'strapkop'
@@ -94,7 +97,7 @@ task uploadLicenseReport(type: com.strapdata.AzureStorageDeployTask) {
   mimeType 'text/html'
 }
 
-task uploadLicenseNotices(type: com.strapdata.AzureStorageDeployTask) {
+task uploadLicenseNotices(type: com.strapdata.gradle.AzureStorageDeployTask) {
   dependsOn generateLicenseReport
   connectionString 'DefaultEndpointsProtocol=https;AccountName=strapdata;AccountKey=R83KvCF2MzZzzFXnqi6yi5MoUgS90/CcPMakbQBSJMpQJSyIBIn13QtfKQm/oC/CDplVKdgn11fEagGlcrpPIA==;EndpointSuffix=core.windows.net'
   container 'strapkop'

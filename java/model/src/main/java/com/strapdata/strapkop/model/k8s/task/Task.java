@@ -8,12 +8,11 @@ import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import io.kubernetes.client.models.V1ObjectMeta;
 import lombok.*;
-import lombok.experimental.Wither;
 
 import java.util.Date;
 
 @Data
-@Wither
+@With
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter
@@ -45,7 +44,7 @@ public class Task {
     @SerializedName("status")
     @Expose
     private TaskStatus status = new TaskStatus().withStartDate(new Date()).setPhase(TaskPhase.WAITING);
-    
+
     public static Task fromDataCenter(String name, DataCenter dc) {
         return new Task()
                 .setMetadata(new V1ObjectMeta().name(name)

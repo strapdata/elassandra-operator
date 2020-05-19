@@ -6,12 +6,14 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.net.InetAddresses;
 import com.strapdata.cassandra.k8s.ElassandraOperatorSeedProviderAndNotifier;
 import com.strapdata.strapkop.OperatorConfig;
-import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.backup.BackupScheduler;
 import com.strapdata.strapkop.cache.CheckPoint;
 import com.strapdata.strapkop.cache.CheckPointCache;
 import com.strapdata.strapkop.cache.NodeCache;
-import com.strapdata.strapkop.cql.*;
+import com.strapdata.strapkop.cql.CqlKeyspaceManager;
+import com.strapdata.strapkop.cql.CqlRole;
+import com.strapdata.strapkop.cql.CqlRoleManager;
+import com.strapdata.strapkop.cql.CqlSessionHandler;
 import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.event.Pod;
 import com.strapdata.strapkop.handler.NodeHandler;
@@ -107,7 +109,6 @@ public class DataCenterUpdateAction {
     private final DataCenterStatus dataCenterStatus;
 
     private final CqlRoleManager cqlRoleManager;
-    private final CqlLicenseManager cqlLicenseManager;
     private final CqlKeyspaceManager cqlKeyspaceManager;
     private final PluginRegistry pluginRegistry;
     private final JmxmpElassandraProxy jmxmpElassandraProxy;
@@ -137,7 +138,6 @@ public class DataCenterUpdateAction {
                                   final JmxmpElassandraProxy jmxmpElassandraProxy,
                                   @Parameter("dataCenter") DataCenter dataCenter,
                                   @Parameter("operation") Operation operation,
-                                  final CqlLicenseManager cqlLicenseManager,
                                   final OperatorConfig operatorConfig,
                                   final BackupScheduler backupScheduler,
                                   final MeterRegistry meterRegistry,
@@ -161,7 +161,6 @@ public class DataCenterUpdateAction {
         this.checkPointCache = checkPointCache;
 
         this.cqlRoleManager = cqlRoleManager;
-        this.cqlLicenseManager = cqlLicenseManager;
         this.cqlKeyspaceManager = cqlKeyspaceManager;
         this.nodeCache = nodeCache;
 
@@ -251,7 +250,7 @@ public class DataCenterUpdateAction {
                 .flatMap(clusterSecretMeta -> {
                     // create cluster secret if not exists
                     return k8sResourceUtils.readOrCreateNamespacedSecret(clusterSecretMeta, () -> {
-                        V1Secret secret = new V1Secret().metadata(clusterSecretMeta);
+                        V1Secret secret = new V1Secret().metadata(clusterSecretMeta).type("Opaque");
                         secret.putStringDataItem(CqlRole.KEY_CASSANDRA_PASSWORD, UUID.randomUUID().toString());
                         secret.putStringDataItem(CqlRole.KEY_ELASSANDRA_OPERATOR_PASSWORD, UUID.randomUUID().toString());
                         secret.putStringDataItem(CqlRole.KEY_ADMIN_PASSWORD, UUID.randomUUID().toString());
@@ -341,7 +340,12 @@ public class DataCenterUpdateAction {
                 sts.getMetadata().getName(), sts.getMetadata().getNamespace(), stsReadyReplicas, sts.getSpec().getReplicas());
 
         Integer rackIndex = Integer.parseInt(sts.getMetadata().getLabels().get(OperatorLabels.RACKINDEX));
-        RackStatus rackStatus = dataCenter.getStatus().getRackStatuses().get(rackIndex);
+        RackStatus rackStatus = dataCenter.getStatus().getRackStatuses().computeIfAbsent(rackIndex, k -> {
+            return new RackStatus()
+                    .withIndex(k)
+                    .withName(sts.getMetadata().getLabels().get(OperatorLabels.RACK))
+                    .withDesiredReplicas(sts.getSpec().getReplicas());
+        });
         rackStatus.setReadyReplicas(stsReadyReplicas);
         rackStatus.setHealth(rackStatus.health());
 
@@ -1518,6 +1522,7 @@ public class DataCenterUpdateAction {
 
             @SuppressWarnings("UnstableApiUsage") final V1Secret certificatesSecret = new V1Secret()
                     .metadata(certificatesMetadata)
+                    .type("Opaque")
                     .putDataItem("keystore.p12",
                             authorityManager.issueCertificateKeystore(
                                     x509CertificateAndPrivateKey,
@@ -1583,6 +1588,7 @@ public class DataCenterUpdateAction {
             final V1ObjectMeta secretMetadata = clusterObjectMeta(OperatorNames.clusterRcFilesSecret(dataCenter));
             final V1Secret secret = new V1Secret()
                     .metadata(secretMetadata)
+                    .type("Opaque")
                     .putStringDataItem("cqlshrc", cqlshrc)
                     .putStringDataItem("curlrc", curlrc);
             if (dataCenterSpec.getSsl())
@@ -1687,13 +1693,11 @@ public class DataCenterUpdateAction {
                 podSpec.setPriorityClassName(dataCenterSpec.getPriorityClassName());
             }
 
-            // Add the nodeinfo init container if we have the nodeinfo secret name provided in the env var NODEINFO_SECRET
-            // To create such a service account:
-            // kubectl create serviceaccount --namespace default nodeinfo
-            // kubectl create clusterrolebinding nodeinfo-cluster-rule --clusterrole=nodeinfo --serviceaccount=default:nodeinfo
-            // kubectl get serviceaccount nodeinfo -o json | jq ".secrets[0].name"
-            // See datacenter HELM chart and https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#manually-create-a-service-account-api-token
-            podSpec.addInitContainersItem(buildInitContainerNodeInfo("nodeinfo", rackStatus));
+            // Add the nodeinfo init container to bind on the k8s node public IP if available.
+            // If externalDns is enabled, this init-container also publish a DNSEndpoint to expose public DNS name of seed nodes.
+            if (dataCenterSpec.getHostNetworkEnabled() || dataCenterSpec.getHostPortEnabled()) {
+                podSpec.addInitContainersItem(buildInitContainerNodeInfo("nodeinfo", rackStatus));
+            }
 
             {
                 if (dataCenterSpec.getImagePullSecrets() != null) {
@@ -1812,18 +1816,14 @@ public class DataCenterUpdateAction {
                 dataCenterSpec.getCustomLabels().entrySet().stream().map(e -> templateMetadata.putLabelsItem(e.getKey(), e.getValue()));
             }
 
-
             // add prometheus annotations to scrap nodes
             if (dataCenterSpec.getPrometheusEnabled()) {
-                String[] annotations = new String[]{"prometheus.io/scrape", "true", "prometheus.io/port", Integer.toString(dataCenterSpec.getPrometheusPort()) };
-                for (int i = 0; i < annotations.length; i += 2)
-                    templateMetadata.putAnnotationsItem(annotations[i], annotations[i + 1]);
+                templateMetadata.putAnnotationsItem("prometheus.io/scrape", "true");
+                templateMetadata.putAnnotationsItem("prometheus.io/port", Integer.toString(dataCenterSpec.getPrometheusPort()));
             }
 
-            // add commitlog replayer
-            // define a undocumented env variable to ignore this container for test purpose
-            boolean skipeplayer = Optional.ofNullable(System.getenv("SKIP_COMMIT_LOG_REPLAYER")).map(Boolean::valueOf).orElse(false);
-            if (!skipeplayer) {
+            // add commitlog replayer init container
+            if (dataCenterSpec.getCommitlogsInitContainer() != null && dataCenterSpec.getCommitlogsInitContainer()) {
                 podSpec.addInitContainersItem(commitlogInitContainer);
             }
 
@@ -1913,9 +1913,7 @@ public class DataCenterUpdateAction {
 
         private V1Container buildInitContainerCommitlogReplayer(String rack) {
             return buildElassandraBaseContainer("commitlog-replayer", rack)
-                    .addEnvItem(new V1EnvVar()
-                            .name("STOP_AFTER_COMMILOG_REPLAY")
-                            .value("true"));
+                    .addEnvItem(new V1EnvVar().name("STOP_AFTER_COMMILOG_REPLAY").value("true"));
         }
 
         private V1Container buildElassandraBaseContainer(String containerName, String rack) {
@@ -1926,10 +1924,7 @@ public class DataCenterUpdateAction {
                     .terminationMessagePolicy("FallbackToLogsOnError")
                     .securityContext(new V1SecurityContext()
                             .runAsUser(CASSANDRA_USER_ID)
-                            .capabilities(new V1Capabilities().add(ImmutableList.of(
-                                    "IPC_LOCK",
-                                    "SYS_RESOURCE"
-                            ))))
+                            .capabilities(new V1Capabilities().add(ImmutableList.of("IPC_LOCK", "SYS_RESOURCE"))))
                     .resources(dataCenterSpec.getResources())
                     .addVolumeMountsItem(new V1VolumeMount()
                             .name("data-volume")
@@ -2010,17 +2005,30 @@ public class DataCenterUpdateAction {
             return cassandraContainer;
         }
 
+        /**
+         * System tunning init container
+         * @return
+         */
         private V1Container buildInitContainerVmMaxMapCount() {
             return new V1Container()
                     .securityContext(new V1SecurityContext().privileged(dataCenterSpec.getPrivilegedSupported()))
-                    .name("increase-vm-max-map-count")
+                    .name("system-tune")
                     .image("busybox")
                     .imagePullPolicy("IfNotPresent")
                     .terminationMessagePolicy("FallbackToLogsOnError")
-                    .command(ImmutableList.of("sysctl", "-w", "vm.max_map_count=1048575"));
+                    .command(ImmutableList.of("sysctl", "-w",
+                            "vm.max_map_count=1048575",
+                            "net.ipv4.tcp_keepalive_time=60",
+                            "net.ipv4.tcp_keepalive_probes=3",
+                            "net.ipv4.tcp_keepalive_intvl=10"));
         }
 
-        // Nodeinfo init container if NODEINFO_SECRET is available as env var
+        /**
+         * Node-info init container to use k8s public IP address and manage DNS publication for seed nodes.
+         * @param nodeInfoSecretName
+         * @param rackStatus
+         * @return
+         */
         private V1Container buildInitContainerNodeInfo(String nodeInfoSecretName, RackStatus rackStatus) {
             String dnsEndpointManifest = null;
 
@@ -2064,7 +2072,6 @@ public class DataCenterUpdateAction {
                 }
             }
 
-            // " && echo \"cassandra-" + dataCenterSpec.getExternalDns().getRoot() + "-$IDX." + dataCenterSpec.getExternalDns().getDomain() +"\" > /nodeinfo/public-ip "
             return new V1Container()
                     .securityContext(new V1SecurityContext().privileged(dataCenterSpec.getPrivilegedSupported()))
                     .name("nodeinfo")
@@ -2091,7 +2098,7 @@ public class DataCenterUpdateAction {
                                                     dataCenterSpec.getExternalDns().getDomain()) :
                                             "") +
                                     " && grep ^ /nodeinfo/* " +
-                                    // here we create the CRD for ExternalDNS in order to register the Seed as DNS A Record (only node 0 of each rack is registered
+                                    // here we create the CRD for ExternalDNS in order to register the Seed as DNS A Record (only node 0 of each rack is registered)
                                     (updateDns ?
                                             " && POD_INDEX=$(echo $POD_NAME | awk -F\"-\" '{print $NF}') " +
                                             " && NODE_IP=$(cat /nodeinfo/public-ip) " +
@@ -2239,7 +2246,8 @@ public class DataCenterUpdateAction {
             for (V1Node node : nodes) {
                 String zoneName = node.getMetadata().getLabels().get(OperatorLabels.ZONE);
                 if (zoneName == null) {
-                    throw new RuntimeException(new StrapkopException(String.format(Locale.ROOT, "missing label %s on node %s", OperatorLabels.ZONE, node.getMetadata().getName())));
+                    logger.warn("missing label {} on node {}", OperatorLabels.ZONE, node.getMetadata().getName());
+                    continue;
                 }
                 if (dataCenterStatus.getZones().indexOf(zoneName) == -1) {
                     // Register the zone name to keep an ordered zones list and compute consistent rackIndex.

@@ -5,7 +5,7 @@ import com.google.gson.annotations.SerializedName;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.experimental.Wither;
+import lombok.With;
 
 import java.util.List;
 
@@ -25,7 +25,7 @@ import java.util.List;
  * repairThreadCount : Since Cassandra 2.2, repairs can be performed with up to 4 threads in order to parallelize the work on different token ranges. (Optional)
  */
 @Data
-@Wither
+@With
 @AllArgsConstructor
 @NoArgsConstructor
 public class ReaperScheduledRepair {

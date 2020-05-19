@@ -2,11 +2,22 @@ package com.strapdata.strapkop.cql;
 
 import com.datastax.driver.core.Row;
 import com.strapdata.elasticsearch.plugin.license.License;
+import lombok.*;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class CqlLicense extends License {
+@NoArgsConstructor
+@AllArgsConstructor
+@With
+@Getter
+@Setter
+public class CqlLicense extends License implements CqlReconciliable {
+
+    boolean reconcilied = false;
+
+    @Override
+    public boolean reconcilied() { return reconcilied; }
 
     public static License fromRow(Row row) {
         License lic = new CqlLicense();

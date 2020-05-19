@@ -2,12 +2,7 @@ package com.strapdata.strapkop.model.k8s.cassandra;
 
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
-import lombok.experimental.Wither;
-
+import lombok.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -16,7 +11,7 @@ import java.util.List;
  * A kibana password is generated as a k8s secret if not exists, and a C* role is created if not exists with this password.
  */
 @Data
-@Wither
+@With
 @AllArgsConstructor
 @NoArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)

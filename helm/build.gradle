@@ -45,7 +45,7 @@ helm {
   }
 }
 
-task uploadElassandraDatacenter(type: com.strapdata.AzureStorageDeployTask) {
+task uploadElassandraDatacenter(type: com.strapdata.gradle.AzureStorageDeployTask) {
   dependsOn 'helmPackageElassandraDatacenterChart'
   connectionString(System.getenv("STRAPKUBE_CONNECTION_STRING"))
   container 'charts'
@@ -53,7 +53,7 @@ task uploadElassandraDatacenter(type: com.strapdata.AzureStorageDeployTask) {
   mimeType 'application/x-tar'
 }
 
-task uploadElassandraOperator(type: com.strapdata.AzureStorageDeployTask) {
+task uploadElassandraOperator(type: com.strapdata.gradle.AzureStorageDeployTask) {
   dependsOn 'helmPackageElassandraOperatorChart'
   connectionString(System.getenv("STRAPKUBE_CONNECTION_STRING"))
   container 'charts'

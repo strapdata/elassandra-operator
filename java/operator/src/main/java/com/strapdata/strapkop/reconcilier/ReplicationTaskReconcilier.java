@@ -1,5 +1,6 @@
 package com.strapdata.strapkop.reconcilier;
 
+import com.google.common.base.Strings;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.cql.CqlKeyspace;
@@ -25,7 +26,6 @@ import io.micronaut.scheduling.executor.UserExecutorConfiguration;
 import io.reactivex.Completable;
 import io.reactivex.CompletableSource;
 import io.reactivex.Single;
-import org.elasticsearch.common.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -143,7 +143,7 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
     }
 
     @Override
-    public Single<Iterable<V1Pod>> listPods(Task task, DataCenter dc) {
-        return initializePodMapWithWaitingStatus(task, dc);
+    public Single<List<V1Pod>> init(Task task, DataCenter dc) {
+        return listAllDcPods(task, dc).map(pods -> initTaskStatusPodMap(task, pods));
     }
 }

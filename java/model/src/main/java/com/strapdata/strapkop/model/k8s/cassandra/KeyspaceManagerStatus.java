@@ -4,13 +4,13 @@ import com.google.gson.annotations.SerializedName;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.experimental.Wither;
+import lombok.With;
 
 import java.util.HashSet;
 import java.util.Set;
 
 @Data
-@Wither
+@With
 @AllArgsConstructor
 @NoArgsConstructor
 public class KeyspaceManagerStatus {

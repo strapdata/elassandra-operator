@@ -1,6 +1,7 @@
 package com.strapdata.strapkop.reconcilier;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
@@ -29,6 +30,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.stream.Collectors;
 
 public abstract class TaskReconcilier extends Reconcilier<Task> {
 
@@ -81,7 +83,7 @@ public abstract class TaskReconcilier extends Reconcilier<Task> {
 
         // failed when datacenter not found => task failed
         return validTask(dc, task)
-                .andThen(listPods(task, dc).flatMapCompletable(pods -> doTask(dc, dataCenterStatus, task, pods)))     // update DC and task status
+                .andThen(init(task, dc).flatMapCompletable(pods -> doTask(dc, dataCenterStatus, task, pods)))     // update DC and task status
                 .andThen(reconcileDcWhenDone(dc, task))
                 .onErrorResumeNext(t -> {
                     logger.error("task={} FAILED due to error:", task.id(), t);
@@ -155,21 +157,40 @@ public abstract class TaskReconcilier extends Reconcilier<Task> {
      * @param dc
      * @return
      */
-    public abstract Single<Iterable<V1Pod>> listPods(Task task, DataCenter dc);
+    public abstract Single<List<V1Pod>> init(Task task, DataCenter dc);
 
     // a possible implementation of initializePodMap
-    public Single<Iterable<V1Pod>> initializePodMapWithWaitingStatus(Task task, DataCenter dc) {
+    public Single<List<V1Pod>> listAllDcPods(Task task, DataCenter dc) {
         final String labelSelector = OperatorLabels.toSelector(ImmutableMap.of(
                 OperatorLabels.MANAGED_BY, "elassandra-operator",
                 OperatorLabels.PARENT, dc.getMetadata().getName(),
                 OperatorLabels.APP, "elassandra"
         ));
-        return Single.fromCallable(new Callable<Iterable<V1Pod>>() {
+        return Single.fromCallable(new Callable<List<V1Pod>>() {
             @Override
-            public Iterable<V1Pod> call() throws Exception {
-                return k8sResourceUtils.listNamespacedPods(dc.getMetadata().getNamespace(), null, labelSelector);
+            public List<V1Pod> call() throws Exception {
+                return Lists.newArrayList(k8sResourceUtils.listNamespacedPods(dc.getMetadata().getNamespace(), null, labelSelector));
             }
         });
+    }
+
+    public Single<List<V1Pod>>  getRunningPods(Task task, DataCenter dc) {
+        final String labelSelector = OperatorLabels.toSelector(ImmutableMap.of(
+                OperatorLabels.MANAGED_BY, "elassandra-operator",
+                OperatorLabels.PARENT, dc.getMetadata().getName(),
+                OperatorLabels.APP, "elassandra"
+        ));
+        return Single.fromCallable(new Callable<List<V1Pod>>() {
+            @Override
+            public List<V1Pod> call() throws Exception {
+                return Lists.newArrayList(k8sResourceUtils.listNamespacedPods(dc.getMetadata().getNamespace(), "status.phase=Running", labelSelector));
+            }
+        });
+    }
+
+    public List<V1Pod> initTaskStatusPodMap(Task task, List<V1Pod> pods) {
+        task.getStatus().setPods(pods.stream().collect(Collectors.toMap(p -> p.getMetadata().getName(), p -> TaskPhase.WAITING)));
+        return pods;
     }
 
     /**

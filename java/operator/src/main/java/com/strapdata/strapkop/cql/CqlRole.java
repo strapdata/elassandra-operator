@@ -1,14 +1,13 @@
 package com.strapdata.strapkop.cql;
 
 import com.datastax.driver.core.Session;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import io.reactivex.Completable;
 import io.reactivex.Single;
 import lombok.*;
-import lombok.experimental.Wither;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,12 +17,12 @@ import java.util.function.Function;
 
 
 @Data
-@Wither
+@With
 @NoArgsConstructor
 @AllArgsConstructor
 @ToString
 @Builder(toBuilder=true)
-public class CqlRole implements Cloneable {
+public class CqlRole implements CqlReconciliable, Cloneable {
     private static final Logger logger = LoggerFactory.getLogger(CqlRole.class);
 
     public static final String KEY_CASSANDRA_PASSWORD = "cassandra.cassandra_password";
@@ -35,28 +34,28 @@ public class CqlRole implements Cloneable {
             .withPassword("cassandra")
             .withSuperUser(true)
             .withLogin(true)
-            .withApplied(true);
+            .withReconcilied(true);
 
     public static final CqlRole CASSANDRA_ROLE = new CqlRole()
             .withUsername("cassandra")
             .withSecretKey(KEY_CASSANDRA_PASSWORD)
             .withSuperUser(true)
             .withLogin(true)
-            .withApplied(false);
+            .withReconcilied(false);
 
     public static final CqlRole ADMIN_ROLE = new CqlRole()
             .withUsername("admin")
             .withSecretKey(KEY_ADMIN_PASSWORD)
             .withSuperUser(true)
             .withLogin(true)
-            .withApplied(false);
+            .withReconcilied(false);
 
     public static final CqlRole STRAPKOP_ROLE = new CqlRole()
             .withUsername("elassandra_operator")
             .withSecretKey(KEY_ELASSANDRA_OPERATOR_PASSWORD)
             .withSuperUser(true)
             .withLogin(true)
-            .withApplied(false);
+            .withReconcilied(false);
 
 
     /**
@@ -85,9 +84,7 @@ public class CqlRole implements Cloneable {
 
     boolean login;
 
-    boolean applied;
-
-
+    boolean reconcilied;
 
     /**
      * Grant statements applied after the role is created
@@ -99,9 +96,13 @@ public class CqlRole implements Cloneable {
      */
     PostCreateHandler postCreateHandler;
 
+    @Override
+    public boolean reconcilied() { return this.reconcilied; }
+
     public CqlRole duplicate() {
-        return this.toBuilder().applied(false).password(null).build();
+        return this.toBuilder().reconcilied(false).password(null).build();
     }
+
 
     public String secret(DataCenter dc) {
         return (secretKey == null) ? null : secretNameProvider.apply(dc) + "/" + secretKey;
@@ -123,7 +124,12 @@ public class CqlRole implements Cloneable {
                         throw new StrapkopException(String.format("invalid character in cassandra password for username %s", username));
                     }
                     return this;
+                })
+                .onErrorReturn(t -> {
+                    logger.warn("dc={} role={} failed to load password:", dataCenter.id(), username, t.toString());
+                    return this;
                 });
+
     }
 
     /**
@@ -134,7 +140,7 @@ public class CqlRole implements Cloneable {
      * @throws StrapkopException
      */
     Single<CqlRole> createOrUpdateRole(DataCenter dataCenter, K8sResourceUtils k8sResourceUtils, final CqlSessionSupplier sessionSupplier) throws Exception {
-        if (!applied) {
+        if (!reconcilied) {
             // create role if not exists, then alter... so this is completely idempotent and can even update password, although it might not be optimized
             return loadPassword(dataCenter, k8sResourceUtils)
                     .flatMap(cqlRole -> {
@@ -171,7 +177,11 @@ public class CqlRole implements Cloneable {
                                 logger.error("datacenter="+ dataCenter.id()+" Failed to execute posteCreate for role=" + this.username, e);
                             }
                         }
-                        this.applied = true;     // mark the role as up-to-date
+                        this.reconcilied = true;     // mark the role as up-to-date
+                        return this;
+                    })
+                    .onErrorReturn(t -> {
+                        logger.warn("dc={} role={} failed to createOrUpdate:", dataCenter.id(), username, t.toString());
                         return this;
                     });
         }
@@ -183,6 +193,10 @@ public class CqlRole implements Cloneable {
         return Single.fromFuture(session.executeAsync(String.format(Locale.ROOT, "DROP ROLE %s", username)))
                 .map(rs -> {
                     return this;
+                })
+                .onErrorReturn(t -> {
+                    logger.warn("dc={} role={} failed to deleteRole:", dataCenter.id(), username, t.toString());
+                    return this;
                 });
     }
 
@@ -192,9 +206,13 @@ public class CqlRole implements Cloneable {
      * @param session
      * @return this
      */
-    Single<CqlRole> updatePassword(Session session) {
+    Single<CqlRole> updatePassword(DataCenter dataCenter, Session session) {
         logger.debug("Updating password for role={}", this);
         return Single.fromFuture(session.executeAsync(String.format(Locale.ROOT, "ALTER ROLE %s WITH PASSWORD = '%s'", username, password)))
-                .map(rs -> this);
+                .map(rs -> this)
+                .onErrorReturn(t -> {
+                    logger.warn("dc={} role={} failed to updatePassword:", dataCenter.id(), username, t.toString());
+                    return this;
+                });
     }
 }

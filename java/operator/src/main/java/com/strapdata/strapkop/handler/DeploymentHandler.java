@@ -10,6 +10,7 @@ import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.cassandra.Operation;
 import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.reconcilier.DataCenterController;
+import com.strapdata.strapkop.reconcilier.Reconciliable;
 import io.kubernetes.client.models.V1Deployment;
 import io.micrometer.core.instrument.ImmutableTag;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -54,8 +55,7 @@ public class DeploymentHandler extends TerminalHandler<K8sWatchEvent<V1Deploymen
 
     @Override
     public void accept(K8sWatchEvent<V1Deployment> event) throws Exception {
-        final V1Deployment deployment;
-        logger.debug("Deployment event={}", event);
+        logger.trace("Deployment event={}", event);
         switch(event.getType()) {
             case INITIAL:
                 logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
@@ -80,6 +80,8 @@ public class DeploymentHandler extends TerminalHandler<K8sWatchEvent<V1Deploymen
                 logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 meterRegistry.counter("k8s.event.deleted", tags).increment();
                 managed--;
+                break;
+
             case ERROR:
                 logger.warn("event type={}", event.getType());
                 meterRegistry.counter("k8s.event.error", tags).increment();
@@ -106,6 +108,7 @@ public class DeploymentHandler extends TerminalHandler<K8sWatchEvent<V1Deploymen
                 Operation op = new Operation().withSubmitDate(new Date()).withDesc("updated deployment="+deployment.getMetadata().getName());
                 workQueues.submit(
                         new ClusterKey(clusterName, deployment.getMetadata().getNamespace()),
+                        Reconciliable.Kind.DATACENTER, K8sWatchEvent.Type.MODIFIED,
                         dataCenterController.deploymentAvailable(op, dataCenter, deployment));
             }
         }

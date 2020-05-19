@@ -18,10 +18,10 @@
     <logger name="com.strapdata.strapkop.event" level="${LOGBACK_com_strapdata_strapkop_event:-INFO}" />
     <logger name="com.strapdata.strapkop.source" level="${LOGBACK_com_strapdata_strapkop_source:-DEBUG}" />
     <logger name="com.strapdata.strapkop.handler" level="${LOGBACK_com_strapdata_strapkop_handler:-DEBUG}" />
-    <logger name="com.strapdata.strapkop.pipeline" level="${LOGBACK_com_strapdata_strapkop_pipeline:-TRACE}" />
+    <logger name="com.strapdata.strapkop.pipeline" level="${LOGBACK_com_strapdata_strapkop_pipeline:-DEBUG}" />
     <logger name="com.strapdata.strapkop.sidecar" level="${LOGBACK_com_strapdata_strapkop_sidecar:-DEBUG}" />
     <logger name="com.strapdata.strapkop.plugins" level="${LOGBACK_com_strapdata_strapkop_test:-TRACE}" />
-    <logger name="com.strapdata.strapkop.cql" level="${LOGBACK_com_strapdata_strapkop_test:-TRACE}" />
+    <logger name="com.strapdata.strapkop.cql" level="${LOGBACK_com_strapdata_strapkop_test:-DEBUG}" />
 
     <logger name="com.strapdata.strapkop.reconcilier" level="${LOGBACK_com_strapdata_strapkop_reconcilier:-DEBUG}" />
 

@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -74,10 +75,10 @@ public class ReaperClient implements Closeable {
                         }));
     }
 
-    public Completable registerScheduledRepair(String username, String password, ReaperScheduledRepair reaperScheduledRepair) {
-        String url = "/repair_schedule?clusterName="+ URLEncoder.encode(dataCenter.getSpec().getClusterName()) +
-                ("&keyspace=" + URLEncoder.encode(reaperScheduledRepair.getKeyspace())) +
-                ("&owner=" + URLEncoder.encode(reaperScheduledRepair.getOwner() == null ? "elassandra-operator" : reaperScheduledRepair.getOwner())) +
+    public Completable registerScheduledRepair(String username, String password, ReaperScheduledRepair reaperScheduledRepair) throws UnsupportedEncodingException {
+        String url = "/repair_schedule?clusterName="+ URLEncoder.encode(dataCenter.getSpec().getClusterName(), "UTF-8") +
+                ("&keyspace=" + URLEncoder.encode(reaperScheduledRepair.getKeyspace(), "UTF-8")) +
+                ("&owner=" + URLEncoder.encode(reaperScheduledRepair.getOwner() == null ? "elassandra-operator" : reaperScheduledRepair.getOwner(), "UTF-8")) +
                 ("&incrementalRepair=" + (reaperScheduledRepair.getIncrementalRepair() != null &&  reaperScheduledRepair.getIncrementalRepair() == true ? "true" : "false")) +
                 ("&scheduleDaysBetween=" + reaperScheduledRepair.getScheduleDaysBetween()) +
                 ("&intensity=" + reaperScheduledRepair.getIntensity()) +
@@ -108,7 +109,7 @@ public class ReaperClient implements Closeable {
         if (this.jwt != null) {
             return Single.just(this.jwt);
         }
-        
+
         return login(username, password)
                 .flatMap(this::getJwt)
                 .doOnError(throwable -> {
@@ -116,7 +117,7 @@ public class ReaperClient implements Closeable {
                 })
                 .doOnSuccess(jwt -> this.jwt = jwt);
     }
-    
+
     /**
      * call POST /login to get the cookie
      */
@@ -133,7 +134,7 @@ public class ReaperClient implements Closeable {
                 .map(this::parseCookie)
                 .singleOrError();
     }
-    
+
     /**
      * call GET /jwt with the cookie to get the token
      */
@@ -146,16 +147,16 @@ public class ReaperClient implements Closeable {
                 .subscribeOn(Schedulers.io()) // force the execution of body extraction in same thread as Request execution
                 .singleOrError();
     }
-    
+
     private static Pattern cookiePattern = Pattern.compile("^(JSESSIONID=.*);");
-    
+
     private String parseCookie(HttpResponse<ByteBuffer> httpResponse) {
 
         final String cookieHeader = httpResponse.header("Set-Cookie");
         if (cookieHeader == null) {
             return null;
         }
-        
+
         final Matcher m = cookiePattern.matcher(cookieHeader);
         if (!m.find()) {
             return null;
@@ -163,7 +164,7 @@ public class ReaperClient implements Closeable {
 
         return m.group(1);
     }
-    
+
     @Override
     public void close() throws IOException {
         httpClient.close();

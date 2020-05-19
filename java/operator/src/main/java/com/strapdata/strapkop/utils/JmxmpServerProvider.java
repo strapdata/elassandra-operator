@@ -1,5 +1,6 @@
 package com.strapdata.strapkop.utils;
 
+import com.strapdata.strapkop.OperatorConfig;
 import io.micronaut.context.annotation.Infrastructure;
 import io.micronaut.discovery.event.ServiceShutdownEvent;
 import io.micronaut.discovery.event.ServiceStartedEvent;
@@ -8,6 +9,7 @@ import io.reactivex.Completable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.management.remote.JMXConnectorServer;
 import javax.management.remote.JMXConnectorServerFactory;
@@ -16,7 +18,6 @@ import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 
 @Singleton
 @Infrastructure
@@ -26,25 +27,28 @@ public class JmxmpServerProvider {
 
     private JMXConnectorServer jmxServer = null;
 
+    @Inject
+    OperatorConfig operatorConfig;
+
     public void createJMXMPServer()  throws IOException
     {
-        final int port = Optional.ofNullable(System.getenv("JMXMP_PORT")).map(Integer::parseInt).orElse(7199);
+        final Integer jmxmpPort = operatorConfig.getJmxmpPort();
+        if (jmxmpPort != null) {
+            Map<String, Object> env = new HashMap<>();
+            // Mark the JMX server as a permanently exported object. This allows the JVM to exit with the
+            // server running and also exempts it from the distributed GC scheduler which otherwise would
+            // potentially attempt a full GC every `sun.rmi.dgc.server.gcInterval` millis (default is 3600000ms)
+            // For more background see:
+            //   - CASSANDRA-2967
+            //   - https://www.jclarity.com/2015/01/27/rmi-system-gc-unplugged/
+            //   - https://bugs.openjdk.java.net/browse/JDK-6760712
+            env.put("jmx.remote.x.daemon", "true");
+            JMXServiceURL url = new JMXServiceURL("jmxmp", null, jmxmpPort);
+            jmxServer = JMXConnectorServerFactory.newJMXConnectorServer(url, env, ManagementFactory.getPlatformMBeanServer());
 
-        Map<String, Object> env = new HashMap<>();
-        // Mark the JMX server as a permanently exported object. This allows the JVM to exit with the
-        // server running and also exempts it from the distributed GC scheduler which otherwise would
-        // potentially attempt a full GC every `sun.rmi.dgc.server.gcInterval` millis (default is 3600000ms)
-        // For more background see:
-        //   - CASSANDRA-2967
-        //   - https://www.jclarity.com/2015/01/27/rmi-system-gc-unplugged/
-        //   - https://bugs.openjdk.java.net/browse/JDK-6760712
-        env.put("jmx.remote.x.daemon", "true");
-        JMXServiceURL url = new JMXServiceURL("jmxmp", null, port);
-        jmxServer = JMXConnectorServerFactory.newJMXConnectorServer(url, env, ManagementFactory.getPlatformMBeanServer());
-
-        jmxServer.start();
-
-        logger.info("JMXMP started server="+url.toString());
+            jmxServer.start();
+            logger.info("JMXMP started server=" + url.toString());
+        }
     }
 
     public void close() {

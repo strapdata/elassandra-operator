@@ -22,15 +22,15 @@ public interface Plugin {
     /**
      * Add/Remove keyspaces to/from the cqlKeyspaceManager for the dataCenter
      */
-    default void syncKeyspaces(final CqlKeyspaceManager cqlKeyspaceManager, final DataCenter dataCenter) {
-
+    default Completable syncKeyspaces(final CqlKeyspaceManager cqlKeyspaceManager, final DataCenter dataCenter) {
+        return Completable.complete();
     }
 
     /**
      * Add/Remove roles to/from the cqlRoleManager for the dataCenter
      */
-    default void syncRoles(final CqlRoleManager cqlRoleManager, final DataCenter dataCenter) {
-
+    default Completable syncRoles(final CqlRoleManager cqlRoleManager, final DataCenter dataCenter) throws ApiException {
+        return Completable.complete();
     }
 
     /**

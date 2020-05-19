@@ -2,6 +2,8 @@ package com.strapdata.strapkop.reconcilier;
 
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.DataCenterCache;
+import com.strapdata.strapkop.cql.CqlRole;
+import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.event.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
@@ -26,13 +28,15 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
+import java.util.List;
 
 @Singleton
 @Infrastructure
 public class BackupTaskReconcilier extends TaskReconcilier {
     private static final Logger logger = LoggerFactory.getLogger(BackupTaskReconcilier.class);
     private final SidecarClientFactory sidecarClientFactory;
-    
+    private final CqlRoleManager cqlRoleManager;
+
     public BackupTaskReconcilier(ReconcilierObserver reconcilierObserver,
                                  final OperatorConfig operatorConfig,
                                  final K8sResourceUtils k8sResourceUtils,
@@ -40,11 +44,13 @@ public class BackupTaskReconcilier extends TaskReconcilier {
                                  final MeterRegistry meterRegistry,
                                  final DataCenterController dataCenterController,
                                  final DataCenterCache dataCenterCache,
+                                 final CqlRoleManager cqlRoleManager,
                                  ExecutorFactory executorFactory,
                                  @Named("tasks") UserExecutorConfiguration userExecutorConfiguration ) {
         super(reconcilierObserver, "backup", operatorConfig, k8sResourceUtils, meterRegistry,
                 dataCenterController, dataCenterCache, executorFactory, userExecutorConfiguration);
         this.sidecarClientFactory = sidecarClientFactory;
+        this.cqlRoleManager = cqlRoleManager;
     }
 
     /**
@@ -64,7 +70,7 @@ public class BackupTaskReconcilier extends TaskReconcilier {
                 .subscribeOn(Schedulers.io())
                 .flatMapSingle(pod -> {
 
-                    return sidecarClientFactory.clientForPod(ElassandraPod.fromV1Pod(pod))
+                    return sidecarClientFactory.clientForPod(ElassandraPod.fromV1Pod(pod), cqlRoleManager.get(dc, CqlRole.STRAPKOP_ROLE.getUsername()))
                             .snapshot(backupSpec.getRepository(), backupSpec.getKeyspaces())
                             .map(backupResponse -> {
                                 logger.debug("Received backupSpec response with status = {}", backupResponse.getStatus());
@@ -81,7 +87,7 @@ public class BackupTaskReconcilier extends TaskReconcilier {
 
 
     @Override
-    public Single<Iterable<V1Pod>> listPods(Task task, DataCenter dc) {
-        return initializePodMapWithWaitingStatus(task, dc);
+    public Single<List<V1Pod>> init(Task task, DataCenter dc) {
+        return listAllDcPods(task, dc).map(pods -> initTaskStatusPodMap(task, pods));
     }
 }

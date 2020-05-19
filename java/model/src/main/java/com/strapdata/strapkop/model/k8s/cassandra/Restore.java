@@ -6,10 +6,10 @@ import com.strapdata.strapkop.model.k8s.task.BackupTaskSpec;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.experimental.Wither;
+import lombok.With;
 
 @Data
-@Wither
+@With
 @AllArgsConstructor
 @NoArgsConstructor
 public class Restore extends BackupTaskSpec {

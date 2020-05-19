@@ -5,15 +5,16 @@ import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.function.Supplier;
 
 /**
  * Manage T for datacenters in a map where the key is a unique datacenter name.
  * @param <T>
  */
-public abstract class AbstractManager<T> {
+public abstract class AbstractManager<T extends CqlReconciliable> {
 
-    private final Map<String, Map<String, T>> ressources = new ConcurrentHashMap<>(); // per datacenter resources
+    private final ConcurrentMap<String, Map<String, T>> ressources = new ConcurrentHashMap<>(); // per datacenter resources
 
     public AbstractManager() {
     }

@@ -2,8 +2,6 @@ package com.strapdata.strapkop.plugins;
 
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
-import com.strapdata.strapkop.cql.CqlKeyspaceManager;
-import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.ssl.AuthorityManager;
@@ -117,28 +115,6 @@ public class WebHookPlugin extends AbstractPlugin {
     @Override
     public boolean isActive(final DataCenter dataCenter) {
         return true;
-    }
-
-    /**
-     * Add/Remove keyspaces to/from the cqlKeyspaceManager for the dataCenter
-     *
-     * @param cqlKeyspaceManager
-     * @param dataCenter
-     */
-    @Override
-    public void syncKeyspaces(CqlKeyspaceManager cqlKeyspaceManager, DataCenter dataCenter) {
-
-    }
-
-    /**
-     * Add/Remove roles to/from the cqlRoleManager for the dataCenter
-     *
-     * @param cqlRoleManager
-     * @param dataCenter
-     */
-    @Override
-    public void syncRoles(CqlRoleManager cqlRoleManager, DataCenter dataCenter) {
-
     }
 
     /**

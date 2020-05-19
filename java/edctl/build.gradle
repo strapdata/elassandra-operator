@@ -41,6 +41,7 @@ jib {
         mainClass = mainClassName
         labels = [ description:'Elassandra Datacenter CLI']
     }
+    allowInsecureRegistries = rootProject.registryInsecure
 }
 tasks.jib.dependsOn project(':java:model').jar
 
@@ -66,8 +67,8 @@ compileTestJava {
 }
 
 dependencies {
-    compile 'org.projectlombok:lombok:1.18.4'
-    annotationProcessor "org.projectlombok:lombok:1.18.4"
+    compile 'org.projectlombok:lombok:1.18.10'
+    annotationProcessor "org.projectlombok:lombok:1.18.10"
     annotationProcessor "io.micronaut:micronaut-inject-java"
     annotationProcessor "io.micronaut:micronaut-validation"
 
