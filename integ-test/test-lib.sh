@@ -9,8 +9,8 @@ set -x
 
 HELM_REPO=helm/src/main/helm
 
-ELASSANDRA_OPERATOR_TAG=$(awk -F "=" '/version/ { print $2 }' gradle.properties)
-ELASSANDRA_NODE_TAG="6.8.4.5-SNAPSHOT"
+export ELASSANDRA_OPERATOR_TAG=$(awk -F "=" '/version/ { print $2 }' gradle.properties)
+export ELASSANDRA_NODE_TAG=$(head -n 1 docker/supportedElassandraVersions.txt)
 
 test_start() {
   set -x
