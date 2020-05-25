@@ -7,8 +7,22 @@
 # az account set --subscription 72738c1b-8ae6-4f23-8531-5796fe866f2e
 set -x
 
+
+export RESOURCE_GROUP_NAME=${RESOURCE_GROUP_NAME:-"cluster1"}
+export K8S_CLUSTER_NAME=${K8S_CLUSTER_NAME:-"cluster1"}
+
 export REGISTRY_URL=strapdata.azurecr.io
 export REGISTRY_SECRET_NAME=${REGISTRY_SECRET_NAME:-"strapregistry"}
+
+function create_cluster() {
+  create_resource_group $RESOURCE_GROUP_NAME
+  create_aks_cluster 1
+}
+
+function destroy_cluster() {
+  delete_aks_cluster $RESOURCE_GROUP_NAME $K8S_CLUSTER_NAME
+}
+
 
 # $1 = $RESOURCE_GROUP_NAME
 function create_resource_group() {
@@ -49,14 +63,13 @@ function create_aks_cluster() {
 
      az aks create --name "${K8S_CLUSTER_NAME}${1}" \
                   --resource-group $RESOURCE_GROUP_NAME \
-                  --ssh-key-value $SSH_PUBKEY \
                   --network-plugin azure \
                   --docker-bridge-address "192.168.0.1/24" \
                   --service-cidr "10.0.$B3.0/22" \
                   --dns-service-ip "10.0.$B3.10" \
                   --vnet-subnet-id $(az network vnet subnet show -g $RESOURCE_GROUP_NAME --vnet-name vnet0 -n "subnet$1" | jq -r '.id') \
                   --node-count 1 \
-                  --node-vm-size Standard_D4_v3 \
+                  --node-vm-size Standard_D2_v3 \
                   --vm-set-type AvailabilitySet \
                   --output table
 #                  --attach-acr "$ACR_ID"
@@ -64,8 +77,7 @@ function create_aks_cluster() {
 #                  --load-balancer-managed-outbound-ip-count 0 \
 
     kubectl create clusterrolebinding kubernetes-dashboard -n kube-system --clusterrole=cluster-admin --serviceaccount=kube-system:kubernetes-dashboard
-
-     use_k8s_cluster $1
+    use_k8s_cluster $1
 }
 
 # $1 = k8s cluster IDX

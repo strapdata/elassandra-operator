@@ -7,6 +7,7 @@
 # az account set --subscription 72738c1b-8ae6-4f23-8531-5796fe866f2e
 set -x
 
+BASE_DIR=$(dirname $0)
 HELM_REPO=helm/src/main/helm
 
 export ELASSANDRA_OPERATOR_TAG=$(awk -F "=" '/version/ { print $2 }' gradle.properties)
@@ -28,7 +29,29 @@ finish() {
   exit 1
 }
 
+init_cluster() {
+  case "$K8S_FLAVOR" in
+  "aks")
+    echo "Loading AKS library"
+    source $BASE_DIR/aks/test-lib-aks.sh
+    ;;
+  "gke")
+    echo "Loading GKE library"
+    source $BASE_DIR/gke/test-lib-gke.sh
+    ;;
+  *)
+    echo "Loading Kind library"
+    source $BASE_DIR/kind/test-lib-kind.sh
+    ;;
+  esac
+
+  create_cluster
+  init_helm
+  install_elassandra_operator
+}
+
 init_helm() {
+   echo "Installing HELM"
 	 helm init
 	 kubectl -n kube-system get po || helm init
 	 kubectl create serviceaccount --namespace kube-system tiller
@@ -38,17 +61,19 @@ init_helm() {
 
   # K8s 1.16+ apiVersion issue
 	# helm init --service-account tiller --override spec.selector.matchLabels.'name'='tiller',spec.selector.matchLabels.'app'='helm' --output yaml | sed 's@apiVersion: extensions/v1beta1@apiVersion: apps/v1@' | kubectl apply -f -
-
+  echo "HELM installed"
 }
 
 # deploy the elassandra operator in $1 = namespace
 install_elassandra_operator() {
+    echo "Installing elassandra-operator in namespace ${1:-default}"
     helm install --namespace ${1:-default} --name strapkop \
     --set image.repository=$REGISTRY_URL/strapdata/elassandra-operator-dev \
     --set image.tag="$ELASSANDRA_OPERATOR_TAG" \
     --set image.pullSecrets[0]="$REGISTRY_SECRET_NAME" \
     --wait \
     $HELM_REPO/elassandra-operator
+    echo "Elassandra-operator installed"
 }
 
 uninstall_elassandra_operator() {
@@ -71,7 +96,7 @@ install_elassandra_datacenter() {
        registry=",image.pullSecrets[0]=$REGISTRY_SECRET_NAME"
     fi
 
-    helm install --namespace "$ns" --name "$cl-$dc" \
+    helm install --namespace "$ns" --name "$ns-$cl-$dc" \
     --set image.elassandraRepository=$REGISTRY_URL/strapdata/elassandra-node-dev \
     --set image.tag=$ELASSANDRA_NODE_TAG \
     --set dataVolumeClaim.storageClassName=${STORAGE_CLASS_NAME:-"standard"}$registry \
@@ -87,18 +112,20 @@ install_elassandra_datacenter() {
 }
 
 uninstall_elassandra_datacenter() {
+    local ns=${1:-"default"}
     local cl=${2:-"cl1"}
     local dc=${3:-"dc1"}
-    helm delete --purge "$cl-$dc"
-    echo "Datacenter $cl-$dc uninstalled"
+    helm delete --purge "$ns-$cl-$dc"
+    echo "Datacenter $cl-$dc uninstalled in namespace $ns"
 }
 
 scale_elassandra_datacenter() {
-    local cl=${1:-"cl1"}
-    local dc=${2:-"dc1"}
-    local sz=${3:-"1"}
-    helm upgrade --reuse-values --set replicas="$sz" "$cl-$dc" $HELM_REPO/elassandra-datacenter
-    echo "Datacenter $cl-$dc scale size=$sz"
+    local ns=${1:-"default"}
+    local cl=${2:-"cl1"}
+    local dc=${3:-"dc1"}
+    local sz=${4:-"1"}
+    helm upgrade --reuse-values --set replicas="$sz" "$ns-$cl-$dc" $HELM_REPO/elassandra-datacenter
+    echo "Datacenter $ns-$cl-$dc scale size=$sz"
 }
 
 elassandra_datacenter_wait_running() {
@@ -106,44 +133,50 @@ elassandra_datacenter_wait_running() {
 }
 
 park_elassandra_datacenter() {
-    local cl=${1:-"cl1"}
-    local dc=${2:-"dc1"}
-    helm upgrade --reuse-values --set parked="true" "$cl-$dc" $HELM_REPO/elassandra-datacenter
-    echo "Datacenter $cl-$dc parked"
+    local ns=${1:-"default"}
+    local cl=${2:-"cl1"}
+    local dc=${3:-"dc1"}
+    helm upgrade --reuse-values --set parked="true" "$ns-$cl-$dc" $HELM_REPO/elassandra-datacenter
+    echo "Datacenter $ns-$cl-$dc parked"
 }
 
 unpark_elassandra_datacenter() {
-    local cl=${1:-"cl1"}
-    local dc=${2:-"dc1"}
-    helm upgrade --reuse-values --set parked="false" "$cl-$dc" $HELM_REPO/elassandra-datacenter
-    echo "Datacenter $cl-$dc unparked"
+    local ns=${1:-"default"}
+    local cl=${2:-"cl1"}
+    local dc=${3:-"dc1"}
+    helm upgrade --reuse-values --set parked="false" "$ns-$cl-$dc" $HELM_REPO/elassandra-datacenter
+    echo "Datacenter $ns-$cl-$dc unparked"
 }
 
 reaper_enable() {
-    local cl=${1:-"cl1"}
-    local dc=${2:-"dc1"}
-    helm upgrade --reuse-values --set reaper.enabled="true",reaper.loggingLevel="TRACE" "$cl-$dc" $HELM_REPO/elassandra-datacenter
+    local ns=${1:-"default"}
+    local cl=${2:-"cl1"}
+    local dc=${3:-"dc1"}
+    helm upgrade --reuse-values --set reaper.enabled="true",reaper.loggingLevel="TRACE" "$ns-$cl-$dc" $HELM_REPO/elassandra-datacenter
     echo "Datacenter $cl-$dc reaper enabled"
 }
 
 reaper_disable() {
-    local cl=${1:-"cl1"}
-    local dc=${2:-"dc1"}
-    helm upgrade --reuse-values --set reaper.enabled="false" "$cl-$dc" $HELM_REPO/elassandra-datacenter
+    local ns=${1:-"default"}
+    local cl=${2:-"cl1"}
+    local dc=${3:-"dc1"}
+    helm upgrade --reuse-values --set reaper.enabled="false" "$ns-$cl-$dc" $HELM_REPO/elassandra-datacenter
     echo "Datacenter $cl-$dc reaper disabled"
 }
 
 downgrade_elassandra_datacenter() {
-    local cl=${1:-"cl1"}
-    local dc=${2:-"dc1"}
-    helm upgrade --reuse-values --set elassandraImage="strapdata.azurecr.io/strapdata/elassandra-node-dev:6.2.3.26" "$cl-$dc" $HELM_REPO/elassandra-datacenter
+    local ns=${1:-"default"}
+    local cl=${2:-"cl1"}
+    local dc=${3:-"dc1"}
+    helm upgrade --reuse-values --set elassandraImage="strapdata.azurecr.io/strapdata/elassandra-node-dev:6.2.3.26" "$ns-$cl-$dc" $HELM_REPO/elassandra-datacenter
     echo "Datacenter $cl-$dc downgrade to 6.2.3.26"
 }
 
 add_memory_elassandra_datacenter() {
-    local cl=${1:-"cl1"}
-    local dc=${2:-"dc1"}
-    helm upgrade --reuse-values --set resources.limits.memory="3Gi" --set "$cl-$dc" $HELM_REPO/elassandra-datacenter
+    local ns=${1:-"default"}
+    local cl=${2:-"cl1"}
+    local dc=${3:-"dc1"}
+    helm upgrade --reuse-values --set resources.limits.memory="3Gi" "$ns-$cl-$dc" $HELM_REPO/elassandra-datacenter
     echo "Datacenter $cl-$dc update memory to 3Gi"
 }
 
@@ -170,5 +203,5 @@ generate_client_cert() {
 }
 
 view_cert() {
-	openssl x509 -text -in $1
+    openssl x509 -text -in $1
 }

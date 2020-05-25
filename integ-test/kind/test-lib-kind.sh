@@ -12,6 +12,10 @@ export REGISTRY_NAME='kind-registry'
 export REGISTRY_PORT='5000'
 export REGISTRY_URL="localhost:5000"
 
+create_cluster() {
+  create_kind_cluster3_with_local_registry
+}
+
 # $1 = cluster name
 create_kind_cluster3() {
   kind create cluster --name ${1:-cluster1} --config integ-test/kind/kind-config-worker-3.yaml --image kindest/node:v1.15.11@sha256:6cc31f3533deb138792db2c7d1ffc36f7456a06f1db5556ad3b6927641016f50
