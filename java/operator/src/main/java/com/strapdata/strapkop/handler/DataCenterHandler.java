@@ -56,13 +56,11 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
                 logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 workQueues.submit(new ClusterKey(event.getResource()),
                         Reconciliable.Kind.DATACENTER, event.getType(),
-                        dataCenterController.initDatacenter(new Operation().withSubmitDate(new Date()).withDesc("dc-init"), dataCenter)
+                        dataCenterController.initDatacenter(new Operation().withSubmitDate(new Date()).withDesc("init"), dataCenter)
                                 .doOnComplete(() -> {
                                     managed++;
                                 })
-                                .doFinally(() -> {
-                                    meterRegistry.counter("k8s.event.init", tags).increment();
-                                }));
+                                .doFinally(() -> meterRegistry.counter("k8s.event.init", tags).increment()));
                 break;
 
             case ADDED:
@@ -70,13 +68,11 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
                 logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 workQueues.submit(new ClusterKey(event.getResource()),
                         Reconciliable.Kind.DATACENTER, event.getType(),
-                        dataCenterController.initDatacenter(new Operation().withSubmitDate(new Date()).withDesc("dc-added"), dataCenter)
+                        dataCenterController.initDatacenter(new Operation().withSubmitDate(new Date()).withDesc("added"), dataCenter)
                                 .doOnComplete(() -> {
                                     managed++;
                                 })
-                                .doFinally(() -> {
-                                    meterRegistry.counter("k8s.event.added", tags).increment();
-                                })
+                                .doFinally(() -> meterRegistry.counter("k8s.event.added", tags).increment())
                 );
                 break;
 
@@ -91,10 +87,8 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
                                     dataCenter.getMetadata().getGeneration(),
                                     new Operation()
                                             .withSubmitDate(new Date())
-                                            .withDesc("edc-modified generation="+dataCenter.getMetadata().getGeneration()))
-                                    .doFinally(() -> {
-                                        meterRegistry.counter("k8s.event.modified", tags).increment();
-                                    })
+                                            .withDesc("modified spec generation="+dataCenter.getMetadata().getGeneration()))
+                                    .doFinally(() -> meterRegistry.counter("k8s.event.modified", tags).increment())
                     );
                 }
                 break;
@@ -111,9 +105,7 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
                                     dataCenterCache.remove(key);
                                     workQueues.dispose(new ClusterKey(event.getResource()));
                                 })
-                                .doFinally(() -> {
-                                    meterRegistry.counter("k8s.event.deleted", tags).increment();
-                                })
+                                .doFinally(() -> meterRegistry.counter("k8s.event.deleted", tags).increment())
                 );
                 break;
 

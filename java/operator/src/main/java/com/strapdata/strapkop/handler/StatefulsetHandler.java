@@ -107,7 +107,9 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
             if (dataCenter != null) {
                 logger.info("datacenter={} sts={}/{} is ready, triggering a dc statefulSetUpdate",
                         dataCenter.id(), sts.getMetadata().getName(), sts.getMetadata().getNamespace());
-                Operation op = new Operation().withSubmitDate(new Date()).withDesc("updated statefulset="+sts.getMetadata().getName());
+                Operation op = new Operation()
+                        .withSubmitDate(new Date())
+                        .withDesc("status update statefulset="+sts.getMetadata().getName());
                 workQueues.submit(
                         new ClusterKey(clusterName, sts.getMetadata().getNamespace()),
                         Reconciliable.Kind.STATEFULSET, K8sWatchEvent.Type.MODIFIED,
