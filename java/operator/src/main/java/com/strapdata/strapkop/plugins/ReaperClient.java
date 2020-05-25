@@ -71,7 +71,7 @@ public class ReaperClient implements Closeable {
                         .singleOrError()
                         .map(res -> {
                             logger.debug("datacenter={} reaper registration rc={} reason={} ", dataCenter.id(), res.getStatus().getCode(), res.getStatus().getReason());
-                            return res.getStatus().getCode() == 204;
+                            return res.getStatus().getCode() == 204   || res.getStatus().getCode() == 201;
                         }));
     }
 
