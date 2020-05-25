@@ -51,7 +51,6 @@ public class ReaperPlugin extends AbstractPlugin {
     public static final int ADMIN_SERVICE_PORT = 8081;    // the REST API
 
     public static final String REAPER_KEYSPACE_NAME = "reaper_db";
-    public static final String REAPER_ADMIN_PASSWORD_KEY = "reaper.admin_password";
 
     public final Scheduler registrationScheduler;
 
@@ -325,13 +324,21 @@ public class ReaperPlugin extends AbstractPlugin {
                         )
                 )
                 .addEnvItem(new V1EnvVar().name("REAPER_JMX_AUTH_USERNAME").value("cassandra"))
-                .addEnvItem(new V1EnvVar().name("REAPER_AUTH_USER").value("admin"))
+                .addEnvItem(new V1EnvVar()
+                        .name("REAPER_AUTH_USER")
+                        .valueFrom(new V1EnvVarSource()
+                                .secretKeyRef(new V1SecretKeySelector()
+                                        .name(reaperSecretName(dataCenter))
+                                        .key("username")
+                                )
+                        )
+                )
                 .addEnvItem(new V1EnvVar()
                         .name("REAPER_AUTH_PASSWORD")
                         .valueFrom(new V1EnvVarSource()
                                 .secretKeyRef(new V1SecretKeySelector()
                                         .name(reaperSecretName(dataCenter))
-                                        .key(REAPER_ADMIN_PASSWORD_KEY)
+                                        .key("password")
                                 )
                         )
                 )
@@ -534,7 +541,7 @@ public class ReaperPlugin extends AbstractPlugin {
     private Single<String> loadReaperAdminPassword(DataCenter dc) throws ApiException, StrapkopException {
         String reaperSecretName = reaperSecretName(dc);
         return k8sResourceUtils.readNamespacedSecret(dc.getMetadata().getNamespace(), reaperSecretName).map(secret -> {
-            final byte[] password = secret.getData().get(REAPER_ADMIN_PASSWORD_KEY);
+            final byte[] password = secret.getData().get("password");
             if (password == null) {
                 throw new StrapkopException(String.format("secret %s does not contain reaper.admin_password", reaperSecretName));
             }
@@ -553,9 +560,9 @@ public class ReaperPlugin extends AbstractPlugin {
             logger.debug("datacenter={} Creating reaper secret name={}", dc.id(), reaperSecretName);
             return new V1Secret()
                     .metadata(secretMetadata)
-                    .type("Opaque")
-                    // replace the default cassandra password
-                    .putStringDataItem(REAPER_ADMIN_PASSWORD_KEY, UUID.randomUUID().toString());
+                    .type("kubernetes.io/basic-auth")
+                    .putDataItem("username", "admin".getBytes())
+                    .putDataItem("password", UUID.randomUUID().toString().getBytes());
         });
     }
 
