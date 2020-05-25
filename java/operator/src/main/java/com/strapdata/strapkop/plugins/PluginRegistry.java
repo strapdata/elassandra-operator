@@ -54,8 +54,8 @@ public class PluginRegistry {
             try {
                 pluginSingles.add(plugin.reconcile(dc)
                         .onErrorResumeNext(t -> {
-                            logger.warn("plugin={} reconcile failed, error={}", plugin.getClass().getName(), t.toString());
-                            return Single.just(true);
+                            logger.warn("datacenter={} plugin={} reconcile failed, error={}", dc.id(), plugin.getClass().getName(), t.toString());
+                            return Single.just(false);
                         }));
             } catch (Exception e) {
                 logger.error("Plugin class=" + plugin.getClass().getSimpleName() + " reconciliation failed:", e);

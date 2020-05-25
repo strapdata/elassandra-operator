@@ -1,7 +1,7 @@
 package com.strapdata.strapkop.cache;
 
 import com.google.common.collect.ImmutableList;
-import io.kubernetes.client.models.V1Node;
+import io.kubernetes.client.openapi.models.V1Node;
 import io.micrometer.core.instrument.ImmutableTag;
 import io.micrometer.core.instrument.MeterRegistry;
 

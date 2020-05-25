@@ -7,7 +7,7 @@ import com.strapdata.strapkop.cache.SidecarConnectionCache;
 import com.strapdata.strapkop.cache.TaskCache;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.cql.CqlSessionHandler;
-import com.strapdata.strapkop.event.Pod;
+import com.strapdata.strapkop.k8s.Pod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
@@ -18,9 +18,9 @@ import com.strapdata.strapkop.model.k8s.cassandra.ReaperPhase;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.plugins.PluginRegistry;
 import com.strapdata.strapkop.plugins.ReaperPlugin;
-import io.kubernetes.client.ApiException;
-import io.kubernetes.client.models.V1Deployment;
-import io.kubernetes.client.models.V1StatefulSet;
+import io.kubernetes.client.openapi.ApiException;
+import io.kubernetes.client.openapi.models.V1Deployment;
+import io.kubernetes.client.openapi.models.V1StatefulSet;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
 import io.reactivex.Completable;
@@ -117,11 +117,11 @@ public class DataCenterController {
     /**
      * Called when the DC CRD is updated, involving a rolling update of sts.
      */
-    public Completable updateDatacenter(Operation op, DataCenter dc) throws Exception {
+    public Completable updateDatacenter(DataCenter dc, Long generation, Operation op) throws Exception {
         return reconcile(dc,
                 fetchExistingStatefulSetsByZone(dc)
                         .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dc, op).setStatefulSetTreeMap(stsMap))
-                .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.updateDatacenter()));
+                .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.updateDatacenter(generation)));
     }
 
     /**
@@ -134,7 +134,7 @@ public class DataCenterController {
         return reconcile(dataCenter,
                 fetchExistingStatefulSetsByZone(dataCenter)
                         .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dataCenter, op).setStatefulSetTreeMap(stsMap))
-                .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.statefulsetUpdate(sts)));
+                .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.statefulsetUpdated(sts)));
     }
 
     public Completable deploymentAvailable(Operation op, DataCenter dataCenter, V1Deployment deployment) throws Exception {

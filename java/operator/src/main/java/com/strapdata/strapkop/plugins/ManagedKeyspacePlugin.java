@@ -11,9 +11,8 @@ import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.cassandra.ManagedKeyspace;
 import com.strapdata.strapkop.ssl.AuthorityManager;
-import io.kubernetes.client.ApiException;
-import io.kubernetes.client.apis.AppsV1Api;
-import io.kubernetes.client.apis.CoreV1Api;
+import io.kubernetes.client.openapi.apis.AppsV1Api;
+import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
 import io.reactivex.Completable;
@@ -78,7 +77,7 @@ public class ManagedKeyspacePlugin extends AbstractPlugin {
      * @param dataCenter
      */
     @Override
-    public Single<Boolean> reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
+    public Single<Boolean> reconcile(DataCenter dataCenter) throws StrapkopException {
         return Single.just(false);
     }
 
@@ -88,7 +87,7 @@ public class ManagedKeyspacePlugin extends AbstractPlugin {
      * @param dataCenter
      */
     @Override
-    public Single<Boolean> delete(DataCenter dataCenter) throws ApiException {
+    public Single<Boolean> delete(DataCenter dataCenter) {
         return Single.just(false);
     }
 

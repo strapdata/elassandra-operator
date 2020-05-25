@@ -45,7 +45,7 @@ subprojects {
       exclude group: 'com.google.guava', module: 'guava'
     }
 
-    implementation "io.kubernetes:client-java:6.0.1"
+    implementation "io.kubernetes:client-java:7.0.0"
     implementation "javax.inject:javax.inject:1"
 
     runtime "ch.qos.logback:logback-classic:1.2.3"

@@ -1,9 +1,10 @@
 package com.strapdata.strapkop.pipeline;
 
-import com.squareup.okhttp.Call;
-import io.kubernetes.client.ApiException;
-import io.kubernetes.client.models.V1ListMeta;
-import io.kubernetes.client.models.V1ObjectMeta;
+
+import io.kubernetes.client.openapi.ApiException;
+import io.kubernetes.client.openapi.models.V1ListMeta;
+import io.kubernetes.client.openapi.models.V1ObjectMeta;
+import okhttp3.Call;
 
 import java.lang.reflect.Type;
 import java.util.Collection;

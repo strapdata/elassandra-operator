@@ -5,7 +5,6 @@ metadata:
     app: {{ template "elassandra-operator.name" . }}
     chart: {{ .Chart.Name }}-{{ .Chart.Version }}
     heritage: {{ .Release.Service }}
-    operator: elassandra
     release: {{ .Release.Name }}
   name: {{ template "elassandra-operator.fullname" . }}
 spec:
@@ -33,6 +32,18 @@ spec:
       {{- end }}
       {{- end }}
       terminationGracePeriodSeconds: 45
+      initContainers:
+        # build a PKCS12 file from the TLS secret
+        - name: init-tls-cert
+          image: frapsoft/openssl
+          command: ['sh', '-c', "openssl pkcs12 -export -in /tls-secret/tls.crt -inkey /tls-secret/tls.key -out /tls/operator.p12 -passout pass:changeit"]
+          #command: ['sh', '-c', "echo toto > /tls/operator.p12"]
+          volumeMounts:
+          - name: tls-secret-volume
+            readOnly: true
+            mountPath: "/tls-secret"
+          - name: tls-volume
+            mountPath: "/tls"
       containers:
         - name: {{ template "elassandra-operator.name" . }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -41,17 +52,21 @@ spec:
 #          Uncomment and modify to change operator behaviour via start up flags
 #          command: ["java"]
 #          args: ["-jar", "/opt/lib/elassandra-operator/elassandra-operator.jar", "--no-version-check=false"]
+          volumeMounts:
+            - name: tls-volume
+              mountPath: "/tls"
           ports:
-            - containerPort: 8080
-              name: http
+            - containerPort: 443
+              name: https
             - containerPort: 5005
               name: jdb
             - containerPort: 7199
               name: jmx
           readinessProbe:
             httpGet:
+              scheme: HTTPS
               path: /ready
-              port: 8080
+              port: 443
             initialDelaySeconds: 5
             periodSeconds: 10
 # https://github.com/kubernetes/kubernetes/issues/55807#issuecomment-459933280
@@ -62,8 +77,9 @@ spec:
           lifecycle:
             preStop:
               httpGet:
+                scheme: HTTPS
                 path: /shutdown/graceful
-                port: 8080
+                port: 443
           resources:
 {{ toYaml .Values.resources | indent 12 }}
           env:
@@ -79,6 +95,12 @@ spec:
             value: {{ $val | quote }}
           {{- end }}
           {{- end }}
+      volumes:
+      - name: tls-volume
+        emptyDir: {}
+      - name: tls-secret-volume
+        secret:
+          secretName: {{ template "elassandra-operator.name" . }}
     {{- if .Values.nodeSelector }}
       nodeSelector:
 {{ toYaml .Values.nodeSelector | indent 8 }}

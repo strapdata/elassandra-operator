@@ -4,7 +4,7 @@ package com.strapdata.strapkop.model.k8s.cassandra;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 import com.strapdata.strapkop.model.GsonUtils;
-import io.kubernetes.client.models.*;
+import io.kubernetes.client.openapi.models.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;

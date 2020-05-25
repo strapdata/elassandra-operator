@@ -21,7 +21,6 @@ import javax.inject.Singleton;
 import java.math.BigInteger;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Per elassandra cluster work queue to ensure operations are executed sequentially over a single cluster, to prevent
@@ -73,22 +72,20 @@ public class WorkQueues {
         Disposable disposable = queue.observeOn(Schedulers.io()).subscribeOn(Schedulers.io())
                 // doOnError will be called if an error occurs within the subject (which is unlikely)
                 .doOnError(throwable -> logger.error("error in work queue for cluster " + key.getName(), throwable))
-                // re subscribe the the subject in case it fails (which is unlikely)
-                .retryWhen(errors -> errors.delay(1, TimeUnit.SECONDS))
                 .subscribe(reconciliable -> {
+                            logger.debug("--- cluster={} id={} kind={} type={}", key, reconciliable.getId(), reconciliable.getKind(), reconciliable.getType());
                             reconciliable.setStartTime(System.currentTimeMillis());
-                            reconciliable.getCompletable().subscribe(
-                                    () -> {
-                                        logger.debug("cluster={} kine={} type={} pending={}ms execution={}ms", key,
-                                                reconciliable.getKind(), reconciliable.getType(),
-                                                reconciliable.getStartTime() - reconciliable.getSubmitTime(),
-                                                System.currentTimeMillis() - reconciliable.getStartTime());
-                                    },
-                                    t -> {
-                                        logger.debug("cluster=" + key + " reconciliable=" + reconciliable + " error:", t);
-                                    });
-                        }
-                );
+                            Throwable e = reconciliable.getCompletable().blockingGet();
+                            if (e == null) {
+                                logger.debug("--- cluster={} id={} kind={} type={} pending={}ms execution={}ms",
+                                        key, reconciliable.getId(),
+                                        reconciliable.getKind(), reconciliable.getType(),
+                                        reconciliable.getStartTime() - reconciliable.getSubmitTime(),
+                                        System.currentTimeMillis() - reconciliable.getStartTime());
+                            } else {
+                                logger.warn("--- cluster=" + key + " reconciliable=" + reconciliable + " error:", e);
+                            }
+                        });
         return queue;
     }
 

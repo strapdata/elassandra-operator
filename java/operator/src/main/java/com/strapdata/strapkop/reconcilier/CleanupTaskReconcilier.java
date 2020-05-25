@@ -2,7 +2,7 @@ package com.strapdata.strapkop.reconcilier;
 
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.DataCenterCache;
-import com.strapdata.strapkop.event.ElassandraPod;
+import com.strapdata.strapkop.k8s.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
@@ -10,8 +10,8 @@ import com.strapdata.strapkop.model.k8s.task.CleanupTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
 import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
-import io.kubernetes.client.ApiException;
-import io.kubernetes.client.models.V1Pod;
+import io.kubernetes.client.openapi.ApiException;
+import io.kubernetes.client.openapi.models.V1Pod;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.annotation.Infrastructure;
 import io.micronaut.scheduling.executor.ExecutorFactory;
@@ -65,7 +65,7 @@ public final class CleanupTaskReconcilier extends TaskReconcilier {
         // TODO: maybe we should try to caught outer exception (even if we already catch inside doOnNext)
         final CleanupTaskSpec cleanupTaskSpec = task.getSpec().getCleanup();
         return Observable.zip(Observable.fromIterable(pods), Observable.interval(cleanupTaskSpec.getWaitIntervalInSec(), TimeUnit.SECONDS), (pod, timer) -> pod)
-                .subscribeOn(Schedulers.computation())
+                .subscribeOn(Schedulers.io())
                 .flatMapSingle(pod ->
                         jmxmpElassandraProxy.cleanup(ElassandraPod.fromV1Pod(pod), task.getSpec().getCleanup().getKeyspace())
                         .doOnComplete(() -> {

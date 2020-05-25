@@ -19,6 +19,16 @@ import java.util.Map;
 @NoArgsConstructor
 public class TaskStatus {
 
+    /**
+     * The most recent task generation observed by the Elassandra operator.
+     */
+    @SerializedName("observedGeneration")
+    @Expose
+    Long observedGeneration;
+
+    /**
+     * Task phase
+     */
     @SerializedName("phase")
     @Expose
     private TaskPhase phase = TaskPhase.WAITING;

@@ -25,15 +25,14 @@ jib {
     from {
         // TODO make it configurable to allow bash exec ???
         //image = 'openjdk:alpine'
-        image = 'openjdk:8-jre-alpine'  // smallest jre image
-        //image = 'gcr.io/distroless/java:8'
+        //image = 'openjdk:8-jre-alpine'  // smallest jre image
+        image = 'gcr.io/distroless/java:8'
     }
     to {
         image = rootProject.registryUrl + dockerImagePrefix + "operator" + dockerImageSuffix
         tags = [ version, project.gitCommitHash, 'latest']
         // osxkeychain does not work on linux and CI environments
         // credHelper = 'osxkeychain'
-
         auth {
             username = System.getenv('DOCKER_USERNAME')
             password = System.getenv('DOCKER_PASSWORD')
@@ -58,7 +57,6 @@ jib {
     }
     allowInsecureRegistries = rootProject.registryInsecure
 }
-tasks.jibDockerBuild.dependsOn project(':java:backup').jar
 tasks.jibDockerBuild.dependsOn project(':java:model').jar
 
 compileJava {
@@ -103,6 +101,9 @@ dependencies {
         exclude group: 'com.strapdata.elasticsearch', module: 'elasticsearch'
     }
 
+    implementation group: 'io.fabric8', name: 'kubernetes-client', version: '4.8.0'
+    implementation group: 'io.fabric8', name: 'kubernetes-model', version: '4.8.0'
+
     testAnnotationProcessor "io.micronaut:micronaut-inject-java"
     compile "javax.annotation:javax.annotation-api"
 
@@ -112,12 +113,11 @@ dependencies {
 
     compile "io.micronaut:micronaut-security-jwt"
 
-    compile "io.kubernetes:client-java:6.0.1"
+    compile "io.kubernetes:client-java:7.0.0"
     compile "javax.inject:javax.inject:1"
     runtime "ch.qos.logback:logback-classic:1.2.3"
 
     compile project(':java:model')
-    compile project(':java:backup')
     compile project(':java:k8s-addons')
     compile project(':java:driver-addons')
 

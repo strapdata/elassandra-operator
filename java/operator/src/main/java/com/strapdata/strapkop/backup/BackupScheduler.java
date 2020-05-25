@@ -7,7 +7,7 @@ import com.strapdata.strapkop.model.k8s.cassandra.ScheduledBackup;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.cache.Cache;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import io.kubernetes.client.ApiException;
+import io.kubernetes.client.openapi.ApiException;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.scheduling.ScheduledExecutorTaskScheduler;
 import io.micronaut.scheduling.TaskExecutors;

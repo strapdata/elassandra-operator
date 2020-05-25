@@ -117,8 +117,8 @@ spec:
 {{- if .Values.jmxPort }}
   jmxPort: {{ .Values.jmxPort }}
 {{- end }}
-  jmxmpEnabled: {{ default "false" .Values.jmxmpEnabled }}
-  jmxmpOverSSL: {{ default "false" .Values.jmxmpOverSSL }}
+  jmxmpEnabled: {{ default "false" .Values.jmxmpEnabled | quote }}
+  jmxmpOverSSL: {{ default "false" .Values.jmxmpOverSSL | quote }}
 {{- if .Values.ssl }}
   ssl:
 {{ toYaml .Values.ssl | indent 4 }}
@@ -150,7 +150,7 @@ spec:
 {{- end }}
 {{- if .Values.kibana }}
   kibana:
-    enabled: {{ default "true" .Values.kibana.enabled }}
+    enabled: {{ .Values.kibana.enabled | quote }}
     {{- if .Values.kibana.ingressSuffix }}
     ingressSuffix: {{ .Values.kibana.ingressSuffix }}
     {{- end }}

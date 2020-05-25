@@ -1,7 +1,7 @@
 package com.strapdata.strapkop.cache;
 
 import com.google.common.collect.ImmutableList;
-import com.strapdata.strapkop.event.ElassandraPod;
+import com.strapdata.strapkop.k8s.ElassandraPod;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.sidecar.SidecarClient;
 import io.micrometer.core.instrument.ImmutableTag;
@@ -17,7 +17,7 @@ import java.util.Objects;
  */
 @Singleton
 public class SidecarConnectionCache extends Cache<ElassandraPod, SidecarClient> {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(SidecarConnectionCache.class);
 
     SidecarConnectionCache(MeterRegistry meterRegistry) {

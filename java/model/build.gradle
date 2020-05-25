@@ -11,6 +11,9 @@ tasks.withType(JavaCompile) {
 dependencies {
     implementation 'org.projectlombok:lombok:1.18.10'
     annotationProcessor "org.projectlombok:lombok:1.18.10"
+
+    implementation group: 'io.fabric8', name: 'kubernetes-client', version: '4.8.0'
+    implementation group: 'io.fabric8', name: 'kubernetes-model', version: '4.8.0'
 }
 
 jar {

@@ -1,17 +1,21 @@
 package com.strapdata.strapkop.pipeline;
 
-import com.squareup.okhttp.Call;
+
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.event.K8sWatchEventSource;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
-import io.kubernetes.client.ApiClient;
-import io.kubernetes.client.ApiException;
-import io.kubernetes.client.apis.AppsV1Api;
-import io.kubernetes.client.models.*;
+import io.kubernetes.client.openapi.ApiClient;
+import io.kubernetes.client.openapi.ApiException;
+import io.kubernetes.client.openapi.apis.AppsV1Api;
+import io.kubernetes.client.openapi.models.V1Deployment;
+import io.kubernetes.client.openapi.models.V1DeploymentList;
+import io.kubernetes.client.openapi.models.V1ListMeta;
+import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Infrastructure;
+import okhttp3.Call;
 
 import javax.inject.Named;
 import java.lang.reflect.Type;
@@ -25,7 +29,7 @@ import java.util.Collection;
 public class DeploymentPipeline extends EventPipeline<K8sWatchEvent<V1Deployment>> {
 
     public DeploymentPipeline(@Named("apiClient") ApiClient apiClient, AppsV1Api appsV1Api, OperatorConfig operatorConfig) {
-        super(new K8sWatchEventSource<>(apiClient, new DeploymentAdapter(appsV1Api, operatorConfig), operatorConfig));
+        super(new K8sWatchEventSource<>(apiClient, new DeploymentAdapter(appsV1Api, operatorConfig)));
     }
 
     private static class DeploymentAdapter extends K8sWatchResourceAdapter<V1Deployment, V1DeploymentList, Key> {
@@ -51,8 +55,8 @@ public class DeploymentPipeline extends EventPipeline<K8sWatchEvent<V1Deployment
         @Override
         public Call createListApiCall(boolean watch, String resourceVersion) throws ApiException {
             return appsV1Api.listNamespacedDeploymentCall(config.getNamespace(),
-                    null, null, null, OperatorLabels.toSelector(OperatorLabels.MANAGED),
-                    null, resourceVersion, null, watch, null, null);
+                    null, null, null, null, OperatorLabels.toSelector(OperatorLabels.MANAGED),
+                    null, resourceVersion, null, watch, null);
         }
 
         @Override

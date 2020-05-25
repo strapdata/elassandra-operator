@@ -10,27 +10,27 @@ source $(dirname $0)/test-lib.sh
 
 test_start
 install_elassandra_datacenter default cl1 dc1 1
-java -jar java/edctl/build/libs/edctl.jar watch-dc --health GREEN
+java -jar java/edctl/build/libs/edctl.jar watch-dc --health GREEN -v
 
 scale_elassandra_datacenter cl1 dc1 2
-java -jar java/edctl/build/libs/edctl.jar watch-dc -p RUNNING -r 2
+java -jar java/edctl/build/libs/edctl.jar watch-dc -p RUNNING -r 2 -v
 
 scale_elassandra_datacenter cl1 dc1 3
-java -jar java/edctl/build/libs/edctl.jar watch-dc -p RUNNING -r 3
+java -jar java/edctl/build/libs/edctl.jar watch-dc -p RUNNING -r 3 -v
 
 
 park_elassandra_datacenter cl1 dc1
-java -jar java/edctl/build/libs/edctl.jar watch-dc -p PARKED -r 0
+java -jar java/edctl/build/libs/edctl.jar watch-dc -p PARKED -r 0 -v
 sleep 10
 unpark_elassandra_datacenter cl1 dc1
-java -jar java/edctl/build/libs/edctl.jar watch-dc -p RUNNING --health GREEN -r 3
+java -jar java/edctl/build/libs/edctl.jar watch-dc -p RUNNING --health GREEN -r 3 -v
 
 
 reaper_enable cl1 dc1
-java -jar java/edctl/build/libs/edctl.jar watch-dc --reaper REGISTERED
+java -jar java/edctl/build/libs/edctl.jar watch-dc --reaper REGISTERED -v
 sleep 10
 reaper_disable cl1 dc1
-java -jar java/edctl/build/libs/edctl.jar watch-dc --reaper NONE
+java -jar java/edctl/build/libs/edctl.jar watch-dc --reaper NONE -v
 
 #downgrade_elassandra_datacenter cl1 dc1
 #java -jar java/edctl/build/libs/edctl.jar watch-dc -p RUNNING

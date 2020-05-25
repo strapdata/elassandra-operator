@@ -14,8 +14,8 @@ import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRole;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.cql.CqlSessionHandler;
-import com.strapdata.strapkop.event.ElassandraPod;
-import com.strapdata.strapkop.event.Pod;
+import com.strapdata.strapkop.k8s.ElassandraPod;
+import com.strapdata.strapkop.k8s.Pod;
 import com.strapdata.strapkop.handler.NodeHandler;
 import com.strapdata.strapkop.handler.StatefulsetHandler;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
@@ -29,13 +29,13 @@ import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import com.strapdata.strapkop.ssl.utils.X509CertificateAndPrivateKey;
 import com.strapdata.strapkop.utils.QuantityConverter;
-import io.kubernetes.client.ApiException;
-import io.kubernetes.client.apis.AppsV1Api;
-import io.kubernetes.client.apis.CoreV1Api;
-import io.kubernetes.client.apis.CustomObjectsApi;
+import io.kubernetes.client.openapi.ApiException;
+import io.kubernetes.client.openapi.apis.AppsV1Api;
+import io.kubernetes.client.openapi.apis.CoreV1Api;
+import io.kubernetes.client.openapi.apis.CustomObjectsApi;
 import io.kubernetes.client.custom.IntOrString;
 import io.kubernetes.client.custom.Quantity;
-import io.kubernetes.client.models.*;
+import io.kubernetes.client.openapi.models.*;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Parameter;
@@ -60,8 +60,8 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import static com.strapdata.strapkop.k8s.ServicesConstants.ELASTICSEARCH_PORT_NAME;
-import static com.strapdata.strapkop.k8s.ServicesConstants.PROMETHEUS_PORT_NAME;
+import static com.strapdata.strapkop.k8s.OperatorNames.ELASTICSEARCH_PORT_NAME;
+import static com.strapdata.strapkop.k8s.OperatorNames.PROMETHEUS_PORT_NAME;
 
 /**
  * The NodePort service has a DNS name and redirect to STS seed pods
@@ -326,18 +326,19 @@ public class DataCenterUpdateAction {
     /**
      * Update DC spec, and trigger the next action to the desired state
      */
-    public Completable updateDatacenter() throws Exception {
-        logger.debug("########## datacenter={} spec updated replicas={}/{}", dataCenter.id(), dataCenterStatus.getReadyReplicas(), dataCenterSpec.getReplicas());
-        return nextAction(false);
+    public Completable updateDatacenter(Long generation) throws Exception {
+        logger.debug("########## datacenter={} spec updated generation={} replicas={}/{}", dataCenter.id(), generation, dataCenterStatus.getReadyReplicas(), dataCenterSpec.getReplicas());
+        dataCenter.getStatus().setObservedGeneration(generation);
+        return nextAction(true);
     }
 
     /**
      * Trigger next action when sts reach the desired state
      */
-    public Completable statefulsetUpdate(V1StatefulSet sts) throws Exception {
+    public Completable statefulsetUpdated(V1StatefulSet sts) throws Exception {
         int stsReadyReplicas = Math.min(sts.getStatus().getReadyReplicas() == null ? 0 : sts.getStatus().getReadyReplicas(), sts.getSpec().getReplicas());
-        logger.debug("########## sts={}/{} replica={}/{}",
-                sts.getMetadata().getName(), sts.getMetadata().getNamespace(), stsReadyReplicas, sts.getSpec().getReplicas());
+        logger.debug("########## sts={}/{} replica={}/{}", sts.getMetadata().getName(), sts.getMetadata().getNamespace(), stsReadyReplicas, sts.getSpec().getReplicas());
+        logger.trace("status={}", dataCenterStatus);
 
         Integer rackIndex = Integer.parseInt(sts.getMetadata().getLabels().get(OperatorLabels.RACKINDEX));
         RackStatus rackStatus = dataCenter.getStatus().getRackStatuses().computeIfAbsent(rackIndex, k -> {
@@ -472,7 +473,7 @@ public class DataCenterUpdateAction {
 
                     return doUpdate.flatMapCompletable(doStatusUpdate -> {
                         if (doStatusUpdate) {
-                            logger.debug("datacenter={} updating status={}", dataCenter.id(), dataCenterStatus);
+                            logger.trace("datacenter={} updating status={}", dataCenter.id(), dataCenterStatus);
                             endOperation();
                             return k8sResourceUtils.updateDataCenterStatus(dataCenter, dataCenterStatus).ignoreElement();
                         }
@@ -711,8 +712,8 @@ public class DataCenterUpdateAction {
                 // otherwise the datacenterSpec fingerprint will change too
                 this.volumeSource = new V1ConfigMapVolumeSource();
                 this.volumeSource.setName(volumeSource.getName());
-                if (volumeSource.isOptional() != null) {
-                    this.volumeSource.setOptional(volumeSource.isOptional().booleanValue());
+                if (volumeSource.getOptional() != null) {
+                    this.volumeSource.setOptional(volumeSource.getOptional().booleanValue());
                 }
                 if (volumeSource.getDefaultMode() != null) {
                     this.volumeSource.setDefaultMode(volumeSource.getDefaultMode().intValue());
@@ -1138,7 +1139,7 @@ public class DataCenterUpdateAction {
                 parameters.put("remote_seeders", String.join(", ", remoteSeeders));
             }
             // Status callback URL allowing Cassandra nodes to notify the operator synchronously
-            parameters.put(ElassandraOperatorSeedProviderAndNotifier.STATUS_NOTIFIER_URL, "http://" + operatorConfig.getServiceName() + ":8080/node/" + dataCenterMetadata.getNamespace());
+            parameters.put(ElassandraOperatorSeedProviderAndNotifier.STATUS_NOTIFIER_URL, "http://" + operatorConfig.getServiceName() + "/node/" + dataCenterMetadata.getNamespace());
             logger.debug("seed parameters={}", parameters);
             final Map<String, Object> config = new HashMap<>(); // can't use ImmutableMap as some values are null
             config.put("seed_provider", ImmutableList.of(ImmutableMap.of(
@@ -1446,7 +1447,7 @@ public class DataCenterUpdateAction {
                 configMapVolumeMountBuilder.addFile("elasticsearch.yml.d/002-enterprise.yaml", toYamlString(esConfig));
                 configMapVolumeMountBuilder.addFile("cassandra-env.sh.d/002-enterprise.sh",
                         "JVM_OPTS=\"$JVM_OPTS -Dcassandra.custom_query_handler_class=org.elassandra.index.EnterpriseElasticQueryHandler" +
-                                " -D" + ElassandraOperatorSeedProviderAndNotifier.STATUS_NOTIFIER_URL + "=http://strapkop-elassandra-operator:8080/node/" + dataCenterMetadata.getNamespace()
+                                " -D" + ElassandraOperatorSeedProviderAndNotifier.STATUS_NOTIFIER_URL + "=https://elassandra-operator/node/" + dataCenterMetadata.getNamespace()
                                 + "\"");
                 // TODO: override com exporter in cassandra-env.sh.d/001-cassandra-exporter.sh
             }
@@ -1906,7 +1907,7 @@ public class DataCenterUpdateAction {
                         .addCommandItem("curl")
                         .addCommandItem("-X")
                         .addCommandItem("POST")
-                        .addCommandItem("http://localhost:8080/enterprise/search/disable"))));
+                        .addCommandItem("http://localhost/enterprise/search/disable"))));
             }
             return cassandraContainer;
         }
@@ -2246,7 +2247,7 @@ public class DataCenterUpdateAction {
             for (V1Node node : nodes) {
                 String zoneName = node.getMetadata().getLabels().get(OperatorLabels.ZONE);
                 if (zoneName == null) {
-                    logger.warn("missing label {} on node {}", OperatorLabels.ZONE, node.getMetadata().getName());
+                    //logger.warn("missing label {} on node {}, ignoring", OperatorLabels.ZONE, node.getMetadata().getName());
                     continue;
                 }
                 if (dataCenterStatus.getZones().indexOf(zoneName) == -1) {

@@ -1,10 +1,10 @@
-package com.strapdata.strapkop.event;
+package com.strapdata.strapkop.k8s;
 
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
-import io.kubernetes.client.models.V1ContainerStatus;
-import io.kubernetes.client.models.V1ObjectMeta;
-import io.kubernetes.client.models.V1Pod;
-import io.kubernetes.client.models.V1PodStatus;
+import io.kubernetes.client.openapi.models.V1ContainerStatus;
+import io.kubernetes.client.openapi.models.V1ObjectMeta;
+import io.kubernetes.client.openapi.models.V1Pod;
+import io.kubernetes.client.openapi.models.V1PodStatus;
 
 import java.util.Map;
 
@@ -66,7 +66,7 @@ public class Pod {
         if (podStatus != null &&  podStatus.getContainerStatuses() != null) {
             for (V1ContainerStatus status : podStatus.getContainerStatuses()) {
                 if (status != null && containerName.equalsIgnoreCase(status.getName())) {
-                    return status.isReady();
+                    return status.getReady();
                 }
             }
         }

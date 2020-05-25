@@ -13,8 +13,8 @@ import com.strapdata.strapkop.model.k8s.cassandra.Operation;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
 import com.strapdata.strapkop.model.k8s.task.TaskStatus;
-import io.kubernetes.client.ApiException;
-import io.kubernetes.client.models.V1Pod;
+import io.kubernetes.client.openapi.ApiException;
+import io.kubernetes.client.openapi.models.V1Pod;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.scheduling.executor.ExecutorFactory;
 import io.micronaut.scheduling.executor.UserExecutorConfiguration;
@@ -76,10 +76,8 @@ public abstract class TaskReconcilier extends Reconcilier<Task> {
         final DataCenterStatus dataCenterStatus = dc.getStatus();
         dataCenterStatus.setCurrentOperation(op);
 
-        logger.debug("datacenter={} task={} processing", dc.id(), task.id());
-
-        if (task.getStatus() == null)
-            task.setStatus(new TaskStatus());
+        logger.debug("datacenter={} task={} processing generation={}", dc.id(), task.id(), task.getMetadata().getGeneration());
+        task.getStatus().setObservedGeneration(task.getMetadata().getGeneration());
 
         // failed when datacenter not found => task failed
         return validTask(dc, task)

@@ -10,7 +10,6 @@
 rootProject.name = 'strapkop'
 include 'java'
 include 'java:model'
-include 'java:backup'
 include 'java:operator'
 include 'java:k8s-addons'
 include 'java:driver-addons'

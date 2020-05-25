@@ -65,13 +65,19 @@ install_elassandra_datacenter() {
     local cl=${2:-"cl1"}
     local dc=${3:-"dc1"}
     local sz=${4:-"1"}
+
+    local registry=""
+    if [ "$REGISTRY_SECRET_NAME" != "" ]; then
+       registry=",image.pullSecrets[0]=$REGISTRY_SECRET_NAME"
+    fi
+
     helm install --namespace "$ns" --name "$cl-$dc" \
     --set image.elassandraRepository=$REGISTRY_URL/strapdata/elassandra-node-dev \
     --set image.tag=$ELASSANDRA_NODE_TAG \
-    --set image.pullSecrets[0]=$REGISTRY_SECRET_NAME \
-    --set dataVolumeClaim.storageClassName=${STORAGE_CLASS_NAME:-"standard"} \
-    --set reaper.enabled="false" \
+    --set dataVolumeClaim.storageClassName=${STORAGE_CLASS_NAME:-"standard"}$registry \
     --set kibana.enabled="false" \
+    --set reaper.enabled="false" \
+    --set reaper.image="$REGISTRY_URL/strapdata/cassandra-reaper:2.1.0-SNAPSHOT-strapdata-1" \
     --set sslStoragePort="38001",jmxPort="35001",prometheusPort="34001" \
     --set externalDns.enabled="false",externalDns.root="xxxx.yyyy",externalDns.domain="test.strapkube.com" \
     --set replicas="$sz" \

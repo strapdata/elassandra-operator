@@ -23,6 +23,6 @@ spec:
       - path: /seeds
         backend:
           serviceName: {{ $serviceAPIName }}
-          servicePort: http
+          servicePort: https
   {{- end }}
 {{- end -}}
