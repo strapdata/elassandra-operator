@@ -1,10 +1,9 @@
 package com.strapdata.strapkop.pipeline;
 
-import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.Cache;
 import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.event.K8sWatchEventSource;
-import io.kubernetes.client.ApiClient;
+import io.kubernetes.client.openapi.ApiClient;
 import io.reactivex.Observable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,13 +19,12 @@ public abstract class CachedK8sWatchPipeline<ResourceT, ResourceListT, K> extend
 
     public CachedK8sWatchPipeline(@Named("apiClient") ApiClient apiClient,
                                   K8sWatchResourceAdapter<ResourceT, ResourceListT, K> adapter,
-                                  Cache<K, ResourceT> cache,
-                                  OperatorConfig operatorConfig) {
-        super(new K8sWatchEventSource<>(apiClient, adapter, operatorConfig));
+                                  Cache<K, ResourceT> cache) {
+        super(new K8sWatchEventSource<>(apiClient, adapter));
         this.cache = cache;
         this.adapter = adapter;
     }
-    
+
     @Override
     protected Observable<K8sWatchEvent<ResourceT>> decorate(Observable<K8sWatchEvent<ResourceT>> observable) {
         return observable.doOnNext(this::updateCache);

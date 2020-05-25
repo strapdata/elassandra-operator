@@ -83,13 +83,20 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
             case MODIFIED:
                 logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 dataCenter = event.getResource();
-                workQueues.submit(new ClusterKey(event.getResource()),
-                        Reconciliable.Kind.DATACENTER, event.getType(),
-                        dataCenterController.updateDatacenter(new Operation().withSubmitDate(new Date()).withDesc("dc-modified"), dataCenter)
-                                .doFinally(() -> {
-                                    meterRegistry.counter("k8s.event.modified", tags).increment();
-                                })
-                );
+                Long observedGeneration = dataCenter.getStatus().getObservedGeneration();
+                if (observedGeneration == null || observedGeneration < dataCenter.getMetadata().getGeneration()) {
+                    workQueues.submit(new ClusterKey(event.getResource()),
+                            Reconciliable.Kind.DATACENTER, event.getType(),
+                            dataCenterController.updateDatacenter(dataCenter,
+                                    dataCenter.getMetadata().getGeneration(),
+                                    new Operation()
+                                            .withSubmitDate(new Date())
+                                            .withDesc("edc-modified generation="+dataCenter.getMetadata().getGeneration()))
+                                    .doFinally(() -> {
+                                        meterRegistry.counter("k8s.event.modified", tags).increment();
+                                    })
+                    );
+                }
                 break;
 
             case DELETED:

@@ -7,14 +7,14 @@ metadata:
     heritage: {{ .Release.Service }}
     operator: elassandra
     release: {{ .Release.Name }}
-  name: {{ template "elassandra-operator.fullname" . }}
+  name: {{ template "elassandra-operator.name" . }}
 spec:
   type: ClusterIP
   ports:
-    - port: 8080
-      targetPort: 8080
+    - port: 443
+      targetPort: 443
       protocol: TCP
-      name: http
+      name: https
     - port: 8081
       targetPort: 8081
       protocol: TCP

@@ -27,7 +27,7 @@ public class OperatorConfig {
     String serviceName;
 
     @Nullable
-    int k8sWatchPeriodInSec = 200;
+    int k8sWatchPeriodInSec = 300;
 
     /**
      * Terminated task retention

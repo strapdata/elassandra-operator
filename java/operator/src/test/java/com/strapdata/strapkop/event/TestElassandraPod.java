@@ -1,6 +1,7 @@
 package com.strapdata.strapkop.event;
 
 
+import com.strapdata.strapkop.k8s.ElassandraPod;
 import org.junit.jupiter.api.Test;
 
 import java.util.regex.Matcher;

@@ -3,7 +3,7 @@ package com.strapdata.strapkop.controllers;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.reconcilier.ReconcilierObserver;
-import io.kubernetes.client.ApiException;
+import io.kubernetes.client.openapi.ApiException;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
@@ -29,12 +29,6 @@ public class ShutdownController {
 
     @Inject
     OperatorConfig operatorConfig;
-
-    @Inject
-    DataCenterController dataCenterController;
-
-    public ShutdownController() {
-    }
 
     /**
      * Delete all datacenters before returning.

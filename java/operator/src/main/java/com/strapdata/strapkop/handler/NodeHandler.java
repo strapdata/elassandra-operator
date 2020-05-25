@@ -3,7 +3,7 @@ package com.strapdata.strapkop.handler;
 import com.google.common.collect.ImmutableList;
 import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
-import io.kubernetes.client.models.V1Node;
+import io.kubernetes.client.openapi.models.V1Node;
 import io.micrometer.core.instrument.ImmutableTag;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tag;

@@ -1,6 +1,9 @@
 package com.strapdata.strapkop.cql;
 
+import com.google.common.collect.ImmutableList;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import io.micrometer.core.instrument.ImmutableTag;
+import io.micrometer.core.instrument.MeterRegistry;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -14,21 +17,25 @@ import java.util.function.Supplier;
  */
 public abstract class AbstractManager<T extends CqlReconciliable> {
 
-    private final ConcurrentMap<String, Map<String, T>> ressources = new ConcurrentHashMap<>(); // per datacenter resources
+    private final ConcurrentMap<String, Map<String, T>> resources = new ConcurrentHashMap<>(); // per datacenter resources
 
-    public AbstractManager() {
+    final MeterRegistry meterRegistry;
+
+    public AbstractManager(final MeterRegistry meterRegistry) {
+        this.meterRegistry = meterRegistry;
+        meterRegistry.gaugeMapSize("manager.size", ImmutableList.of(new ImmutableTag("type", getClass().getSimpleName())), resources);
     }
 
     public Map<String, T> get(final DataCenter dataCenter) {
-        return ressources.get(key(dataCenter));
+        return resources.get(key(dataCenter));
     }
 
     public Map<String, T> get(String namespace, String clusterName, String datacenterName) {
-        return ressources.get(key(namespace, clusterName, datacenterName));
+        return resources.get(key(namespace, clusterName, datacenterName));
     }
 
     public Map<String, T> get(String dcKey) {
-        return ressources.get(dcKey);
+        return resources.get(dcKey);
     }
 
 
@@ -37,28 +44,34 @@ public abstract class AbstractManager<T extends CqlReconciliable> {
         return map == null ? null : map.get(name);
     }
 
-    public T put(final DataCenter dataCenter, String name, T t) {
-        Map<String, T> map = get(dataCenter);
-        return map == null ? null : map.put(name, t);
+    public void put(final DataCenter dataCenter, String name, T t) {
+        resources.compute(key(dataCenter), (k, v) -> {
+            if (v == null)
+                v = new HashMap<>();
+            v.put(name, t);
+            return v;
+        });
     }
 
     public void addIfAbsent(final DataCenter dataCenter, String key, Supplier<T> valueSupplier) {
-        ressources.compute(key(dataCenter), (k,v) -> {
+        resources.compute(key(dataCenter), (k, v) -> {
             if (v == null)
                 v = new HashMap<>();
-            v.putIfAbsent(key, valueSupplier.get());
+            v.computeIfAbsent(key, kk -> valueSupplier.get());
             return v;
         });
     }
 
     public void remove(final DataCenter dataCenter) {
-        ressources.remove(key(dataCenter));
+        resources.remove(key(dataCenter));
     }
 
     public void remove(final DataCenter dataCenter, String name) {
-        Map<String, T> map = get(dataCenter);
-        if (map != null)
-            map.remove(name);
+        resources.compute(key(dataCenter), (k, v) -> {
+            if (v != null)
+                v.remove(name);
+            return v;
+        });
     }
 
     // per DC  unique key

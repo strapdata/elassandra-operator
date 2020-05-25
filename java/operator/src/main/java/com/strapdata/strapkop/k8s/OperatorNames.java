@@ -1,12 +1,18 @@
 package com.strapdata.strapkop.k8s;
 
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
-import io.kubernetes.client.models.V1OwnerReference;
+import io.kubernetes.client.openapi.models.V1OwnerReference;
 
 import java.util.Locale;
 import java.util.UUID;
 
 public class OperatorNames {
+
+    public static final String CQL_PORT_NAME = "cql";
+    public static final String STORAGE_PORT_NAME = "internode";
+    public static final String ELASTICSEARCH_PORT_NAME = "elasticsearch";
+    public static final String ELASTICSEARCH_TRANSPORT_PORT_NAME = "transport";
+    public static final String PROMETHEUS_PORT_NAME = "prometheus";
 
     public static String configMapUniqueName(final String name, final String fingerprint) {
         return name + "-" + fingerprint;

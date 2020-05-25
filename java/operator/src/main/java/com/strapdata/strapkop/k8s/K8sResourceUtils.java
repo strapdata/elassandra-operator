@@ -6,7 +6,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterators;
 import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
-import com.squareup.okhttp.Call;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
@@ -16,13 +15,14 @@ import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskList;
 import com.strapdata.strapkop.model.k8s.task.TaskSpec;
-import io.kubernetes.client.ApiException;
-import io.kubernetes.client.ApiResponse;
-import io.kubernetes.client.apis.*;
-import io.kubernetes.client.models.*;
+import io.kubernetes.client.openapi.ApiException;
+import io.kubernetes.client.openapi.ApiResponse;
+import io.kubernetes.client.openapi.apis.*;
+import io.kubernetes.client.openapi.models.*;
 import io.reactivex.Completable;
 import io.reactivex.Single;
 import io.reactivex.functions.Action;
+import okhttp3.Call;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -416,7 +416,7 @@ public class K8sResourceUtils {
 
     public V1Status deleteService(final V1Service service) throws ApiException {
         final V1ObjectMeta metadata = service.getMetadata();
-        return coreApi.deleteNamespacedService(metadata.getName(), metadata.getNamespace(), null, new V1DeleteOptions(), null, null, null, null);
+        return coreApi.deleteNamespacedService(metadata.getName(), metadata.getNamespace(), null, null, null, null, null, new V1DeleteOptions());
     }
 
     public Completable deleteIngress(String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) {
@@ -437,12 +437,12 @@ public class K8sResourceUtils {
 
     public V1Status deleteIngress(final ExtensionsV1beta1Ingress ingress) throws ApiException {
             final V1ObjectMeta metadata = ingress.getMetadata();
-            return extensionsV1beta1Api.deleteNamespacedIngress(metadata.getName(), metadata.getNamespace(), null, new V1DeleteOptions(), null, null, null, null);
+            return extensionsV1beta1Api.deleteNamespacedIngress(metadata.getName(), metadata.getNamespace(), null, null, null, null, null, new V1DeleteOptions());
     }
 
     public V1Status deleteConfigMap(final V1ConfigMap configMap) throws ApiException {
         final V1ObjectMeta configMapMetadata = configMap.getMetadata();
-        return coreApi.deleteNamespacedConfigMap(configMapMetadata.getName(), configMapMetadata.getNamespace(), null, new V1DeleteOptions(), null, null, null, null);
+        return coreApi.deleteNamespacedConfigMap(configMapMetadata.getName(), configMapMetadata.getNamespace(), null, null, null, null, null, new V1DeleteOptions());
     }
 
     public Completable deleteStatefulSet(final V1StatefulSet statefulSet) throws ApiException {
@@ -467,7 +467,7 @@ public class K8sResourceUtils {
             V1Status v1Status = null;
             try {
                 final V1ObjectMeta statefulSetMetadata = statefulSet.getMetadata();
-                v1Status = appsApi.deleteNamespacedStatefulSet(statefulSetMetadata.getName(), statefulSetMetadata.getNamespace(), null, deleteOptions, null, null, null, "Foreground");
+                v1Status = appsApi.deleteNamespacedStatefulSet(statefulSetMetadata.getName(), statefulSetMetadata.getNamespace(), null, null, null, null, null, deleteOptions);
             } catch (final JsonSyntaxException e) {
                 logger.debug("Caught JSON exception while deleting Service. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
             }
@@ -498,7 +498,7 @@ public class K8sResourceUtils {
                     V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
                     Call call = customObjectsApi.deleteNamespacedCustomObjectCall("stable.strapdata.com", "v1",
                             metadata.getNamespace(), "elassandradatacenters", metadata.getName(), deleteOptions,
-                            null, null, "Foreground", null, null);
+                            null, null, "Foreground", null);
                     final ApiResponse<DataCenter> apiResponse = customObjectsApi.getApiClient().execute(call, DataCenter.class);
                     return apiResponse.getData();
                 } catch (ApiException e) {
@@ -516,19 +516,19 @@ public class K8sResourceUtils {
     public V1Status deleteDeployment(final V1ObjectMeta metadata) throws ApiException {
         logger.debug("Deleting Deployment namespace={} name={}", metadata.getNamespace(), metadata.getName());
         V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
-        return appsApi.deleteNamespacedDeployment(metadata.getName(), metadata.getNamespace(), null, deleteOptions, null, null, null, "Foreground");
+        return appsApi.deleteNamespacedDeployment(metadata.getName(), metadata.getNamespace(), null, null, null, null, null, deleteOptions);
     }
 
     public V1Status deletePodDisruptionBudget(final V1ObjectMeta metadata) throws ApiException {
         logger.debug("Deleting PodDisruptionBudget namespace={} name={}", metadata.getNamespace(), metadata.getName());
         V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
-        return policyV1beta1Api.deleteNamespacedPodDisruptionBudget(metadata.getName(), metadata.getNamespace(), null, deleteOptions, null, null, null, "Foreground");
+        return policyV1beta1Api.deleteNamespacedPodDisruptionBudget(metadata.getName(), metadata.getNamespace(), null, null, null, null, null, deleteOptions);
     }
 
     public Completable deleteService(final String name, final String namespace) throws ApiException {
         return deleteResource(() -> {
             V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
-            return coreApi.deleteNamespacedService(name, namespace, null, deleteOptions, null, null, null, "Foreground");
+            return coreApi.deleteNamespacedService(name, namespace, null, null, null, null, null, deleteOptions);
         });
     }
 
@@ -539,7 +539,7 @@ public class K8sResourceUtils {
             V1Status v1Status = null;
             try {
                 logger.debug("Deleting PVC name={}", pvcName);
-                v1Status = coreApi.deleteNamespacedPersistentVolumeClaim(pvcName, persistentVolumeClaim.getMetadata().getNamespace(), null, deleteOptions, null, null, null, "Foreground");
+                v1Status = coreApi.deleteNamespacedPersistentVolumeClaim(pvcName, persistentVolumeClaim.getMetadata().getNamespace(), null, null, null, null, null, deleteOptions);
             } catch (final JsonSyntaxException e) {
                 logger.debug("Caught JSON exception while deleting Service. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
             }
@@ -590,7 +590,7 @@ public class K8sResourceUtils {
             private final V1PodList podList;
 
             private V1PodPage(final String continueToken) throws ApiException {
-                podList = coreApi.listNamespacedPod(namespace, null, continueToken, fieldSelector, labelSelector, null, null, null, null);
+                podList = coreApi.listNamespacedPod(namespace, null, null, continueToken, fieldSelector, labelSelector, null, null, null, null);
             }
 
             @Override
@@ -617,7 +617,7 @@ public class K8sResourceUtils {
             private final V1PersistentVolumeClaimList podList;
 
             private V1PersistentVolumeClaimPage(final String continueToken) throws ApiException {
-                podList = coreApi.listNamespacedPersistentVolumeClaim(namespace, null, continueToken, fieldSelector, labelSelector, null, null, null, null);
+                podList = coreApi.listNamespacedPersistentVolumeClaim(namespace, null, null, continueToken, fieldSelector, labelSelector, null, null, null, null);
             }
 
             @Override
@@ -644,7 +644,7 @@ public class K8sResourceUtils {
 
             private V1DataCenterPage(final String continueToken) throws ApiException {
                 final Call call = customObjectsApi.listClusterCustomObjectCall(StrapdataCrdGroup.GROUP, DataCenter.VERSION,
-                        DataCenter.PLURAL, null, null, labelSelector, null, null, null, null, null);
+                        DataCenter.PLURAL, null, null, null, labelSelector, null, null, null, null, null);
                 final ApiResponse<DataCenterList> apiResponse = customObjectsApi.getApiClient().execute(call, DataCenterList.class);
                 dcList = apiResponse.getData();
             }
@@ -673,7 +673,7 @@ public class K8sResourceUtils {
             private final V1StatefulSetList statefulSetList;
 
             private V1StatefulSetPage(final String continueToken) throws ApiException {
-                statefulSetList = appsApi.listNamespacedStatefulSet(namespace, null, continueToken, fieldSelector, labelSelector, null, null, null, null);
+                statefulSetList = appsApi.listNamespacedStatefulSet(namespace, null, null, continueToken, fieldSelector, labelSelector, null, null, null, null);
             }
 
             @Override
@@ -700,7 +700,7 @@ public class K8sResourceUtils {
             private final V1ConfigMapList configMapList;
 
             private V1ConfigMapPage(final String continueToken) throws ApiException {
-                configMapList = coreApi.listNamespacedConfigMap(namespace, null, continueToken, fieldSelector, labelSelector, null, null, null, null);
+                configMapList = coreApi.listNamespacedConfigMap(namespace, null, null, continueToken, fieldSelector, labelSelector, null, null, null, null);
             }
 
             @Override
@@ -726,7 +726,7 @@ public class K8sResourceUtils {
             private final V1SecretList secretList;
 
             private V1SecretPage(final String continueToken) throws ApiException {
-                secretList = coreApi.listNamespacedSecret(namespace, null, continueToken, fieldSelector, labelSelector, null, null, null, null);
+                secretList = coreApi.listNamespacedSecret(namespace, null, null, continueToken, fieldSelector, labelSelector, null, null, null, null);
             }
 
             @Override
@@ -752,7 +752,7 @@ public class K8sResourceUtils {
             private final V1ServiceAccountList secretList;
 
             private V1ServiceAccountPage(final String continueToken) throws ApiException {
-                secretList = coreApi.listNamespacedServiceAccount(namespace, null, continueToken, fieldSelector, labelSelector, null, null, null, null);
+                secretList = coreApi.listNamespacedServiceAccount(namespace, null, null, continueToken, fieldSelector, labelSelector, null, null, null, null);
             }
 
             @Override
@@ -778,7 +778,7 @@ public class K8sResourceUtils {
             private final V1ServiceList serviceList;
 
             private V1ServicePage(final String continueToken) throws ApiException {
-                serviceList = coreApi.listNamespacedService(namespace, null, continueToken, fieldSelector, labelSelector, null, null, null, null);
+                serviceList = coreApi.listNamespacedService(namespace, null, null, continueToken, fieldSelector, labelSelector, null, null, null, null);
             }
 
             @Override
@@ -806,7 +806,7 @@ public class K8sResourceUtils {
             private final ExtensionsV1beta1IngressList ingressList;
 
             private V1IngressPage(final String continueToken) throws ApiException {
-                ingressList = extensionsV1beta1Api.listNamespacedIngress(namespace, null, continueToken, fieldSelector, labelSelector, null, null, null, false);
+                ingressList = extensionsV1beta1Api.listNamespacedIngress(namespace, null, null, continueToken, fieldSelector, labelSelector, null, null, null, false);
             }
 
             @Override
@@ -834,8 +834,8 @@ public class K8sResourceUtils {
             private final TaskList taskList;
 
             private TaskPage(final String continueToken) throws ApiException {
-                com.squareup.okhttp.Call call = customObjectsApi.listNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, Task.VERSION, namespace, Task.PLURAL,
-                        "false", null, labelSelector, null, null, null, null, null);
+                Call call = customObjectsApi.listNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, Task.VERSION, namespace, Task.PLURAL,
+                        "false", null, null, labelSelector, null, null, null, null, null);
                 Type localVarReturnType = new TypeToken<TaskList>(){}.getType();
                 ApiResponse<TaskList> resp = customObjectsApi.getApiClient().execute(call, localVarReturnType);
                 taskList = resp.getData();
@@ -868,7 +868,7 @@ public class K8sResourceUtils {
 
             private V1DeploymentPage(final String continueToken) throws ApiException {
                 try {
-                    deploymentList = appsApi.listNamespacedDeployment(namespace, null, continueToken, fieldSelector, labelSelector, null, null, null, null);
+                    deploymentList = appsApi.listNamespacedDeployment(namespace, null, null, continueToken, fieldSelector, labelSelector, null, null, null, null);
                 } catch(ApiException e) {
                     logger.warn("Failed to list deployments in namespace="+namespace+" labelSelector="+labelSelector, e);
                     throw e;
@@ -901,7 +901,7 @@ public class K8sResourceUtils {
             public DataCenter call() throws Exception {
                 try {
                     final Call call = customObjectsApi.getNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, DataCenter.VERSION,
-                            key.getNamespace(), DataCenter.PLURAL, key.getName(), null, null);
+                            key.getNamespace(), DataCenter.PLURAL, key.getName(), null);
                     final ApiResponse<DataCenter> apiResponse = customObjectsApi.getApiClient().execute(call, DataCenter.class);
                     return apiResponse.getData();
                 } catch(ApiException e) {
@@ -921,7 +921,7 @@ public class K8sResourceUtils {
             public Optional<Task> call() throws Exception {
                 try {
                     final Call call = customObjectsApi.getNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, Task.VERSION,
-                            namespace, Task.PLURAL, name, null, null);
+                            namespace, Task.PLURAL, name, null);
                     final ApiResponse<Task> apiResponse = customObjectsApi.getApiClient().execute(call, Task.class);
                     return Optional.ofNullable(apiResponse.getData());
                 } catch(ApiException e) {
@@ -938,7 +938,7 @@ public class K8sResourceUtils {
         return Single.fromCallable( () ->{
             try {
                 final Call call = customObjectsApi.patchNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, DataCenter.VERSION,
-                        dc.getMetadata().getNamespace(), DataCenter.PLURAL, dc.getMetadata().getName(), dc, null, null);
+                        dc.getMetadata().getNamespace(), DataCenter.PLURAL, dc.getMetadata().getName(), dc, null);
                 final ApiResponse<DataCenter> apiResponse = customObjectsApi.getApiClient().execute(call, DataCenter.class);
                 return apiResponse.getData();
             } catch(ApiException e) {
@@ -1014,7 +1014,7 @@ public class K8sResourceUtils {
             public Task call() throws Exception {
                 try {
                     final Call call = customObjectsApi.createNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, Task.VERSION,
-                            task.getMetadata().getNamespace(), Task.PLURAL, task, null, null, null);
+                            task.getMetadata().getNamespace(), Task.PLURAL, task, null, null);
                     final ApiResponse<Task> apiResponse = customObjectsApi.getApiClient().execute(call, Task.class);
                     return apiResponse.getData();
                 } catch(ApiException e) {
@@ -1050,7 +1050,7 @@ public class K8sResourceUtils {
                     V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
                     Call call = customObjectsApi.deleteNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, Task.VERSION,
                             metadata.getNamespace(), Task.PLURAL, metadata.getName(), deleteOptions,
-                            null, null, "Foreground", null, null);
+                            null, null, "Foreground", null);
                     final ApiResponse<Task> apiResponse = customObjectsApi.getApiClient().execute(call, Task.class);
                     return apiResponse.getData();
                 } catch (ApiException e) {
@@ -1086,13 +1086,13 @@ public class K8sResourceUtils {
      */
     public boolean podExists(final String namespace, final String label, final String value) throws ApiException {
         final String labelSelector = OperatorLabels.toSelector(ImmutableMap.of(label, value));
-        V1PodList pods = coreApi.listNamespacedPod(namespace, null, null, null, labelSelector, null, null, null, null);
+        V1PodList pods = coreApi.listNamespacedPod(namespace, null, null, null, null, labelSelector, null, null, null, null);
         return (pods != null && !pods.getItems().isEmpty());
     }
 
     public boolean deletePod(final String namespace, final String podname) throws ApiException {
         V1DeleteOptions v1DeleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
-        V1Status status = coreApi.deleteNamespacedPod(podname, namespace, null, v1DeleteOptions, null, null, null, "Foreground");
+        V1Status status = coreApi.deleteNamespacedPod(podname, namespace, null, null, null, null, null, v1DeleteOptions);
         return status.getCode() == 200;
     }
 

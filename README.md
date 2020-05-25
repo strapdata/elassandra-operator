@@ -11,12 +11,12 @@ Compile the java module :
 ./gradlew build
 ```
 
-Build the docker images (operator + sidecar + latest elassandra):
+Build the docker images (operator + latest elassandra):
 ```bash
 ./gradlew dockerBuild
 ```
 
-Publish the docker images (operator + sidecar + latest elassandra):
+Publish the docker images (operator + latest elassandra):
 ```bash
 ./gradlew dockerPush -PregistryUsername=$DOCKER_USERNAME -PregistryPassword=$DOCKER_PASSWORD -PregistryUrl=$DOCKER_URL
 ```
@@ -24,6 +24,7 @@ Publish the docker images (operator + sidecar + latest elassandra):
 Publish in local insecure registry
 ```bash
 ./gradlew dockerPush -PregistryUrl="localhost:5000/" -PregistryInsecure
+./gradlew java:operator:jib -PregistryUrl="localhost:5000/" -PregistryInsecure
 ```
 
 Build parameters are located in `gradle.properties`.

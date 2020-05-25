@@ -1,10 +1,9 @@
-package com.strapdata.strapkop.event;
+package com.strapdata.strapkop.k8s;
 
-import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
-import io.kubernetes.client.models.V1ObjectMeta;
-import io.kubernetes.client.models.V1Pod;
+import io.kubernetes.client.openapi.models.V1ObjectMeta;
+import io.kubernetes.client.openapi.models.V1Pod;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -35,7 +34,7 @@ public class ElassandraPod {
     @EqualsAndHashCode.Exclude
     private int esPort = 9200;
 
-    final static Pattern podNamePattern = Pattern.compile("elassandra-([\\w]+)-([\\w]+)-([\\w-]+)-([\\d]+)");
+    final public static Pattern podNamePattern = Pattern.compile("elassandra-([\\w]+)-([\\w]+)-([\\w-]+)-([\\d]+)");
 
     public ElassandraPod(final DataCenter dc, final int rackIndex, final int index) {
         this.setName(OperatorNames.podName(dc, rackIndex, index))

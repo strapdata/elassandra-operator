@@ -2,7 +2,9 @@ package com.strapdata.strapkop.reconcilier;
 
 import com.google.gson.JsonSyntaxException;
 import com.strapdata.strapkop.backup.BackupScheduler;
-import com.strapdata.strapkop.cache.*;
+import com.strapdata.strapkop.cache.CheckPointCache;
+import com.strapdata.strapkop.cache.SidecarConnectionCache;
+import com.strapdata.strapkop.cache.StatefulsetCache;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.cql.CqlSessionSupplier;
@@ -10,9 +12,9 @@ import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
-import io.kubernetes.client.ApiException;
-import io.kubernetes.client.apis.AppsV1Api;
-import io.kubernetes.client.apis.CoreV1Api;
+import io.kubernetes.client.openapi.ApiException;
+import io.kubernetes.client.openapi.apis.AppsV1Api;
+import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
@@ -108,7 +110,8 @@ public class DataCenterDeleteAction {
                 try {
                     // delete secrets
                     coreV1Api.deleteCollectionNamespacedSecret(dataCenter.getMetadata().getNamespace(), "false",
-                            null, null, labelSelector, null, null, null, null);
+                            null, null, null, null, null, labelSelector, null,
+                            null, null, null, null, null, null);
                     logger.debug("Deleted Secrets namespace={}", dataCenter.getMetadata().getNamespace());
                 } catch (final JsonSyntaxException e) {
                     logger.debug("Caught JSON exception while deleting Secrets. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);

@@ -20,8 +20,24 @@ public class CqlKeyspace implements CqlReconciliable {
     private static final Logger logger = LoggerFactory.getLogger(CqlKeyspaceManager.class);
 
     // spec
+    /**
+     * Keyspace name
+     */
     String name;
+
+    /**
+     * Keyspace desired replication factor
+     */
     int rf;
+
+    /**
+     * Create keyspace if not exists
+     */
+    boolean createIfNotExists = true;
+
+    /**
+     * Enable keyspace repair
+     */
     boolean repair;
 
     // status

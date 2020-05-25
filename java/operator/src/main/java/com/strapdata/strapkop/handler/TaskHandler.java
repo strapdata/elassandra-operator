@@ -87,7 +87,10 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
             case MODIFIED:
                 logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 meterRegistry.counter("k8s.event.modified", tags).increment();
-                reconcileTask(event.getResource(), event.getType());
+                Long generation = event.getResource().getStatus().getObservedGeneration();
+                if (generation == null || event.getResource().getMetadata().getGeneration() > generation) {
+                    reconcileTask(event.getResource(), event.getType());
+                }
                 break;
 
             case DELETED: {
@@ -123,8 +126,8 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
         );
 
         TaskStatus taskStatus = task.getStatus();
-        logger.debug("task={} taskStatus={}", task.id(), taskStatus);
-        if (taskStatus == null || taskStatus.getPhase() == null || !taskStatus.getPhase().isTerminated()) {
+        logger.debug("task={} generation={} taskStatus={}", task.id(), task.getMetadata().getGeneration(), taskStatus);
+        if (taskStatus.getPhase() == null || !taskStatus.getPhase().isTerminated()) {
             // execute task
             final Tuple2<Key, String> key = new Tuple2<>(new Key(task.getMetadata().getLabels().get(OperatorLabels.PARENT), task.getMetadata().getNamespace()), task.getMetadata().getName());
             Completable completable = taskReconcilierResolver.getTaskReconcilier(task).reconcile(task);

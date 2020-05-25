@@ -6,7 +6,7 @@ import com.google.gson.annotations.SerializedName;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
-import io.kubernetes.client.models.V1ObjectMeta;
+import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import lombok.*;
 
 import java.util.Date;

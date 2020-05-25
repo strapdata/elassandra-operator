@@ -15,15 +15,20 @@
 
     <logger name="com.strapdata.strapkop.controllers" level="${LOGBACK_com_strapdata_strapkop_controllers:-DEBUG}" />
     <logger name="com.strapdata.strapkop.k8s" level="${LOGBACK_com_strapdata_strapkop_k8s:-WARN}" />
-    <logger name="com.strapdata.strapkop.event" level="${LOGBACK_com_strapdata_strapkop_event:-INFO}" />
-    <logger name="com.strapdata.strapkop.source" level="${LOGBACK_com_strapdata_strapkop_source:-DEBUG}" />
+    <logger name="com.strapdata.strapkop.event" level="${LOGBACK_com_strapdata_strapkop_event:-WARN}" />
     <logger name="com.strapdata.strapkop.handler" level="${LOGBACK_com_strapdata_strapkop_handler:-DEBUG}" />
+    <logger name="com.strapdata.strapkop.handler.NodeHandler" level="${LOGBACK_com_strapdata_strapkop_handler:-WARN}" />
+
     <logger name="com.strapdata.strapkop.pipeline" level="${LOGBACK_com_strapdata_strapkop_pipeline:-DEBUG}" />
     <logger name="com.strapdata.strapkop.sidecar" level="${LOGBACK_com_strapdata_strapkop_sidecar:-DEBUG}" />
-    <logger name="com.strapdata.strapkop.plugins" level="${LOGBACK_com_strapdata_strapkop_test:-TRACE}" />
+    <logger name="com.strapdata.strapkop.plugins" level="${LOGBACK_com_strapdata_strapkop_plugins:-TRACE}" />
     <logger name="com.strapdata.strapkop.cql" level="${LOGBACK_com_strapdata_strapkop_test:-DEBUG}" />
 
     <logger name="com.strapdata.strapkop.reconcilier" level="${LOGBACK_com_strapdata_strapkop_reconcilier:-DEBUG}" />
+
+    <!--
+    <logger name="io.micronaut.http" level="TRACE"/>
+    -->
 
     <root level="INFO">
         <appender-ref ref="STDOUT" />

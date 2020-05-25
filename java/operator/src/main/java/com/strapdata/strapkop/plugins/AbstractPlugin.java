@@ -8,10 +8,9 @@ import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.ssl.AuthorityManager;
-import io.kubernetes.client.ApiException;
-import io.kubernetes.client.apis.AppsV1Api;
-import io.kubernetes.client.apis.CoreV1Api;
-import io.kubernetes.client.models.V1Deployment;
+import io.kubernetes.client.openapi.apis.AppsV1Api;
+import io.kubernetes.client.openapi.apis.CoreV1Api;
+import io.kubernetes.client.openapi.models.V1Deployment;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
 import io.reactivex.Completable;
@@ -56,7 +55,7 @@ public abstract class AbstractPlugin implements Plugin {
      * @param dataCenter
      */
     @Override
-    public Completable reconciled(DataCenter dataCenter) throws ApiException, StrapkopException {
+    public Completable reconciled(DataCenter dataCenter) throws StrapkopException {
         return Completable.complete();
     }
 

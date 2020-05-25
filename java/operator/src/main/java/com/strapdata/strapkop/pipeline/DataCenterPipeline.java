@@ -1,19 +1,19 @@
 package com.strapdata.strapkop.pipeline;
 
-import com.squareup.okhttp.Call;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenterList;
-import io.kubernetes.client.ApiClient;
-import io.kubernetes.client.ApiException;
-import io.kubernetes.client.apis.CustomObjectsApi;
-import io.kubernetes.client.models.V1ListMeta;
-import io.kubernetes.client.models.V1ObjectMeta;
+import io.kubernetes.client.openapi.ApiClient;
+import io.kubernetes.client.openapi.ApiException;
+import io.kubernetes.client.openapi.apis.CustomObjectsApi;
+import io.kubernetes.client.openapi.models.V1ListMeta;
+import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Infrastructure;
+import okhttp3.Call;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,7 +28,7 @@ public class DataCenterPipeline extends CachedK8sWatchPipeline<DataCenter, DataC
     private final Logger logger = LoggerFactory.getLogger(DataCenterPipeline.class);
 
     public DataCenterPipeline(@Named("apiClient") ApiClient apiClient, DataCenterCache cache, CustomObjectsApi customObjectsApi, OperatorConfig config) {
-        super(apiClient, new DataCenterAdapter(customObjectsApi, config), cache, config);
+        super(apiClient, new DataCenterAdapter(customObjectsApi, config), cache);
     }
 
     public static class DataCenterAdapter extends K8sWatchResourceAdapter<DataCenter, DataCenterList, Key> {
@@ -55,7 +55,7 @@ public class DataCenterPipeline extends CachedK8sWatchPipeline<DataCenter, DataC
         public Call createListApiCall(boolean watch, String resourceVersion) throws ApiException {
             return customObjectsApi.listNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, DataCenter.VERSION,
                     config.getNamespace(), DataCenter.PLURAL, null, null, null,
-                    resourceVersion, null, watch, null, null);
+                    null, null, resourceVersion, null, watch, null);
         }
 
         @Override

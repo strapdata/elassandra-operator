@@ -2,7 +2,7 @@ package com.strapdata.strapkop.reconcilier;
 
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.DataCenterCache;
-import com.strapdata.strapkop.event.ElassandraPod;
+import com.strapdata.strapkop.k8s.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
@@ -10,8 +10,8 @@ import com.strapdata.strapkop.model.k8s.task.RepairTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
 import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
-import io.kubernetes.client.ApiException;
-import io.kubernetes.client.models.V1Pod;
+import io.kubernetes.client.openapi.ApiException;
+import io.kubernetes.client.openapi.models.V1Pod;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.annotation.Infrastructure;
 import io.micronaut.scheduling.executor.ExecutorFactory;
@@ -53,7 +53,7 @@ public final class RepairTaskReconcilier extends TaskReconcilier {
     protected Completable doTask(final DataCenter dc, final DataCenterStatus dataCenterStatus, final Task task, Iterable<V1Pod> pods) throws ApiException {
         final RepairTaskSpec repairTaskSpec = task.getSpec().getRepair();
         return Observable.zip(Observable.fromIterable(pods), Observable.interval(repairTaskSpec.getWaitIntervalInSec(), TimeUnit.SECONDS), (pod, timer) -> pod)
-                .subscribeOn(Schedulers.computation())
+                .subscribeOn(Schedulers.io())
                 .flatMapSingle(pod -> jmxmpElassandraProxy.repair(ElassandraPod.fromV1Pod(pod), task.getSpec().getRepair().getKeyspace())
                         .onErrorResumeNext(throwable -> {
                             logger.error("Error while executing repair on pod={}", pod, throwable);

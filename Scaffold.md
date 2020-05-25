@@ -5,5 +5,6 @@
 kubectl config get-contexts
 
 skaffold init
-skaffold dev --default-repo strapdata.azurecr.io
-skaffold dev --kube-context azure-northeurope-1 
+skaffold config set --kube-context kind-cluster1 local-cluster true
+skaffold dev --default-repo localhost:5000
+skaffold dev --kube-context kind-cluster1

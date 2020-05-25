@@ -4,7 +4,7 @@ metadata:
   name: strapkop
 build:
   artifacts:
-  - image: strapdata.azurecr.io/strapdata/elassandra-operator-dev
+  - image: localhost:5000/strapdata/elassandra-operator-dev
     context: java/operator
     jib:
       project: java:operator
@@ -21,10 +21,10 @@ deploy:
       wait: false
       version: "0.3.0"
       values:
-        images: strapdata.azurecr.io/strapdata/elassandra-operator-dev
+        images: localhost:5000/strapdata/elassandra-operator-dev
 profiles:
   - name: dev
     activation:
       - env: MICRONAUT_ENV=dev
-        kubeContext: azure-northeurope-1
+        kubeContext: kind-cluster1
         command: dev

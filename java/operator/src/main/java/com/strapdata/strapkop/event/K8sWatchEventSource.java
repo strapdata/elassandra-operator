@@ -4,11 +4,10 @@ import com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
-import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.pipeline.K8sWatchResourceAdapter;
-import io.kubernetes.client.ApiClient;
-import io.kubernetes.client.ApiException;
-import io.kubernetes.client.ApiResponse;
+import io.kubernetes.client.openapi.ApiClient;
+import io.kubernetes.client.openapi.ApiException;
+import io.kubernetes.client.openapi.ApiResponse;
 import io.kubernetes.client.util.Watch;
 import io.reactivex.Observable;
 import io.reactivex.schedulers.Schedulers;
@@ -16,7 +15,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Named;
-import java.util.concurrent.TimeUnit;
 
 import static com.strapdata.strapkop.event.K8sWatchEvent.Type.ERROR;
 import static com.strapdata.strapkop.event.K8sWatchEvent.Type.INITIAL;
@@ -29,24 +27,21 @@ import static com.strapdata.strapkop.event.K8sWatchEvent.Type.INITIAL;
  */
 @SuppressWarnings("UnstableApiUsage")
 public class K8sWatchEventSource<ResourceT, ResourceListT, Key> implements EventSource<K8sWatchEvent<ResourceT>> {
-    
+
     private final Logger logger = LoggerFactory.getLogger(K8sWatchEventSource.class);
-    
+
     private final ApiClient watchClient;
     private final K8sWatchResourceAdapter<ResourceT, ResourceListT, Key> adapter;
     private final Gson gson;
 
     private String lastResourceVersion = null;
 
-    public K8sWatchEventSource(final @Named("watchClient") ApiClient watchClient, final K8sWatchResourceAdapter<ResourceT, ResourceListT, Key> adapter, OperatorConfig config) {
-        this.watchClient = watchClient;
-        watchClient.getHttpClient().setReadTimeout(config.getK8sWatchPeriodInSec(), TimeUnit.SECONDS);
-        logger.debug("watchClient read timeout={}", watchClient.getHttpClient().getReadTimeout());
-
-        this.adapter = adapter;
+    public K8sWatchEventSource(final @Named("watchClient") ApiClient watchClient,
+                               final K8sWatchResourceAdapter<ResourceT, ResourceListT, Key> adapter) {
+        this.watchClient = watchClient;this.adapter = adapter;
         this.gson = watchClient.getJSON().getGson();
     }
-    
+
     /**
      * Create a cold observable containing the existing resources first, then watching for modifications
      *
@@ -55,18 +50,18 @@ public class K8sWatchEventSource<ResourceT, ResourceListT, Key> implements Event
      */
     @Override
     public Observable<K8sWatchEvent<ResourceT>> createObservable() throws ApiException {
-        
+
         logger.debug("(re)creating k8s event observable for {}", this.adapter.getName());
-        
+
         // if last resource version is not null, restart watching where we stopped
         if (lastResourceVersion != null) {
             return createWatchObservable();
         }
-        
+
         // otherwise take a snapshot of the current state, then watch
         return Observable.concat(createInitialObservable(), createWatchObservable());
     }
-    
+
     /**
      * Fetch initial existing resource and create a cold observable out of it
      *
@@ -82,7 +77,7 @@ public class K8sWatchEventSource<ResourceT, ResourceListT, Key> implements Event
         lastResourceVersion = adapter.getListMetadata(resourceList).getResourceVersion();
         return Observable.fromIterable(adapter.getListItems(resourceList)).map(resource -> new K8sWatchEvent<>(INITIAL, resource, lastResourceVersion));
     }
-    
+
     /**
      * Create a cold observable out of a k8s watch
      *
@@ -91,9 +86,10 @@ public class K8sWatchEventSource<ResourceT, ResourceListT, Key> implements Event
      */
     private Observable<K8sWatchEvent<ResourceT>> createWatchObservable() throws ApiException {
         logger.debug("Creating k8s watch for resource : {}", adapter.getName());
-        final Watch<JsonObject> watch = Watch.createWatch(watchClient, adapter.createListApiCall(true, lastResourceVersion),
-                new TypeToken<Watch.Response<JsonObject>>() {
-                }.getType());
+        final Watch<JsonObject> watch = Watch.createWatch(
+                watchClient.setReadTimeout(0), // watch client continous read, see https://github.com/kubernetes-client/java/issues/178
+                adapter.createListApiCall(true, lastResourceVersion),
+                new TypeToken<Watch.Response<JsonObject>>() {}.getType());
         return Observable.fromIterable(watch)
                 .observeOn(Schedulers.io()).observeOn(Schedulers.io()) // blocking io seemed to happen on computational thread...
                 .doOnError(t -> {
@@ -107,7 +103,7 @@ public class K8sWatchEventSource<ResourceT, ResourceListT, Key> implements Event
                 .map(this::objectJsonToEvent)
                 .doFinally(watch::close);
     }
-    
+
     /**
      * Transform a raw ObjectJson into a Event ready to be published by the observable
      *
@@ -117,7 +113,7 @@ public class K8sWatchEventSource<ResourceT, ResourceListT, Key> implements Event
     private K8sWatchEvent<ResourceT> objectJsonToEvent(Watch.Response<JsonObject> response) {
         final K8sWatchEvent.Type type = K8sWatchEvent.Type.valueOf(response.type);
         ResourceT resource = null;
-        
+
         if (type == ERROR) {
             logger.error("{} list watch failed with status={} object={}.", adapter.getName(), response.status, response.object);
         } else {

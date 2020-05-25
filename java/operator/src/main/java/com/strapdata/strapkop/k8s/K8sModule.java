@@ -1,9 +1,10 @@
 package com.strapdata.strapkop.k8s;
 
-import io.kubernetes.client.ApiClient;
-import io.kubernetes.client.apis.*;
+import io.kubernetes.client.openapi.ApiClient;
+import io.kubernetes.client.openapi.apis.*;
 import io.kubernetes.client.util.ClientBuilder;
 import io.kubernetes.client.util.Config;
+import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 
@@ -18,11 +19,9 @@ public class K8sModule {
     private final ApiClient watchClient;
     private final ApiClient debuggableApiClient;
 
-    public K8sModule() throws IOException {
-        apiClient = ClientBuilder.standard().build();
-
-        // watch client continous read, see https://github.com/kubernetes-client/java/issues/178
-        watchClient =  Config.defaultClient();
+    public K8sModule(ApplicationContext applicationContext) throws IOException {
+        this.apiClient = ClientBuilder.standard().build();
+        this.watchClient =  Config.defaultClient();
 
         // trick to debug k8s calls except for the Watch (not supported)
         if (System.getenv("K8S_API_DEBUG") != null) {
@@ -32,7 +31,7 @@ public class K8sModule {
             debuggableApiClient = apiClient;
         }
     }
-    
+
     @Bean
     @Singleton
     public CoreV1Api provideCoreV1Api() {
@@ -56,19 +55,19 @@ public class K8sModule {
     public ExtensionsV1beta1Api provideExtensionsV1beta1Api() {
         return new ExtensionsV1beta1Api(apiClient);
     }
-    
+
     @Bean
     @Singleton
     public VersionApi provideVersionApi() {
         return new VersionApi(apiClient);
     }
-    
+
     @Bean
     @Singleton
     public AppsV1beta2Api provideAppsV1beta2Api() {
         return new AppsV1beta2Api(apiClient);
     }
-    
+
     @Bean
     @Singleton
     @Named("apiClient")
@@ -89,7 +88,7 @@ public class K8sModule {
     public ApiClient provideDebugApiClient() {
         return this.debuggableApiClient;
     }
-    
+
     @Bean
     @Singleton
     public AppsV1Api provideAppsV1Api() {

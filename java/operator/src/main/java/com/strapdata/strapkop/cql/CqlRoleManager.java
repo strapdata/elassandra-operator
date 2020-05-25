@@ -20,8 +20,9 @@ import com.strapdata.strapkop.plugins.Plugin;
 import com.strapdata.strapkop.plugins.PluginRegistry;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import com.strapdata.strapkop.ssl.utils.X509CertificateAndPrivateKey;
-import io.kubernetes.client.ApiException;
-import io.kubernetes.client.apis.CoreV1Api;
+import io.kubernetes.client.openapi.ApiException;
+import io.kubernetes.client.openapi.apis.CoreV1Api;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.annotation.Infrastructure;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
@@ -33,6 +34,7 @@ import io.vavr.Tuple2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.inject.Singleton;
 import javax.net.ssl.SSLException;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
@@ -51,6 +53,7 @@ import java.util.stream.Collectors;
  *
  * TODO: update password when k8s secret is updated.
  */
+@Singleton
 @Infrastructure
 public class CqlRoleManager extends AbstractManager<CqlRole> {
 
@@ -64,8 +67,9 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
     public CqlRoleManager(final CoreV1Api coreApi,
                           final K8sResourceUtils k8sResourceUtils,
                           final AuthorityManager authorityManager,
-                          final OperatorConfig operatorConfig) {
-        super();
+                          final OperatorConfig operatorConfig,
+                          final MeterRegistry meterRegistry) {
+        super(meterRegistry);
         this.coreApi = coreApi;
         this.k8sResourceUtils = k8sResourceUtils;
         this.authorityManager = authorityManager;
@@ -249,6 +253,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                                 logger.warn("datacenter="+dc.id()+" Failed to close root session:" + e.getMessage(), e);
                             }
                             return strapkopConnection;
+                        } catch(AuthenticationException e) {
                         } catch(Exception e) {
                             logger.error("datacenter="+dc.id()+" Failed to reconnect with the operator role="+strakopRole+" :"+e.getMessage(), e);
                         }

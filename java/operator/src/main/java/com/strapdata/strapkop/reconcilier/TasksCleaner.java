@@ -3,7 +3,7 @@ package com.strapdata.strapkop.reconcilier;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import io.kubernetes.client.ApiException;
+import io.kubernetes.client.openapi.ApiException;
 import io.micronaut.discovery.event.ServiceShutdownEvent;
 import io.micronaut.discovery.event.ServiceStartedEvent;
 import io.micronaut.runtime.event.annotation.EventListener;

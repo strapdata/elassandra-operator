@@ -7,6 +7,8 @@ import com.datastax.driver.core.exceptions.NoHostAvailableException;
 import com.strapdata.elasticsearch.plugin.license.License;
 import com.strapdata.elasticsearch.plugin.license.LicenseVerifierService;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micronaut.context.annotation.Infrastructure;
 import io.reactivex.Completable;
 import io.reactivex.Single;
 import org.slf4j.Logger;
@@ -17,12 +19,17 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 @Singleton
+@Infrastructure
 public class CqlLicenseManager extends AbstractManager<CqlLicense> implements LicenseVerifierService {
 
     private static final Logger logger = LoggerFactory.getLogger(CqlLicenseManager.class);
     private static final String SELECT_STATEMENT = "SELECT * from elastic_admin.licenses";
 
     public static final String LICENSE_KEY = "license";
+
+    public CqlLicenseManager(final MeterRegistry meterRegistry) {
+        super(meterRegistry);
+    }
 
     public Completable verifyLicense(DataCenter dataCenter, CqlSessionHandler sessionHandler) {
         return Single.just(sessionHandler)

@@ -19,11 +19,11 @@ import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenterSpec;
 import com.strapdata.strapkop.model.k8s.cassandra.KibanaSpace;
 import com.strapdata.strapkop.ssl.AuthorityManager;
-import io.kubernetes.client.ApiException;
-import io.kubernetes.client.apis.AppsV1Api;
-import io.kubernetes.client.apis.CoreV1Api;
+import io.kubernetes.client.openapi.ApiException;
+import io.kubernetes.client.openapi.apis.AppsV1Api;
+import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.custom.IntOrString;
-import io.kubernetes.client.models.*;
+import io.kubernetes.client.openapi.models.*;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
 import io.reactivex.Completable;
@@ -164,9 +164,10 @@ public class KibanaPlugin extends AbstractPlugin {
 
         return this.listDeployments(dataCenter)
                 .flatMap(deployments -> {
-                    logger.debug("datacenter={} parked={} deployments.size={}", dataCenter.id(), dataCenter.getSpec().isParked(), deployments.size());
-                    if ((dataCenter.getSpec().getKibana().getEnabled() == false || desiredKibanaMap.size() == 0 || dataCenter.getSpec().isParked()) &&
-                            !deployments.isEmpty()) {
+                    boolean kibanaEnabled = dataCenter.getSpec().getKibana() != null && dataCenter.getSpec().getKibana().getEnabled();
+                    logger.debug("datacenter={} enabled={} parked={} deployments.size={}",
+                            dataCenter.id(), kibanaEnabled, dataCenter.getSpec().isParked(), deployments.size());
+                    if ((kibanaEnabled == false || desiredKibanaMap.size() == 0 || dataCenter.getSpec().isParked())) {
                         return delete(dataCenter)
                                 .map(s -> {
                                     dataCenter.getStatus().setKibanaSpaceNames(new HashSet<>());
@@ -479,8 +480,7 @@ public class KibanaPlugin extends AbstractPlugin {
                 }));
     }
 
-    private Single<V1Secret> createKibanaSecretIfNotExists(DataCenter dataCenter, KibanaSpace kibanaSpace) throws
-            ApiException {
+    private Single<V1Secret> createKibanaSecretIfNotExists(DataCenter dataCenter, KibanaSpace kibanaSpace) throws ApiException {
         String kibanaSecretName = kibanaName(dataCenter, kibanaSpace);
         final V1ObjectMeta secretMetadata = new V1ObjectMeta()
                 .name(kibanaSecretName)

@@ -17,6 +17,16 @@ import java.util.*;
 @NoArgsConstructor
 public class DataCenterStatus {
 
+    /**
+     * The most recent datacenter generation observed by the Elassandra operator.
+     */
+    @SerializedName("observedGeneration")
+    @Expose
+    Long observedGeneration;
+
+    /**
+     *
+     */
     @SerializedName("currentOperation")
     @Expose
     private Operation currentOperation;

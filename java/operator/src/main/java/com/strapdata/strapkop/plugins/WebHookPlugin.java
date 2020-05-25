@@ -5,9 +5,8 @@ import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
 import com.strapdata.strapkop.ssl.AuthorityManager;
-import io.kubernetes.client.ApiException;
-import io.kubernetes.client.apis.AppsV1Api;
-import io.kubernetes.client.apis.CoreV1Api;
+import io.kubernetes.client.openapi.apis.AppsV1Api;
+import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.HttpRequest;
@@ -63,7 +62,7 @@ public class WebHookPlugin extends AbstractPlugin {
      * @param dataCenter
      */
     @Override
-    public Completable reconciled(DataCenter dataCenter) throws ApiException, StrapkopException {
+    public Completable reconciled(DataCenter dataCenter) throws StrapkopException {
         if (!Strings.isNullOrEmpty(dataCenter.getSpec().getWebHookUrl())) {
             try {
                 String uri = UriTemplate.of(dataCenter.getSpec().getWebHookUrl()).expand(buildParams(dataCenter));
@@ -90,7 +89,7 @@ public class WebHookPlugin extends AbstractPlugin {
      * @param dataCenter
      */
     @Override
-    public Single<Boolean> delete(DataCenter dataCenter) throws ApiException {
+    public Single<Boolean> delete(DataCenter dataCenter) {
         if (!Strings.isNullOrEmpty(dataCenter.getSpec().getWebHookUrl())) {
             try {
                 String uri = UriTemplate.of(dataCenter.getSpec().getWebHookUrl()).expand(buildParams(dataCenter));
@@ -123,7 +122,7 @@ public class WebHookPlugin extends AbstractPlugin {
      * @param dataCenter
      */
     @Override
-    public Single<Boolean> reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
+    public Single<Boolean> reconcile(DataCenter dataCenter) throws StrapkopException {
         return Single.just(false);
     }
 

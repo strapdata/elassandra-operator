@@ -1,8 +1,17 @@
 micronaut:
-    server:
-        port: 8080
     application:
         name: elassandra-operator
+    ssl:
+        enabled: true
+        port: 443
+    server:
+        ssl:
+            #protocol: [ "SSLv3", "TLSv1", "TLSv1.1", "TLSv1.2" ]
+            #ciphers: [ "TLS_ECDH_RSA_WITH_3DES_EDE_CBC_SHA", "TLS_ECDH_ECDSA_WITH_3DES_EDE_CBC_SHA", "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384" ]
+            key-store:
+                type: "${OPERATOR_KEYSTORE_TYPE:PKCS12}"
+                path: "${OPERATOR_KEYSTORE_PATH:`file:/tls/operator.p12`}"
+                password: "${OPERATOR_KEYSTORE_PASSWORD:changeit}"
     executors:
         authority:
             type: FIXED
@@ -16,14 +25,6 @@ micronaut:
         status:
             type: WORK_STEALING
 
-    router:
-        static-resources:
-            swagger:
-                enabled: true
-                paths:
-                    - classpath:META-INF/swagger
-                    - classpath:swagger
-                mapping: /swagger/**
     metrics:
         enabled: true
         export:
@@ -58,7 +59,8 @@ endpoints:
     prometheus:
         sensitive: false
 jackson:
-    module-scan: false
+    module-scan: true
+    serialization-inclusion: NON_NULL
 
 operator:
     jmxmpPort: ${JMXMP_PORT:7199}
@@ -66,8 +68,5 @@ operator:
     elassandraNodeWatchPeriodInSec: ${ELASSANDRA_NODE_WATCH_PERIOD:60}
     namespace: "${OPERATOR_NAMESPACE:}"
     serviceName: "${OPERATOR_SERVICE_NAME:elassandra-operator}"
-    test:
-        enabled: "${TESTSUITE_ENABLE:false}"
-        platform: "${TESTSUITE_PLATFORM:LOCAL}"
     tasks:
         retentionPeriod: "${TASKS_RETENTION:7D}"

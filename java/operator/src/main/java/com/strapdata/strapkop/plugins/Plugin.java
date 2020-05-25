@@ -4,7 +4,7 @@ import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
-import io.kubernetes.client.ApiException;
+import io.kubernetes.client.openapi.ApiException;
 import io.reactivex.Completable;
 import io.reactivex.Single;
 

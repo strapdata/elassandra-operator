@@ -3,7 +3,6 @@ package com.strapdata.strapkop.plugins;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Iterables;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.cql.CqlKeyspace;
@@ -16,11 +15,11 @@ import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.cassandra.*;
 import com.strapdata.strapkop.reconcilier.DataCenterUpdateAction;
 import com.strapdata.strapkop.ssl.AuthorityManager;
-import io.kubernetes.client.ApiException;
-import io.kubernetes.client.apis.AppsV1Api;
-import io.kubernetes.client.apis.CoreV1Api;
 import io.kubernetes.client.custom.IntOrString;
-import io.kubernetes.client.models.*;
+import io.kubernetes.client.openapi.ApiException;
+import io.kubernetes.client.openapi.apis.AppsV1Api;
+import io.kubernetes.client.openapi.apis.CoreV1Api;
+import io.kubernetes.client.openapi.models.*;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.scheduling.executor.ExecutorFactory;
@@ -34,7 +33,6 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 /**
  * Manage reaper deployment
@@ -53,6 +51,7 @@ public class ReaperPlugin extends AbstractPlugin {
     public static final int ADMIN_SERVICE_PORT = 8081;    // the REST API
 
     public static final String REAPER_KEYSPACE_NAME = "reaper_db";
+    public static final String REAPER_ADMIN_PASSWORD_KEY = "reaper.admin_password";
 
     public final Scheduler registrationScheduler;
 
@@ -79,7 +78,7 @@ public class ReaperPlugin extends AbstractPlugin {
     public static final CqlKeyspace REAPER_KEYSPACE = new CqlKeyspace().withName(REAPER_KEYSPACE_NAME).withRf(3).withRepair(true);
 
     @Override
-    public  Map<String, String> deploymentLabelSelector(DataCenter dc) {
+    public Map<String, String> deploymentLabelSelector(DataCenter dc) {
         return reaperLabels(dc);
     }
 
@@ -93,6 +92,9 @@ public class ReaperPlugin extends AbstractPlugin {
         return Completable.complete();
     }
 
+    /**
+     * Cassandra reaper CQL role with all permission on the reaper keyspace.
+     */
     public static final CqlRole REAPER_ROLE = new CqlRole()
             .withUsername("reaper")
             .withSecretKey(DataCenterUpdateAction.KEY_REAPER_PASSWORD)
@@ -125,8 +127,17 @@ public class ReaperPlugin extends AbstractPlugin {
         );
     }
 
+    /**
+     * Return true if datacenter.status is updated
+     *
+     * @param dataCenter
+     * @return
+     * @throws ApiException
+     * @throws StrapkopException
+     * @throws IOException
+     */
     @Override
-    public Single<Boolean> reconcile(DataCenter dataCenter) throws ApiException, StrapkopException, IOException {
+    public Single<Boolean> reconcile(DataCenter dataCenter) throws StrapkopException {
         logger.trace("datacenter={} reaper.spec={}", dataCenter.id(), dataCenter.getSpec().getReaper());
 
         boolean reaperEnabled = dataCenter.getSpec().getReaper() != null && dataCenter.getSpec().getReaper().getEnabled();
@@ -141,7 +152,7 @@ public class ReaperPlugin extends AbstractPlugin {
                         });
                     }
 
-                    switch(reaperPhase) {
+                    switch (reaperPhase) {
                         case NONE:
                             CqlRole reaperRole = cqlRoleManager.get(dataCenter, REAPER_ROLE.getUsername());
                             if (reaperRole != null && reaperRole.isReconcilied()) {
@@ -166,13 +177,18 @@ public class ReaperPlugin extends AbstractPlugin {
     }
 
     @Override
-    public Single<Boolean> delete(final DataCenter dataCenter) throws ApiException {
+    public Single<Boolean> delete(final DataCenter dataCenter) {
         final String reaperLabelSelector = OperatorLabels.toSelector(reaperLabels(dataCenter));
         return Completable.mergeArray(new Completable[]{
                 k8sResourceUtils.deleteDeployment(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector),
                 k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector),
                 k8sResourceUtils.deleteIngress(dataCenter.getMetadata().getNamespace(), null, reaperLabelSelector)
-        }).toSingleDefault(true);
+        })
+                .toSingleDefault(true)
+                .map(b -> {
+                    logger.debug("dc={} reaper undeployed", dataCenter.id());
+                    return b;
+                });
     }
 
     /**
@@ -315,7 +331,7 @@ public class ReaperPlugin extends AbstractPlugin {
                         .valueFrom(new V1EnvVarSource()
                                 .secretKeyRef(new V1SecretKeySelector()
                                         .name(reaperSecretName(dataCenter))
-                                        .key("reaper.admin_password")
+                                        .key(REAPER_ADMIN_PASSWORD_KEY)
                                 )
                         )
                 )
@@ -423,7 +439,7 @@ public class ReaperPlugin extends AbstractPlugin {
                 .putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, datacenterGeneration);
         if (dataCenterSpec.getReaper().getIngressAnnotations() != null && !dataCenterSpec.getReaper().getIngressAnnotations().isEmpty()) {
             dataCenterSpec.getReaper().getIngressAnnotations().entrySet().stream()
-                .map(e -> ingressMeta.putAnnotationsItem(e.getKey(), e.getValue()));
+                    .map(e -> ingressMeta.putAnnotationsItem(e.getKey(), e.getValue()));
         }
         final ExtensionsV1beta1Ingress ingress;
         if (!Strings.isNullOrEmpty(dataCenterSpec.getReaper().getIngressSuffix())) {
@@ -464,16 +480,13 @@ public class ReaperPlugin extends AbstractPlugin {
             ingress = null;
         }
 
-        // deploy manifests in parallel
-        List<CompletableSource> todoList = new ArrayList<>();
-        todoList.add(createReaperSecretIfNotExists(dataCenter).ignoreElement());
-        todoList.add(k8sResourceUtils.createOrReplaceNamespacedDeployment(deployment).ignoreElement());
-        todoList.add(k8sResourceUtils.createOrReplaceNamespacedService(service).ignoreElement());
+        Completable todo = createReaperSecretIfNotExists(dataCenter).ignoreElement()
+                .andThen(k8sResourceUtils.createOrReplaceNamespacedDeployment(deployment).ignoreElement())
+                .andThen(k8sResourceUtils.createOrReplaceNamespacedService(service).ignoreElement());
         if (ingress != null)
-            todoList.add(k8sResourceUtils.createOrReplaceNamespacedIngress(ingress).ignoreElement());
+            todo = todo.andThen(k8sResourceUtils.createOrReplaceNamespacedIngress(ingress).ignoreElement());
 
-        return Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()]))
-                .toSingleDefault(false);
+        return todo.toSingleDefault(false);
     }
 
     private String reaperSecretName(DataCenter dataCenter) {
@@ -486,68 +499,63 @@ public class ReaperPlugin extends AbstractPlugin {
      * THe registration is done only once. If the datacenter is unregistered by the user, it will not register it again automatically.
      */
     public Completable register(DataCenter dc) throws StrapkopException, ApiException, MalformedURLException {
-            ReaperClient reaperClient = new ReaperClient(dc, this.registrationScheduler);
-            return loadReaperAdminPassword(dc)
-                    .observeOn(registrationScheduler)
-                    .subscribeOn(registrationScheduler)
-                    .flatMap(password ->
-                            reaperClient.registerCluster("admin", password)
-                            .retryWhen((Flowable<Throwable> f) -> f.take(9).delay(21, TimeUnit.SECONDS))
-                    )
-                    .flatMapCompletable(bool -> {
-                        if (bool) {
-                            dc.getStatus().setReaperPhase(ReaperPhase.REGISTERED);
-                            logger.info("dc={} cassandra-reaper registred", dc.id());
-                            return registerScheduledRepair(dc);
+        ReaperClient reaperClient = new ReaperClient(dc, this.registrationScheduler);
+        return loadReaperAdminPassword(dc)
+                .observeOn(registrationScheduler)
+                .subscribeOn(registrationScheduler)
+                .flatMap(password ->
+                        reaperClient.registerCluster("admin", password)
+                                .retryWhen((Flowable<Throwable> f) -> f.take(9).delay(21, TimeUnit.SECONDS))
+                )
+                .flatMapCompletable(bool -> {
+                    if (bool) {
+                        dc.getStatus().setReaperPhase(ReaperPhase.REGISTERED);
+                        logger.info("dc={} cassandra-reaper successfully registred", dc.id());
+                        return registerScheduledRepair(dc);
+                    }
+                    return Completable.complete();
+                })
+                .doFinally(() -> {
+                    if (reaperClient != null) {
+                        try {
+                            reaperClient.close();
+                        } catch (Throwable t) {
                         }
-                        return Completable.complete();
-                    })
-                    .doFinally(() -> {
-                        if (reaperClient != null) {
-                            try {
-                                reaperClient.close();
-                            } catch (Throwable t) {
-                            }
-                        }
-                    })
-                    .doOnError(e -> {
-                        dc.getStatus().setLastError(e.toString());
-                        dc.getStatus().setLastErrorTime(new Date());
-                        logger.error("datacenter={} error while registering in cassandra-reaper", dc.id(), e);
-                    });
+                    }
+                })
+                .doOnError(e -> {
+                    dc.getStatus().setLastError(e.toString());
+                    dc.getStatus().setLastErrorTime(new Date());
+                    logger.error("datacenter=" + dc.id() + " error while registering in cassandra-reaper", e);
+                });
     }
 
     // TODO: cache cluster secret to avoid loading secret again and again
     private Single<String> loadReaperAdminPassword(DataCenter dc) throws ApiException, StrapkopException {
-        final String secretName = reaperSecretName(dc);
-        final V1ObjectMeta secretMetadata = new V1ObjectMeta()
-                .name(secretName)
-                .namespace(dc.getMetadata().getNamespace())
-                .labels(OperatorLabels.datacenter(dc));
-
-        return k8sResourceUtils.readNamespacedSecret(dc.getMetadata().getNamespace(), secretName).map(secret -> {
-            final byte[] password = secret.getData().get("reaper.admin_password");
+        String reaperSecretName = reaperSecretName(dc);
+        return k8sResourceUtils.readNamespacedSecret(dc.getMetadata().getNamespace(), reaperSecretName).map(secret -> {
+            final byte[] password = secret.getData().get(REAPER_ADMIN_PASSWORD_KEY);
             if (password == null) {
-                throw new StrapkopException(String.format("secret %s does not contain reaper.admin_password", secretName));
+                throw new StrapkopException(String.format("secret %s does not contain reaper.admin_password", reaperSecretName));
             }
             return new String(password);
         });
     }
 
-    private Single<V1Secret> createReaperSecretIfNotExists(DataCenter dataCenter) throws ApiException {
-        String reaperSecretName = reaperSecretName(dataCenter);
+    private Single<V1Secret> createReaperSecretIfNotExists(DataCenter dc) throws ApiException {
+        String reaperSecretName = reaperSecretName(dc);
         final V1ObjectMeta secretMetadata = new V1ObjectMeta()
                 .name(reaperSecretName)
-                .namespace(dataCenter.getMetadata().getNamespace())
-                .labels(OperatorLabels.datacenter(dataCenter));
+                .namespace(dc.getMetadata().getNamespace())
+                .labels(OperatorLabels.datacenter(dc));
 
         return this.k8sResourceUtils.readOrCreateNamespacedSecret(secretMetadata, () -> {
-            logger.debug("datacenter={} Creating reaper secret name={}", dataCenter.id(), reaperSecretName);
+            logger.debug("datacenter={} Creating reaper secret name={}", dc.id(), reaperSecretName);
             return new V1Secret()
                     .metadata(secretMetadata)
                     .type("Opaque")
                     // replace the default cassandra password
-                    .putStringDataItem("reaper.admin_password", UUID.randomUUID().toString());
+                    .putStringDataItem(REAPER_ADMIN_PASSWORD_KEY, UUID.randomUUID().toString());
         });
     }
 
@@ -560,23 +568,18 @@ public class ReaperPlugin extends AbstractPlugin {
                 .flatMapCompletable(password -> {
                     List<CompletableSource> todoList = new ArrayList<>();
                     Map<String, ReaperScheduledRepair> scheduledRepairMap = new HashMap<>();
-
-
                     // repair system + elastic_admin_xxx + managed keyspaces
-                    for(CqlKeyspace cqlKeyspace :
-                            Iterables.concat(
-                                    this.cqlKeyspaceManager.get(dc).values(),
-                                    this.cqlKeyspaceManager.getSystemAndElasticKeyspaces(dc).stream().filter(CqlKeyspace::isRepair).collect(Collectors.toList()))) {
+                    for (CqlKeyspace cqlKeyspace : this.cqlKeyspaceManager.get(dc).values()) {
                         scheduledRepairMap.put(cqlKeyspace.getName(), new ReaperScheduledRepair()
                                 .withKeyspace(cqlKeyspace.getName())
                                 .withOwner("elassandra-operator"));
                     }
                     // add explicit scheduled repair, can ovreride default settings
                     if (dc.getSpec().getReaper().getReaperScheduledRepairs() != null) {
-                        dc.getSpec().getReaper().getReaperScheduledRepairs().stream().map(s-> scheduledRepairMap.put(s.getKeyspace(), s));
+                        dc.getSpec().getReaper().getReaperScheduledRepairs().stream().map(s -> scheduledRepairMap.put(s.getKeyspace(), s));
                     }
                     logger.debug("Submit scheduledRepair={}", scheduledRepairMap.values());
-                    for(ReaperScheduledRepair reaperScheduledRepair : scheduledRepairMap.values()) {
+                    for (ReaperScheduledRepair reaperScheduledRepair : scheduledRepairMap.values()) {
                         todoList.add(reaperClient.registerScheduledRepair("admin", password, reaperScheduledRepair));
                     }
                     return Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()]));

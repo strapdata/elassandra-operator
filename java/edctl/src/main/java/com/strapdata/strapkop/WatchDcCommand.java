@@ -2,16 +2,18 @@ package com.strapdata.strapkop;
 
 import com.google.common.reflect.TypeToken;
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
-import com.strapdata.strapkop.model.k8s.cassandra.*;
-import io.kubernetes.client.ApiClient;
-import io.kubernetes.client.Configuration;
-import io.kubernetes.client.apis.CustomObjectsApi;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.cassandra.DataCenterPhase;
+import com.strapdata.strapkop.model.k8s.cassandra.Health;
+import com.strapdata.strapkop.model.k8s.cassandra.ReaperPhase;
+import io.kubernetes.client.openapi.ApiClient;
+import io.kubernetes.client.openapi.Configuration;
+import io.kubernetes.client.openapi.apis.CustomObjectsApi;
 import io.kubernetes.client.util.Config;
 import io.kubernetes.client.util.Watch;
 import picocli.CommandLine;
 
 import java.util.concurrent.Callable;
-import java.util.concurrent.TimeUnit;
 
 @CommandLine.Command(name = "watch-dc", description = "edctl watch datacenter subcommand")
 public class WatchDcCommand implements Callable<Integer> {
@@ -34,28 +36,39 @@ public class WatchDcCommand implements Callable<Integer> {
     @CommandLine.Option(names = {"-t","--timeout"}, description = "Wait timeout", defaultValue = "600")
     Integer timeout;
 
+    @CommandLine.Option(names = {"-v","--verbose"}, description = "Verbose mode")
+    Boolean verbose;
+
     @Override
     public Integer call() throws Exception {
-        System.out.println("Waiting datacenter namespace="+namespace+" phase="+phase+" health=" + health + " replicas="+readyReplicas+" timeout="+timeout+"s");
+        System.out.println("Waiting datacenter namespace="+namespace+
+                " phase=" + phase +
+                " health=" + health +
+                " replicas=" + readyReplicas +
+                " reaper=" + reaperPhase +
+                " timeout="+timeout+"s");
 
-        ApiClient client = Config.defaultClient();
-        client.getHttpClient().setReadTimeout(timeout, TimeUnit.SECONDS);
+        ApiClient client = Config.defaultClient().setReadTimeout(timeout * 1000);
         Configuration.setDefaultApiClient(client);
         CustomObjectsApi customObjectsApi = new CustomObjectsApi(client);
 
         Watch<DataCenter> watch = Watch.createWatch(client,
                 customObjectsApi.listNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, DataCenter.VERSION,
                         namespace, DataCenter.PLURAL, null, null, null,
-                        null, timeout, true, null, null),
+                        null, timeout, null, null, true, null),
                 new TypeToken<Watch.Response<DataCenter>>(){}.getType());
 
         long start = System.currentTimeMillis();
         for (Watch.Response<DataCenter> item : watch) {
-            System.out.printf("%s : %s phase=%s heath=%s replicas=%d %n", item.type, item.object.getMetadata().getName(),
+            System.out.printf("%s : %s phase=%s heath=%s replicas=%d reaper=%s \n", item.type, item.object.getMetadata().getName(),
                     item.object.getStatus().getPhase().name(),
                     item.object.getStatus().getHealth().name(),
-                    item.object.getStatus().getReadyReplicas());
+                    item.object.getStatus().getReadyReplicas(),
+                    item.object.getStatus().getReaperPhase());
             boolean conditionMet = true;
+
+            if (Boolean.TRUE.equals(verbose))
+                System.out.println(item.object);
 
             if (phase != null && !phase.equals(item.object.getStatus().getPhase()))
                 conditionMet = false;
@@ -79,6 +92,4 @@ public class WatchDcCommand implements Callable<Integer> {
         System.out.println("timeout " + (end-start) + "ms");
         return 1;
     }
-
-
 }

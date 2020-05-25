@@ -1,9 +1,9 @@
 package com.strapdata.strapkop.preflight;
 
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
-import io.kubernetes.client.ApiException;
-import io.kubernetes.client.apis.ApiextensionsV1beta1Api;
-import io.kubernetes.client.models.V1beta1CustomResourceDefinition;
+import io.kubernetes.client.openapi.ApiException;
+import io.kubernetes.client.openapi.apis.ApiextensionsV1beta1Api;
+import io.kubernetes.client.openapi.models.V1beta1CustomResourceDefinition;
 import io.kubernetes.client.util.Yaml;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
