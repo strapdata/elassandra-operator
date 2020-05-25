@@ -40,7 +40,7 @@ public class WatchTaskCommand implements Callable<Integer> {
         Watch<Task> watch = Watch.createWatch(client,
                 customObjectsApi.listNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, DataCenter.VERSION,
                         namespace, Task.PLURAL, null, null, null,
-                        null, timeout, null, null, true, null),
+                        null, null, null, timeout, true, null),
                 new TypeToken<Watch.Response<DataCenter>>(){}.getType());
 
         long start = System.currentTimeMillis();
