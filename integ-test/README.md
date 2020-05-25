@@ -1,2 +1,1 @@
-# Strapkop integration tests
-
+# Elassandra operator integration tests

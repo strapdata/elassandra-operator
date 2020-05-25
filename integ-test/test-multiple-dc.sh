@@ -2,24 +2,17 @@
 
 source $(dirname $0)/test-lib.sh
 
-#create_resource_group
-#create_aks_cluster 3
-#helm_init
-#install_elassandra_operator
+NS="ns2"
 
 test_start
-install_elassandra_datacenter default cl1 dc1 1
-java -jar java/edctl/build/libs/edctl.jar watch-dc --health GREEN
+install_elassandra_datacenter $NS cl1 dc1 1
+java -jar java/edctl/build/libs/edctl.jar watch-dc -n $NS --health GREEN
 
 install_elassandra_datacenter default cl1 dc2 1
-java -jar java/edctl/build/libs/edctl.jar watch-dc --health GREEN
+java -jar java/edctl/build/libs/edctl.jar watch-dc -n $NS --health GREEN
 
+uninstall_elassandra_datacenter $NS cl1 dc1
+uninstall_elassandra_datacenter $NS cl1 dc2
 
-#create_resource_group
-#create_aks_cluster 3
-#helm_init
-#install_elassandra_operator
-
-uninstall_elassandra_datacenter
 echo "Test SUCCESSFUL"
 test_end
