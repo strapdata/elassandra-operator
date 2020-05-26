@@ -74,7 +74,7 @@ public class DataCenterUpdateAction {
     private static final long MB = 1024 * 1024;
     private static final long GB = MB * 1024;
 
-    public static final String OPERATOR_KEYSTORE_MOUNT_PATH = "/tmp/operator-keystore";
+    public static final String OPERATOR_KEYSTORE_MOUNT_PATH = "/tmp/datacenter-keystore";
     public static final String OPERATOR_KEYSTORE = "keystore.p12";
     public static final String OPERATOR_KEYPASS = "changeit";
 
@@ -552,7 +552,7 @@ public class DataCenterUpdateAction {
                     .andThen(configMapVolumeMounts.createOrReplaceNamespacedConfigMaps())
                     .andThen(builder.buildStatefulSetRack(rackStatus, configMapVolumeMounts)
                             .flatMap(sts -> {
-                                endOperation("scale-up rack "+rackStatus.getName());
+                                endOperation("scale-up rack="+rackStatus.getName());
                                 return k8sResourceUtils.updateDataCenterStatus(dataCenter, dataCenterStatus);
                             })
                             .ignoreElement()
@@ -576,7 +576,7 @@ public class DataCenterUpdateAction {
                 .andThen(configMapVolumeMounts.createOrReplaceNamespacedConfigMaps()) // update seeds
                 .andThen(k8sResourceUtils.replaceNamespacedStatefulSet(sts)
                         .flatMap(s -> {
-                            endOperation("scale-up rack "+rackStatus.getName());
+                            endOperation("scale-up rack="+rackStatus.getName());
                             return k8sResourceUtils.updateDataCenterStatus(dataCenter, dataCenterStatus);
                         })
                         .ignoreElement());
@@ -686,17 +686,6 @@ public class DataCenterUpdateAction {
                 });
          */
     }
-
-
-
-
-
-
-
-
-
-
-
 
     public class ConfigMapVolumeMountBuilder {
         public final V1ConfigMap configMap;
@@ -1654,6 +1643,12 @@ public class DataCenterUpdateAction {
                             .emptyDir(new V1EmptyDirVolumeSource())
                     )
                     .addVolumesItem(new V1Volume()
+                            .name("operator-truststore-volume")
+                            .secret(new V1SecretVolumeSource()
+                                    .secretName(AuthorityManager.OPERATOR_TRUSTORE_SECRET_NAME)
+                            )
+                    )
+                    .addVolumesItem(new V1Volume()
                             .name("cqlshrc-volume")
                             .secret(new V1SecretVolumeSource()
                                     .secretName(OperatorNames.clusterRcFilesSecret(dataCenter))
@@ -1769,18 +1764,18 @@ public class DataCenterUpdateAction {
 
             // mount SSL keystores
             if (dataCenterSpec.getSsl()) {
-                V1VolumeMount opKeystoreVolMount = new V1VolumeMount().name("operator-keystore").mountPath(OPERATOR_KEYSTORE_MOUNT_PATH);
+                V1VolumeMount opKeystoreVolMount = new V1VolumeMount().name("datacenter-keystore").mountPath(OPERATOR_KEYSTORE_MOUNT_PATH);
                 cassandraContainer.addVolumeMountsItem(opKeystoreVolMount);
                 commitlogInitContainer.addVolumeMountsItem(opKeystoreVolMount);
 
-                podSpec.addVolumesItem(new V1Volume().name("operator-keystore")
+                podSpec.addVolumesItem(new V1Volume().name("datacenter-keystore")
                         .secret(new V1SecretVolumeSource().secretName(OperatorNames.keystoreSecret(dataCenter))
                                 .addItemsItem(new V1KeyToPath().key("keystore.p12").path(OPERATOR_KEYSTORE))));
 
-                V1VolumeMount opTruststoreVolMount = new V1VolumeMount().name("operator-truststore").mountPath(authorityManager.getPublicCaMountPath());
+                V1VolumeMount opTruststoreVolMount = new V1VolumeMount().name("datacenter-truststore").mountPath(authorityManager.getPublicCaMountPath());
                 cassandraContainer.addVolumeMountsItem(opTruststoreVolMount);
                 commitlogInitContainer.addVolumeMountsItem(opTruststoreVolMount);
-                podSpec.addVolumesItem(new V1Volume().name("operator-truststore")
+                podSpec.addVolumesItem(new V1Volume().name("datacenter-truststore")
                         .secret(new V1SecretVolumeSource()
                                 .secretName(authorityManager.getPublicCaSecretName())
                                 .addItemsItem(new V1KeyToPath().key(AuthorityManager.SECRET_CACERT_PEM).path(AuthorityManager.SECRET_CACERT_PEM))
@@ -1883,14 +1878,6 @@ public class DataCenterUpdateAction {
                     });
         }
 
-        private V1EnvVar buildEnvVarFromSecret(String varName, String secretEntry, String k8sSecretReference) {
-            return new V1EnvVar()
-                    .name(varName)
-                    .valueFrom(new V1EnvVarSource().secretKeyRef(new V1SecretKeySelector()
-                            .name(k8sSecretReference)
-                            .key(secretEntry)));
-        }
-
         private V1Container buildElassandraContainer(String rack) {
             final V1Container cassandraContainer = buildElassandraBaseContainer("elassandra", rack)
                     .readinessProbe(new V1Probe()
@@ -1940,6 +1927,11 @@ public class DataCenterUpdateAction {
                             .mountPath("/etc/podinfo")
                     )
                     .addVolumeMountsItem(new V1VolumeMount()
+                            .name("operator-truststore-volume")
+                            .mountPath("/tmp/operator-truststore")
+                            .subPath("truststore")
+                    )
+                    .addVolumeMountsItem(new V1VolumeMount()
                             .name("cassandra-log-volume")
                             .mountPath("/var/log/cassandra")
                     )
@@ -1965,6 +1957,15 @@ public class DataCenterUpdateAction {
                     .addEnvItem(new V1EnvVar().name("CASSANDRA_RACK").value(rack))
                     .addEnvItem(new V1EnvVar().name("CASSANDRA_DATACENTER").value(dataCenterMetadata.getName()))
                     .addEnvItem(new V1EnvVar().name("CASSANDRA_CLUSTER").value(dataCenterSpec.getClusterName()))
+                    .addEnvItem(new V1EnvVar().name("SEEDER_TRUSTSTORE").value("/tmp/operator-truststore"))
+                    .addEnvItem(new V1EnvVar().name("SEEDER_STORE_TYPE").valueFrom(new V1EnvVarSource()
+                            .secretKeyRef(new V1SecretKeySelector()
+                                    .name(AuthorityManager.OPERATOR_TRUSTORE_SECRET_NAME)
+                                    .key("storetype"))))
+                    .addEnvItem(new V1EnvVar().name("SEEDER_TRUSTSTORE_PASSWORD").valueFrom(new V1EnvVarSource()
+                            .secretKeyRef(new V1SecretKeySelector()
+                                    .name(AuthorityManager.OPERATOR_TRUSTORE_SECRET_NAME)
+                                    .key("storepass"))))
                     ;
 
             String nodetoolOpts = " -u cassandra -pwf /etc/cassandra/jmxremote.password ";
