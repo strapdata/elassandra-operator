@@ -2,8 +2,14 @@
 
 ## Build 
 
+Build jar:
 ```
 ./gradlew java:edctl:shadowJar
+```
+
+Build executable:
+```
+./gradlew java:edctl:makeExec
 ```
 
 ## Usage

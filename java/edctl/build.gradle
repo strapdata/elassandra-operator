@@ -1,3 +1,5 @@
+import com.strapdata.gradle.ReallyExecutableJarTask;
+
 plugins {
     id 'java'
     id 'application'
@@ -102,4 +104,8 @@ dependencies {
     compile project(':java:model')
 
     runtime "ch.qos.logback:logback-classic:1.2.3"
+}
+
+task makeExec(type: ReallyExecutableJarTask) {
+    dependsOn shadowJar
 }
