@@ -77,6 +77,7 @@ task dockerPush {
   dependsOn ':dockerBuild'
   dependsOn ':docker:dockerPushImage'
   dependsOn ':java:operator:jib'
+  dependsOn ':reaper:pushReaper'
 }
 
 task dockerBuildAllVersions {
