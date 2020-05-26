@@ -157,11 +157,6 @@ public class K8sResourceUtils {
 
     public Single<V1Service> createOrReplaceNamespacedService(final V1Service service) throws ApiException, IOException {
         final String namespace = service.getMetadata().getNamespace();
-        /*
-        ApiClient debuggableApiClient = ClientBuilder.standard().build();
-        debuggableApiClient.setDebugging(true);
-        CoreV1Api debuggableCore = new CoreV1Api(debuggableApiClient);
-        */
         return createOrReplaceResource(namespace, service,
                 () -> coreApi.createNamespacedService(namespace, service, null, null, null),
                 () -> {
@@ -273,6 +268,13 @@ public class K8sResourceUtils {
                         throw e;
                     }
                 });
+    }
+
+    public Single<V1Secret> createOrReplaceNamespacedSecret(final V1Secret secret) throws ApiException {
+        final String namespace = secret.getMetadata().getNamespace();
+        return createOrReplaceResource(namespace, secret,
+                () -> coreApi.createNamespacedSecret(namespace, secret, null, null, null),
+                () -> coreApi.replaceNamespacedSecret(secret.getMetadata().getName(), namespace, secret, null, null, null));
     }
 
     public Single<V1StatefulSet> replaceNamespacedStatefulSet(final V1StatefulSet statefulset) throws ApiException {

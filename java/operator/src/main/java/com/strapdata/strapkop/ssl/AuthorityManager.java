@@ -6,14 +6,15 @@ import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.ssl.utils.CertManager;
 import com.strapdata.strapkop.ssl.utils.X509CertificateAndPrivateKey;
 import io.kubernetes.client.openapi.ApiException;
-import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1Secret;
 import io.micronaut.cache.annotation.CacheConfig;
 import io.micronaut.caffeine.cache.AsyncLoadingCache;
 import io.micronaut.caffeine.cache.Caffeine;
+import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.scheduling.executor.ExecutorFactory;
 import io.micronaut.scheduling.executor.UserExecutorConfiguration;
+import io.reactivex.Completable;
 import io.reactivex.Single;
 import io.vavr.Tuple2;
 import io.vavr.control.Option;
@@ -25,7 +26,10 @@ import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -33,20 +37,23 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Read/Write the operator CA in a k8s secret.
- * Secret name is defined by PUBLIC_CA_SECRET_NAME / PRIVATE_CA_SECRET_NAME env variable, default=ca
+ * Read/Write the datacenter root CA in a k8s secret.
  */
-// TODO: move ca password in a secret
 @Singleton
 @CacheConfig("ca-cache")
 public class AuthorityManager {
     private static final Logger logger = LoggerFactory.getLogger(AuthorityManager.class);
 
-    // secret names
-    public static final String DEFAULT_PUBLIC_CA_SECRET_NAME = "ca-pub"; // public CA certificate, secret available for all pods
-    public static final String DEFAULT_PUBLIC_CA_MOUNT_PATH = "/tmp/operator-truststore"; // public CA certificate mount path
+    // Operator truststore inherited from the micronaut ssl trust-store
+    // see https://docs.micronaut.io/1.3.0/guide/configurationreference.html#io.micronaut.http.ssl.DefaultSslConfiguration$DefaultTrustStoreConfiguration
+    public static final String OPERATOR_TRUSTORE_SECRET_NAME = "operator-truststore";
+    public static final String OPERATOR_TRUSTORE_MOUNT_PATH = "/tmp/operator-truststore"; // operator truststore mount path
 
+    // datacenter root CA used to generate interla certificates
+    public static final String DEFAULT_PUBLIC_CA_SECRET_NAME = "ca-pub"; // public CA certificate, secret available for all pods
     public static final String DEFAULT_PRIVATE_CA_SECRET_NAME = "ca-key"; // secret for issuing certificates, only for some privileged pods
+
+    public static final String DEFAULT_PUBLIC_CA_MOUNT_PATH = "/tmp/datacenter-truststore"; // public CA certificate mount path
 
     // secret keys
     public static final String SECRET_CA_KEY = "ca.key";
@@ -63,7 +70,7 @@ public class AuthorityManager {
     K8sResourceUtils k8sResourceUtils;
 
     @Inject
-    private CoreV1Api coreApi;
+    SslConfiguration sslConfiguration;
 
     private final AsyncLoadingCache<String, X509CertificateAndPrivateKey> cache;
 
@@ -73,7 +80,7 @@ public class AuthorityManager {
                 .executor(executorFactory.executorService(userExecutorConfiguration))
                 .maximumSize(256)
                 .expireAfterWrite(1, TimeUnit.MINUTES)
-                .buildAsync(ns -> loadOrGenerateCa(ns).blockingGet());
+                .buildAsync(ns -> loadOrGenerateDatatcenterCa(ns).blockingGet());
     }
 
     public X509CertificateAndPrivateKey get(String namespace) throws ExecutionException, InterruptedException {
@@ -138,7 +145,7 @@ public class AuthorityManager {
      * @throws IOException
      * @throws OperatorCreationException
      */
-    public Single<X509CertificateAndPrivateKey> storeAsSecret(String namespace, X509CertificateAndPrivateKey ca) throws ApiException, GeneralSecurityException, IOException, OperatorCreationException {
+    public Single<X509CertificateAndPrivateKey> storeCaAsSecret(String namespace, X509CertificateAndPrivateKey ca) throws ApiException, GeneralSecurityException, IOException, OperatorCreationException {
         final V1Secret publicSecret = new V1Secret()
                 .metadata(new V1ObjectMeta()
                         .name(getPublicCaSecretName())
@@ -163,7 +170,7 @@ public class AuthorityManager {
     }
 
 
-    private Single<X509CertificateAndPrivateKey> loadOrGenerateCa(String namespace) {
+    private Single<X509CertificateAndPrivateKey> loadOrGenerateDatatcenterCa(String namespace) {
         return k8sResourceUtils.readOptionalNamespacedSecret(namespace, getPublicCaSecretName())
                 .flatMap(caPub -> k8sResourceUtils.readOptionalNamespacedSecret(namespace, getPrivateCaSecretName()).map(caKey -> new Tuple2<>(caPub, caKey)))
                 .flatMap(tuple -> {
@@ -173,11 +180,43 @@ public class AuthorityManager {
                     if (certsBytes == null || key == null) {
                         logger.info("Generating operator root ca for namespace={}", namespace);
                         ca = certManager.generateCa("AutoGeneratedRootCA", getCaKeyPass().toCharArray());
-                        return storeAsSecret(namespace, ca);
+                        return storeCaAsSecret(namespace, ca);
                     } else {
                         return Single.just(new X509CertificateAndPrivateKey(new String(certsBytes), new String(key)));
                     }
-                });
+                })
+                .flatMap(x -> storeOperatorTruststoreAsSecret(namespace).toSingleDefault(x));
+    }
+
+    /**
+     * Store the elassandra-operator truststore in a namespaced secret.
+     * This allow elassandra https connections to the operator.
+     * @param namespace
+     * @return
+     * @throws ApiException
+     * @throws IOException
+     */
+    public Completable storeOperatorTruststoreAsSecret(String namespace) throws ApiException, IOException {
+        SslConfiguration.TrustStoreConfiguration trustStoreConfiguration = sslConfiguration.getTrustStore();
+        if (trustStoreConfiguration.getPath().isPresent() && trustStoreConfiguration.getType().isPresent() && trustStoreConfiguration.getPassword().isPresent()) {
+            byte[] trustStoreBytes = null;
+            if (trustStoreConfiguration.getPath().get().startsWith("file:")) {
+                trustStoreBytes = Files.readAllBytes(Paths.get(trustStoreConfiguration.getPath().get().substring("file:".length())));
+            } else if (trustStoreConfiguration.getPath().get().startsWith("classpath:")) {
+                throw new UnsupportedEncodingException("classpath truststore not supported");
+            }
+            final V1Secret operatorTruststoreSecret = new V1Secret()
+                    .metadata(new V1ObjectMeta()
+                            .name(OPERATOR_TRUSTORE_SECRET_NAME)
+                            .namespace(namespace)
+                            .labels(OperatorLabels.MANAGED))
+                    .type("Opaque")
+                    .putStringDataItem("storetype", trustStoreConfiguration.getType().get())
+                    .putStringDataItem("storepass", trustStoreConfiguration.getPassword().get())
+                    .putDataItem("truststore", trustStoreBytes);
+            return k8sResourceUtils.createOrReplaceNamespacedSecret(operatorTruststoreSecret).ignoreElement();
+        }
+        return Completable.complete();
     }
 
     /**
@@ -206,4 +245,5 @@ public class AuthorityManager {
                 alias,
                 password);
     }
+
 }

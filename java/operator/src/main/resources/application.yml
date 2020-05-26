@@ -4,10 +4,12 @@ micronaut:
     ssl:
         enabled: true
         port: 443
+        trust-store:
+            type: "${OPERATOR_TRUSTSTORE_TYPE:PKCS12}"
+            path: "${OPERATOR_TRUSTSTORE_PATH:`file:/tls/operator.p12`}"
+            password: "${OPERATOR_TRUSTSTORE_PASSWORD:changeit}"
     server:
         ssl:
-            #protocol: [ "SSLv3", "TLSv1", "TLSv1.1", "TLSv1.2" ]
-            #ciphers: [ "TLS_ECDH_RSA_WITH_3DES_EDE_CBC_SHA", "TLS_ECDH_ECDSA_WITH_3DES_EDE_CBC_SHA", "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384" ]
             key-store:
                 type: "${OPERATOR_KEYSTORE_TYPE:PKCS12}"
                 path: "${OPERATOR_KEYSTORE_PATH:`file:/tls/operator.p12`}"
