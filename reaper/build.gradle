@@ -1,0 +1,23 @@
+import com.bmuschko.gradle.docker.tasks.image.DockerBuildImage
+import com.bmuschko.gradle.docker.tasks.image.DockerPushImage
+
+plugins {
+    id 'base'
+    id 'com.bmuschko.docker-remote-api'
+}
+
+def reaperImageName = registryUrl + "strapdata/cassandra-reaper:${reaperVersion}"
+
+task buildReaper(type: DockerBuildImage) {
+    inputDir = file('.')
+    images.add(reaperImageName)
+    buildArgs = [
+            'baseImage': "${reaperParentImage}:${reaperVersion}",
+            'driverAddons': "../java/driver-addons/build/libs/driver-addons-${project.version}.jar"
+    ]
+}
+
+task pushReaper(type: DockerPushImage) {
+    dependsOn "buildReaper"
+    images = [ reaperImageName ]
+}
