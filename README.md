@@ -24,7 +24,6 @@ Publish the docker images (operator + latest elassandra):
 Publish in local insecure registry
 ```bash
 ./gradlew dockerPush -PregistryUrl="localhost:5000/" -PregistryInsecure
-./gradlew java:operator:jib -PregistryUrl="localhost:5000/" -PregistryInsecure
 ```
 
 Build parameters are located in `gradle.properties`.
@@ -66,10 +65,6 @@ The operator image can be built we debug enabled :
 ```
 
 The sidecar image is by now build with debug enable on port 5005.
-
-## Release & CI/CD
-
-Check-out the [Jenkins CI](https://jenkins.azure.strapcloud.com/blue/organizations/jenkins/strapkop/activity).
 
 ### Docker images
 
