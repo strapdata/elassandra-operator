@@ -324,7 +324,7 @@ If you want execute a cleanup by yourself,  you have to create a **CleanUp task*
 .. code-block:: bash
 
     $ cat > cleanup-task.yaml << EOF
-    apiVersion: stable.strapdata.com/v1
+    apiVersion: elassandra.strapdata.com/v1
     kind: ElassandraTask
     metadata:
       name: "cleanup-task-001"
@@ -344,7 +344,7 @@ To check the status of the task :
     cleanup-task-001   76s
 
     $ kubectl get elassandratasks cleanup-task-001 -o yaml
-    apiVersion: stable.strapdata.com/v1
+    apiVersion: elassandra.strapdata.com/v1
     kind: ElassandraTask
     metadata:
       creationTimestamp: "2019-11-07T16:13:22Z"
@@ -352,7 +352,7 @@ To check the status of the task :
       name: cleanup-task-001
       namespace: default
       resourceVersion: "290120"
-      selfLink: /apis/stable.strapdata.com/v1/namespaces/default/elassandratasks/cleanup-task-001
+      selfLink: /apis/elassandra.strapdata.com/v1/namespaces/default/elassandratasks/cleanup-task-001
       uid: 345c5c85-377a-4d97-ad21-34457a2c7440
     spec:
       cleanup: {}

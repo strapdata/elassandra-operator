@@ -76,7 +76,7 @@ public class JmxmpElassandraProxy {
         DataCenter dc = getDataCenter(pod);
         String jmxUrl = UriTemplate.of("service:jmx:jmxmp://{jmxHost}:{jmxPort}/").expand(ImmutableMap.of(
                 "jmxHost", pod.getFqdn(),
-                "jmxPort", dc.getSpec().getJmxPort()));
+                "jmxPort", dc.getSpec().getJvm().getJmxPort()));
         JMXConnector jmxConnector = null; //jmxConnectorCache.get(pod);
         if (jmxConnector != null)
             return Single.just(jmxConnector);
@@ -85,7 +85,7 @@ public class JmxmpElassandraProxy {
         return loadPassword(dc, this.k8sResourceUtils, OperatorNames.clusterSecret(dc), DataCenterUpdateAction.KEY_JMX_PASSWORD)
                 .flatMap(jmxPassword -> {
                     final Map<String, Object> env = new HashMap<>();
-                    if (dc.getSpec().getSsl()) {
+                    if (dc.getSpec().getCassandra().getSsl()) {
                         // see https://docs.oracle.com/cd/E19698-01/816-7609/6mdjrf873/index.html
                         Security.addProvider(new com.sun.security.sasl.Provider());
                         env.put("jmx.remote.profiles", "TLS SASL/PLAIN");

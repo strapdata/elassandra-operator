@@ -64,13 +64,21 @@ init_helm() {
   echo "HELM installed"
 }
 
-# deploy the elassandra operator in $1 = namespace
+# deploy the elassandra operator
+# $1 = namespace
+# $2 = helm settings
 install_elassandra_operator() {
     echo "Installing elassandra-operator in namespace ${1:-default}"
+
+    local args=""
+    if [ "$2" != "" ]; then
+       args=",$2"
+    fi
+
     helm install --namespace ${1:-default} --name strapkop \
     --set image.repository=$REGISTRY_URL/strapdata/elassandra-operator-dev \
     --set image.tag="$ELASSANDRA_OPERATOR_TAG" \
-    --set image.pullSecrets[0]="$REGISTRY_SECRET_NAME" \
+    --set image.pullSecrets[0]="$REGISTRY_SECRET_NAME"$args \
     --wait \
     $HELM_REPO/elassandra-operator
     echo "Elassandra-operator installed"
@@ -85,6 +93,7 @@ uninstall_elassandra_operator() {
 # $2 = cluster
 # $3 = datacenter name
 # $4 = number of nodes
+# $5 = helm settings
 install_elassandra_datacenter() {
     local ns=${1:-"default"}
     local cl=${2:-"cl1"}
@@ -96,16 +105,20 @@ install_elassandra_datacenter() {
        registry=",image.pullSecrets[0]=$REGISTRY_SECRET_NAME"
     fi
 
+    local args=""
+    if [ "$5" != "" ]; then
+       args=",$5"
+    fi
+
     helm install --namespace "$ns" --name "$ns-$cl-$dc" \
     --set image.elassandraRepository=$REGISTRY_URL/strapdata/elassandra-node-dev \
     --set image.tag=$ELASSANDRA_NODE_TAG \
     --set dataVolumeClaim.storageClassName=${STORAGE_CLASS_NAME:-"standard"}$registry \
-    --set kibana.enabled="false" \
-    --set reaper.enabled="false" \
-    --set reaper.image="$REGISTRY_URL/strapdata/cassandra-reaper:2.1.0-SNAPSHOT-strapdata-1" \
-    --set sslStoragePort="38001",jmxPort="35001",prometheusPort="34001" \
+    --set elasticsearch.kibana.enabled="false" \
+    --set reaper.enabled="false",reaper.image="$REGISTRY_URL/strapdata/cassandra-reaper:2.0.3" \
+    --set cassandra.sslStoragePort="38001",jvm.jmxPort="35001",prometheus.port="34001" \
     --set externalDns.enabled="false",externalDns.root="xxxx.yyyy",externalDns.domain="test.strapkube.com" \
-    --set replicas="$sz" \
+    --set replicas="$sz"$args \
     --wait \
     $HELM_REPO/elassandra-datacenter
     echo "Datacenter $cl-$dc size=$sz deployed in namespace $ns"

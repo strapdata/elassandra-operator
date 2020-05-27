@@ -13,7 +13,7 @@ export REGISTRY_PORT='5000'
 export REGISTRY_URL="localhost:5000"
 
 create_cluster() {
-  create_kind_cluster3_with_local_registry
+  create_kind_cluster6_with_local_registry
 }
 
 # $1 = cluster name
@@ -31,7 +31,7 @@ create_kind_cluster3() {
 }
 
 # $1 = cluster name
-delete_kind_cluster() {
+delete_cluster() {
   kind delete clusters ${1:-cluster1}
 }
 
@@ -51,13 +51,16 @@ create_local_registry() {
 }
 
 # create registry container unless it already exists
-create_kind_cluster3_with_local_registry() {
+create_kind_cluster6_with_local_registry() {
   # create a cluster with the local registry enabled in containerd
   cat <<EOF | kind create cluster --name ${1:-cluster1} --image kindest/node:v1.15.11@sha256:6cc31f3533deb138792db2c7d1ffc36f7456a06f1db5556ad3b6927641016f50 --config=-
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
 - role: control-plane
+- role: worker
+- role: worker
+- role: worker
 - role: worker
 - role: worker
 - role: worker
@@ -84,6 +87,9 @@ EOF
   kubectl label nodes cluster1-worker failure-domain.beta.kubernetes.io/zone=a
   kubectl label nodes cluster1-worker2 failure-domain.beta.kubernetes.io/zone=b
   kubectl label nodes cluster1-worker3 failure-domain.beta.kubernetes.io/zone=c
+  kubectl label nodes cluster1-worker4 failure-domain.beta.kubernetes.io/zone=a
+  kubectl label nodes cluster1-worker5 failure-domain.beta.kubernetes.io/zone=b
+  kubectl label nodes cluster1-worker6 failure-domain.beta.kubernetes.io/zone=c
 }
 
 

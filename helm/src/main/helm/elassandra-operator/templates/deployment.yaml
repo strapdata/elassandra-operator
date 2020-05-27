@@ -33,11 +33,10 @@ spec:
       {{- end }}
       terminationGracePeriodSeconds: 45
       initContainers:
-        # build a PKCS12 file from the TLS secret
+        # build a PKCS12 keystore from the TLS secret for the micronaut server
         - name: init-tls-cert
           image: frapsoft/openssl
           command: ['sh', '-c', "openssl pkcs12 -export -in /tls-secret/tls.crt -inkey /tls-secret/tls.key -out /tls/operator.p12 -passout pass:changeit"]
-          #command: ['sh', '-c', "echo toto > /tls/operator.p12"]
           volumeMounts:
           - name: tls-secret-volume
             readOnly: true
@@ -88,7 +87,7 @@ spec:
             value: {{ .Values.namespace }}
           {{- end }}
           - name: OPERATOR_SERVICE_NAME
-            value: {{ template "elassandra-operator.fullname" . }}
+            value: {{ template "elassandra-operator.name" . }}
           {{- if .Values.env }}
           {{- range $key, $val := .Values.env }}
           - name: {{ $key }}

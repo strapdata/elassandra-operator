@@ -25,7 +25,7 @@ import java.util.Collection;
 @Infrastructure
 public class DataCenterPipeline extends CachedK8sWatchPipeline<DataCenter, DataCenterList, Key> {
 
-    private final Logger logger = LoggerFactory.getLogger(DataCenterPipeline.class);
+    private static final Logger logger = LoggerFactory.getLogger(DataCenterPipeline.class);
 
     public DataCenterPipeline(@Named("apiClient") ApiClient apiClient, DataCenterCache cache, CustomObjectsApi customObjectsApi, OperatorConfig config) {
         super(apiClient, new DataCenterAdapter(customObjectsApi, config), cache);
@@ -52,7 +52,8 @@ public class DataCenterPipeline extends CachedK8sWatchPipeline<DataCenter, DataC
         }
 
         @Override
-        public Call createListApiCall(boolean watch, String resourceVersion) throws ApiException {
+        public Call createListApiCall(Boolean watch, String resourceVersion) throws ApiException {
+            logger.trace("watch={} resourceVersion={}", watch, resourceVersion);
             return customObjectsApi.listNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, DataCenter.VERSION,
                     config.getNamespace(), DataCenter.PLURAL, null, null, null,
                     null, null, resourceVersion, null, watch, null);

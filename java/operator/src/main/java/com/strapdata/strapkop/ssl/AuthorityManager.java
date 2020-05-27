@@ -11,6 +11,7 @@ import io.kubernetes.client.openapi.models.V1Secret;
 import io.micronaut.cache.annotation.CacheConfig;
 import io.micronaut.caffeine.cache.AsyncLoadingCache;
 import io.micronaut.caffeine.cache.Caffeine;
+import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.scheduling.executor.ExecutorFactory;
 import io.micronaut.scheduling.executor.UserExecutorConfiguration;
@@ -46,7 +47,7 @@ public class AuthorityManager {
 
     // Operator truststore inherited from the micronaut ssl trust-store
     // see https://docs.micronaut.io/1.3.0/guide/configurationreference.html#io.micronaut.http.ssl.DefaultSslConfiguration$DefaultTrustStoreConfiguration
-    public static final String OPERATOR_TRUSTORE_SECRET_NAME = "operator-truststore";
+    public static final String OPERATOR_TRUSTORE_SECRET_NAME = "elassandra-operator-truststore";
     public static final String OPERATOR_TRUSTORE_MOUNT_PATH = "/tmp/operator-truststore"; // operator truststore mount path
 
     // datacenter root CA used to generate interla certificates
@@ -70,7 +71,7 @@ public class AuthorityManager {
     K8sResourceUtils k8sResourceUtils;
 
     @Inject
-    SslConfiguration sslConfiguration;
+    ServerSslConfiguration serverSslConfiguration;
 
     private final AsyncLoadingCache<String, X509CertificateAndPrivateKey> cache;
 
@@ -189,21 +190,23 @@ public class AuthorityManager {
     }
 
     /**
-     * Store the elassandra-operator truststore in a namespaced secret.
-     * This allow elassandra https connections to the operator.
+     * Store the elassandra-operator keystore in a namespaced secret.
+     * This allow trusted elassandra https connections to the operator.
      * @param namespace
      * @return
      * @throws ApiException
      * @throws IOException
      */
     public Completable storeOperatorTruststoreAsSecret(String namespace) throws ApiException, IOException {
-        SslConfiguration.TrustStoreConfiguration trustStoreConfiguration = sslConfiguration.getTrustStore();
-        if (trustStoreConfiguration.getPath().isPresent() && trustStoreConfiguration.getType().isPresent() && trustStoreConfiguration.getPassword().isPresent()) {
+        SslConfiguration.KeyStoreConfiguration keyStoreConfiguration = serverSslConfiguration.getKeyStore();
+        if (keyStoreConfiguration.getPath().isPresent() &&
+                keyStoreConfiguration.getType().isPresent() &&
+                keyStoreConfiguration.getPassword().isPresent()) {
             byte[] trustStoreBytes = null;
-            if (trustStoreConfiguration.getPath().get().startsWith("file:")) {
-                trustStoreBytes = Files.readAllBytes(Paths.get(trustStoreConfiguration.getPath().get().substring("file:".length())));
-            } else if (trustStoreConfiguration.getPath().get().startsWith("classpath:")) {
-                throw new UnsupportedEncodingException("classpath truststore not supported");
+            if (keyStoreConfiguration.getPath().get().startsWith("file:")) {
+                trustStoreBytes = Files.readAllBytes(Paths.get(keyStoreConfiguration.getPath().get().substring("file:".length())));
+            } else {
+                throw new UnsupportedEncodingException("Only file:truststore is supported, please check your micronaut.server.ssl.key-store configuration.");
             }
             final V1Secret operatorTruststoreSecret = new V1Secret()
                     .metadata(new V1ObjectMeta()
@@ -211,10 +214,17 @@ public class AuthorityManager {
                             .namespace(namespace)
                             .labels(OperatorLabels.MANAGED))
                     .type("Opaque")
-                    .putStringDataItem("storetype", trustStoreConfiguration.getType().get())
-                    .putStringDataItem("storepass", trustStoreConfiguration.getPassword().get())
+                    .putStringDataItem("storetype", keyStoreConfiguration.getType().get())
+                    .putStringDataItem("storepass", keyStoreConfiguration.getPassword().get())
                     .putDataItem("truststore", trustStoreBytes);
-            return k8sResourceUtils.createOrReplaceNamespacedSecret(operatorTruststoreSecret).ignoreElement();
+            return k8sResourceUtils.createOrReplaceNamespacedSecret(operatorTruststoreSecret)
+                    .map(s -> {
+                        logger.debug("operator truststore secret={}/{} created", OPERATOR_TRUSTORE_SECRET_NAME, namespace);
+                        return s;
+                    }).ignoreElement();
+        } else {
+            logger.warn("operator truststore secret={}/{} not created, please check your micronaut.server.ssl.key-store configuration.",
+                    OPERATOR_TRUSTORE_SECRET_NAME, namespace);
         }
         return Completable.complete();
     }

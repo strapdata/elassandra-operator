@@ -23,7 +23,7 @@ public class TaskReconcilierResolver {
             ReplicationTaskReconcilier replicationTaskReconcilier,
             RebuildTaskReconcilier rebuildTaskReconcilier,
             RemoveNodesTaskReconcilier removeNodesTaskReconcilier,
-            ElasticResetTaskReconcilier elasticResetTaskReconcilier
+            UpdateRoutingTaskReconcilier elasticResetTaskReconcilier
     ) {
         taskFamily = ImmutableList.of(
                 Tuple.of(backupTaskReconcilier, TaskSpec::getBackup),
@@ -32,7 +32,7 @@ public class TaskReconcilierResolver {
                 Tuple.of(replicationTaskReconcilier, TaskSpec::getReplication),
                 Tuple.of(removeNodesTaskReconcilier, TaskSpec::getRemoveNodes),
                 Tuple.of(rebuildTaskReconcilier, TaskSpec::getRebuild),
-                Tuple.of(elasticResetTaskReconcilier, TaskSpec::getElasticReset)
+                Tuple.of(elasticResetTaskReconcilier, TaskSpec::getUpdateRouting)
                 );
     }
 

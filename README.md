@@ -32,27 +32,7 @@ Build parameters are located in `gradle.properties`.
 
 M_K8S_FLAVOR=kind M_INTEG_DIR=scale_up mage integ:run
 
-## Integration testing
 
-Deploy the operator and a datacenter (3 nodes) for manual experimentation :
-```bash
-./test/basic-setup dc1 3
-```
-
-Run a full test that spawn a 1-node dc, scale to 3 nodes then cleanup everything :
-```bash
-./test/test-scale dc1 1 3
-```
-
-To cleanup all resources created in the k8s cluster :
-```bash
-./test/full-cleanup
-```
-
-Running all the main test scenarios from gradle :
-```bash
-./gradlew :test:test
-```
 
 There are plenty of test and helpers script located in `./test`, `./test/lib` and `./test/aks`.
 They are parameterized from env variables with consistent default (see `./test/config`).

@@ -52,7 +52,7 @@ public class StatefulsetPipeline extends CachedK8sWatchPipeline<V1StatefulSet, V
         }
 
         @Override
-        public Call createListApiCall(boolean watch, String resourceVersion) throws ApiException {
+        public Call createListApiCall(Boolean watch, String resourceVersion) throws ApiException {
             return appsV1Api.listNamespacedStatefulSetCall(config.getNamespace(),
                     null, null, null, null, OperatorLabels.toSelector(OperatorLabels.MANAGED),
                     null, resourceVersion, null, watch, null);

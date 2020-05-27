@@ -244,9 +244,11 @@ public class ReaperPlugin extends AbstractPlugin {
         // Create an accumulator for JAVA_OPTS
         // TODO do we have to make HEAP values configurable in the reaper section of DCSpec ??
         StringBuilder javaOptsBuilder = new StringBuilder(200);
-        if (dataCenterSpec.getJmxmpEnabled()) {
+        if (dataCenterSpec.getJvm().getJmxmpEnabled()) {
             javaOptsBuilder.append(" -Ddw.jmxmp.enabled=true ");
-            if (dataCenterSpec.getSsl() && (!dataCenterSpec.getJmxmpEnabled() || (dataCenterSpec.getJmxmpEnabled() && dataCenterSpec.getJmxmpOverSSL()))) {
+            if (dataCenterSpec.getCassandra().getSsl() &&
+                    (!dataCenterSpec.getJvm().getJmxmpEnabled() ||
+                    (dataCenterSpec.getJvm().getJmxmpEnabled() && dataCenterSpec.getJvm().getJmxmpOverSSL()))) {
                 javaOptsBuilder.append(" -Ddw.jmxmp.ssl=true ");
             }
         }
@@ -345,7 +347,7 @@ public class ReaperPlugin extends AbstractPlugin {
                 .addEnvItem(new V1EnvVar().name("REAPER_STORAGE_TYPE").value("cassandra"))
                 .addEnvItem(new V1EnvVar().name("REAPER_CASS_CLUSTER_NAME").value(dataCenterSpec.getClusterName()))
                 .addEnvItem(new V1EnvVar().name("REAPER_CASS_CONTACT_POINTS").value("[ \"" + contactPoint + "\" ]"))
-                .addEnvItem(new V1EnvVar().name("REAPER_CASS_PORT").value(dataCenterSpec.getNativePort().toString()))
+                .addEnvItem(new V1EnvVar().name("REAPER_CASS_PORT").value(dataCenterSpec.getCassandra().getNativePort().toString()))
                 .addEnvItem(new V1EnvVar().name("REAPER_CASS_KEYSPACE").value("reaper_db"))
                 .addEnvItem(new V1EnvVar().name("REAPER_CASS_LOCAL_DC").value(dataCenterSpec.getDatacenterName()))
                 .addEnvItem(new V1EnvVar().name("JWT_SECRET").value(Base64.getEncoder().encodeToString(dataCenterSpec.getReaper().getJwtSecret().getBytes())))
@@ -367,7 +369,7 @@ public class ReaperPlugin extends AbstractPlugin {
         }
 
         // reaper with cassandra authentication
-        if (!Objects.equals(dataCenterSpec.getAuthentication(), Authentication.NONE)) {
+        if (!Objects.equals(dataCenterSpec.getCassandra().getAuthentication(), Authentication.NONE)) {
             container
                     .addEnvItem(new V1EnvVar()
                             .name("REAPER_CASS_AUTH_ENABLED")
@@ -394,7 +396,7 @@ public class ReaperPlugin extends AbstractPlugin {
         }
 
         // reaper with cassandra ssl on native port
-        if (Boolean.TRUE.equals(dataCenterSpec.getSsl())) {
+        if (Boolean.TRUE.equals(dataCenterSpec.getCassandra().getSsl())) {
             podSpec.addVolumesItem(new V1Volume()
                     .name("truststore")
                     .secret(new V1SecretVolumeSource()
@@ -582,8 +584,8 @@ public class ReaperPlugin extends AbstractPlugin {
                                 .withOwner("elassandra-operator"));
                     }
                     // add explicit scheduled repair, can ovreride default settings
-                    if (dc.getSpec().getReaper().getReaperScheduledRepairs() != null) {
-                        dc.getSpec().getReaper().getReaperScheduledRepairs().stream().map(s -> scheduledRepairMap.put(s.getKeyspace(), s));
+                    if (dc.getSpec().getReaper().getScheduledRepairs() != null) {
+                        dc.getSpec().getReaper().getScheduledRepairs().stream().map(s -> scheduledRepairMap.put(s.getKeyspace(), s));
                     }
                     logger.debug("Submit scheduledRepair={}", scheduledRepairMap.values());
                     for (ReaperScheduledRepair reaperScheduledRepair : scheduledRepairMap.values()) {

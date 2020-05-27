@@ -52,7 +52,7 @@ public class TaskPipeline extends CachedK8sWatchPipeline<Task, TaskList, Key> {
         }
 
         @Override
-        public Call createListApiCall(boolean watch, String resourceVersion) throws ApiException {
+        public Call createListApiCall(Boolean watch, String resourceVersion) throws ApiException {
             return customObjectsApi.listNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, Task.VERSION,
                     config.getNamespace(), Task.PLURAL, null, null, null,
                     null, null, resourceVersion, null, watch, null);

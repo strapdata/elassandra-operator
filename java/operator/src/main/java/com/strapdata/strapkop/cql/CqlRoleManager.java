@@ -86,7 +86,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
     public Single<Boolean> reconcileRole(DataCenter dataCenter, Boolean status, CqlSessionSupplier sessionSupplier, PluginRegistry pluginRegistry) {
         return Single.just(status)
                 .map(doUpdateStatus -> {
-                    if (Authentication.NONE.equals(dataCenter.getSpec().getAuthentication()))
+                    if (Authentication.NONE.equals(dataCenter.getSpec().getCassandra().getAuthentication()))
                         return doUpdateStatus;
 
                     addIfAbsent(dataCenter, CqlRole.CASSANDRA_ROLE.username, () -> CqlRole.CASSANDRA_ROLE.duplicate());
@@ -150,7 +150,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                 @Override
                 public Tuple2<Cluster,Session> call() throws Exception {
                     logger.debug("datacenter={} Creating a new CQL connection", dc.id());
-                    if (dc.getSpec().getAuthentication().equals(Authentication.NONE))
+                    if (dc.getSpec().getCassandra().getAuthentication().equals(Authentication.NONE))
                         return connect(dc, dcStatus, Optional.empty()).blockingGet();
 
                     // WARNING: get the role copy for the current dc
@@ -286,7 +286,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
         // TODO: updateConnection remote seeds as contact point
         final Cluster.Builder builder = Cluster.builder()
                 .withClusterName(dc.getSpec().getClusterName())
-                .withPort(dc.getSpec().getNativePort())
+                .withPort(dc.getSpec().getCassandra().getNativePort())
                 .withQueryOptions(new QueryOptions().setConsistencyLevel(ConsistencyLevel.LOCAL_ONE))
                 .withPoolingOptions(new PoolingOptions()
                         // see https://dzone.com/articles/tuning-datastax-java-driver-for-cassandra
@@ -303,7 +303,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                                 .build()))
                 .withRetryPolicy(new LoggingRetryPolicy(StrapkopRetryPolicy.INSTANCE));
 
-        if (dc.getSpec().getHostNetworkEnabled() || dc.getSpec().getHostPortEnabled()) {
+        if (dc.getSpec().getNetworking().getHostNetworkEnabled() || dc.getSpec().getNetworking().getHostPortEnabled()) {
             // if cluster has public broadcast IPs, the translator retreive internal k8s IP addresses
             builder.withAddressTranslator(new KubernetesDnsAddressTranslator());
         }
@@ -311,8 +311,8 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
         // contact local nodes is bootstrapped or first DC in the cluster
         boolean hasSeedBootstrapped = dc.getStatus().getBootstrapped();
         if (hasSeedBootstrapped ||
-                ((dc.getSpec().getRemoteSeeds() == null || dc.getSpec().getRemoteSeeds().isEmpty()) &&
-                        (dc.getSpec().getRemoteSeeders() == null || dc.getSpec().getRemoteSeeders().isEmpty()))) {
+                ((dc.getSpec().getCassandra().getRemoteSeeds() == null || dc.getSpec().getCassandra().getRemoteSeeds().isEmpty()) &&
+                        (dc.getSpec().getCassandra().getRemoteSeeders() == null || dc.getSpec().getCassandra().getRemoteSeeders().isEmpty()))) {
             String contactPoint = OperatorNames.nodesService(dc) + "." + dc.getMetadata().getNamespace() + ".svc.cluster.local";
             try {
                 logger.debug("datacenter={} add local seed={}", dc.id(), contactPoint);
@@ -327,7 +327,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
             }
         }
 
-        if (Objects.equals(dc.getSpec().getSsl(), Boolean.TRUE)) {
+        if (Objects.equals(dc.getSpec().getCassandra().getSsl(), Boolean.TRUE)) {
             builder.withSSL(getSSLOptions(dc.getMetadata().getNamespace()));
         }
 

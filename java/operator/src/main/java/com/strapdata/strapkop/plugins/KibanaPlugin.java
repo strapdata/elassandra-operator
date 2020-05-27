@@ -68,13 +68,13 @@ public class KibanaPlugin extends AbstractPlugin {
     private static final KibanaSpace DEFAULT_KIBANA_SPACE = new KibanaSpace().withName("").withKeyspaces(ImmutableSet.of("_kibana"));
 
     private Map<String, KibanaSpace> getKibanaSpaces(final DataCenter dataCenter) {
-        Map<String, KibanaSpace> spaces = dataCenter.getSpec().getKibana().getSpaces().stream().collect(Collectors.toMap(KibanaSpace::getName, Function.identity()));
+        Map<String, KibanaSpace> spaces = dataCenter.getSpec().getElasticsearch().getKibana().getSpaces().stream().collect(Collectors.toMap(KibanaSpace::getName, Function.identity()));
         return (spaces.size() == 0) ? ImmutableMap.of(DEFAULT_KIBANA_SPACE.getName(), DEFAULT_KIBANA_SPACE) : spaces;
     }
 
     @Override
     public Completable syncKeyspaces(final CqlKeyspaceManager cqlKeyspaceManager, final DataCenter dataCenter) {
-        Integer version = dataCenter.getSpec().getKibana().getVersion();
+        Integer version = dataCenter.getSpec().getElasticsearch().getKibana().getVersion();
         for (KibanaSpace kibana : getKibanaSpaces(dataCenter).values()) {
             cqlKeyspaceManager.addIfAbsent(dataCenter, kibana.keyspace(version), () -> new CqlKeyspace()
                     .withName(kibana.keyspace(version))
@@ -93,7 +93,7 @@ public class KibanaPlugin extends AbstractPlugin {
      */
     @Override
     public Completable syncRoles(final CqlRoleManager cqlRoleManager, final DataCenter dataCenter) throws ApiException {
-        Integer version = dataCenter.getSpec().getKibana().getVersion();
+        Integer version = dataCenter.getSpec().getElasticsearch().getKibana().getVersion();
         List<CompletableSource> todoList = new ArrayList<>();
         for (KibanaSpace kibana : getKibanaSpaces(dataCenter).values()) {
             V1ObjectMeta v1SecretMeta = new V1ObjectMeta()
@@ -152,19 +152,19 @@ public class KibanaPlugin extends AbstractPlugin {
 
     @Override
     public boolean isActive(final DataCenter dataCenter) {
-        return dataCenter.getSpec().getElasticsearchEnabled() && dataCenter.getSpec().getKibana().getEnabled();
+        return dataCenter.getSpec().getElasticsearch().getEnabled() && dataCenter.getSpec().getElasticsearch().getKibana().getEnabled();
     }
 
 
     @Override
     public Single<Boolean> reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
-        logger.trace("datacenter={} kibana.spec={}", dataCenter.id(), dataCenter.getSpec().getKibana());
+        logger.trace("datacenter={} kibana.spec={}", dataCenter.id(), dataCenter.getSpec().getElasticsearch().getKibana());
         Set<String> deployedKibanaSpaces = dataCenter.getStatus().getKibanaSpaceNames();
         Map<String, KibanaSpace> desiredKibanaMap = getKibanaSpaces(dataCenter);
 
         return this.listDeployments(dataCenter)
                 .flatMap(deployments -> {
-                    boolean kibanaEnabled = dataCenter.getSpec().getKibana() != null && dataCenter.getSpec().getKibana().getEnabled();
+                    boolean kibanaEnabled = dataCenter.getSpec().getElasticsearch().getKibana() != null && dataCenter.getSpec().getElasticsearch().getKibana().getEnabled();
                     logger.debug("datacenter={} enabled={} parked={} deployments.size={}",
                             dataCenter.id(), kibanaEnabled, dataCenter.getSpec().isParked(), deployments.size());
                     if ((kibanaEnabled == false || desiredKibanaMap.size() == 0 || dataCenter.getSpec().isParked())) {
@@ -248,7 +248,7 @@ public class KibanaPlugin extends AbstractPlugin {
         if (dataCenter.getSpec().isParked())
             return 0;
 
-        Integer version = dataCenter.getSpec().getKibana().getVersion();
+        Integer version = dataCenter.getSpec().getElasticsearch().getKibana().getVersion();
         return (dataCenter.getStatus().getPhase().isRunning() &&
                 dataCenter.getStatus().getBootstrapped() == true &&
                 dataCenter.getStatus().getKeyspaceManagerStatus().getKeyspaces().contains(kibanaSpace.keyspace(version))) ? kibanaSpace.getReplicas() : 0;
@@ -259,7 +259,7 @@ public class KibanaPlugin extends AbstractPlugin {
             ApiException, StrapkopException {
         final V1ObjectMeta dataCenterMetadata = dataCenter.getMetadata();
         final DataCenterSpec dataCenterSpec = dataCenter.getSpec();
-        final Integer version = dataCenter.getSpec().getKibana().getVersion();
+        final Integer version = dataCenter.getSpec().getElasticsearch().getKibana().getVersion();
 
         final Map<String, String> labels = kibanaSpaceLabels(dataCenter, space.getName());
 
@@ -300,7 +300,7 @@ public class KibanaPlugin extends AbstractPlugin {
 
         container
                 .name("kibana")
-                .image(dataCenter.getSpec().getKibana().getImage())
+                .image(dataCenter.getSpec().getElasticsearch().getKibana().getImage())
                 .terminationMessagePolicy("FallbackToLogsOnError")
                 .addPortsItem(new V1ContainerPort()
                         .name("kibana")
@@ -335,8 +335,8 @@ public class KibanaPlugin extends AbstractPlugin {
                 */
                 .addEnvItem(new V1EnvVar()
                         .name("ELASTICSEARCH_URL")
-                        .value((Boolean.TRUE.equals(dataCenterSpec.getEnterprise().getHttps()) ? "https://" : "http://") +
-                                OperatorNames.elasticsearchService(dataCenter) + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local:" + dataCenterSpec.getElasticsearchPort())
+                        .value((Boolean.TRUE.equals(dataCenterSpec.getElasticsearch().getEnterprise().getHttps()) ? "https://" : "http://") +
+                                OperatorNames.elasticsearchService(dataCenter) + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local:" + dataCenterSpec.getElasticsearch().getHttpPort())
                 )
                 .addEnvItem(new V1EnvVar()
                         .name("KIBANA_INDEX")
@@ -355,7 +355,7 @@ public class KibanaPlugin extends AbstractPlugin {
 
 
         // kibana with cassandra authentication
-        if (!Objects.equals(dataCenterSpec.getAuthentication(), Authentication.NONE)) {
+        if (!Objects.equals(dataCenterSpec.getCassandra().getAuthentication(), Authentication.NONE)) {
             String kibanaSecretName = kibanaName(dataCenter, space);
 
             container
@@ -377,7 +377,7 @@ public class KibanaPlugin extends AbstractPlugin {
         }
 
         // kibana with cassandra ssl on native port
-        if (Boolean.TRUE.equals(dataCenterSpec.getSsl())) {
+        if (Boolean.TRUE.equals(dataCenterSpec.getCassandra().getSsl())) {
             podSpec.addVolumesItem(new V1Volume()
                     .name("truststore")
                     .secret(new V1SecretVolumeSource()
@@ -412,16 +412,16 @@ public class KibanaPlugin extends AbstractPlugin {
                             ));
                 })
                 .flatMap(s -> {
-                    if (!Strings.isNullOrEmpty(dataCenterSpec.getKibana().getIngressSuffix())) {
-                        String kibanaHost = space.name() + "-" + dataCenterSpec.getKibana().getIngressSuffix();
+                    if (!Strings.isNullOrEmpty(dataCenterSpec.getElasticsearch().getKibana().getIngressSuffix())) {
+                        String kibanaHost = space.name() + "-" + dataCenterSpec.getElasticsearch().getKibana().getIngressSuffix();
                         logger.info("Creating kibana ingress for host={}", kibanaHost);
                         final V1ObjectMeta ingressMeta = new V1ObjectMeta()
                                 .name(kibanaNameDc(dataCenter, space))
                                 .namespace(dataCenterMetadata.getNamespace())
                                 .labels(labels)
                                 .putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, dataCenter.getMetadata().getGeneration().toString());
-                        if (dataCenterSpec.getKibana().getIngressAnnotations() != null && !dataCenterSpec.getKibana().getIngressAnnotations().isEmpty()) {
-                            dataCenterSpec.getKibana().getIngressAnnotations().entrySet().stream()
+                        if (dataCenterSpec.getElasticsearch().getKibana().getIngressAnnotations() != null && !dataCenterSpec.getElasticsearch().getKibana().getIngressAnnotations().isEmpty()) {
+                            dataCenterSpec.getElasticsearch().getKibana().getIngressAnnotations().entrySet().stream()
                                     .map(e -> ingressMeta.putAnnotationsItem(e.getKey(), e.getValue()));
                         }
                         final ExtensionsV1beta1Ingress ingress = new ExtensionsV1beta1Ingress()

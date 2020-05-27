@@ -2,10 +2,17 @@ package com.strapdata.strapkop.model.k8s.cassandra;
 
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
+import com.strapdata.strapkop.model.GsonUtils;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.With;
+import org.apache.commons.codec.digest.DigestUtils;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Elasticsearch configuration.
@@ -36,7 +43,7 @@ public class Elasticsearch {
      */
     @SerializedName("transportPort")
     @Expose
-    private Integer elasticsearchTransportPort = 9300;
+    private Integer transportPort = 9300;
 
     /**
      * Create a Load balancer service with external IP for Elasticsearch
@@ -59,4 +66,58 @@ public class Elasticsearch {
     @Expose
     private Boolean ingressEnabled = false;
 
+    /**
+     * Elasticsearch YAML configuration map
+     */
+    @SerializedName("config")
+    @Expose
+    private Map<String, Object> config = new HashMap<>();
+
+    /**
+     * Elassandra datacenter group
+     */
+    @SerializedName("datacenterGroup")
+    @Expose
+    private String datacenterGroup = null;
+
+    /**
+     * Elassandra datacenter group
+     */
+    @SerializedName("datacenterTags")
+    @Expose
+    private List<String> datacenterTags = null;
+
+    /**
+     * Elassandra Enterprise configuration
+     */
+    @SerializedName("enterprise")
+    @Expose
+    private Enterprise enterprise = new Enterprise()
+            .setCbs(false)
+            .setHttps(false)
+            .setJmx(false)
+            .setSsl(false)
+            .setAaa(new Aaa().setEnabled(false));
+
+    /**
+     * Kibana configuration.
+     *
+     */
+    @SerializedName("kibana")
+    @Expose
+    private Kibana kibana = new Kibana();
+
+    public String kibanaFingerprint() {
+        List<Object> acc = new ArrayList<>();
+
+        // we exclude :
+        // * Reaper config
+        // * Kibana config
+        // * parked attribute
+        // * scheduledBackups (DC reconciliation is useless in this case, we only want to update Scheduler)
+        acc.add(kibana);
+        String json = GsonUtils.toJson(acc);
+        String digest = DigestUtils.sha1Hex(json).substring(0,7);
+        return digest;
+    }
 }

@@ -57,7 +57,9 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
     }
 
     private String elasticAdminKeyspaceName(DataCenter dataCenter) {
-        return (dataCenter.getSpec().getDatacenterGroup() != null) ? "elastic_admin_" + dataCenter.getSpec().getDatacenterGroup() : "elastic_admin";
+        return (dataCenter.getSpec().getElasticsearch().getDatacenterGroup() != null)
+                ? "elastic_admin_" + dataCenter.getSpec().getElasticsearch().getDatacenterGroup()
+                : "elastic_admin";
     }
 
     /**
@@ -75,7 +77,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                         addIfAbsent(dataCenter, keyspace.name, () -> keyspace);
                     }
                     String elasticAdminKeyspaceName = elasticAdminKeyspaceName(dataCenter);
-                    if (dataCenter.getSpec().getElasticsearchEnabled()) {
+                    if (dataCenter.getSpec().getElasticsearch().getEnabled()) {
                         addIfAbsent(dataCenter, elasticAdminKeyspaceName, () -> new CqlKeyspace()
                                 .withName(elasticAdminKeyspaceName).withRf(3).withRepair(true).withCreateIfNotExists(false));
                     } else {

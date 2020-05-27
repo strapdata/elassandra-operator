@@ -8,7 +8,7 @@ replicas=${2:-1}
 backup_name=${3:-testbackup-${name}}
 
 cat <<EOF | kubectl create -f -
-apiVersion: stable.strapdata.com/v1
+apiVersion: elassandra.strapdata.com/v1
 kind: ElassandraTask
 metadata:
   name: ${backup_name}

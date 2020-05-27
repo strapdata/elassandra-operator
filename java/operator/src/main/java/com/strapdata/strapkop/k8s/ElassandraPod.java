@@ -44,8 +44,8 @@ public class ElassandraPod {
                 .setParent(dc.getMetadata().getName())
                 .setNamespace(dc.getMetadata().getNamespace())
                 .setRackIndex(rackIndex)
-                .setSsl(dc.getSpec().getSsl())
-                .setEsPort(dc.getSpec().getElasticsearchPort());
+                .setSsl(dc.getSpec().getCassandra().getSsl())
+                .setEsPort(dc.getSpec().getElasticsearch().getHttpPort());
     }
 
     public ElassandraPod(final String namespace, final String clusterName, String dcName, String podName) {

@@ -27,10 +27,6 @@ public class DataCenterSpec {
     @Expose
     private String datacenterName;
 
-    @SerializedName("workload")
-    @Expose
-    private Workload workload = Workload.READ_WRITE;
-
     /**
      * Number of Cassandra nodes in this data center.
      */
@@ -115,24 +111,20 @@ public class DataCenterSpec {
     @Expose
     private V1ResourceRequirements resources = null;
 
-    @SerializedName("computeJvmMemorySettings")
-    @Expose
-    private boolean computeJvmMemorySettings = true;
-
-    /**
-     *  Tell Cassandra to use the local IP address (INTERNAL_IP).
-     *  May require a VPC  or VPN between the datacenters.
-     */
-    @SerializedName("snitchPreferLocal")
-    @Expose
-    private Boolean snitchPreferLocal = true;
-
     /**
      * PVC spec
      */
     @SerializedName("dataVolumeClaim")
     @Expose
     private V1PersistentVolumeClaimSpec dataVolumeClaim;
+
+
+    /**
+     * Decomission policy control PVC when node removed.
+     */
+    @SerializedName("decommissionPolicy")
+    @Expose
+    private DecommissionPolicy decommissionPolicy = DecommissionPolicy.DELETE_PVC;
 
     /**
      * Name of an optional config map that contains cassandra configuration in the form of yaml fragments
@@ -151,25 +143,11 @@ public class DataCenterSpec {
     private V1SecretVolumeSource userSecretVolumeSource;
 
     /**
-     * Play cassandra commitlogs in a dedicated init container to avoid the liveness timeout endless loop.
+     * Prometheus configuration.
      */
-    @SerializedName("commitlogsInitContainer")
+    @SerializedName("prometheus")
     @Expose
-    private Boolean commitlogsInitContainer = false;
-
-    /**
-     * Enable Prometheus support.
-     */
-    @SerializedName("prometheusEnabled")
-    @Expose
-    private Boolean prometheusEnabled = false;
-
-    /**
-     * Prometheus agent listen port.
-     */
-    @SerializedName("prometheusPort")
-    @Expose
-    private Integer prometheusPort = 9500;
+    private Prometheus prometheus = new Prometheus();
 
     /**
      * Reaper configuration.
@@ -180,14 +158,6 @@ public class DataCenterSpec {
     private Reaper reaper = new Reaper();
 
     /**
-     * Kibana configuration.
-     *
-     */
-    @SerializedName("kibana")
-    @Expose
-    private Kibana kibana = new Kibana();
-
-    /**
      * Managed keyspaces map.
      */
     @SerializedName("managedKeyspaces")
@@ -195,110 +165,18 @@ public class DataCenterSpec {
     private Set<ManagedKeyspace> managedKeyspaces = new HashSet<>();
 
     /**
-     * Attempt to run privileged configuration options for better performance
-     *
+     * Kubernetes networking configuration
      */
-    @SerializedName("privilegedSupported")
+    @SerializedName("networking")
     @Expose
-    private Boolean privilegedSupported = false;
+    private Networking networking = new Networking();
 
     /**
-     * Enable hostPort for nativePort, storagePort and sslStoragePort
+     * Elasticsearch configuration
      */
-    @SerializedName("hostPortEnabled")
+    @SerializedName("elasticsearch")
     @Expose
-    private Boolean hostPortEnabled = true;
-
-    /**
-     * Enable hostNetwork, allowing to bind on host IP addresses.
-     */
-    @SerializedName("hostNetworkEnabled")
-    @Expose
-    private Boolean hostNetworkEnabled = false;
-
-    /**
-     * Enable external LoadBalancer for each Elassandra node.
-     */
-    @SerializedName("nodeLoadBalancerEnabled")
-    @Expose
-    private Boolean nodeLoadBalancerEnabled = false;
-
-    /**
-     * Enable elasticsearch service
-     */
-    @SerializedName("elasticsearchEnabled")
-    @Expose
-    private Boolean elasticsearchEnabled = true;
-
-    /**
-     * Elasticsearch HTTP port
-     */
-    @SerializedName("elasticsearchPort")
-    @Expose
-    private Integer elasticsearchPort = 9200;
-
-    /**
-     * Elasticsearch Transport port
-     */
-    @SerializedName("elasticsearchTransportPort")
-    @Expose
-    private Integer elasticsearchTransportPort = 9300;
-
-    /**
-     * CQL native port (also hostPort)
-     */
-    @SerializedName("nativePort")
-    @Expose
-    private Integer nativePort = 39042;
-
-    /**
-     * Cassandra storage port (also hostPort)
-     */
-    @SerializedName("storagePort")
-    @Expose
-    private Integer storagePort = 37000;
-
-    /**
-     * Cassandra storage port (also hostPort)
-     */
-    @SerializedName("sslStoragePort")
-    @Expose
-    private Integer sslStoragePort = 37001;
-
-    /**
-     * Java JMX port
-     */
-    @SerializedName("jmxPort")
-    @Expose
-    private Integer jmxPort = 7199;
-
-    /**
-     * Enable JMXMP.
-     */
-    @SerializedName("jmxmpEnabled")
-    @Expose
-    private Boolean jmxmpEnabled = true;
-
-    /**
-     * Enable SSL with JMXMP.
-     */
-    @SerializedName("jmxmpOverSSL")
-    @Expose
-    private Boolean jmxmpOverSSL = true;
-
-    /**
-     * Java debugger port (also hostPort)
-     */
-    @SerializedName("jdbPort")
-    @Expose
-    private Integer jdbPort = -1;
-
-    /**
-     * Enable SSL support
-     */
-    @SerializedName("ssl")
-    @Expose
-    private Boolean ssl = false;
+    private Elasticsearch elasticsearch = new Elasticsearch();
 
     /**
      * External DNS config for public nodes and elasticsearch service.
@@ -307,68 +185,23 @@ public class DataCenterSpec {
     @Expose
     private ExternalDns externalDns = null;
 
+
     /**
-     * Decomission policy control PVC when node removed.
+     * Jvm configuration
      */
-    @SerializedName("decommissionPolicy")
+    @SerializedName("jvm")
     @Expose
-    private DecommissionPolicy decommissionPolicy = DecommissionPolicy.DELETE_PVC;
+    private Jvm jvm = new Jvm();
 
     /**
-     * Enable cassandra/ldap authentication and authorization
+     * Cassandra configuration
      */
-    @SerializedName("authentication")
+    @SerializedName("cassandra")
     @Expose
-    private Authentication authentication = Authentication.CASSANDRA;
-
-    @SerializedName("enterprise")
-    @Expose
-    private Enterprise enterprise = new Enterprise();
+    private Cassandra cassandra = new Cassandra();
 
     /**
-     * Remote seed IP addresses.
-     */
-    @SerializedName("remoteSeeds")
-    @Expose
-    private List<String> remoteSeeds = new ArrayList<>();
-
-    /**
-     * List of URL providing dynamic seed list.
-     */
-    @SerializedName("remoteSeeders")
-    @Expose
-    private List<String> remoteSeeders = new ArrayList<>();
-
-    /**
-     * Create a Load balancer service with external IP for Elasticsearch
-     */
-    @SerializedName("elasticsearchLoadBalancerEnabled")
-    @Expose
-    private Boolean elasticsearchLoadBalancerEnabled = false;
-
-    /**
-     * The LoadBalancer exposing cql + elasticsearch nodePorts
-     */
-    @SerializedName("elasticsearchLoadBalancerIp")
-    @Expose
-    private String elasticsearchLoadBalancerIp;
-
-    /**
-     * Enable Elasticsearch service ingress
-     */
-    @SerializedName("elasticsearchIngressEnabled")
-    @Expose
-    private Boolean elasticsearchIngressEnabled = false;
-
-    /**
-     * Elassandra datacenter group
-     */
-    @SerializedName("datacenterGroup")
-    @Expose
-    private String datacenterGroup = null;
-
-    /**
-     * Elassandra web hook URL called when the datacenter is reconcilied.
+     * Elassandra webhook URL called when the datacenter is reconcilied.
      */
     @SerializedName("webHookUrl")
     @Expose
@@ -389,8 +222,6 @@ public class DataCenterSpec {
         // * Kibana config
         // * parked attribute
         // * scheduledBackups (DC reconciliation is useless in this case, we only want to update Scheduler)
-
-        acc.add(workload);
         acc.add(podsAffinityPolicy);
         acc.add(elassandraImage);
         acc.add(imagePullPolicy);
@@ -402,30 +233,13 @@ public class DataCenterSpec {
         acc.add(priorityClassName);
         acc.add(appServiceAccount);
         acc.add(externalDns);
-        acc.add(snitchPreferLocal);
+        acc.add(networking);
+        acc.add(cassandra);
+        acc.add(elasticsearch);
         acc.add(resources);
-        acc.add(prometheusEnabled);
-        acc.add(elasticsearchEnabled);
-        acc.add(elasticsearchLoadBalancerEnabled);
-        acc.add(elasticsearchLoadBalancerIp);
-        acc.add(elasticsearchIngressEnabled);
-        acc.add(elasticsearchPort);
-        acc.add(privilegedSupported);
+        acc.add(prometheus);
+        acc.add(jvm);
         acc.add(managedKeyspaces);
-        acc.add(nodeLoadBalancerEnabled);
-        acc.add(nativePort);
-        acc.add(storagePort);
-        acc.add(sslStoragePort);
-        acc.add(jmxPort);
-        acc.add(jmxmpOverSSL);
-        acc.add(jmxmpEnabled);
-        acc.add(jdbPort);
-        acc.add(ssl);
-        acc.add(authentication);
-        acc.add(enterprise);
-        acc.add(remoteSeeders);
-        acc.add(remoteSeeds);
-        acc.add(datacenterGroup);
         acc.add(userSecretVolumeSource);
         if (userConfigMapVolumeSource != null) {
             acc.add(userConfigMapVolumeSource);
@@ -437,31 +251,5 @@ public class DataCenterSpec {
         return digest;
     }
 
-    public String kibanaFingerprint() {
-        List<Object> acc = new ArrayList<>();
 
-        // we exclude :
-        // * Reaper config
-        // * Kibana config
-        // * parked attribute
-        // * scheduledBackups (DC reconciliation is useless in this case, we only want to update Scheduler)
-        acc.add(kibana);
-        String json = GsonUtils.toJson(acc);
-        String digest = DigestUtils.sha1Hex(json).substring(0,7);
-        return digest;
-    }
-
-    public String reaperFingerprint() {
-        List<Object> acc = new ArrayList<>();
-
-        // we exclude :
-        // * Reaper config
-        // * Kibana config
-        // * parked attribute
-        // * scheduledBackups (DC reconciliation is useless in this case, we only want to update Scheduler)
-        acc.add(reaper);
-        String json = GsonUtils.toJson(acc);
-        String digest = DigestUtils.sha1Hex(json).substring(0,7);
-        return digest;
-    }
 }

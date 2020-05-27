@@ -33,9 +33,9 @@ public class TaskSpec {
     @Expose
     private RebuildTaskSpec rebuild;
 
-    @SerializedName("elasticReset")
+    @SerializedName("updateRouting")
     @Expose
-    private ElasticResetTaskSpec elasticReset;
+    private UpdateRoutingTaskSpec updateRouting;
 
     @SerializedName("removeNodes")
     @Expose

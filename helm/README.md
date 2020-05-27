@@ -14,7 +14,7 @@
 ./gradlew :helm:uploadElassandraOperator
 ```
 
-## Generate an operator self-signed certificate
+## Generate an elassandra-operator self-signed certificate
 
 ```bash
 openssl req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes \
@@ -22,12 +22,12 @@ openssl req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes \
   <(echo "[req]"; 
     echo distinguished_name=req; 
     echo "[san]"; 
-    echo subjectAltName=DNS:elassandra-operator.default.svc
+    echo subjectAltName=DNS:elassandra-operator.default.svc.cluster.local
     ) \
   -subj "/CN=localhost"
 ```
 
-Deploy it as a K8s secret 
+Deploy it as a k8s secret 
 
 ```bash
 kubectl -n default create secret tls elassandra-operator --cert=elassandra-operator.crt --key=elassandra-operator.key

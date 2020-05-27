@@ -73,7 +73,8 @@ public class SeedsController {
                                             String nodeName = pod.getSpec().getNodeName();
                                             logger.debug("found node={}", nodeName);
                                             if (pod.getStatus() != null && pod.getStatus().getHostIP() != null) {
-                                                if (dataCenter.getSpec().getHostPortEnabled() == true || dataCenter.getSpec().getHostNetworkEnabled() == true) {
+                                                if (dataCenter.getSpec().getNetworking().getHostPortEnabled() == true ||
+                                                        dataCenter.getSpec().getNetworking().getHostNetworkEnabled() == true) {
                                                     if (externalDns && dataCenter.getSpec().getExternalDns() != null && dataCenter.getSpec().getExternalDns().getEnabled()) {
                                                         String seedHostname =
                                                                 "elassandra-" + dataCenter.getMetadata().getNamespace()+

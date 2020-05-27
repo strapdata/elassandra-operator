@@ -60,7 +60,7 @@ public class ReaperClient implements Closeable {
      */
     public Single<Boolean> registerCluster(String username, String password) {
         final String seedHost = OperatorNames.nodesService(dataCenter) + "." + dataCenter.getMetadata().getNamespace() + ".svc.cluster.local";
-        final int jmxPort = dataCenter.getSpec().getJmxPort();
+        final int jmxPort = dataCenter.getSpec().getJvm().getJmxPort();
         final String url = String.format("/cluster?seedHost=%s&jmxPort=%d", seedHost, jmxPort);
         logger.debug("datacenter={} url={}", dataCenter.id(), url);
 

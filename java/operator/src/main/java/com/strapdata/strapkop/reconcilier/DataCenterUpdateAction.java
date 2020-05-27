@@ -22,6 +22,7 @@ import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
+import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
 import com.strapdata.strapkop.model.k8s.cassandra.*;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.plugins.PluginRegistry;
@@ -165,23 +166,7 @@ public class DataCenterUpdateAction {
         this.nodeCache = nodeCache;
 
         this.jmxmpElassandraProxy = jmxmpElassandraProxy;
-        if (dataCenter.getStatus() == null) {
-            dataCenter.setStatus(new DataCenterStatus());
-        }
         this.dataCenterStatus = this.dataCenter.getStatus();
-
-        // normalize Enterprise object
-        if (this.dataCenterSpec.getEnterprise() == null) {
-            this.dataCenterSpec.setEnterprise(new Enterprise());
-        } else if (!this.dataCenterSpec.getEnterprise().getEnabled()) {
-            // force enable to true but disable all feature in order to create license
-            this.dataCenterSpec.setEnterprise(new Enterprise()
-                    .setCbs(false)
-                    .setHttps(false)
-                    .setJmx(false)
-                    .setSsl(false)
-                    .setAaa(new Aaa().setEnabled(false)));
-        }
 
         this.backupScheduler = backupScheduler;
         this.meterRegistry = meterRegistry;
@@ -279,7 +264,7 @@ public class DataCenterUpdateAction {
                 })
                 .flatMap(passwords -> {
                     // create SSL keystore if not exists
-                    return !dataCenterSpec.getSsl() ?
+                    return !dataCenterSpec.getCassandra().getSsl() ?
                             Single.just(passwords) :
                             authorityManager.getSingle(dataCenterMetadata.getNamespace())
                                     .flatMap(x509CertificateAndPrivateKey -> {
@@ -839,7 +824,7 @@ public class DataCenterUpdateAction {
         private void addPortsItem(V1Container container, int port, String name, boolean withHostPort) {
             if (port > 0) {
                 V1ContainerPort v1Port = new V1ContainerPort().name(name).containerPort(port);
-                container.addPortsItem((dataCenterSpec.getHostPortEnabled() && withHostPort) ? v1Port.hostPort(port) : v1Port);
+                container.addPortsItem((dataCenterSpec.getNetworking().getHostPortEnabled() && withHostPort) ? v1Port.hostPort(port) : v1Port);
             }
         }
 
@@ -893,9 +878,9 @@ public class DataCenterUpdateAction {
         // Unfortunately, AKS does not allow to reuse a public IP for multiple LB.
         public V1Service buildElasticsearchService() throws ApiException {
             V1ServiceSpec v1ServiceSpec = new V1ServiceSpec()
-                    .type(dataCenterSpec.getElasticsearchLoadBalancerEnabled() ? "LoadBalancer" : "ClusterIP")
-                    .addPortsItem(new V1ServicePort().name("cql").port(dataCenterSpec.getNativePort()))
-                    .addPortsItem(new V1ServicePort().name("elasticsearch").port(dataCenterSpec.getElasticsearchPort()))
+                    .type(dataCenterSpec.getElasticsearch().getLoadBalancerEnabled() ? "LoadBalancer" : "ClusterIP")
+                    .addPortsItem(new V1ServicePort().name("cql").port(dataCenterSpec.getCassandra().getNativePort()))
+                    .addPortsItem(new V1ServicePort().name("elasticsearch").port(dataCenterSpec.getElasticsearch().getHttpPort()))
                     .selector(ImmutableMap.of(
                             OperatorLabels.CLUSTER, dataCenterSpec.getClusterName(),
                             OperatorLabels.DATACENTER, dataCenter.getSpec().getDatacenterName(),
@@ -904,10 +889,10 @@ public class DataCenterUpdateAction {
             V1ObjectMeta v1ObjectMeta = dataCenterObjectMeta(OperatorNames.externalService(dataCenter));
 
             // set loadbalancer public ip if available
-            if (dataCenterSpec.getElasticsearchLoadBalancerEnabled()) {
+            if (dataCenterSpec.getElasticsearch().getLoadBalancerEnabled()) {
                 v1ServiceSpec.externalTrafficPolicy("Local");
-                if (!Strings.isNullOrEmpty(dataCenterSpec.getElasticsearchLoadBalancerIp()))
-                    v1ServiceSpec.setLoadBalancerIP(dataCenterSpec.getElasticsearchLoadBalancerIp());
+                if (!Strings.isNullOrEmpty(dataCenterSpec.getElasticsearch().getLoadBalancerIp()))
+                    v1ServiceSpec.setLoadBalancerIP(dataCenterSpec.getElasticsearch().getLoadBalancerIp());
 
                 // Add external-dns annotation to update public DNS
                 if (dataCenterSpec.getExternalDns() != null && dataCenterSpec.getExternalDns().getEnabled() == true) {
@@ -963,18 +948,20 @@ public class DataCenterUpdateAction {
                             .publishNotReadyAddresses(true)
                             .type("ClusterIP")
                             .clusterIP("None")
-                            .addPortsItem(new V1ServicePort().name("internode").port(dataCenterSpec.getSsl() ? dataCenterSpec.getSslStoragePort() : dataCenterSpec.getStoragePort()))
-                            .addPortsItem(new V1ServicePort().name("cql").port(dataCenterSpec.getNativePort()))
-                            .addPortsItem(new V1ServicePort().name("jmx").port(dataCenterSpec.getJmxPort()))
+                            .addPortsItem(new V1ServicePort().name("internode").port(dataCenterSpec.getCassandra().getSsl()
+                                    ? dataCenterSpec.getCassandra().getSslStoragePort()
+                                    : dataCenterSpec.getCassandra().getStoragePort()))
+                            .addPortsItem(new V1ServicePort().name("cql").port(dataCenterSpec.getCassandra().getNativePort()))
+                            .addPortsItem(new V1ServicePort().name("jmx").port(dataCenterSpec.getJvm().getJmxPort()))
                             .selector(OperatorLabels.datacenter(dataCenter))
                     );
 
-            if (dataCenterSpec.getElasticsearchEnabled()) {
-                service.getSpec().addPortsItem(new V1ServicePort().name(ELASTICSEARCH_PORT_NAME).port(dataCenterSpec.getElasticsearchPort()));
+            if (dataCenterSpec.getElasticsearch().getEnabled()) {
+                service.getSpec().addPortsItem(new V1ServicePort().name(ELASTICSEARCH_PORT_NAME).port(dataCenterSpec.getElasticsearch().getHttpPort()));
             }
 
-            if (dataCenterSpec.getPrometheusEnabled()) {
-                service.getSpec().addPortsItem(new V1ServicePort().name(PROMETHEUS_PORT_NAME).port(dataCenterSpec.getPrometheusPort()));
+            if (dataCenterSpec.getPrometheus().getEnabled()) {
+                service.getSpec().addPortsItem(new V1ServicePort().name(PROMETHEUS_PORT_NAME).port(dataCenterSpec.getPrometheus().getPort()));
             }
             return service;
         }
@@ -995,8 +982,10 @@ public class DataCenterUpdateAction {
                     .spec(new V1ServiceSpec()
                             .type("LoadBalancer")
                             .publishNotReadyAddresses(true)
-                            .addPortsItem(new V1ServicePort().name("internode").port(dataCenterSpec.getSsl() ? dataCenterSpec.getSslStoragePort() : dataCenterSpec.getStoragePort()))
-                            .addPortsItem(new V1ServicePort().name("cql").port(dataCenterSpec.getNativePort()))
+                            .addPortsItem(new V1ServicePort().name("internode").port(dataCenterSpec.getCassandra().getSsl()
+                                    ? dataCenterSpec.getCassandra().getSslStoragePort()
+                                    : dataCenterSpec.getCassandra().getStoragePort()))
+                            .addPortsItem(new V1ServicePort().name("cql").port(dataCenterSpec.getCassandra().getNativePort()))
                             .selector(OperatorLabels.pod(dataCenter, rackName, rackIndex, podName))
                     );
             return service;
@@ -1007,7 +996,7 @@ public class DataCenterUpdateAction {
                     .metadata(dataCenterObjectMeta(OperatorNames.elasticsearchService(dataCenter)))
                     .spec(new V1ServiceSpec()
                             .type("ClusterIP")
-                            .addPortsItem(new V1ServicePort().name(ELASTICSEARCH_PORT_NAME).port(dataCenterSpec.getElasticsearchPort()))
+                            .addPortsItem(new V1ServicePort().name(ELASTICSEARCH_PORT_NAME).port(dataCenterSpec.getElasticsearch().getHttpPort()))
                             .selector(OperatorLabels.datacenter(dataCenter))
                     );
         }
@@ -1067,13 +1056,13 @@ public class DataCenterUpdateAction {
 
             // cassandra.yaml overrides
             Set<String> remoteSeeds = new HashSet<>();
-            if (dataCenterSpec.getRemoteSeeds() != null && !dataCenterSpec.getRemoteSeeds().isEmpty()) {
-                remoteSeeds.addAll(dataCenterSpec.getRemoteSeeds().stream().map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList()));
+            if (dataCenterSpec.getCassandra().getRemoteSeeds() != null && !dataCenterSpec.getCassandra().getRemoteSeeds().isEmpty()) {
+                remoteSeeds.addAll(dataCenterSpec.getCassandra().getRemoteSeeds().stream().map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList()));
             }
 
             Set<String> remoteSeeders = new HashSet<>();
-            if (dataCenterSpec.getRemoteSeeders() != null && !dataCenterSpec.getRemoteSeeders().isEmpty()) {
-                remoteSeeders.addAll(dataCenterSpec.getRemoteSeeders().stream().map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList()));
+            if (dataCenterSpec.getCassandra().getRemoteSeeders() != null && !dataCenterSpec.getCassandra().getRemoteSeeders().isEmpty()) {
+                remoteSeeders.addAll(dataCenterSpec.getCassandra().getRemoteSeeders().stream().map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList()));
             }
 
             Set<String> seeds = new HashSet<>();
@@ -1082,7 +1071,7 @@ public class DataCenterUpdateAction {
                     // first node in the first DC is seed
                     RackStatus rackStatus = dataCenterStatus.getRackStatuses().values().stream()
                             .filter(r -> r.getIndex() == 0).collect(Collectors.toList()).get(0);
-                    if (dataCenterSpec.getHostNetworkEnabled() || dataCenterSpec.getHostPortEnabled()) {
+                    if (dataCenterSpec.getNetworking().getHostNetworkEnabled() || dataCenterSpec.getNetworking().getHostPortEnabled()) {
                         seeds.add(OperatorNames.externalPodFqdn(dataCenter, rackStatus.getIndex(), 0));
                     } else {
                         seeds.add(OperatorNames.internalPodFqdn(dataCenter, rackStatus.getIndex(), 0));
@@ -1093,7 +1082,7 @@ public class DataCenterUpdateAction {
             } else {
                 // node-0 of each rack are seeds
                 for (RackStatus rackStatus : dataCenterStatus.getRackStatuses().values()) {
-                    if (dataCenterSpec.getHostNetworkEnabled() || dataCenterSpec.getHostPortEnabled()) {
+                    if (dataCenterSpec.getNetworking().getHostNetworkEnabled() || dataCenterSpec.getNetworking().getHostPortEnabled()) {
                         seeds.add(OperatorNames.externalPodFqdn(dataCenter, rackStatus.getIndex(), 0));
                     } else {
                         seeds.add(OperatorNames.internalPodFqdn(dataCenter, rackStatus.getIndex(), 0));
@@ -1109,7 +1098,7 @@ public class DataCenterUpdateAction {
                         logger.warn("sts for rack={} not found", rackStatus);
                     } else {
                         if (v1StatefulSet.getStatus().getReadyReplicas() != null && v1StatefulSet.getStatus().getReadyReplicas() > 0) {
-                            if (dataCenterSpec.getHostNetworkEnabled() || dataCenterSpec.getHostPortEnabled()) {
+                            if (dataCenterSpec.getNetworking().getHostNetworkEnabled() || dataCenterSpec.getNetworking().getHostPortEnabled()) {
                                 seeds.add(OperatorNames.externalPodFqdn(dataCenter, rackStatus.getIndex(), 0));
                             } else {
                                 seeds.add(OperatorNames.internalPodFqdn(dataCenter, rackStatus.getIndex(), 0));
@@ -1170,9 +1159,9 @@ public class DataCenterUpdateAction {
                 // broadcast_rpc is set dynamically from entry-point.sh according to env $POD_IP
                 config.put("rpc_address", "0.0.0.0"); // bind rpc to all addresses (allow localhost access)
 
-                config.put("storage_port", dataCenterSpec.getStoragePort());
-                config.put("ssl_storage_port", dataCenterSpec.getSslStoragePort());
-                config.put("native_transport_port", dataCenterSpec.getNativePort());
+                config.put("storage_port", dataCenterSpec.getCassandra().getStoragePort());
+                config.put("ssl_storage_port", dataCenterSpec.getCassandra().getSslStoragePort());
+                config.put("native_transport_port", dataCenterSpec.getCassandra().getNativePort());
 
                 // compute the number os CPU to adapt the ConcurrentWriter settings (force a min to 1 to avoid the a ThreadPool of 0)
                 final int cpu = Math.max(1, Runtime.getRuntime().availableProcessors());
@@ -1191,16 +1180,16 @@ public class DataCenterUpdateAction {
                 // value used by : https://blog.deimos.fr/2018/06/24/running-cassandra-on-kubernetes/
                 config.put("hinted_handoff_throttle_in_kb", 4096);
 
-                if (dataCenterSpec.getWorkload() != null) {
-                    if (dataCenterSpec.getWorkload().equals(Workload.READ)
-                            || dataCenterSpec.getWorkload().equals(Workload.READ_WRITE)) {
+                if (dataCenterSpec.getCassandra().getWorkload() != null) {
+                    if (dataCenterSpec.getCassandra().getWorkload().equals(Workload.READ)
+                            || dataCenterSpec.getCassandra().getWorkload().equals(Workload.READ_WRITE)) {
                         // because we are in a read heavy workload, we set the cache to 100MB
                         // (the max value of the auto setting -  (min(5% of Heap (in MB), 100MB)) )
                         config.put("key_cache_size_in_mb", 100);
                     }
 
-                    if (dataCenterSpec.getWorkload().equals(Workload.WRITE)
-                            || dataCenterSpec.getWorkload().equals(Workload.READ_WRITE)) {
+                    if (dataCenterSpec.getCassandra().getWorkload().equals(Workload.WRITE)
+                            || dataCenterSpec.getCassandra().getWorkload().equals(Workload.READ_WRITE)) {
                         // configure memtable_flush_writers has an influence on the memtable_cleanup_threshold (1/(nb_flush_w + 1))
                         // so we set a little bit higher value for Write Heavy Workload
                         // default is 1/(memtable_flush_writers +1) ==> 1/3
@@ -1218,7 +1207,7 @@ public class DataCenterUpdateAction {
                         config.put("memtable_allocation_type", "offheap_objects");
                     }
 
-                    if (dataCenterSpec.getWorkload().equals(Workload.READ_WRITE)) {
+                    if (dataCenterSpec.getCassandra().getWorkload().equals(Workload.READ_WRITE)) {
                         // The faster you insert data, the faster you need to compact in order to keep the sstable count down,
                         // but in general, setting this to 16 to 32 times the rate you are inserting data is more than sufficient.
                         config.put("compaction_throughput_mb_per_sec", 24); // default is 16 - set to 24 to increase the compaction speed
@@ -1229,27 +1218,27 @@ public class DataCenterUpdateAction {
             }
 
             // prometheus support (see prometheus annotations)
-            if (dataCenterSpec.getPrometheusEnabled()) {
+            if (dataCenterSpec.getPrometheus().getEnabled()) {
                 // jmx-promtheus exporter
                 // TODO: use version less symlink to avoid issues when upgrading the image
                 configMapVolumeMountBuilder.addFile("cassandra-env.sh.d/001-cassandra-exporter.sh",
                         "JVM_OPTS=\"${JVM_OPTS} -javaagent:${CASSANDRA_HOME}/agents/jmx_prometheus_javaagent.jar=${POD_IP}:" +
-                                dataCenterSpec.getPrometheusPort() +
+                                dataCenterSpec.getPrometheus().getPort() +
                                 ":${CASSANDRA_CONF}/jmx_prometheus_exporter.yml\"");
             }
 
             StringBuilder jvmOptionsD = new StringBuilder(500);
-            jvmOptionsD.append("-Dcassandra.jmx.remote.port=" + dataCenterSpec.getJmxPort() + "\n");
+            jvmOptionsD.append("-Dcassandra.jmx.remote.port=" + dataCenterSpec.getJvm().getJmxPort() + "\n");
 
             // Add JMX configuration
-            if (dataCenterSpec.getJmxmpEnabled()) {
+            if (dataCenterSpec.getJvm().getJmxmpEnabled()) {
                 // JMXMP is fine, but visualVM cannot use jmxmp+tls+auth
                 jvmOptionsD.append("-Dcassandra.jmxmp=true\n");
             }
 
             // Remote JMX require SSL, otherwise this is local clear JMX
             if (useJmxOverSSL()) {
-                jvmOptionsD.append("-Dcom.sun.management.jmxremote.rmi.port=" + dataCenterSpec.getJmxPort() + "\n");
+                jvmOptionsD.append("-Dcom.sun.management.jmxremote.rmi.port=" + dataCenterSpec.getJvm().getJmxPort() + "\n");
                 jvmOptionsD.append("-Dcom.sun.management.jmxremote.authenticate=true\n");
                 jvmOptionsD.append("-Dcom.sun.management.jmxremote.password.file=/etc/cassandra/jmxremote.password\n");
                 //"-Dcom.sun.management.jmxremote.access.file=/etc/cassandra/jmxremote.access\n" + \
@@ -1263,7 +1252,7 @@ public class DataCenterUpdateAction {
                 jvmOptionsD.append("-Djavax.net.ssl.trustStoreType=PKCS12");
             } else {
                 // local JMX, clear + no auth
-                jvmOptionsD.append("-Dcom.sun.management.jmxremote.rmi.port=" + dataCenterSpec.getJmxPort() + "\n");
+                jvmOptionsD.append("-Dcom.sun.management.jmxremote.rmi.port=" + dataCenterSpec.getJvm().getJmxPort() + "\n");
                 jvmOptionsD.append("-Dcom.sun.management.jmxremote.authenticate=true\n");
                 jvmOptionsD.append("-Dcom.sun.management.jmxremote.password.file=/etc/cassandra/jmxremote.password\n");
                 jvmOptionsD.append("-Djava.rmi.server.hostname=127.0.0.1\n");
@@ -1272,9 +1261,9 @@ public class DataCenterUpdateAction {
             configMapVolumeMountBuilder.addFile("jvm.options.d/001-jmx.options", jvmOptionsD.toString());
 
             // Add jdb transport socket
-            if (dataCenterSpec.getJdbPort() > 0) {
+            if (dataCenterSpec.getJvm().getJdbPort() > 0) {
                 configMapVolumeMountBuilder.addFile("cassandra-env.sh.d/001-cassandra-jdb.sh",
-                        "JVM_OPTS=\"${JVM_OPTS} -Xdebug -Xnoagent -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=${POD_IP}:" + dataCenterSpec.getJdbPort() + "\"");
+                        "JVM_OPTS=\"${JVM_OPTS} -Xdebug -Xnoagent -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=${POD_IP}:" + dataCenterSpec.getJvm().getJdbPort() + "\"");
             }
 
             // this does not work with elassandra because it needs to run as root. It has been moved to the init container
@@ -1284,7 +1273,7 @@ public class DataCenterUpdateAction {
             //);
 
             // heap size and GC settings
-            if (dataCenterSpec.isComputeJvmMemorySettings() && dataCenterSpec.getResources() != null) {
+            if (dataCenterSpec.getJvm().isComputeJvmMemorySettings() && dataCenterSpec.getResources() != null) {
                 Map<String, Quantity> resourceQuantity = Optional.ofNullable(dataCenterSpec.getResources().getRequests()).orElse(dataCenterSpec.getResources().getLimits());
                 final long memoryLimit = QuantityConverter.toMegaBytes(resourceQuantity.get("memory"));
                 final long coreCount = QuantityConverter.toCpu(resourceQuantity.get("cpu"));
@@ -1354,7 +1343,7 @@ public class DataCenterUpdateAction {
             // not sure if k8s exposes the right number of CPU cores inside the container
 
             // add SSL config
-            if (dataCenterSpec.getSsl()) {
+            if (dataCenterSpec.getCassandra().getSsl()) {
                 final Map<String, Object> cassandraConfig = new HashMap<>();
                 cassandraConfig.put("server_encryption_options", ImmutableMap.builder()
                         .put("internode_encryption", "all")
@@ -1386,7 +1375,7 @@ public class DataCenterUpdateAction {
             }
 
             // add authentication config
-            switch (dataCenterSpec.getAuthentication()) {
+            switch (dataCenterSpec.getCassandra().getAuthentication()) {
                 case NONE:
                     // create configMapFile also in NONE case because the ElassandraEnterprise image
                     // defines the PasswordAuthorizer as default.
@@ -1414,38 +1403,40 @@ public class DataCenterUpdateAction {
             }
 
             // add elasticsearch config support
-            final Enterprise enterprise = dataCenterSpec.getEnterprise();
-            if (enterprise.getEnabled()) {
-                final Map<String, Object> esConfig = new HashMap<>();
-                esConfig.put("http.port", dataCenterSpec.getElasticsearchPort());
+            if (dataCenterSpec.getElasticsearch().getEnabled()) {
+                final Enterprise enterprise = dataCenterSpec.getElasticsearch().getEnterprise();
+                if (enterprise.getEnabled()) {
+                    final Map<String, Object> esConfig = new HashMap<>();
+                    esConfig.put("http.port", dataCenterSpec.getElasticsearch().getHttpPort());
 
-                esConfig.put("jmx", ImmutableMap.of("enabled", enterprise.getJmx()));
-                esConfig.put("https", ImmutableMap.of("enabled", enterprise.getHttps()));
-                esConfig.put("ssl", ImmutableMap.of("transport", ImmutableMap.of("enabled", enterprise.getSsl())));
+                    esConfig.put("jmx", ImmutableMap.of("enabled", enterprise.getJmx()));
+                    esConfig.put("https", ImmutableMap.of("enabled", enterprise.getHttps()));
+                    esConfig.put("ssl", ImmutableMap.of("transport", ImmutableMap.of("enabled", enterprise.getSsl())));
 
-                if (enterprise.getAaa() == null) {
-                    esConfig.put("aaa", ImmutableMap.of("enabled", false));
-                } else {
-                    esConfig.put("aaa", ImmutableMap.of(
-                            "enabled", enterprise.getAaa().getEnabled(),
-                            "audit", ImmutableMap.of("enabled", enterprise.getAaa().getAudit())
-                    ));
+                    if (enterprise.getAaa() == null) {
+                        esConfig.put("aaa", ImmutableMap.of("enabled", false));
+                    } else {
+                        esConfig.put("aaa", ImmutableMap.of(
+                                "enabled", enterprise.getAaa().getEnabled(),
+                                "audit", ImmutableMap.of("enabled", enterprise.getAaa().getAudit())
+                        ));
+                    }
+
+                    esConfig.put("cbs", ImmutableMap.of("enabled", enterprise.getCbs()));
+                    configMapVolumeMountBuilder.addFile("elasticsearch.yml.d/002-enterprise.yaml", toYamlString(esConfig));
+                    configMapVolumeMountBuilder.addFile("cassandra-env.sh.d/002-enterprise.sh",
+                            "JVM_OPTS=\"$JVM_OPTS -Dcassandra.custom_query_handler_class=org.elassandra.index.EnterpriseElasticQueryHandler" +
+                                    " -D" + ElassandraOperatorSeedProviderAndNotifier.STATUS_NOTIFIER_URL + "=https://elassandra-operator/node/" + dataCenterMetadata.getNamespace()
+                                    + "\"");
+                    // TODO: override com exporter in cassandra-env.sh.d/001-cassandra-exporter.sh
                 }
 
-                esConfig.put("cbs", ImmutableMap.of("enabled", enterprise.getCbs()));
-                configMapVolumeMountBuilder.addFile("elasticsearch.yml.d/002-enterprise.yaml", toYamlString(esConfig));
-                configMapVolumeMountBuilder.addFile("cassandra-env.sh.d/002-enterprise.sh",
-                        "JVM_OPTS=\"$JVM_OPTS -Dcassandra.custom_query_handler_class=org.elassandra.index.EnterpriseElasticQueryHandler" +
-                                " -D" + ElassandraOperatorSeedProviderAndNotifier.STATUS_NOTIFIER_URL + "=https://elassandra-operator/node/" + dataCenterMetadata.getNamespace()
-                                + "\"");
-                // TODO: override com exporter in cassandra-env.sh.d/001-cassandra-exporter.sh
-            }
-
-            // add elassandra datacenter.group config
-            if (dataCenterSpec.getDatacenterGroup() != null) {
-                final Map<String, Object> esConfig = new HashMap<>();
-                esConfig.put("datacenter", ImmutableMap.of("group", dataCenterSpec.getDatacenterGroup()));
-                configMapVolumeMountBuilder.addFile("elasticsearch.yml.d/003-datacentergroup.yaml", toYamlString(esConfig));
+                // add elassandra datacenter.group config
+                if (dataCenterSpec.getElasticsearch().getDatacenterGroup() != null) {
+                    final Map<String, Object> esConfig = new HashMap<>();
+                    esConfig.put("datacenter", ImmutableMap.of("group", dataCenterSpec.getElasticsearch().getDatacenterGroup()));
+                    configMapVolumeMountBuilder.addFile("elasticsearch.yml.d/003-datacentergroup.yaml", toYamlString(esConfig));
+                }
             }
 
             return configMapVolumeMountBuilder.makeUnique();
@@ -1463,7 +1454,7 @@ public class DataCenterUpdateAction {
             final Properties rackDcProperties = new Properties();
             rackDcProperties.setProperty("dc", dataCenterSpec.getDatacenterName());
             rackDcProperties.setProperty("rack", rack);
-            rackDcProperties.setProperty("prefer_local", Boolean.toString(dataCenterSpec.getSnitchPreferLocal()));
+            rackDcProperties.setProperty("prefer_local", Boolean.toString(dataCenterSpec.getCassandra().getSnitchPreferLocal()));
 
             final StringWriter writer = new StringWriter();
             rackDcProperties.store(writer, "generated by cassandra-operator");
@@ -1547,30 +1538,30 @@ public class DataCenterUpdateAction {
             String cqlshrc = "";
             String curlrc = "";
 
-            if (dataCenterSpec.getSsl()) {
+            if (dataCenterSpec.getCassandra().getSsl()) {
                 cqlshrc += "[connection]\n" +
                         "factory = cqlshlib.ssl.ssl_transport_factory\n" +
-                        "port = " + dataCenterSpec.getNativePort() + "\n" +
+                        "port = " + dataCenterSpec.getCassandra().getNativePort() + "\n" +
                         "ssl = true\n" +
                         "\n" +
                         "[ssl]\n" +
                         "certfile = " + authorityManager.getPublicCaMountPath() + "/cacert.pem\n" +
                         "validate = true\n";
 
-                if (Optional.ofNullable(dataCenterSpec.getEnterprise()).map(Enterprise::getSsl).orElse(false)) {
+                if (dataCenterSpec.getElasticsearch().getEnterprise().getSsl()) {
                     curlrc += "cacert = " + authorityManager.getPublicCaMountPath() + "/cacert.pem\n";
                 }
             } else {
                 cqlshrc += "[connection]\n" +
                         "factory = cqlshlib.ssl.ssl_transport_factory\n" +
-                        "port = " + dataCenterSpec.getNativePort() + "\n";
+                        "port = " + dataCenterSpec.getCassandra().getNativePort() + "\n";
             }
 
-            if (!dataCenterSpec.getAuthentication().equals(Authentication.NONE)) {
+            if (!dataCenterSpec.getCassandra().getAuthentication().equals(Authentication.NONE)) {
                 cqlshrc += String.format(Locale.ROOT, "[authentication]\n" +
                         "username = %s\n" +
                         "password = %s", username, password);
-                if (Optional.ofNullable(dataCenterSpec.getEnterprise()).map(Enterprise::getAaa).map(Aaa::getEnabled).orElse(false)) {
+                if (dataCenterSpec.getElasticsearch().getEnterprise().getAaa().getEnabled()) {
                     curlrc += String.format(Locale.ROOT, "user = %s:%s\n", username, password);
                 }
             }
@@ -1581,7 +1572,7 @@ public class DataCenterUpdateAction {
                     .type("Opaque")
                     .putStringDataItem("cqlshrc", cqlshrc)
                     .putStringDataItem("curlrc", curlrc);
-            if (dataCenterSpec.getSsl())
+            if (dataCenterSpec.getCassandra().getSsl())
                 secret.putStringDataItem("nodetool-ssl.properties", nodetoolSsl());
             return secret;
         }
@@ -1604,8 +1595,8 @@ public class DataCenterUpdateAction {
             final V1Container cassandraContainer = buildElassandraContainer(rackStatus.getName());
             final V1Container commitlogInitContainer = buildInitContainerCommitlogReplayer(rackStatus.getName());
 
-            if (dataCenterSpec.getPrometheusEnabled()) {
-                cassandraContainer.addPortsItem(new V1ContainerPort().name(PROMETHEUS_PORT_NAME).containerPort(dataCenterSpec.getPrometheusPort()));
+            if (dataCenterSpec.getPrometheus().getEnabled()) {
+                cassandraContainer.addPortsItem(new V1ContainerPort().name(PROMETHEUS_PORT_NAME).containerPort(dataCenterSpec.getPrometheus().getPort()));
             }
 
             final V1PodSpec podSpec = new V1PodSpec()
@@ -1668,12 +1659,12 @@ public class DataCenterUpdateAction {
                     );
 
             // https://kubernetes.io/fr/docs/concepts/services-networking/dns-pod-service/#politique-dns-du-pod
-            if (dataCenterSpec.getHostNetworkEnabled()) {
+            if (dataCenterSpec.getNetworking().getHostNetworkEnabled()) {
                 podSpec.setHostNetwork(true);
                 podSpec.setDnsPolicy("ClusterFirstWithHostNet");    // allow service DNS resolution
             }
 
-            if (dataCenterSpec.getSsl()) {
+            if (dataCenterSpec.getCassandra().getSsl()) {
                 podSpec.addVolumesItem(new V1Volume()
                         .name("nodetool-ssl-volume")
                         .secret(new V1SecretVolumeSource()
@@ -1691,7 +1682,7 @@ public class DataCenterUpdateAction {
 
             // Add the nodeinfo init container to bind on the k8s node public IP if available.
             // If externalDns is enabled, this init-container also publish a DNSEndpoint to expose public DNS name of seed nodes.
-            if (dataCenterSpec.getHostNetworkEnabled() || dataCenterSpec.getHostPortEnabled()) {
+            if (dataCenterSpec.getNetworking().getHostNetworkEnabled() || dataCenterSpec.getNetworking().getHostPortEnabled()) {
                 podSpec.addInitContainersItem(buildInitContainerNodeInfo("nodeinfo", rackStatus));
             }
 
@@ -1763,7 +1754,7 @@ public class DataCenterUpdateAction {
             commitlogInitContainer.addEnvItem(jmxPasswordEnvVar);
 
             // mount SSL keystores
-            if (dataCenterSpec.getSsl()) {
+            if (dataCenterSpec.getCassandra().getSsl()) {
                 V1VolumeMount opKeystoreVolMount = new V1VolumeMount().name("datacenter-keystore").mountPath(OPERATOR_KEYSTORE_MOUNT_PATH);
                 cassandraContainer.addVolumeMountsItem(opKeystoreVolMount);
                 commitlogInitContainer.addVolumeMountsItem(opKeystoreVolMount);
@@ -1783,7 +1774,7 @@ public class DataCenterUpdateAction {
             }
 
             // Cluster secret mounted as config file (e.g AAA shared secret)
-            if (dataCenterSpec.getEnterprise() != null && dataCenterSpec.getEnterprise().getAaa() != null && dataCenterSpec.getEnterprise().getAaa().getEnabled()) {
+            if (dataCenterSpec.getElasticsearch().getEnterprise().getAaa() != null && dataCenterSpec.getElasticsearch().getEnterprise().getAaa().getEnabled()) {
                 final String opClusterSecretPath = "/tmp/operator-cluster-secret";
                 V1VolumeMount opClusterSecretVolMount = new V1VolumeMount().name("operator-cluster-secret").mountPath(opClusterSecretPath);
 
@@ -1813,13 +1804,13 @@ public class DataCenterUpdateAction {
             }
 
             // add prometheus annotations to scrap nodes
-            if (dataCenterSpec.getPrometheusEnabled()) {
+            if (dataCenterSpec.getPrometheus().getEnabled()) {
                 templateMetadata.putAnnotationsItem("prometheus.io/scrape", "true");
-                templateMetadata.putAnnotationsItem("prometheus.io/port", Integer.toString(dataCenterSpec.getPrometheusPort()));
+                templateMetadata.putAnnotationsItem("prometheus.io/port", Integer.toString(dataCenterSpec.getPrometheus().getPort()));
             }
 
             // add commitlog replayer init container
-            if (dataCenterSpec.getCommitlogsInitContainer() != null && dataCenterSpec.getCommitlogsInitContainer()) {
+            if (dataCenterSpec.getCassandra().getCommitlogsInitContainer() != null && dataCenterSpec.getCassandra().getCommitlogsInitContainer()) {
                 podSpec.addInitContainersItem(commitlogInitContainer);
             }
 
@@ -1883,13 +1874,13 @@ public class DataCenterUpdateAction {
                     .readinessProbe(new V1Probe()
                             .exec(new V1ExecAction()
                                     .addCommandItem("/ready-probe.sh")
-                                    .addCommandItem(dataCenterSpec.getNativePort().toString())
-                                    .addCommandItem(dataCenterSpec.getElasticsearchPort().toString())
+                                    .addCommandItem(dataCenterSpec.getCassandra().getNativePort().toString())
+                                    .addCommandItem(dataCenterSpec.getElasticsearch().getHttpPort().toString())
                             )
                             .initialDelaySeconds(15)
                             .timeoutSeconds(5)
                     );
-            if (dataCenterSpec.getElasticsearchEnabled() && dataCenterSpec.getEnterprise().getJmx()) {
+            if (dataCenterSpec.getElasticsearch().getEnabled() && dataCenterSpec.getElasticsearch().getEnterprise().getJmx()) {
                 cassandraContainer.lifecycle(new V1Lifecycle().preStop(new V1Handler().exec(new V1ExecAction()
                         .addCommandItem("curl")
                         .addCommandItem("-X")
@@ -1945,11 +1936,11 @@ public class DataCenterUpdateAction {
                             .mountPath("/home/cassandra/.curlrc")
                             .subPath(".curlrc")
                     )
-                    .addEnvItem(new V1EnvVar().name("JMX_PORT").value(Integer.toString(dataCenterSpec.getJmxPort())))
-                    .addEnvItem(new V1EnvVar().name("NODETOOL_JMX_PORT").value(Integer.toString(dataCenterSpec.getJmxPort())))
-                    .addEnvItem(new V1EnvVar().name("CQLS_OPTS").value(dataCenterSpec.getSsl() ? "--ssl" : ""))
-                    .addEnvItem(new V1EnvVar().name("ES_SCHEME").value(dataCenterSpec.getEnterprise().getHttps() ? "https" : "http"))
-                    .addEnvItem(new V1EnvVar().name("ES_PORT").value(Integer.toString(dataCenterSpec.getElasticsearchPort())))
+                    .addEnvItem(new V1EnvVar().name("JMX_PORT").value(Integer.toString(dataCenterSpec.getJvm().getJmxPort())))
+                    .addEnvItem(new V1EnvVar().name("NODETOOL_JMX_PORT").value(Integer.toString(dataCenterSpec.getJvm().getJmxPort())))
+                    .addEnvItem(new V1EnvVar().name("CQLS_OPTS").value(dataCenterSpec.getCassandra().getSsl() ? "--ssl" : ""))
+                    .addEnvItem(new V1EnvVar().name("ES_SCHEME").value(dataCenterSpec.getElasticsearch().getEnterprise().getHttps() ? "https" : "http"))
+                    .addEnvItem(new V1EnvVar().name("ES_PORT").value(Integer.toString(dataCenterSpec.getElasticsearch().getHttpPort())))
                     .addEnvItem(new V1EnvVar().name("NAMESPACE").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.namespace"))))
                     .addEnvItem(new V1EnvVar().name("POD_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.name"))))
                     .addEnvItem(new V1EnvVar().name("POD_IP").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("status.podIP"))))
@@ -1969,11 +1960,11 @@ public class DataCenterUpdateAction {
                     ;
 
             String nodetoolOpts = " -u cassandra -pwf /etc/cassandra/jmxremote.password ";
-            nodetoolOpts += dataCenterSpec.getJmxmpEnabled() ? " --jmxmp " : "";
+            nodetoolOpts += dataCenterSpec.getJvm().getJmxmpEnabled() ? " --jmxmp " : "";
             nodetoolOpts += useJmxOverSSL() ? " --ssl " : "";
             cassandraContainer.addEnvItem(new V1EnvVar().name("NODETOOL_OPTS").value(nodetoolOpts));
 
-            if (dataCenterSpec.getSsl()) {
+            if (dataCenterSpec.getCassandra().getSsl()) {
                 cassandraContainer.addVolumeMountsItem(new V1VolumeMount()
                         .name("nodetool-ssl-volume")
                         .mountPath("/home/cassandra/.cassandra/nodetool-ssl.properties")
@@ -1981,24 +1972,24 @@ public class DataCenterUpdateAction {
                 );
             }
 
-            if (dataCenterSpec.getHostPortEnabled() || dataCenterSpec.getHostNetworkEnabled()) {
+            if (dataCenterSpec.getNetworking().getHostPortEnabled() || dataCenterSpec.getNetworking().getHostNetworkEnabled()) {
                 // expose only one storage port on node
-                if (dataCenterSpec.getSsl()) {
-                    addPortsItem(cassandraContainer, dataCenterSpec.getSslStoragePort(), "internode-ssl", true);
+                if (dataCenterSpec.getCassandra().getSsl()) {
+                    addPortsItem(cassandraContainer, dataCenterSpec.getCassandra().getSslStoragePort(), "internode-ssl", true);
                 } else {
-                    addPortsItem(cassandraContainer, dataCenterSpec.getStoragePort(), "internode", true);
+                    addPortsItem(cassandraContainer, dataCenterSpec.getCassandra().getStoragePort(), "internode", true);
                 }
             } else {
-                addPortsItem(cassandraContainer, dataCenterSpec.getStoragePort(), "internode", false);
-                addPortsItem(cassandraContainer, dataCenterSpec.getSslStoragePort(), "internode-ssl", false);
+                addPortsItem(cassandraContainer, dataCenterSpec.getCassandra().getStoragePort(), "internode", false);
+                addPortsItem(cassandraContainer, dataCenterSpec.getCassandra().getSslStoragePort(), "internode-ssl", false);
             }
-            addPortsItem(cassandraContainer, dataCenterSpec.getNativePort(), "cql", dataCenterSpec.getHostPortEnabled());
-            addPortsItem(cassandraContainer, dataCenterSpec.getJmxPort(), "jmx", false);
-            addPortsItem(cassandraContainer, dataCenterSpec.getJdbPort(), "jdb", false);
+            addPortsItem(cassandraContainer, dataCenterSpec.getCassandra().getNativePort(), "cql", dataCenterSpec.getNetworking().getHostPortEnabled());
+            addPortsItem(cassandraContainer, dataCenterSpec.getJvm().getJmxPort(), "jmx", false);
+            addPortsItem(cassandraContainer, dataCenterSpec.getJvm().getJdbPort(), "jdb", false);
 
-            if (dataCenterSpec.getElasticsearchEnabled()) {
-                cassandraContainer.addPortsItem(new V1ContainerPort().name(ELASTICSEARCH_PORT_NAME).containerPort(dataCenterSpec.getElasticsearchPort()));
-                cassandraContainer.addPortsItem(new V1ContainerPort().name("transport").containerPort(dataCenterSpec.getElasticsearchTransportPort()));
+            if (dataCenterSpec.getElasticsearch().getEnabled()) {
+                cassandraContainer.addPortsItem(new V1ContainerPort().name(ELASTICSEARCH_PORT_NAME).containerPort(dataCenterSpec.getElasticsearch().getHttpPort()));
+                cassandraContainer.addPortsItem(new V1ContainerPort().name("transport").containerPort(dataCenterSpec.getElasticsearch().getTransportPort()));
                 cassandraContainer.addEnvItem(new V1EnvVar().name("CASSANDRA_DAEMON").value("org.apache.cassandra.service.ElassandraDaemon"));
             } else {
                 cassandraContainer.addEnvItem(new V1EnvVar().name("CASSANDRA_DAEMON").value("org.apache.cassandra.service.CassandraDaemon"));
@@ -2013,7 +2004,7 @@ public class DataCenterUpdateAction {
          */
         private V1Container buildInitContainerVmMaxMapCount() {
             return new V1Container()
-                    .securityContext(new V1SecurityContext().privileged(dataCenterSpec.getPrivilegedSupported()))
+                    .securityContext(new V1SecurityContext().privileged(true))
                     .name("system-tune")
                     .image("busybox")
                     .imagePullPolicy("IfNotPresent")
@@ -2043,7 +2034,7 @@ public class DataCenterUpdateAction {
             }
 
             boolean updateDns = false;
-            if ((dataCenterSpec.getHostPortEnabled() || dataCenterSpec.getHostNetworkEnabled()) &&
+            if ((dataCenterSpec.getNetworking().getHostPortEnabled() || dataCenterSpec.getNetworking().getHostNetworkEnabled()) &&
                     dataCenterSpec.getExternalDns() != null && dataCenterSpec.getExternalDns().getEnabled()) {
                 updateDns = true;
                 int rackIndex = dataCenterStatus.getZones().indexOf(rackStatus.getName());
@@ -2055,7 +2046,7 @@ public class DataCenterUpdateAction {
                         "  name: " + seedHostname + "\n" +
                         "  namespace: " + dataCenterMetadata.getNamespace() + "\n" +
                         "  ownerReferences:\n" +
-                        "  - apiVersion: stable.strapdata.com/v1\n" +
+                        "  - apiVersion: " + StrapdataCrdGroup.GROUP+"/" + DataCenter.VERSION + "\n" +
                         "    controller: true\n" +
                         "    blockOwnerDeletion: true\n" +
                         "    kind: ElassandraDatacenter\n" +
@@ -2075,7 +2066,7 @@ public class DataCenterUpdateAction {
             }
 
             return new V1Container()
-                    .securityContext(new V1SecurityContext().privileged(dataCenterSpec.getPrivilegedSupported()))
+                    .securityContext(new V1SecurityContext().privileged(true))
                     .name("nodeinfo")
                     .image("bitnami/kubectl")
                     .imagePullPolicy("IfNotPresent")
@@ -2085,7 +2076,7 @@ public class DataCenterUpdateAction {
                                     " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"beta.kubernetes.io/instance-type\"}}'| awk '!/<no value>/ { print $0 }' > /nodeinfo/instance-type " +
                                     " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"storagetier\"}}' | awk '!/<no value>/ { print $0 }' > /nodeinfo/storagetier " +
                                     // try first to extract ExternalIP from node
-                                    ((dataCenterSpec.getHostPortEnabled() || dataCenterSpec.getHostNetworkEnabled()) ?
+                                    ((dataCenterSpec.getNetworking().getHostPortEnabled() || dataCenterSpec.getNetworking().getHostNetworkEnabled()) ?
                                             // if ExternalIP isn't set, try to extract public ip annotation
                                             " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o jsonpath='{.status.addresses[?(@.type==\"ExternalIP\")].address}' > /nodeinfo/public-ip " +
                                             " && ((PUB_IP=`cat /nodeinfo/public-ip` && test \"$PUB_IP\" = \"\" && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"kubernetes.strapdata.com/public-ip\"}}' | awk '!/<no value>/ { print $0 }' > /nodeinfo/public-ip) || true ) " +
@@ -2093,7 +2084,7 @@ public class DataCenterUpdateAction {
                                             ""
                                     ) +
                                     // persist public name
-                                    (dataCenterSpec.getNodeLoadBalancerEnabled() ?
+                                    (dataCenterSpec.getNetworking().getNodeLoadBalancerEnabled() ?
                                             String.format(Locale.ROOT, " && echo \"${POD_NAME//%s/%s}.%s\" > /nodeinfo/public-name ",
                                                     "elassandra-" + dataCenterSpec.getClusterName() + "-" + dataCenterSpec.getDatacenterName(),
                                                     "cassandra-" + dataCenterSpec.getExternalDns().getRoot(),
@@ -2121,7 +2112,7 @@ public class DataCenterUpdateAction {
     }
 
     private boolean useJmxOverSSL() {
-        return dataCenterSpec.getSsl() && (!dataCenterSpec.getJmxmpEnabled() || (dataCenterSpec.getJmxmpEnabled() && dataCenterSpec.getJmxmpOverSSL()));
+        return dataCenterSpec.getCassandra().getSsl() && (!dataCenterSpec.getJvm().getJmxmpEnabled() || (dataCenterSpec.getJvm().getJmxmpEnabled() && dataCenterSpec.getJvm().getJmxmpOverSSL()));
     }
 
     /**

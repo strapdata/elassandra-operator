@@ -6,25 +6,19 @@ parked: false
 autoScaleMode: "MANUAL"
 
 image:
-  elassandraRepository: strapdata.azurecr.io/strapdata/elassandra-node-dev
+  elassandraRepository: strapdata/elassandra-node-dev
   tag: 6.8.4.5
   pullPolicy: Always
   pullSecrets: []
 
 # STRICT or SLACK
 nodeAffinityPolicy: STRICT
-
-# PVC delete policy, KEEP_PVC or DELETE_PVC
-decommissionPolicy: "DELETE_PVC"
-
 annotations: {}
 customLabels: {}
-
 priorityClassName:
 appServiceAccount:
-# TODO: we do not support unprivileged setup yet
-privilegedSupported: true
 
+# Resource config
 resources:
   requests:
     cpu: 500m
@@ -33,6 +27,7 @@ resources:
     cpu: 2000m
     memory: 2Gi
 
+# Storage config
 dataVolumeClaim:
   accessModes:
     - ReadWriteOnce
@@ -40,10 +35,14 @@ dataVolumeClaim:
   resources:
     requests:
       storage: 500Mi
+# PVC delete policy, KEEP_PVC or DELETE_PVC
+decommissionPolicy: "DELETE_PVC"
 
-
-hostPortEnabled: false
-hostNetworkEnabled: false
+# Kubernetes Network config
+networking:
+  hostPortEnabled: false
+  hostNetworkEnabled: false
+  nodeLoadBalancerEnabled: false
 
 # When hostNetwork or hostPort is enabled, and k8s node have a public IP address,
 # externalDns publish a DNS name for seed nodes allowing to be joined by remote DCs.
@@ -53,27 +52,14 @@ externalDns:
   domain: "example.com"
   ttl: 300
 
-kibana:
-  enabled: true
-  image: "docker.elastic.co/kibana/kibana-oss"
-  ingressSuffix:
-  ingressAnnotations: {}
-  #tag: 6.8.4
-  #version: 1
-  spaces:
-    - name: ""
-      keyspaces: []
-
+# Cassandra reaper config
 reaper:
-  image: strapdata.azurecr.io/strapdata/cassandra-reaper:2.0.3-SNAPSHOT-strapdata
+  image: strapdata/cassandra-reaper:2.0.3
   enabled: true
   jwtSecret: "68d45d8f-419f-429e-8ba0-7b475cba795d"
   ingressSuffix:
   ingressAnnotations: {}
   loggingLevel: "INFO"
-
-# Tell Cassandra to use the local IP address (INTERNAL_IP).
-snitchPreferLocal: false
 
 managedKeyspaces: {}
 #  - keyspace: gravitee
@@ -89,91 +75,69 @@ managedKeyspaces: {}
 # URL template support {namespace}, {clusterName}, {datacenterName}, {phase}, {replicas}, {readyReplicas}
 webHookUrl:
 
+# JVM config
+jvm:
+  options: {}
+  computeJvmMemorySettings: true
+  jdbPort: 4242
+  # JMXMP is mandatory
+  jmxPort: 7199
+  jmxmpEnabled: true
+  jmxmpOverSSL: true
 
-
-computeJvmMemorySettings: true
-
-enterprise:
-  enabled: true
-  jmx: true
-  https: true
+# Cassandra configuration
+cassandra:
+  config: {}
   ssl: true
-  aaa:
+  authentication: CASSANDRA
+  # Tell Cassandra to use the local IP address (INTERNAL_IP).
+  snitchPreferLocal: true
+  # Cassandra seeds config
+  remoteSeeds: []
+  remoteSeeders: []
+  nativePort: 39042
+  storagePort: 37000
+  sslStoragePort: 37001
+
+# Elasticsearch config
+elasticsearch:
+  enabled: true
+  httpPort: 9200
+  transportPort: 9300
+  ingressEnabled: false
+  loadBalancerEnabled: false
+  loadBalancerIp:
+  config: {}
+  datacenter:
+    group:
+    tags: []
+  enterprise:
     enabled: true
-    audit: true
-  cbs: true
+    jmx: true
+    https: true
+    ssl: true
+    aaa:
+      enabled: true
+      audit: true
+    cbs: true
+  kibana:
+    enabled: true
+    image: "docker.elastic.co/kibana/kibana-oss"
+    ingressSuffix:
+    ingressAnnotations: {}
+    #tag: 6.8.4
+    #version: 1
+    spaces:
+      - name: ""
+        keyspaces: []
 
-# Elassandra datacenter.group
-#datacenterGroup:
+# Prometheus metrics exporter
+prometheus:
+  enabled: true
+  port: 9500
 
-#Example authentication for AWS S3 based backups
-#env:
-#  - name: AWS_ACCESS_KEY_ID
-#    valueFrom:
-#      secretKeyRef:
-#        name: awsbackuptest
-#        key: access
-#  - name: AWS_SECRET_ACCESS_KEY
-#    valueFrom:
-#      secretKeyRef:
-#        name: awsbackuptest
-#        key: secret
-#  - name: AWS_REGION
-#    value: "us-west-2"
-
-#Example authentication for AWS GCP based backups
-#env:
-#  - name: GOOGLE_APPLICATION_CREDENTIALS
-#    value: "/tmp/user-config/service_key.json"
-#  - name: GOOGLE_CLOUD_PROJECT
-#    value: "elassandra-operator"
-#  - name: BUCKET_NAME
-#    value: "my-bucket"
-#
-
-# Custom configmap that defines the ConfigMap key (relative to /etc/cassandra) -> path mappings.
-# Example:
-# userConfigMapVolumeSource:
-#   name: concurrent-data
-#   items:
-#   - key: 100-concurrent-yaml
-#     path: cassandra.yaml.d/100-concurrent.yaml
-
-## Example GCP ConfigMap
-#apiVersion: extensions/v1beta1
-#kind: ConfigMap
-#metadata:
-#  name: configMapReference
-#data:
-#  service_key.json: "XXXXXXXXX"
-
-prometheusEnabled: true
-prometheusPort: 9500
-
-elasticsearchEnabled: true
-elasticsearchIngressEnabled: false
-elasticsearchLoadBalancerIp:
-
-elasticsearchPort: 9200
-elasticsearchTransportPort: 9300
-elasticsearchLoadBalancerEnabled: true
-
-ssl: true
-authentication: CASSANDRA
-
-nativePort: 39042
-storagePort: 37000
-sslStoragePort: 37001
-
-jdbPort: 4242
-
-# JMXMP is mandatory
-jmxPort: 7199
-jmxmpEnabled: true
-jmxmpOverSSL: true
-
-remoteSeeds: []
-remoteSeeders:
+# periodic backups
+scheduledBackups:
 
 # Override some config files in /etc/cassandra
 configs:
