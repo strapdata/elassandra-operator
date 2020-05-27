@@ -90,8 +90,8 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
         List<CompletableSource> todoList = new ArrayList<>();
         for (V1Pod v1Pod : pods) {
             ElassandraPod pod = ElassandraPod.fromV1Pod(v1Pod)
-                    .setEsPort(dc.getSpec().getElasticsearchPort())
-                    .setSsl(dc.getSpec().getSsl());
+                    .setEsPort(dc.getSpec().getElasticsearch().getHttpPort())
+                    .setSsl(dc.getSpec().getCassandra().getSsl());
             todoList.add(jmxmpElassandraProxy.rebuild(pod, rebuildTaskSpec.getSrcDcName(), null)
                     .toSingleDefault(task)
                     .map(t -> {

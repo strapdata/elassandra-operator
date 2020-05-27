@@ -28,5 +28,5 @@ If release name contains chart name it will be used as a full name.
 Return the appropriate apiVersion value to use for the elassandra-operator managed k8s resources
 */}}
 {{- define "elassandra-operator.apiVersion" -}}
-{{- printf "%s" "stable.strapdata.com/v1" -}}
+{{- printf "%s" "elassandra.strapdata.com/v1" -}}
 {{- end -}}

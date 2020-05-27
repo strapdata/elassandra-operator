@@ -101,7 +101,7 @@ Here is an example of Task manifest.
 
 .. code-block:: yaml
 
-    apiVersion: stable.strapdata.com/v1
+    apiVersion: elassandra.strapdata.com/v1
     kind: ElassandraTask
     metadata:
       name: "backup001"

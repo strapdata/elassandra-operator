@@ -47,7 +47,7 @@ public class NodePipeline extends CachedK8sWatchPipeline<V1Node, V1NodeList, Str
         }
 
         @Override
-        public Call createListApiCall(boolean watch, String resourceVersion) throws ApiException {
+        public Call createListApiCall(Boolean watch, String resourceVersion) throws ApiException {
             return coreV1Api.listNodeCall(null, null, null, null,
                     null, null,  resourceVersion, null, watch
                     , null);

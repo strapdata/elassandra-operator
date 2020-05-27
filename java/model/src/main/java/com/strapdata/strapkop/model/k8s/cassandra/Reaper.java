@@ -2,11 +2,14 @@ package com.strapdata.strapkop.model.k8s.cassandra;
 
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
+import com.strapdata.strapkop.model.GsonUtils;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.With;
+import org.apache.commons.codec.digest.DigestUtils;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -32,7 +35,6 @@ public class Reaper {
     @SerializedName("jwtSecret")
     @Expose
     private String jwtSecret = null;
-
 
     /**
      * Enable Cassandra Reaper support.
@@ -66,8 +68,21 @@ public class Reaper {
     @Expose
     private Map<String, String> ingressAnnotations = null;
 
-    @SerializedName("reaperScheduledRepairs")
+    @SerializedName("scheduledRepairs")
     @Expose
-    private List<ReaperScheduledRepair> reaperScheduledRepairs = null;
+    private List<ReaperScheduledRepair> scheduledRepairs = null;
 
+    public String reaperFingerprint() {
+        List<Object> acc = new ArrayList<>();
+
+        // we exclude :
+        // * Reaper config
+        // * Kibana config
+        // * parked attribute
+        // * scheduledBackups (DC reconciliation is useless in this case, we only want to update Scheduler)
+        acc.add(this);
+        String json = GsonUtils.toJson(acc);
+        String digest = DigestUtils.sha1Hex(json).substring(0,7);
+        return digest;
+    }
 }

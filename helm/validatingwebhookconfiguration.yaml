@@ -12,7 +12,7 @@ metadata:
 webhooks:
   - name: "elassandradatacenter-webhook.elassandra.strapdata.com"
     rules:
-      - apiGroups: ["stable.strapdata.com"]
+      - apiGroups: ["elassandra.strapdata.com"]
         apiVersions: ["v1"]
         operations: ["CREATE", "UPDATE"]
         resources: ["elassandradatacenters"]

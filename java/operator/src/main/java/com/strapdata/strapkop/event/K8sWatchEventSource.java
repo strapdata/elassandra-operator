@@ -38,7 +38,8 @@ public class K8sWatchEventSource<ResourceT, ResourceListT, Key> implements Event
 
     public K8sWatchEventSource(final @Named("watchClient") ApiClient watchClient,
                                final K8sWatchResourceAdapter<ResourceT, ResourceListT, Key> adapter) {
-        this.watchClient = watchClient;this.adapter = adapter;
+        this.watchClient = watchClient;
+        this.adapter = adapter;
         this.gson = watchClient.getJSON().getGson();
     }
 
@@ -70,12 +71,17 @@ public class K8sWatchEventSource<ResourceT, ResourceListT, Key> implements Event
      */
     private Observable<K8sWatchEvent<ResourceT>> createInitialObservable() throws ApiException {
         logger.debug("Fetching existing k8s resources synchronously : {}", adapter.getName());
-        final ApiResponse<ResourceListT> apiResponse = watchClient.execute(adapter.createListApiCall(false, null), adapter.getResourceListType());
-        // TODO: is it necessary to handle different response statuses here...
-        final ResourceListT resourceList = apiResponse.getData();
-        logger.info("Fetched {} existing {}", adapter.getListItems(resourceList).size(), adapter.getName());
-        lastResourceVersion = adapter.getListMetadata(resourceList).getResourceVersion();
-        return Observable.fromIterable(adapter.getListItems(resourceList)).map(resource -> new K8sWatchEvent<>(INITIAL, resource, lastResourceVersion));
+        try {
+            final ApiResponse<ResourceListT> apiResponse = watchClient.execute(adapter.createListApiCall(false, null), adapter.getResourceListType());
+            // TODO: is it necessary to handle different response statuses here...
+            final ResourceListT resourceList = apiResponse.getData();
+            logger.info("Fetched {} existing {}", adapter.getListItems(resourceList).size(), adapter.getName());
+            lastResourceVersion = adapter.getListMetadata(resourceList).getResourceVersion();
+            return Observable.fromIterable(adapter.getListItems(resourceList)).map(resource -> new K8sWatchEvent<>(INITIAL, resource, lastResourceVersion));
+        } catch(Exception e) {
+            logger.error("error", e);
+            throw e;
+        }
     }
 
     /**
@@ -88,7 +94,7 @@ public class K8sWatchEventSource<ResourceT, ResourceListT, Key> implements Event
         logger.debug("Creating k8s watch for resource : {}", adapter.getName());
         final Watch<JsonObject> watch = Watch.createWatch(
                 watchClient.setReadTimeout(0), // watch client continous read, see https://github.com/kubernetes-client/java/issues/178
-                adapter.createListApiCall(true, lastResourceVersion),
+                adapter.createListApiCall(Boolean.TRUE, lastResourceVersion),
                 new TypeToken<Watch.Response<JsonObject>>() {}.getType());
         return Observable.fromIterable(watch)
                 .observeOn(Schedulers.io()).observeOn(Schedulers.io()) // blocking io seemed to happen on computational thread...

@@ -19,6 +19,9 @@ public class OperatorConfig {
     @Nullable
     String namespace;
 
+    /**
+     * Operator JMXMP port
+     */
     Integer jmxmpPort;
 
     /**

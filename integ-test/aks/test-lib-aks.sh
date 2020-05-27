@@ -19,7 +19,7 @@ function create_cluster() {
   create_aks_cluster 1
 }
 
-function destroy_cluster() {
+function delete_cluster() {
   delete_aks_cluster $RESOURCE_GROUP_NAME $K8S_CLUSTER_NAME
 }
 

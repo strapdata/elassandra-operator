@@ -9,7 +9,7 @@ Minimal values file for the Elassandra Operator helm chart.
 
 .. code::
 
-    apiVersion: stable.strapdata.com/v1
+    apiVersion: elassandra.strapdata.com/v1
     image:
       repository: strapdata/elassandra-operator
       tag: 6.2.3.22

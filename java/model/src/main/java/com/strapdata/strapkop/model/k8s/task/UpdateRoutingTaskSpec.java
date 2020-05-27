@@ -5,18 +5,18 @@ import com.google.gson.annotations.SerializedName;
 import lombok.*;
 
 /**
- * Played after DC rebuild to reload license and update ES routing table.
+ * After DC rebuild, reload license and update ES routing table.
  */
 @Data
 @With
 @AllArgsConstructor
 @NoArgsConstructor
 @ToString
-public class ElasticResetTaskSpec {
+public class UpdateRoutingTaskSpec {
     /**
-     * Update the elasticsearch routing table for the specified indices
+     * Update the elasticsearch routing table for the specified indices expression
      */
-    @SerializedName("updateRoutingIndices")
+    @SerializedName("indices")
     @Expose
-    String updateRoutingIndices;
+    String indices;
 }

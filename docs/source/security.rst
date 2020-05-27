@@ -36,7 +36,7 @@ cluster role ``elassandra-operator`` with the following restricted operations:
       verbs:
       - '*'
     - apiGroups:
-      - stable.strapdata.com
+      - elassandra.strapdata.com
       resources:
       - elassandradatacenter
       - elassandradatacenters

@@ -22,7 +22,7 @@ rules:
   verbs:
   - '*'
 - apiGroups:
-  - stable.strapdata.com
+  - elassandra.strapdata.com
   resources:
   - elassandradatacenter
   - elassandradatacenters

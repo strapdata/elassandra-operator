@@ -19,7 +19,8 @@ import java.util.Optional;
 @AllArgsConstructor
 @NoArgsConstructor
 public class ScheduledBackup {
-    @SerializedName("tag")
+
+    @SerializedName("tagSuffix")
     @Expose
     private String tagSuffix;
 
@@ -27,7 +28,7 @@ public class ScheduledBackup {
     @Expose
     private String cron;
 
-    @SerializedName("backupDefinition")
+    @SerializedName("backup")
     @Expose
     private BackupTaskSpec backup;
 

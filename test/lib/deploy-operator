@@ -18,7 +18,7 @@ helm ${helm_cmd} elassandra-operator \
 
 for ((i=10; i>=1; i--)); do
 
-  if kubectl get crd elassandradatacenters.stable.strapdata.com; then
+  if kubectl get crd elassandradatacenters.elassandra.strapdata.com; then
     test/lib/wait-pod-ready $(test/lib/get-operator-pod-name)
     sleep 5 # some magic
     exit 0

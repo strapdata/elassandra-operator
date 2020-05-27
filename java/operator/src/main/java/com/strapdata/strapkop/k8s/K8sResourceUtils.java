@@ -498,8 +498,8 @@ public class K8sResourceUtils {
                 try {
                     logger.debug("Deleting DataCenter namespace={} name={}", metadata.getNamespace(), metadata.getName());
                     V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
-                    Call call = customObjectsApi.deleteNamespacedCustomObjectCall("stable.strapdata.com", "v1",
-                            metadata.getNamespace(), "elassandradatacenters", metadata.getName(), deleteOptions,
+                    Call call = customObjectsApi.deleteNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, DataCenter.VERSION,
+                            metadata.getNamespace(), DataCenter.PLURAL, metadata.getName(), deleteOptions,
                             null, null, "Foreground", null);
                     final ApiResponse<DataCenter> apiResponse = customObjectsApi.getApiClient().execute(call, DataCenter.class);
                     return apiResponse.getData();

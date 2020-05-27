@@ -1,4 +1,4 @@
-apiVersion: stable.strapdata.com/v1
+apiVersion: elassandra.strapdata.com/v1
 kind: ElassandraDatacenter
 metadata:
   name: {{ template "elassandra.resourceName" . }}
@@ -14,7 +14,6 @@ metadata:
 spec:
   clusterName: {{ include "elassandra.clusterName" . | required "Invalid clusterName : Release name has to be clustername-dcname (in lowercase), clustername must match ([0-9a-z]+)" }}
   datacenterName: {{ include "elassandra.datacenterName" . | required "Invalid datacenterName : Release name has to be clustername-dcname (in lowercase), datacenterName must match ([0-9a-z]+)" }}
-  workload: {{ default "READ_WRITE" .Values.workload }}
   replicas: {{ default "1" .Values.replicas }}
   parked: {{ default "false" .Values.parked }}
   autoScaleMode: {{ default "MANUAL" .Values.autoScaleMode }}
@@ -29,7 +28,6 @@ spec:
     - {{ $pullSecret }}
   {{- end }}
   {{- end }}
-  computeJvmMemorySettings:  {{ default "true" .Values.computeJvmMemorySettings }}
   {{- if .Values.appServiceAccount }}
   appServiceAccount: {{ .Values.appServiceAccount  }}
   {{ else }}
@@ -50,14 +48,14 @@ spec:
 {{ toYaml .Values.resources | indent 4 }}
   dataVolumeClaim:
 {{ toYaml .Values.dataVolumeClaim | indent 4 }}
-{{- if .Values.env }}
+  {{- if .Values.env }}
   env:
 {{ toYaml .Values.env | indent 4 }}
-{{- end }}
-{{- if .Values.scheduledBackups }}
+  {{- end }}
+  {{- if .Values.scheduledBackups }}
   scheduledBackups:
 {{ toYaml .Values.scheduledBackups | indent 4 }}
-{{- end }}
+  {{- end }}
   userConfigMapVolumeSource:
     name: {{ template "elassandra.resourceName" . }}
     items:
@@ -72,17 +70,58 @@ spec:
   userSecretVolumeSource:
 {{ toYaml .Values.userSecretVolumeSource | indent 4 }}
 {{- end }}
-  elasticsearchEnabled: {{ default "true" .Values.elasticsearchEnabled }}
-  elasticsearchLoadBalancerEnabled: {{ default "false" .Values.elasticsearchLoadBalancerEnabled }}
-  {{- if .Values.elasticsearchLoadBalancerIp }}
-  elasticsearchLoadBalancerIp: {{ .Values.elasticsearchLoadBalancerIp }}
-  {{- end }}
-  elasticsearchIngressEnabled: {{ default "false" .Values.elasticsearchIngressEnabled }}
-  prometheusEnabled: {{ default "false" .Values.prometheusEnabled }}
-  prometheusPort: {{ default "9500" .Values.prometheusPort }}
+  elasticsearch:
+    enabled: {{ default "true" .Values.elasticsearch.enabled | quote }}
+    httpPort: {{ default "9200" .Values.elasticsearch.httpPort | quote }}
+    transportPort: {{ default "9300" .Values.elasticsearch.transportPort | quote }}
+    loadBalancerEnabled: {{ default "false" .Values.elasticsearch.loadBalancerEnabled | quote }}
+    {{- if .Values.elasticsearch.loadBalancerIp }}
+    loadBalancerIp: {{ .Values.elasticsearch.loadBalancerIp | quote }}
+    {{- end }}
+    ingressEnabled: {{ default "false" .Values.elasticsearch.ingressEnabled | quote }}
+    {{- if .Values.elasticsearch.datacenterGroup }}
+    datacenterGroup: {{ .Values.elasticsearch.datacenterGroup | quote }}
+    {{- end }}
+    {{- if .Values.elasticsearch.datacenterTags }}
+    datacenterTags: {{ .Values.elasticsearch.datacenterTags }}
+    {{- end }}
+    {{- if .Values.enterprise }}
+    enterprise:
+{{ toYaml .Values.enterprise | indent 6 }}
+    {{- end }}
+    config:
+{{ toYaml .Values.elasticsearch.config | indent 6 }}
+    {{- if .Values.elasticsearch.kibana }}
+    kibana:
+      enabled: {{ .Values.elasticsearch.kibana.enabled | quote }}
+      {{- if .Values.elasticsearch.kibana.ingressSuffix }}
+      ingressSuffix: {{ .Values.elasticsearch.kibana.ingressSuffix | quote }}
+      {{- end }}
+      {{- if .Values.elasticsearch.kibana.ingressAnnotations }}
+      ingressAnnotations:
+{{ toYaml .Values.elasticsearch.kibana.ingressAnnotations | indent 8 }}
+      {{- end }}
+      {{- if .Values.elasticsearch.kibana.image }}
+      {{- if .Values.elasticsearch.kibana.tag }}
+      image:  "{{ .Values.elasticsearch.kibana.image }}:{{ .Values.elasticsearch.kibana.tag }}"
+      {{- else }}
+      image:  "{{ .Values.elasticsearch.kibana.image }}:{{ template "kibana.version" . }}"
+      {{- end }}
+      {{- if .Values.elasticsearch.kibana.version }}
+      version: {{ .Values.elasticsearch.kibana.version }}
+      {{- end }}
+      {{- end }}
+      {{- if .Values.elasticsearch.kibana.spaces }}
+      spaces:
+{{ toYaml .Values.elasticsearch.kibana.spaces | indent 8 }}
+      {{- end }}
+    {{- end }}
+  prometheus:
+    enabled: {{ default "false" .Values.prometheus.enabled | quote }}
+    port: {{ default "9500" .Values.prometheus.port | quote }}
 {{- if .Values.reaper }}
   reaper:
-    enabled: {{ default "false" .Values.reaper.enabled }}
+    enabled: {{ default "false" .Values.reaper.enabled | quote }}
     {{- if .Values.reaper.image }}
     image: {{ .Values.reaper.image }}
     {{- end }}
@@ -90,86 +129,55 @@ spec:
     ingressSuffix: {{ .Values.reaper.ingressSuffix }}
     {{- if .Values.reaper.ingressAnnotations }}
     ingressAnnotations:
-    {{ toYaml .Values.reaper.ingressAnnotations | indent 6 }}
+{{ toYaml .Values.reaper.ingressAnnotations | indent 6 }}
     {{- end }}
-{{- end }}
+    {{- end }}
     jwtSecret: {{ default "68d45d8f-419f-429e-8ba0-7b475cba795d" .Values.reaper.jwtSecret }}
     loggingLevel: {{ default "INFO" .Values.reaper.loggingLevel }}
 {{- end }}
 {{- if .Values.externalDns }}
   externalDns:
-    enabled: {{ default "false" .Values.externalDns.enabled }}
-    root: {{ default "xxx" .Values.externalDns.root }}
-    domain: {{ .Values.externalDns.domain }}
+    enabled: {{ default "false" .Values.externalDns.enabled | quote }}
+    root: {{ default "xxx" .Values.externalDns.root | quote }}
+    domain: {{ .Values.externalDns.domain | quote }}
     ttl: {{ default "300" .Values.externalDns.ttl }}
 {{- end }}
-  privilegedSupported: {{ default "false" .Values.privilegedSupported }}
-  hostPortEnabled: {{ default "false" .Values.hostPortEnabled }}
-  hostNetworkEnabled: {{ default "false" .Values.hostNetworkEnabled }}
-  elasticsearchPort: {{ default "9200" .Values.elasticsearchPort | quote }}
-  elasticsearchTransportPort: {{ default "9300" .Values.elasticsearchTransportPort | quote }}
-  nativePort: {{ default "9042" .Values.nativePort | quote }}
-  storagePort: {{ default "7000" .Values.storagePort | quote }}
-  sslStoragePort: {{ default "7001" .Values.sslStoragePort | quote }}
-{{- if .Values.jdbPort }}
-  jdbPort: {{ .Values.jdbPort }}
-{{- end }}
-{{- if .Values.jmxPort }}
-  jmxPort: {{ .Values.jmxPort }}
-{{- end }}
-  jmxmpEnabled: {{ default "false" .Values.jmxmpEnabled | quote }}
-  jmxmpOverSSL: {{ default "false" .Values.jmxmpOverSSL | quote }}
-{{- if .Values.ssl }}
-  ssl:
-{{ toYaml .Values.ssl | indent 4 }}
-{{- end }}
-{{- if .Values.authentication }}
-  authentication:
-{{ toYaml .Values.authentication | indent 4 }}
-{{- end }}
-{{- if .Values.enterprise }}
-  enterprise:
-{{ toYaml .Values.enterprise | indent 4 }}
-{{- end }}
-{{- if .Values.remoteSeeds }}
-  remoteSeeds:
-{{ toYaml .Values.remoteSeeds | indent 4 }}
-{{- end }}
-{{- if .Values.remoteSeeders }}
-  remoteSeeders:
-{{ toYaml .Values.remoteSeeders | indent 4 }}
-{{- end }}
-{{- if .Values.datacenterGroup }}
-  datacenterGroup:
-{{ toYaml .Values.datacenterGroup | indent 4 }}
-{{- end }}
-  snitchPreferLocal: {{ default "true" .Values.snitchPreferLocal }}
+  networking:
+    hostPortEnabled: {{ default "false" .Values.networking.hostPortEnabled | quote }}
+    hostNetworkEnabled: {{ default "false" .Values.networking.hostNetworkEnabled | quote }}
+    nodeLoadBalancerEnabled: {{ default "false" .Values.networking.nodeLoadBalancerEnabled | quote }}
+  jvm:
+    computeJvmMemorySettings: {{ default "true" .Values.jvm.computeJvmMemorySettings | quote }}
+    jdbPort: {{ default "-1" .Values.jvm.jdbPort  | quote }}
+    jmxPort: {{ default "-1" .Values.jvm.jmxPort | quote }}
+    jmxmpEnabled: {{ default "true" .Values.jvm.jmxmpEnabled | quote }}
+    jmxmpOverSSL: {{ default "true" .Values.jvm.jmxmpOverSSL | quote }}
+  cassandra:
+    workload: {{ default "READ_WRITE" .Values.workload  | quote }}
+    config:
+{{ toYaml .Values.cassandra.config | indent 6 }}
+    commitlogsInitContainer: {{ default "false" .Values.cassandra.commitlogsInitContainer | quote }}
+    nativePort: {{ default "9042" .Values.cassandra.nativePort | quote }}
+    storagePort: {{ default "7000" .Values.cassandra.storagePort | quote }}
+    sslStoragePort: {{ default "7001" .Values.cassandra.sslStoragePort | quote }}
+    {{- if .Values.cassandra.ssl }}
+    ssl:
+    {{ toYaml .Values.cassandra.ssl | indent 6 }}
+    {{- end }}
+    {{- if .Values.cassandra.authentication }}
+    authentication:
+    {{ toYaml .Values.cassandra.authentication | indent 6 }}
+    {{- end }}
+    {{- if .Values.cassandra.remoteSeeds }}
+    remoteSeeds:
+    {{ toYaml .Values.cassandra.remoteSeeds | indent 6 }}
+    {{- end }}
+    {{- if .Values.cassandra.remoteSeeders }}
+    remoteSeeders:
+    {{ toYaml .Values.cassandra.remoteSeeders | indent 6 }}
+    {{- end }}
+    snitchPreferLocal: {{ default "true" .Values.cassandra.snitchPreferLocal | quote }}
 {{- if .Values.managedKeyspaces }}
   managedKeyspaces:
 {{ toYaml .Values.managedKeyspaces | indent 4 }}
-{{- end }}
-{{- if .Values.kibana }}
-  kibana:
-    enabled: {{ .Values.kibana.enabled | quote }}
-    {{- if .Values.kibana.ingressSuffix }}
-    ingressSuffix: {{ .Values.kibana.ingressSuffix }}
-    {{- end }}
-    {{- if .Values.kibana.ingressAnnotations }}
-    ingressAnnotations:
-    {{ toYaml .Values.kibana.ingressAnnotations | indent 6 }}
-    {{- end }}
-    {{- if .Values.kibana.image }}
-    {{- if .Values.kibana.tag }}
-    image:  "{{ .Values.kibana.image }}:{{ .Values.kibana.tag }}"
-    {{- else }}
-    image:  "{{ .Values.kibana.image }}:{{ template "kibana.version" . }}"
-    {{- end }}
-    {{- if .Values.kibana.version }}
-    version: {{ .Values.kibana.version }}
-    {{- end }}
-{{- end }}
-{{- if .Values.kibana.spaces }}
-    spaces:
-{{ toYaml .Values.kibana.spaces | indent 4 }}
-{{- end }}
 {{- end }}
