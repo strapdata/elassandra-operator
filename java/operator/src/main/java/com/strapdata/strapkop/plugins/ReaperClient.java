@@ -2,8 +2,8 @@ package com.strapdata.strapkop.plugins;
 
 import com.google.common.collect.ImmutableMap;
 import com.strapdata.strapkop.k8s.OperatorNames;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
-import com.strapdata.strapkop.model.k8s.cassandra.ReaperScheduledRepair;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.ReaperScheduledRepair;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;

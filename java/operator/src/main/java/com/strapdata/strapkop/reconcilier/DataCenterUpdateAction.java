@@ -23,7 +23,7 @@ import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
-import com.strapdata.strapkop.model.k8s.cassandra.*;
+import com.strapdata.strapkop.model.k8s.datacenter.*;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.plugins.PluginRegistry;
 import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
@@ -293,7 +293,7 @@ public class DataCenterUpdateAction {
                             .withName(NodeHandler.getZone(node))
                             .withFingerprint(configMapVolumeMounts.fingerPrint());
 
-                    dataCenterStatus.getRackStatuses().put(new Integer(0), rackStatus);
+                    dataCenterStatus.getRackStatuses().put(0, rackStatus);
                     dataCenterStatus.setHealth(Health.RED);
                     dataCenterStatus.setPhase(DataCenterPhase.RUNNING);
                     configMapVolumeMounts.setRack(rackStatus);

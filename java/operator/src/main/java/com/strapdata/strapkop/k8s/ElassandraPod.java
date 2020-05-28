@@ -1,7 +1,7 @@
 package com.strapdata.strapkop.k8s;
 
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.kubernetes.client.openapi.models.V1Pod;
 import lombok.Data;

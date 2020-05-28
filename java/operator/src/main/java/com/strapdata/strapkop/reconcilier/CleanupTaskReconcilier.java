@@ -4,8 +4,8 @@ import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.k8s.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenterStatus;
 import com.strapdata.strapkop.model.k8s.task.CleanupTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
@@ -47,7 +47,7 @@ public final class CleanupTaskReconcilier extends TaskReconcilier {
                                   final DataCenterCache dataCenterCache,
                                   ExecutorFactory executorFactory,
                                   @Named("tasks") UserExecutorConfiguration userExecutorConfiguration) {
-        super(reconcilierObserver,"cleanup", operatorConfig, k8sResourceUtils, meterRegistry,
+        super(reconcilierObserver, operatorConfig, k8sResourceUtils, meterRegistry,
                 dataCenterController, dataCenterCache, executorFactory, userExecutorConfiguration);
         this.jmxmpElassandraProxy = jmxmpElassandraProxy;
     }
@@ -78,7 +78,7 @@ public final class CleanupTaskReconcilier extends TaskReconcilier {
                         })
                         .toSingleDefault(pod))
                 .toList()
-                .flatMapCompletable(list -> finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.SUCCEED));
+                .flatMapCompletable(list -> finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.SUCCEED, "cleanup"));
     }
 
     @Override

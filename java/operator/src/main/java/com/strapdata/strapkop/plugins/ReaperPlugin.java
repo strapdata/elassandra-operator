@@ -12,7 +12,7 @@ import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
-import com.strapdata.strapkop.model.k8s.cassandra.*;
+import com.strapdata.strapkop.model.k8s.datacenter.*;
 import com.strapdata.strapkop.reconcilier.DataCenterUpdateAction;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import io.kubernetes.client.custom.IntOrString;

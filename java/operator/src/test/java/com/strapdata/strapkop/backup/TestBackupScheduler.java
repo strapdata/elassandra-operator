@@ -2,9 +2,9 @@ package com.strapdata.strapkop.backup;
 
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.model.Key;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenterSpec;
-import com.strapdata.strapkop.model.k8s.cassandra.ScheduledBackup;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenterSpec;
+import com.strapdata.strapkop.model.k8s.datacenter.ScheduledBackup;
 import com.strapdata.strapkop.model.k8s.task.BackupTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import io.kubernetes.client.models.V1ObjectMeta;

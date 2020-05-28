@@ -7,8 +7,8 @@ import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.k8s.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenterStatus;
 import com.strapdata.strapkop.model.k8s.task.RebuildTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
@@ -60,7 +60,7 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
                                   final DataCenterCache dataCenterCache,
                                   ExecutorFactory executorFactory,
                                   @Named("tasks") UserExecutorConfiguration userExecutorConfiguration) {
-        super(reconcilierObserver, "rebuild", operatorConfig, k8sResourceUtils, meterRegistry,
+        super(reconcilierObserver, operatorConfig, k8sResourceUtils, meterRegistry,
                 dataCenterController, dataCenterCache, executorFactory, userExecutorConfiguration);
         this.jmxmpElassandraProxy = jmxmpElassandraProxy;
         this.context = context;
@@ -97,7 +97,7 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
                     .map(t -> {
                         // update pod status in memory (no etcd update)
                         task.getStatus().getPods().put(pod.getName(), TaskPhase.SUCCEED);
-                        logger.debug("datacenter={} rebuild={} srcDc={} done", dc.id(), task.id(), rebuildTaskSpec.getSrcDcName());
+                        logger.debug("datacenter={} task={} rebuild srcDcName={} done", dc.id(), task.id(), rebuildTaskSpec.getSrcDcName());
                         return t;
                     })
                     .ignoreElement()
@@ -110,7 +110,7 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
         }
 
         return Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()]))
-                .andThen(finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.SUCCEED));
+                .andThen(finalizeTaskStatus(dc, dataCenterStatus.setBootstrapped(true), task, TaskPhase.SUCCEED, "rebuild"));
     }
 
     @Override

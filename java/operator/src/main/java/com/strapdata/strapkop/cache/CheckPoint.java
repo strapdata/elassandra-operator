@@ -1,6 +1,6 @@
 package com.strapdata.strapkop.cache;
 
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenterSpec;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenterSpec;
 import lombok.*;
 
 @Data

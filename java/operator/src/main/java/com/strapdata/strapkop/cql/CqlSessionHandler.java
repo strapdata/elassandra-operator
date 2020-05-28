@@ -2,7 +2,7 @@ package com.strapdata.strapkop.cql;
 
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.Session;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
 import io.micronaut.context.annotation.Prototype;
 import io.reactivex.Flowable;
 import io.reactivex.Single;

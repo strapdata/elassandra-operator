@@ -2,7 +2,7 @@ package com.strapdata.strapkop.model.fabric8.datacenter;
 
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.strapdata.strapkop.model.k8s.cassandra.*;
+import com.strapdata.strapkop.model.k8s.datacenter.*;
 import io.fabric8.kubernetes.api.model.KubernetesResource;
 import io.kubernetes.client.openapi.models.*;
 import lombok.Getter;

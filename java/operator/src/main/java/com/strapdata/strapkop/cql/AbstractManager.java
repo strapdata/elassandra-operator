@@ -1,7 +1,7 @@
 package com.strapdata.strapkop.cql;
 
 import com.google.common.collect.ImmutableList;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
 import io.micrometer.core.instrument.ImmutableTag;
 import io.micrometer.core.instrument.MeterRegistry;
 

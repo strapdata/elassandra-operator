@@ -9,7 +9,7 @@ Build jar:
 
 Build executable:
 ```
-./gradlew java:edctl:makeExec
+./gradlew java:edctl:buildExec
 ```
 
 ## Usage

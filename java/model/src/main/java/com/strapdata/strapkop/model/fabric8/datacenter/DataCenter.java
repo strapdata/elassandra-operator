@@ -1,6 +1,6 @@
 package com.strapdata.strapkop.model.fabric8.datacenter;
 
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenterSpec;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenterSpec;
 import io.fabric8.kubernetes.api.model.ObjectMeta;
 import io.fabric8.kubernetes.client.CustomResource;
 import lombok.Getter;
