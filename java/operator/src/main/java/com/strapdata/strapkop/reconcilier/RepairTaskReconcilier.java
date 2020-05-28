@@ -4,8 +4,8 @@ import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.k8s.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenterStatus;
 import com.strapdata.strapkop.model.k8s.task.RepairTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
@@ -44,7 +44,7 @@ public final class RepairTaskReconcilier extends TaskReconcilier {
                                  final DataCenterCache dataCenterCache,
                                  ExecutorFactory executorFactory,
                                  @Named("tasks") UserExecutorConfiguration userExecutorConfiguration) {
-        super(reconcilierObserver,"repair", operatorConfig, k8sResourceUtils, meterRegistry,
+        super(reconcilierObserver, operatorConfig, k8sResourceUtils, meterRegistry,
                 dataCenterController, dataCenterCache, executorFactory, userExecutorConfiguration);
         this.jmxmpElassandraProxy = jmxmpElassandraProxy;
     }
@@ -55,14 +55,23 @@ public final class RepairTaskReconcilier extends TaskReconcilier {
         return Observable.zip(Observable.fromIterable(pods), Observable.interval(repairTaskSpec.getWaitIntervalInSec(), TimeUnit.SECONDS), (pod, timer) -> pod)
                 .subscribeOn(Schedulers.io())
                 .flatMapSingle(pod -> jmxmpElassandraProxy.repair(ElassandraPod.fromV1Pod(pod), task.getSpec().getRepair().getKeyspace())
+                        .toSingleDefault(pod)
+                        .map(p -> {
+                            // update pod status in memory (no etcd update)
+                            task.getStatus().getPods().put(p.getMetadata().getName(), TaskPhase.SUCCEED);
+                            logger.debug("datacenter={} task={} repair pod={} done", dc.id(), task.id(), p.getMetadata().getName());
+                            return p;
+                        })
+                        .ignoreElement()
                         .onErrorResumeNext(throwable -> {
                             logger.error("Error while executing repair on pod={}", pod, throwable);
                             task.getStatus().setLastMessage(throwable.getMessage());
-                            return finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.FAILED);
+                            task.getStatus().getPods().put(pod.getMetadata().getName(), TaskPhase.FAILED);
+                            return Completable.complete();
                         })
                         .toSingleDefault(pod))
                 .toList()
-                .flatMapCompletable(list -> finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.SUCCEED));
+                .flatMapCompletable(list -> finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.SUCCEED, "repair"));
     }
 
     // repair PR on all available nodes

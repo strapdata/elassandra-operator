@@ -9,7 +9,7 @@ import com.strapdata.strapkop.k8s.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.Key;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
 import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.reconcilier.DataCenterUpdateAction;
 import com.strapdata.strapkop.ssl.AuthorityManager;
@@ -235,10 +235,6 @@ public class JmxmpElassandraProxy {
                 password = null;
             }
         }
-
-        protected void finalize() {
-            clearPassword();
-        }
     }
 
     public Single<ElassandraNodeStatus> status(ElassandraPod pod) throws MalformedURLException {
@@ -284,17 +280,23 @@ public class JmxmpElassandraProxy {
         return storageServiceMBeanProvider(pod)
                 .flatMap(storageServiceMBean -> endpointSnitchInfoMBean(pod).map(endpointSnitchInfoMBean -> new Tuple2<>(storageServiceMBean, endpointSnitchInfoMBean)))
                 .flatMapCompletable(tuple -> Completable.create(emitter -> {
-                    Map<String, String> endpointToHostId = tuple._1.getEndpointToHostId();
-                    Set<String> endpoints = tuple._1.getTokenToEndpointMap().values().stream().collect(Collectors.toSet());
-                    for (String endpoint : endpoints) {
-                        String dc = tuple._2.getDatacenter(endpoint);
-                        if (dcName.equals(dc)) {
-                            String hostId = endpointToHostId.get(endpoint);
-                            logger.debug("pod={} removing node endpoint={} id={}", pod.id(), endpoint, hostId);
-                            tuple._1.removeNode(hostId);
+                    try {
+                        Map<String, String> endpointToHostId = tuple._1.getEndpointToHostId();
+                        Set<String> endpoints = tuple._1.getTokenToEndpointMap().values().stream().collect(Collectors.toSet());
+                        for (String endpoint : endpoints) {
+                            String dc = tuple._2.getDatacenter(endpoint);
+                            if (dcName.equals(dc)) {
+                                String hostId = endpointToHostId.get(endpoint);
+                                logger.debug("pod={} removing node endpoint={} id={}", pod.id(), endpoint, hostId);
+                                tuple._1.removeNode(hostId);
+                            }
                         }
+                        logger.info("nodes of datacenter={} removed from pod={}", dcName, pod.id());
+                        emitter.onComplete();
+                    } catch(Throwable t) {
+                        logger.error("error:", t);
+                        emitter.onError(t);
                     }
-                    logger.info("nodes of datacenter={} removed from pod={}", dcName, pod.id());
                 }));
     }
 

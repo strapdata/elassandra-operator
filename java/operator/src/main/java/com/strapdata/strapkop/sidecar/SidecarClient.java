@@ -2,7 +2,6 @@ package com.strapdata.strapkop.sidecar;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.strapdata.strapkop.cql.CqlRole;
-import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.model.sidecar.BackupResponse;
 import com.strapdata.strapkop.model.sidecar.StatusResponse;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
@@ -43,15 +42,11 @@ public class SidecarClient {
     static final Logger logger = LoggerFactory.getLogger(SidecarClient.class);
 
     private RxHttpClient httpClient;
-    private CqlRoleManager cqlRoleManager;
-    private String dcKey;
     private CqlRole cqlRole;
 
     public SidecarClient(URL url,
                          HttpClientConfiguration httpClientConfiguration,
                          SslContext sslContext,
-                         CqlRoleManager cqlRoleManager,
-                         String dcKey,
                          CqlRole cqlRole) {
         this.httpClient = new DefaultHttpClient(LoadBalancer.fixed(url),
                 httpClientConfiguration,
@@ -60,15 +55,15 @@ public class SidecarClient {
                 new SidecarNettyClientSslBuilder(new ResourceResolver(), sslContext),
                 createDefaultMediaTypeRegistry(),
                 AnnotationMetadataResolver.DEFAULT);
-        this.cqlRoleManager = cqlRoleManager;
-        this.dcKey = dcKey;
+        this.cqlRole = cqlRole;
     }
 
     private static MediaTypeCodecRegistry createDefaultMediaTypeRegistry() {
         ObjectMapper objectMapper = new ObjectMapperFactory().objectMapper(null, null);
         ApplicationConfiguration applicationConfiguration = new ApplicationConfiguration();
         return MediaTypeCodecRegistry.of(
-                new JsonMediaTypeCodec(objectMapper, applicationConfiguration, null), new JsonStreamMediaTypeCodec(objectMapper, applicationConfiguration, null)
+                new JsonMediaTypeCodec(objectMapper, applicationConfiguration, null),
+                new JsonStreamMediaTypeCodec(objectMapper, applicationConfiguration, null)
         );
     }
 
@@ -79,8 +74,9 @@ public class SidecarClient {
      * @return
      */
     public <I> MutableHttpRequest<I> auth(MutableHttpRequest<I> req) {
-        logger.debug("auth with cqlRole={}", cqlRole);
-        req.basicAuth(cqlRole.getUsername(), cqlRole.getPassword());
+        logger.debug("cqlRole={}", cqlRole);
+        if (cqlRole != null)
+            req.basicAuth(cqlRole.getUsername(), cqlRole.getPassword());
         return req;
     }
 
@@ -132,7 +128,7 @@ public class SidecarClient {
     }
 
     public Completable updateRouting(@Nullable String indices) throws UnsupportedEncodingException {
-        String idx = (indices == null) ? "" : "/"+indices;
+        String idx = (indices == null) ? "" : "/" + indices;
         return httpClient.exchange(auth(POST(idx + "/_updaterouting", ""))).ignoreElements();
     }
 

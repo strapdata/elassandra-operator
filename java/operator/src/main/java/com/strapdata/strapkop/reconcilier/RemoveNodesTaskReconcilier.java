@@ -7,8 +7,8 @@ import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.k8s.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenterStatus;
 import com.strapdata.strapkop.model.k8s.task.RemoveNodesTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
@@ -57,7 +57,7 @@ public class RemoveNodesTaskReconcilier extends TaskReconcilier {
                                       final MeterRegistry meterRegistry,
                                       ExecutorFactory executorFactory,
                                       @Named("tasks") UserExecutorConfiguration userExecutorConfiguration ) {
-        super(reconcilierObserver, "removeNodes", operatorConfig, k8sResourceUtils, meterRegistry,
+        super(reconcilierObserver, operatorConfig, k8sResourceUtils, meterRegistry,
                 dataCenterController, dataCenterCache, executorFactory, userExecutorConfiguration);
         this.jmxmpElassandraProxy = jmxmpElassandraProxy;
         this.context = context;
@@ -80,7 +80,7 @@ public class RemoveNodesTaskReconcilier extends TaskReconcilier {
 
         if (Strings.isNullOrEmpty(dcName)) {
             logger.warn("datacenter={} removeNodes={} dcName not set, ignoring task={}", dc.id(), task.id());
-            return finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.SUCCEED);
+            return finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.SUCCEED, "removeNodes");
         }
 
         Iterator<V1Pod> it = pods.iterator();
@@ -88,22 +88,24 @@ public class RemoveNodesTaskReconcilier extends TaskReconcilier {
             return Completable.complete();
 
         ElassandraPod pod = ElassandraPod.fromV1Pod(it.next());
-
         return jmxmpElassandraProxy.removeDcNodes(pod, dcName)
                 .toSingleDefault(pod)
-                .map(p -> task.getStatus().getPods().put(p.getName(), TaskPhase.SUCCEED))
-                .flatMapCompletable(list -> finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.SUCCEED))
+                .flatMapCompletable(p -> {
+                    task.getStatus().getPods().put(p.getName(), TaskPhase.SUCCEED);
+                    logger.debug("datacenter={} task={} removeNodes dcName={} done", dc.id(), task.id(), dcName);
+                    return finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.SUCCEED, "removeNodes");
+                })
                 .onErrorResumeNext(throwable -> {
                     logger.error("datacenter={} task={} Error removing nodes of dc={} error:{}",
                             dc.id(), task.id(), dcName, throwable.getMessage());
                     task.getStatus().setLastMessage(throwable.getMessage());
-                    return finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.FAILED);
+                    return finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.FAILED, "removeNodes");
                 });
     }
 
     @Override
     public Single<List<V1Pod>> init(Task task, DataCenter dc) {
-        return getRunningPods(task, dc).map(pods ->
+        return getElassandraRunningPods(dc).map(pods ->
                 initTaskStatusPodMap(task, pods.size() == 0 ? ImmutableList.of() : ImmutableList.of(pods.get(0))));
     }
 }

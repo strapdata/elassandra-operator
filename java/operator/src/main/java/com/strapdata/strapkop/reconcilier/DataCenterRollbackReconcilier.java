@@ -2,7 +2,7 @@ package com.strapdata.strapkop.reconcilier;
 
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.model.Key;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenterStatus;
 import com.strapdata.strapkop.plugins.PluginRegistry;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.apis.CoreV1Api;

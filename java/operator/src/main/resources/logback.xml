@@ -22,12 +22,14 @@
     <logger name="com.strapdata.strapkop.pipeline" level="${LOGBACK_com_strapdata_strapkop_pipeline:-DEBUG}" />
     <logger name="com.strapdata.strapkop.sidecar" level="${LOGBACK_com_strapdata_strapkop_sidecar:-DEBUG}" />
     <logger name="com.strapdata.strapkop.plugins" level="${LOGBACK_com_strapdata_strapkop_plugins:-TRACE}" />
-    <logger name="com.strapdata.strapkop.cql" level="${LOGBACK_com_strapdata_strapkop_test:-DEBUG}" />
+    <logger name="com.strapdata.strapkop.cql" level="${LOGBACK_com_strapdata_strapkop_cql:-DEBUG}" />
 
     <logger name="com.strapdata.strapkop.reconcilier" level="${LOGBACK_com_strapdata_strapkop_reconcilier:-DEBUG}" />
 
+
+    <logger name="io.micronaut.http.client" level="TRACE"/>
     <!--
-    <logger name="io.micronaut.http" level="TRACE"/>
+    <logger name="io.micronaut.http.server" level="TRACE"/>
     -->
 
     <root level="INFO">

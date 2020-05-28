@@ -1,6 +1,5 @@
 package com.strapdata.strapkop.reconcilier;
 
-import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.DataCenterCache;
@@ -9,11 +8,11 @@ import com.strapdata.strapkop.cql.CqlRole;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.k8s.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
-import com.strapdata.strapkop.model.k8s.task.UpdateRoutingTaskSpec;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenterStatus;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
+import com.strapdata.strapkop.model.k8s.task.UpdateRoutingTaskSpec;
 import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
 import com.strapdata.strapkop.sidecar.SidecarClientFactory;
 import io.kubernetes.client.openapi.ApiException;
@@ -62,7 +61,7 @@ public class UpdateRoutingTaskReconcilier extends TaskReconcilier {
                                         final DataCenterCache dataCenterCache,
                                         ExecutorFactory executorFactory,
                                         @Named("tasks") UserExecutorConfiguration userExecutorConfiguration) {
-        super(reconcilierObserver, "elasticReset", operatorConfig, k8sResourceUtils, meterRegistry,
+        super(reconcilierObserver, operatorConfig, k8sResourceUtils, meterRegistry,
                 dataCenterController, dataCenterCache, executorFactory, userExecutorConfiguration);
         this.jmxmpElassandraProxy = jmxmpElassandraProxy;
         this.context = context;
@@ -81,17 +80,17 @@ public class UpdateRoutingTaskReconcilier extends TaskReconcilier {
      */
     @Override
     protected Completable doTask(final DataCenter dc, final DataCenterStatus dataCenterStatus, final Task task, Iterable<V1Pod> pods) throws Exception {
-        final UpdateRoutingTaskSpec elasticResetTaskSpec = task.getSpec().getUpdateRouting();
+        final UpdateRoutingTaskSpec updateRoutingTaskSpec = task.getSpec().getUpdateRouting();
         task.getStatus().setStartDate(new Date());
 
-        logger.info("datacenter={} task={} task.status={} elasticReset executed on pods={} updateRoutingIndices={}",
+        logger.info("datacenter={} task={} task.status={} executed on pods={} updateRoutingIndices={}",
                 dc.id(), task.id(), task.getStatus(),
-                Lists.newArrayList(pods).stream().map(p->p.getMetadata().getName()).collect(Collectors.toList()),
-                elasticResetTaskSpec.getIndices());
+                Lists.newArrayList(pods).stream().map(p -> p.getMetadata().getName()).collect(Collectors.toList()),
+                updateRoutingTaskSpec.getIndices());
 
         if (dc.getSpec().getElasticsearch().getEnterprise().getEnabled() == false) {
             task.getStatus().setLastMessage("No Elasticsearch Enterprise enabled");
-            finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.IGNORED);
+            finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.IGNORED, "updateRouting");
         }
 
         cqlRoleManager.addIfAbsent(dc, CqlRole.STRAPKOP_ROLE.getUsername(), () -> CqlRole.STRAPKOP_ROLE.duplicate());
@@ -102,32 +101,38 @@ public class UpdateRoutingTaskReconcilier extends TaskReconcilier {
         Completable reloadLicense = null;
         List<CompletableSource> routingUpdates = new ArrayList<>();
         for (V1Pod v1Pod : pods) {
-            ElassandraPod pod = ElassandraPod.fromV1Pod(v1Pod)
+            final ElassandraPod pod = ElassandraPod.fromV1Pod(v1Pod)
                     .setEsPort(dc.getSpec().getElasticsearch().getHttpPort())
                     .setSsl(dc.getSpec().getCassandra().getSsl());
             if (reloadLicense == null) {
                 reloadLicense = sidecarClientFactory.clientForPod(pod, strapkopRole).reloadLicense()
                         .onErrorResumeNext(throwable -> {
-                            logger.error("datacenter={} elasticReset={} Error while executing destination DC on pod={}", dc.id(), task.id(), pod, throwable);
+                            logger.error("datacenter={} updateRouting={} Error while executing destination DC on pod={}", dc.id(), task.id(), pod, throwable);
                             task.getStatus().setLastMessage(throwable.getMessage());
                             task.getStatus().getPods().put(pod.getName(), TaskPhase.FAILED);
                             return Completable.complete();
                         });
             }
-            if (!Strings.isNullOrEmpty(elasticResetTaskSpec.getIndices())) {
-                routingUpdates.add(sidecarClientFactory.clientForPod(pod, strapkopRole).updateRouting(elasticResetTaskSpec.getIndices())
-                        .onErrorResumeNext(throwable -> {
-                            logger.error("datacenter={} elasticReset={} Error while executing destination DC on pod={}", dc.id(), task.id(), pod, throwable);
-                            task.getStatus().setLastMessage(throwable.getMessage());
-                            task.getStatus().getPods().put(pod.getName(), TaskPhase.FAILED);
-                            return Completable.complete();
-                        }));
-            }
+            routingUpdates.add(sidecarClientFactory.clientForPod(pod, strapkopRole).updateRouting(updateRoutingTaskSpec.getIndices())
+                    .toSingleDefault(task)
+                    .map(t -> {
+                        // update pod status in memory (no etcd update)
+                        task.getStatus().getPods().put(pod.getName(), TaskPhase.SUCCEED);
+                        logger.debug("datacenter={} task={} updateRouting done", dc.id(), task.id());
+                        return t;
+                    })
+                    .ignoreElement()
+                    .onErrorResumeNext(throwable -> {
+                        logger.error("datacenter={} elasticReset={} Error while executing destination DC on pod={}", dc.id(), task.id(), pod, throwable);
+                        task.getStatus().setLastMessage(throwable.getMessage());
+                        task.getStatus().getPods().put(pod.getName(), TaskPhase.FAILED);
+                        return Completable.complete();
+                    }));
         }
 
         return (reloadLicense == null ? Completable.complete() : reloadLicense)
                 .andThen(Completable.mergeArray(routingUpdates.toArray(new CompletableSource[routingUpdates.size()])))
-                .andThen(finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.SUCCEED));
+                .andThen(finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.SUCCEED, "updateRouting"));
     }
 
     @Override
@@ -137,6 +142,7 @@ public class UpdateRoutingTaskReconcilier extends TaskReconcilier {
 
     /**
      * Trigger reconciliation for plugin after rebuild done
+     *
      * @return
      */
     @Override

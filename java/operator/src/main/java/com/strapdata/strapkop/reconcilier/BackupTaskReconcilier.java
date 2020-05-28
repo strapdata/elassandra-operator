@@ -6,8 +6,8 @@ import com.strapdata.strapkop.cql.CqlRole;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.k8s.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenterStatus;
 import com.strapdata.strapkop.model.k8s.task.BackupTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
@@ -47,7 +47,7 @@ public class BackupTaskReconcilier extends TaskReconcilier {
                                  final CqlRoleManager cqlRoleManager,
                                  ExecutorFactory executorFactory,
                                  @Named("tasks") UserExecutorConfiguration userExecutorConfiguration ) {
-        super(reconcilierObserver, "backup", operatorConfig, k8sResourceUtils, meterRegistry,
+        super(reconcilierObserver, operatorConfig, k8sResourceUtils, meterRegistry,
                 dataCenterController, dataCenterCache, executorFactory, userExecutorConfiguration);
         this.sidecarClientFactory = sidecarClientFactory;
         this.cqlRoleManager = cqlRoleManager;
@@ -81,10 +81,8 @@ public class BackupTaskReconcilier extends TaskReconcilier {
                             });
                 })
                 .toList()
-                .flatMapCompletable(list -> finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.SUCCEED));
+                .flatMapCompletable(list -> finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.SUCCEED, "backup"));
     }
-
-
 
     @Override
     public Single<List<V1Pod>> init(Task task, DataCenter dc) {

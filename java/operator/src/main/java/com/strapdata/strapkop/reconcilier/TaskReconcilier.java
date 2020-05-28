@@ -5,11 +5,12 @@ import com.google.common.collect.Lists;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
+import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
-import com.strapdata.strapkop.model.k8s.cassandra.Operation;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenterStatus;
+import com.strapdata.strapkop.model.k8s.datacenter.Operation;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
 import com.strapdata.strapkop.model.k8s.task.TaskStatus;
@@ -36,7 +37,6 @@ public abstract class TaskReconcilier extends Reconcilier<Task> {
 
     private static final Logger logger = LoggerFactory.getLogger(TaskReconcilier.class);
     final K8sResourceUtils k8sResourceUtils;
-    final String taskType;
     final MeterRegistry meterRegistry;
     final DataCenterController dataCenterController;
     final DataCenterCache dataCenterCache;
@@ -45,7 +45,6 @@ public abstract class TaskReconcilier extends Reconcilier<Task> {
     public final Scheduler tasksScheduler;
 
     TaskReconcilier(ReconcilierObserver reconcilierObserver,
-                    String taskType,
                     final OperatorConfig operatorConfig,
                     final K8sResourceUtils k8sResourceUtils,
                     final MeterRegistry meterRegistry,
@@ -55,7 +54,6 @@ public abstract class TaskReconcilier extends Reconcilier<Task> {
                     @Named("tasks") UserExecutorConfiguration userExecutorConfiguration) {
         super(reconcilierObserver);
         this.k8sResourceUtils = k8sResourceUtils;
-        this.taskType = taskType;
         this.meterRegistry = meterRegistry;
         this.dataCenterController = dataCenterController;
         this.dataCenterCache = dataCenterCache;
@@ -71,7 +69,8 @@ public abstract class TaskReconcilier extends Reconcilier<Task> {
 
     @Override
     public Completable reconcile(final Task task) throws Exception {
-        DataCenter dc = dataCenterCache.get(new Key(task.getMetadata().getLabels().get(OperatorLabels.PARENT), task.getMetadata().getNamespace()));
+        String dcName = OperatorNames.dataCenterResource(task.getSpec().getCluster(), task.getSpec().getDatacenter());
+        DataCenter dc = dataCenterCache.get(new Key(dcName, task.getMetadata().getNamespace()));
         Operation op = new Operation().withSubmitDate(new Date()).withDesc("task-"+task.getMetadata().getName());
         final DataCenterStatus dataCenterStatus = dc.getStatus();
         dataCenterStatus.setCurrentOperation(op);
@@ -104,7 +103,7 @@ public abstract class TaskReconcilier extends Reconcilier<Task> {
         return k8sResourceUtils.updateDataCenterStatus(dc, dataCenterStatus).ignoreElement();
     }
 
-    public Completable finalizeTaskStatus(final DataCenter dc, final DataCenterStatus dataCenterStatus, final Task task, TaskPhase taskPhase0) throws ApiException {
+    public Completable finalizeTaskStatus(final DataCenter dc, final DataCenterStatus dataCenterStatus, final Task task, TaskPhase taskPhase0, String taskTag) throws ApiException {
         TaskStatus taskStatus = task.getStatus();
         TaskPhase taskPhase = taskPhase0;
         for (Map.Entry<String, TaskPhase> e : taskStatus.getPods().entrySet()) {
@@ -116,6 +115,7 @@ public abstract class TaskReconcilier extends Reconcilier<Task> {
         final TaskPhase taskPhaseFinal = taskPhase;
         taskStatus.setPhase(taskPhaseFinal);
         logger.debug("task={} finalized phase={}", task.id(), taskPhaseFinal);
+        updateMetrics(task, taskTag, taskPhaseFinal.isSucceed());
         return k8sResourceUtils.updateTaskStatus(task)
                 .flatMapCompletable(p -> {
                     if (task.getStatus() == null)
@@ -139,10 +139,6 @@ public abstract class TaskReconcilier extends Reconcilier<Task> {
                         history.remove(operatorConfig.getOperationHistoryDepth());
                     dataCenterStatus.setOperationHistory(history);
 
-                    if (TaskPhase.SUCCEED.equals(taskPhaseFinal)) {
-                        // datacenter is rebuild and ready to use.
-                        dataCenterStatus.setBootstrapped(true);
-                    }
                     logger.debug("update status taskStatus={} datacenterStatus={}", task.getStatus(), dataCenterStatus);
                     return k8sResourceUtils.updateDataCenterStatus(dc, dataCenterStatus).ignoreElement();
                 });
@@ -172,7 +168,7 @@ public abstract class TaskReconcilier extends Reconcilier<Task> {
         });
     }
 
-    public Single<List<V1Pod>>  getRunningPods(Task task, DataCenter dc) {
+    public Single<List<V1Pod>>  getElassandraRunningPods(DataCenter dc) {
         final String labelSelector = OperatorLabels.toSelector(ImmutableMap.of(
                 OperatorLabels.MANAGED_BY, "elassandra-operator",
                 OperatorLabels.PARENT, dc.getMetadata().getName(),
@@ -198,5 +194,13 @@ public abstract class TaskReconcilier extends Reconcilier<Task> {
      */
     public boolean reconcileDataCenterWhenDone() {
         return false;
+    }
+
+    public void updateMetrics(Task task, String taskTag, boolean succeed) {
+        meterRegistry.counter(succeed ? "task.succeed" : "task.failed",
+                "task", taskTag,
+                "cluster", task.getSpec().getCluster(),
+                "datacenter", task.getSpec().getDatacenter())
+                .increment();
     }
 }

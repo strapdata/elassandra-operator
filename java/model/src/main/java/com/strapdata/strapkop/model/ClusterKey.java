@@ -1,6 +1,6 @@
 package com.strapdata.strapkop.model;
 
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;

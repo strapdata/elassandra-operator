@@ -6,7 +6,7 @@ import com.datastax.driver.core.exceptions.AuthenticationException;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
 import com.strapdata.elasticsearch.plugin.license.License;
 import com.strapdata.elasticsearch.plugin.license.LicenseVerifierService;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.annotation.Infrastructure;
 import io.reactivex.Completable;

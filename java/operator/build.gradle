@@ -99,6 +99,7 @@ dependencies {
     compile("com.strapdata.elasticsearch.plugin.enterprise:strapdata-license:$javaElassandraVersion") {
         exclude group: 'com.strapdata.elasticsearch', module: 'elasticsearch'
     }
+    implementation group: 'org.elasticsearch.client', name:'elasticsearch-rest-high-level-client', version: '6.2.3'
 
     implementation group: 'io.fabric8', name: 'kubernetes-client', version: '4.8.0'
     implementation group: 'io.fabric8', name: 'kubernetes-model', version: '4.8.0'

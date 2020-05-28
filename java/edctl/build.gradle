@@ -106,6 +106,6 @@ dependencies {
     runtime "ch.qos.logback:logback-classic:1.2.3"
 }
 
-task makeExec(type: ReallyExecutableJarTask) {
+task buildExec(type: ReallyExecutableJarTask) {
     dependsOn shadowJar
 }

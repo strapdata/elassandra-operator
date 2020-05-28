@@ -2,7 +2,6 @@ package com.strapdata.strapkop.sidecar;
 
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.cache.SidecarConnectionCache;
-import com.strapdata.strapkop.cql.AbstractManager;
 import com.strapdata.strapkop.cql.CqlRole;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.k8s.ElassandraPod;
@@ -62,15 +61,12 @@ public class SidecarClientFactory {
         logger.debug("creating sidecar for pod={} in {}/{} url={}", pod.getName(), pod.getDataCenter(), pod.getNamespace(), url.toString());
         DefaultHttpClientConfiguration httpClientConfiguration = new DefaultHttpClientConfiguration();
         httpClientConfiguration.setReadTimeout(Duration.ofSeconds(30));
-        sidecarClient = new SidecarClient(url, httpClientConfiguration, getSSLContext(pod.getNamespace()), cqlRoleManager, AbstractManager.key(pod.getNamespace(),
-                pod.getCluster(),
-                AbstractManager.key(pod.getNamespace(), pod.getCluster(), pod.getDataCenter())),
-                cqlRole);
+        sidecarClient = new SidecarClient(url, httpClientConfiguration, getSslContext(pod.getNamespace()), cqlRole);
         sidecarConnectionCache.put(pod, sidecarClient);
         return sidecarClient;
     }
 
-    private SslContext getSSLContext(String namespace) throws StrapkopException, ApiException, SSLException, ExecutionException, InterruptedException {
+    private SslContext getSslContext(String namespace) throws StrapkopException, ApiException, SSLException, ExecutionException, InterruptedException {
         X509CertificateAndPrivateKey ca = authorityManager.get(namespace);
         return SslContextBuilder
                 .forClient()

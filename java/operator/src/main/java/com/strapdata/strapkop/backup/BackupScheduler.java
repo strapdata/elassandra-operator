@@ -2,8 +2,8 @@ package com.strapdata.strapkop.backup;
 
 import com.google.common.base.Strings;
 import com.strapdata.strapkop.model.Key;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
-import com.strapdata.strapkop.model.k8s.cassandra.ScheduledBackup;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.ScheduledBackup;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.cache.Cache;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;

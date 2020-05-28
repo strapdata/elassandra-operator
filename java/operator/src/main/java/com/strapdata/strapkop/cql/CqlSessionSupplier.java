@@ -1,7 +1,7 @@
 package com.strapdata.strapkop.cql;
 
 import com.datastax.driver.core.Session;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
 import io.reactivex.Single;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

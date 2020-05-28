@@ -9,8 +9,8 @@ import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.cql.CqlSessionHandler;
 import com.strapdata.strapkop.k8s.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenterStatus;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenterStatus;
 import com.strapdata.strapkop.model.k8s.task.ReplicationTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
@@ -62,7 +62,7 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
                                       final DataCenterCache dataCenterCache,
                                       ExecutorFactory executorFactory,
                                       @Named("tasks") UserExecutorConfiguration userExecutorConfiguration) {
-        super(reconcilierObserver, "replication", operatorConfig, k8sResourceUtils, meterRegistry,
+        super(reconcilierObserver, operatorConfig, k8sResourceUtils, meterRegistry,
                 dataCenterController, dataCenterCache, executorFactory, userExecutorConfiguration);
         this.context = context;
         this.cqlRoleManager = cqlRoleManager;
@@ -84,12 +84,13 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
 
         if (Strings.isNullOrEmpty(replicationTaskSpec.getDcName())) {
             logger.error("datacenter={} task={} dcName not set, ignoring task", dc.id(), task.id());
-            return finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.SUCCEED);
+            return finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.SUCCEED,
+                    replicationTaskSpec.getAction().equals(ReplicationTaskSpec.Action.ADD) ? "replicationAdd" : "replicationRemove");
         }
 
         final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
         switch (replicationTaskSpec.getAction()) {
-            case ADD:
+            case ADD: {
                 final Map<String, Integer> replicationMap = new HashMap<>();
                 replicationMap.putAll(replicationTaskSpec.getReplicationMap());
                 for (CqlKeyspace systemKs : CqlKeyspaceManager.SYSTEM_KEYSPACES)
@@ -114,29 +115,29 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
                             .ignoreElement()
                     );
                 }
-                return todo
-                        .andThen(Completable.mergeArray(fulshCompletables.toArray(new CompletableSource[fulshCompletables.size()]))
-                        .toSingleDefault(TaskPhase.SUCCEED)
-                        .flatMapCompletable(phase -> finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.SUCCEED))
-                        .onErrorResumeNext(throwable -> {
-                            logger.error("datacenter={} task={} add replication failed, error={}",
-                                    dc.id(), task.id(), replicationTaskSpec.getDcName(), throwable.getMessage());
-                            task.getStatus().setLastMessage(throwable.getMessage());
-                            return finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.FAILED);
-                        }))
+                return todo.andThen(Completable.mergeArray(fulshCompletables.toArray(new CompletableSource[fulshCompletables.size()]))
+                                .toSingleDefault(TaskPhase.SUCCEED)
+                                .flatMapCompletable(phase -> finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.SUCCEED, "replicationAdd"))
+                                .onErrorResumeNext(throwable -> {
+                                    logger.error("datacenter={} task={} add replication failed, error={}",
+                                            dc.id(), task.id(), replicationTaskSpec.getDcName(), throwable.getMessage());
+                                    task.getStatus().setLastMessage(throwable.getMessage());
+                                    return finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.FAILED, "replicationAdd");
+                                }))
                         .doFinally(() -> cqlSessionHandler.close());
-
-            case REMOVE:
+            }
+            case REMOVE: {
                 return this.cqlKeyspaceManager.removeDcFromReplicationMap(dc, replicationTaskSpec.getDcName(), cqlSessionHandler)
                         .toSingleDefault(TaskPhase.SUCCEED)
-                        .flatMapCompletable(phase -> finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.SUCCEED))
+                        .flatMapCompletable(phase -> finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.SUCCEED, "replicationRemove"))
                         .onErrorResumeNext(throwable -> {
                             logger.error("datacenter={} task={} remove replication failed, error={}",
                                     dc.id(), task.id(), replicationTaskSpec.getDcName(), throwable.getMessage());
                             task.getStatus().setLastMessage(throwable.getMessage());
-                            return finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.FAILED);
+                            return finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.FAILED, "replicationRemove");
                         })
                         .doFinally(() -> cqlSessionHandler.close());
+            }
         }
         cqlSessionHandler.close(); // close on error
         throw new IllegalArgumentException("Unknwon action");

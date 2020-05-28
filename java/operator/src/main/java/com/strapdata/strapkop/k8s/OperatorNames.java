@@ -1,6 +1,6 @@
 package com.strapdata.strapkop.k8s;
 
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
 import io.kubernetes.client.openapi.models.V1OwnerReference;
 
 import java.util.Locale;
@@ -16,10 +16,6 @@ public class OperatorNames {
 
     public static String configMapUniqueName(final String name, final String fingerprint) {
         return name + "-" + fingerprint;
-    }
-
-    public static String historyDataCenterName(final String datacenterName, final long generation) {
-        return String.format("%s-%04d", datacenterName, generation);
     }
 
     public static String clusterChildObjectName(final String nameFormat, final DataCenter dataCenter) {

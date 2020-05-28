@@ -2,7 +2,7 @@ package com.strapdata.strapkop.cache;
 
 import com.google.common.collect.ImmutableList;
 import com.strapdata.strapkop.k8s.ElassandraPod;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
 import com.strapdata.strapkop.sidecar.SidecarClient;
 import io.micrometer.core.instrument.ImmutableTag;
 import io.micrometer.core.instrument.MeterRegistry;

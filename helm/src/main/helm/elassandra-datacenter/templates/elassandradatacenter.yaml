@@ -85,9 +85,9 @@ spec:
     {{- if .Values.elasticsearch.datacenterTags }}
     datacenterTags: {{ .Values.elasticsearch.datacenterTags }}
     {{- end }}
-    {{- if .Values.enterprise }}
+    {{- if .Values.elasticsearch.enterprise }}
     enterprise:
-{{ toYaml .Values.enterprise | indent 6 }}
+{{ toYaml .Values.elasticsearch.enterprise | indent 6 }}
     {{- end }}
     config:
 {{ toYaml .Values.elasticsearch.config | indent 6 }}

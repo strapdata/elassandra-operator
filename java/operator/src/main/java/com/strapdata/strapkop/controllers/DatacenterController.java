@@ -11,7 +11,7 @@ import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.ClusterKey;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
-import com.strapdata.strapkop.model.k8s.cassandra.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.pipeline.WorkQueues;
 import io.fabric8.kubernetes.api.model.admission.AdmissionResponseBuilder;
