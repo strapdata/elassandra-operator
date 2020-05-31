@@ -33,6 +33,7 @@ public class TasksCleaner {
         this.cleanerThread = new Timer("elassandra-tasks-cleaner", true);
         final int retentionInMs = (int) operatorConfig.getTaskRetention().getSeconds() * 1000;
         // start cleaner thread after 60s and execute it every retentionInMs/5
+        logger.info("Starting task cleaner period={}", retentionInMs / 5);
         cleanerThread.schedule(new Cleaner(retentionInMs, operatorConfig.getNamespace()), 60_000l, retentionInMs / 5);
     }
 
@@ -63,6 +64,7 @@ public class TasksCleaner {
                         // trigger the deletion but not wait the end.
                         try {
                             k8sResourceUtils.deleteTask(task.getMetadata()).subscribe();
+                            logger.debug("task={} deleted", task.id());
                         } catch (ApiException ae) {
                             logger.info("cleaner iteration fails on task '{}' due to : {}", task.getMetadata().getName(), ae.getMessage(), ae);
                         }
