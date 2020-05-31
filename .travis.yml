@@ -26,12 +26,12 @@ before_install:
   # Installing Kind
   - curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.8.1/kind-$(uname)-amd64
   - chmod +x ./kind
-  - PATH=`pwd`/kind/:$PATH
+  - export PATH=$PWD/kind/:$PATH
   - kind version
   # Installing Helm
   - wget -q ${HELM_URL}/${HELM_TGZ}
   - tar xzfv ${HELM_TGZ}
-  - PATH=`pwd`/linux-amd64/:$PATH
+  - export PATH=$PWD/linux-amd64/:$PATH
   - helm version
 install:
 - ./gradlew --version
