@@ -1,10 +1,6 @@
 Monitoring and Alerting
 -----------------------
 
-Prometheus operator
-...................
-
-Elassandra Enterprise nodes expose Cassandra and Elasticsearch a prometheus endpoint on <hostname>:9500/metrics.
-
-The prometheus operator automatically scrape PODs having the kubernetes annotation "prometheus.io/scrape=true".
+The Elassandra operator and Elassandra nodes expose a prometheus prometheus endpoint and setup the
+prometheus annotation ``prometheus.io/scrape=true` to enable automatic scraping by the prometheus operator.
 

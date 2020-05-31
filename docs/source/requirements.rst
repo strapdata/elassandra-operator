@@ -58,12 +58,7 @@ Usage of SSD disks is recommended for better performances.
 Network requirements
 ....................
 
-The Elassandra Operator can deploy datacenters in various networking configuration.
-
-.. node::
-
-    Because Cassandra 3.x directly use IP addresses for inter-node communication, Cassandra
-    native (9042) and storage (7000/7001) ports must be
+The Elassandra Operator can deploy datacenters in 3 networking configuration.
 
 In-cluster networking
 _____________________

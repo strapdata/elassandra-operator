@@ -104,7 +104,7 @@ cluster role ``elassandra-operator`` with the following restricted operations:
 
 In order to access Kubernetes nodes information about server type, storage type and optional public IP address,
 the Elassandra operator create a dedicated ServiceAccount suffixed by ``nodeinfo`` associated to the ClusterRole
-``node-reader``. When starting Elassandra pods, this allows an init container to retrieve usefull information.
+``node-reader``. When starting Elassandra pods, this allows an init container to retrieve these information.
 
 The node-reader has the following permissions:
 
@@ -160,4 +160,8 @@ certificate secret. Thus, all nodes trust the same root CA.
 Authentication
 ..............
 
-Elassandra operator can automatically create Cassandra roles with a password defined as a Kubernetes secret, and set Cassandra permission and Elasticsearch privileges.
+Elassandra operator can automatically setup a strong password for the default cassandra suuper user, and create the following
+Cassandra roles with a password defined as a Kubernetes secret.
+
+* ``admin`` with the cassandra superuser privilege
+* ``elassandra_operator`` with no superuser privilege.
