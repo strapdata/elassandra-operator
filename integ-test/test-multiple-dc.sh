@@ -21,7 +21,7 @@ cat <<EOF | kubectl apply -f -
 apiVersion: elassandra.strapdata.com/v1
 kind: ElassandraTask
 metadata:
-  name: replication-add
+  name: replication-add-$$
   namespace: $NS
 spec:
   cluster: "cl1"
@@ -33,14 +33,14 @@ spec:
     replicationMap:
       foo: 1
 EOF
-java/edctl/build/libs/edctl watch-task -n replication-add -ns $NS --phase SUCCEED
+java/edctl/build/libs/edctl watch-task -n replication-add-$$ -ns $NS --phase SUCCEED
 
 # rebuild datacenter dc2 from dc1
 cat <<EOF | kubectl apply -f -
 apiVersion: elassandra.strapdata.com/v1
 kind: ElassandraTask
 metadata:
-  name: rebuild-dc2
+  name: rebuild-dc2-$$
   namespace: $NS
 spec:
   cluster: "cl1"
@@ -48,21 +48,22 @@ spec:
   rebuild:
     srcDcName: "dc1"
 EOF
-java/edctl/build/libs/edctl watch-task -n rebuild-dc2 -ns $NS --phase SUCCEED
+java/edctl/build/libs/edctl watch-task -n rebuild-dc2-$$ -ns $NS --phase SUCCEED
 
 # update routing table on dc2
 cat <<EOF | kubectl apply -f -
 apiVersion: elassandra.strapdata.com/v1
 kind: ElassandraTask
 metadata:
-  name: updaterouting-dc2
+  name: updaterouting-dc2-$$
   namespace: $NS
 spec:
   cluster: "cl1"
   datacenter: "dc2"
   updateRouting: {}
 EOF
-java/edctl/build/libs/edctl watch-task -n updaterouting-dc2 -ns $NS --phase SUCCEED
+java/edctl/build/libs/edctl watch-task -n updaterouting-dc2-$$ -ns $NS --phase SUCCEED
+sleep 5
 
 # check index
 TOTAL_HIT=$(kubectl exec -it elassandra-cl1-dc2-0-0 -n $NS -- bash -l -c "get 'foo/bar/_search?pretty'" | tail -n +4 | jq ".hits.total")
@@ -92,7 +93,7 @@ cat <<EOF | kubectl apply -f -
 apiVersion: elassandra.strapdata.com/v1
 kind: ElassandraTask
 metadata:
-  name: replication-remove-dc2
+  name: replication-remove-dc2-$$
   namespace: $NS
 spec:
   cluster: "cl1"
@@ -101,7 +102,7 @@ spec:
     action: REMOVE
     dcName: "dc2"
 EOF
-java/edctl/build/libs/edctl watch-task -n replication-remove-dc2 -ns $NS --phase SUCCEED
+java/edctl/build/libs/edctl watch-task -n replication-remove-dc2-$$ -ns $NS --phase SUCCEED
 
 # delete dc2
 uninstall_elassandra_datacenter $NS cl1 dc2
@@ -114,7 +115,7 @@ cat <<EOF | kubectl apply -f -
 apiVersion: elassandra.strapdata.com/v1
 kind: ElassandraTask
 metadata:
-  name: removenodes-dc2
+  name: removenodes-dc2-$$
   namespace: $NS
 spec:
   cluster: "cl1"
@@ -122,13 +123,12 @@ spec:
   removeNodes:
     dcName: "dc2"
 EOF
-java/edctl/build/libs/edctl watch-task -n removenodes-dc2 -ns $NS --phase SUCCEED
 
-kubectl exec -it elassandra-cl1-dc1-0-0 -n $NS -- bash -lc "nodetool -u cassandra -pwf /etc/cassandra/jmxremote.password  --jmxmp  --ssl gossipinfo" | grep DC | grep dc2
-if [ $? -eq 0 ]; then
-   echo "Error, remain nodes from dc2"
-   finish
-fi
+# wait for leaving nodes
+sleep 15
+
+# check dead nodes are removed
+kubectl exec -it elassandra-cl1-dc1-0-0 -n $NS -- bash -lc "nodetool -u cassandra -pwf /etc/cassandra/jmxremote.password  --jmxmp  --ssl status" | grep -v "DN "
 
 # cleanup
 uninstall_elassandra_datacenter $NS cl1 dc1
