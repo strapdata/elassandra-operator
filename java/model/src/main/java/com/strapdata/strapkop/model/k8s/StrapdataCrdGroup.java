@@ -4,7 +4,6 @@ package com.strapdata.strapkop.model.k8s;
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.info.Contact;
 import io.swagger.v3.oas.annotations.info.Info;
-import io.swagger.v3.oas.annotations.info.License;
 
 import java.io.InputStream;
 
@@ -13,8 +12,7 @@ import java.io.InputStream;
                 title = "Elassandra-Operator CRD",
                 version = "1.0",
                 description = "Elassandra-Operator Custom Resource Definition",
-                license = @License(name = "Apache 2.0", url = "http://foo.bar"),
-                contact = @Contact(url = "http://gigantic-server.com", name = "Fred", email = "support@strapdata.com")
+                contact = @Contact(url = "http://www.strapdata.com", name = "Fred", email = "support@strapdata.com")
         )
 )
 public class StrapdataCrdGroup {
