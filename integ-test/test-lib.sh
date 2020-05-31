@@ -48,7 +48,6 @@ setup_cluster() {
   create_cluster
   create_registry
   init_helm
-  install_elassandra_operator
 }
 
 init_helm() {
