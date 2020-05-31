@@ -36,7 +36,7 @@ script:
 - ./gradlew java:edctl:buildExec
 - (source integ-test/kind/test-lib-kind.sh && create_local_registry)
 - ./gradlew clean dockerPush -PregistryUrl="localhost:5000/" -PregistryInsecure
-- (source integ-test/test-lib.sh && init_cluster && test-scaleup-park-unpark-reaper.sh && test-multiple-dc.sh)
+- (source integ-test/test-lib.sh && init_cluster && integ-test/test-scaleup-park-unpark-reaper.sh && integ-test/test-multiple-dc.sh)
 # - (cd docs; make clean html SPHINXOPTS="-W")
 deploy:
 #- provider: script
