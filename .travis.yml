@@ -32,7 +32,6 @@ before_install:
   - wget -q ${HELM_URL}/${HELM_TGZ}
   - tar xzfv ${HELM_TGZ}
   - export PATH=$PATH:$PWD/linux-amd64/
-  - helm version
 install:
 - ./gradlew --version
 # Create Kind cluster and local registry
