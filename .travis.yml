@@ -51,6 +51,9 @@ script:
 - ./gradlew dockerPush -PregistryUrl="localhost:5000/" -PregistryInsecure
 - ./gradlew java:edctl:buildExec
 - integ-test/install_elassandra_operator.sh
+# wait CRD deployed
+- sleep 10
+- kubectl get crd
 - integ-test/test-scaleup-park-unpark-reaper.sh
 - integ-test/test-multiple-dc.sh
 # - (cd docs; make clean html SPHINXOPTS="-W")
