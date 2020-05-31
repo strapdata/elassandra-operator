@@ -30,6 +30,9 @@ before_install:
   # log to remote registry
   - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin strapdata.azurecr.io
   - echo "$NEXUS_PASSWORD" | docker login -u "$NEXUS_USERNAME" --password-stdin https://docker.repo.strapdata.com
+  # Install kubectl
+  - curl -Lo kubectl https://storage.googleapis.com/kubernetes-release/release/v1.15.0/bin/linux/amd64/kubectl && \
+    chmod +x kubectl && sudo mv kubectl /usr/local/bin/
   # Installing Kind
   - curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.8.1/kind-$(uname)-amd64
   - chmod +x ./kind
@@ -52,7 +55,7 @@ script:
 - ./gradlew java:edctl:buildExec
 - integ-test/install_elassandra_operator.sh
 # wait CRD deployed
-- sleep 10
+- sleep 20
 - kubectl get crd
 - integ-test/test-scaleup-park-unpark-reaper.sh
 - integ-test/test-multiple-dc.sh
