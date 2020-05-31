@@ -12,6 +12,7 @@ env:
   - MEMORY_LIMIT=2048Mi
   - HELM_URL=https://get.helm.sh
   - HELM_TGZ=helm-v2.14.3-linux-amd64.tar.gz
+  - K8S_FLAVOR=kind
 cache:
   directories:
   - "$HOME/.gradle/caches/"
@@ -22,6 +23,8 @@ services:
 before_install:
   - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin strapdata.azurecr.io
   - echo "$NEXUS_PASSWORD" | docker login -u "$NEXUS_USERNAME" --password-stdin https://docker.repo.strapdata.com
+  - (source integ-test/test-lib.sh && init_cluster)
+  - (source integ-test/kind/test-lib-kind.sh && create_local_registry)
 install:
 - "./gradlew --version"
 # Installing Helm
@@ -34,9 +37,8 @@ install:
 - helm init --client-only
 script:
 - ./gradlew java:edctl:buildExec
-- (source integ-test/kind/test-lib-kind.sh && create_local_registry)
 - ./gradlew clean dockerPush -PregistryUrl="localhost:5000/" -PregistryInsecure
-- (source integ-test/test-lib.sh && init_cluster && integ-test/test-scaleup-park-unpark-reaper.sh && integ-test/test-multiple-dc.sh)
+- (source integ-test/test-lib.sh && integ-test/test-scaleup-park-unpark-reaper.sh && integ-test/test-multiple-dc.sh)
 # - (cd docs; make clean html SPHINXOPTS="-W")
 deploy:
 #- provider: script
