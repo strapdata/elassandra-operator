@@ -21,6 +21,13 @@ cache:
 services:
 - docker
 before_install:
+  # Enable swap
+  - sudo fallocate -l 4G /swapfile
+  - sudo chmod 600 /swapfile
+  - sudo mkswap /swapfile
+  - sudo swapon /swapfile
+  - sudo sysctl vm.swappiness=10
+  # log to remote registry
   - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin strapdata.azurecr.io
   - echo "$NEXUS_PASSWORD" | docker login -u "$NEXUS_USERNAME" --password-stdin https://docker.repo.strapdata.com
   # Installing Kind
@@ -33,6 +40,7 @@ before_install:
   - tar xzfv ${HELM_TGZ}
   - export PATH=$PATH:$PWD/linux-amd64/
 install:
+- cd ${TRAVIS_BUILD_DIR}
 - ./gradlew --version
 # Create Kind cluster and local registry
 - helm init --client-only
