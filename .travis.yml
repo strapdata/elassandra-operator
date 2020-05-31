@@ -25,12 +25,19 @@ before_install:
 install:
 - "./gradlew --version"
 # Installing Helm
+- curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.8.1/kind-$(uname)-amd64
+- chmod +x ./kind
+- PATH=`pwd`/kind/:$PATH
 - wget -q ${HELM_URL}/${HELM_TGZ}
 - tar xzfv ${HELM_TGZ}
 - PATH=`pwd`/linux-amd64/:$PATH
 - helm init --client-only
 script:
-- "./gradlew build"
+- ./gradlew java:edctl:buildExec
+- (source integ-test/kind/test-lib-kind.sh && create_local_registry)
+- ./gradlew clean dockerPush -PregistryUrl="localhost:5000/" -PregistryInsecure
+- (source integ-test/test-lib.sh && init_cluster && test-scaleup-park-unpark-reaper.sh && test-multiple-dc.sh)
+# - (cd docs; make clean html SPHINXOPTS="-W")
 deploy:
 #- provider: script
 #  skip_cleanup: true
@@ -46,7 +53,8 @@ deploy:
   skip_cleanup: true
   script:
     - ./gradlew dockerPush -PregistryUsername=$DOCKER_USERNAME -PregistryPassword=$DOCKER_PASSWORD -PregistryUrl=$DOCKER_URL
-    - ./gradlew java:edctl:jib -Djib.to.auth.username=$DOCKER_USERNAME -Djib.to.auth.password=$DOCKER_PASSWORD
+    - ./gradlew java:edctl:buildExec -Djib.to.auth.username=$DOCKER_USERNAME -Djib.to.auth.password=$DOCKER_PASSWORD
+    - ./gradlew java:edctl:exec -Djib.to.auth.username=$DOCKER_USERNAME -Djib.to.auth.password=$DOCKER_PASSWORD
     - ./gradlew java:model:publish -PrepoUsername=$NEXUS_USERNAME -PrepoPassword=$NEXUS_PASSWORD
   # push to GCR.IO done by the marketplace repository
   on:
