@@ -36,14 +36,14 @@ install:
 - ./gradlew --version
 # Create Kind cluster and local registry
 - helm init --client-only
-- (source integ-test/test-lib.sh && init_cluster)
-- (source integ-test/kind/test-lib-kind.sh && create_local_registry)
+- ./integ-test/setup_cluster.sh
 - kind get clusters
 - docker ps -a
 script:
 - ./gradlew java:edctl:buildExec
 - ./gradlew clean dockerPush -PregistryUrl="localhost:5000/" -PregistryInsecure
-- (source integ-test/test-lib.sh && integ-test/test-scaleup-park-unpark-reaper.sh && integ-test/test-multiple-dc.sh)
+- integ-test/test-scaleup-park-unpark-reaper.sh
+- integ-test/test-multiple-dc.sh
 # - (cd docs; make clean html SPHINXOPTS="-W")
 deploy:
 #- provider: script

@@ -29,7 +29,7 @@ finish() {
   exit 1
 }
 
-init_cluster() {
+setup_cluster() {
   case "$K8S_FLAVOR" in
   "aks")
     echo "Loading AKS library"
@@ -46,6 +46,7 @@ init_cluster() {
   esac
 
   create_cluster
+  create_registry
   init_helm
   install_elassandra_operator
 }

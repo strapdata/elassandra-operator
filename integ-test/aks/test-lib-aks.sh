@@ -19,6 +19,10 @@ function create_cluster() {
   create_aks_cluster 1
 }
 
+create_registry() {
+  # assume Azure registry already exists
+}
+
 function delete_cluster() {
   delete_aks_cluster $RESOURCE_GROUP_NAME $K8S_CLUSTER_NAME
 }

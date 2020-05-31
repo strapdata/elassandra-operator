@@ -35,6 +35,10 @@ delete_cluster() {
   kind delete clusters ${1:-cluster1}
 }
 
+create_registry() {
+  create_local_registry
+}
+
 # check registry content:
 # http://localhost:5000/v2/_catalog
 # http://localhost:5000/v2/strapdata/elassandra-node-dev/tags/list
