@@ -35,7 +35,8 @@ before_install:
 install:
 - ./gradlew --version
 # Create Kind cluster and local registry
-- helm init --client-only  - (source integ-test/test-lib.sh && init_cluster)
+- helm init --client-only
+- (source integ-test/test-lib.sh && init_cluster)
 - (source integ-test/kind/test-lib-kind.sh && create_local_registry)
 - kind get clusters
 - docker ps -a
