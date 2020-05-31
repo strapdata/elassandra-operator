@@ -23,18 +23,23 @@ services:
 before_install:
   - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin strapdata.azurecr.io
   - echo "$NEXUS_PASSWORD" | docker login -u "$NEXUS_USERNAME" --password-stdin https://docker.repo.strapdata.com
-  - (source integ-test/test-lib.sh && init_cluster)
-  - (source integ-test/kind/test-lib-kind.sh && create_local_registry)
+  # Installing Kind
+  - curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.8.1/kind-$(uname)-amd64
+  - chmod +x ./kind
+  - PATH=`pwd`/kind/:$PATH
+  - kind version
+  # Installing Helm
+  - wget -q ${HELM_URL}/${HELM_TGZ}
+  - tar xzfv ${HELM_TGZ}
+  - PATH=`pwd`/linux-amd64/:$PATH
+  - helm version
 install:
-- "./gradlew --version"
-# Installing Helm
-- curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.8.1/kind-$(uname)-amd64
-- chmod +x ./kind
-- PATH=`pwd`/kind/:$PATH
-- wget -q ${HELM_URL}/${HELM_TGZ}
-- tar xzfv ${HELM_TGZ}
-- PATH=`pwd`/linux-amd64/:$PATH
-- helm init --client-only
+- ./gradlew --version
+# Create Kind cluster and local registry
+- helm init --client-only  - (source integ-test/test-lib.sh && init_cluster)
+- (source integ-test/kind/test-lib-kind.sh && create_local_registry)
+- kind get clusters
+- docker ps -a
 script:
 - ./gradlew java:edctl:buildExec
 - ./gradlew clean dockerPush -PregistryUrl="localhost:5000/" -PregistryInsecure
