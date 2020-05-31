@@ -31,12 +31,13 @@ before_install:
   - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin strapdata.azurecr.io
   - echo "$NEXUS_PASSWORD" | docker login -u "$NEXUS_USERNAME" --password-stdin https://docker.repo.strapdata.com
   # Install kubectl
-  - curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.15.0/bin/linux/amd64/kubectl && \
-    chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+  - curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.15.0/bin/linux/amd64/kubectl
+  - chmod +x ./kubectl
+  - sudo mv ./kubectl /usr/local/bin/
   # Installing Kind
   - curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.8.1/kind-$(uname)-amd64
   - chmod +x ./kind
-  - export PATH=$PATH:$PWD
+  - sudo mv kind /usr/local/bin/
   - kind version
   # Installing Helm
   - wget -q ${HELM_URL}/${HELM_TGZ}
