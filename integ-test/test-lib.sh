@@ -29,7 +29,7 @@ finish() {
   exit 1
 }
 
-setup_cluster() {
+setup_flavor() {
   case "$K8S_FLAVOR" in
   "aks")
     echo "Loading AKS library"
@@ -44,7 +44,10 @@ setup_cluster() {
     source $BASE_DIR/kind/test-lib-kind.sh
     ;;
   esac
+}
 
+setup_cluster() {
+  setup_flavor
   create_cluster
   create_registry
   init_helm
