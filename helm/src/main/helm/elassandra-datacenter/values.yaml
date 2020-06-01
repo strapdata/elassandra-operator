@@ -54,7 +54,7 @@ externalDns:
 
 # Cassandra reaper config
 reaper:
-  image: strapdata/cassandra-reaper:2.0.3
+  image: strapdata/cassandra-reaper:2.1.0-SNAPSHOT-strapkop
   enabled: true
   jwtSecret: "68d45d8f-419f-429e-8ba0-7b475cba795d"
   ingressSuffix:
