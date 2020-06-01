@@ -7,7 +7,7 @@
 # az account set --subscription 72738c1b-8ae6-4f23-8531-5796fe866f2e
 set -x
 
-BASE_DIR=$(dirname $0)
+BASE_DIR=integ-test
 HELM_REPO=helm/src/main/helm
 
 export ELASSANDRA_OPERATOR_TAG=$(awk -F "=" '/version/ { print $2 }' gradle.properties)

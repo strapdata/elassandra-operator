@@ -1,36 +1,33 @@
 #!/usr/bin/env bash
 
-source $(dirname $0)/test-lib.sh
+source integ-test/test-lib.sh
 setup_flavor
 
 NS="ns1"
 
 test_start
 install_elassandra_datacenter $NS cl1 dc1 1
-kubectl get all
-sleep 60
-kubectl get all
-java/edctl/build/libs/edctl watch-dc -n $NS --health GREEN -v
+java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --health GREEN
 
 scale_elassandra_datacenter $NS cl1 dc1 2
-java/edctl/build/libs/edctl watch-dc -n $NS -p RUNNING -r 2 -v
+java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS -p RUNNING -r 2
 
 scale_elassandra_datacenter $NS cl1 dc1 3
-java/edctl/build/libs/edctl watch-dc -n $NS -p RUNNING -r 3 -v
+java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS -p RUNNING -r 3
 
 
 park_elassandra_datacenter $NS cl1 dc1
-java/edctl/build/libs/edctl watch-dc -n $NS -p PARKED -r 0 -v
+java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS -p PARKED -r 0
 sleep 10
 unpark_elassandra_datacenter $NS cl1 dc1
-java/edctl/build/libs/edctl watch-dc -n $NS -p RUNNING --health GREEN -r 3 -v
+java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS -p RUNNING --health GREEN -r 3
 
 
 reaper_enable $NS cl1 dc1
-java/edctl/build/libs/edctl watch-dc -n $NS --reaper REGISTERED -v
+java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --reaper REGISTERED
 sleep 10
 reaper_disable $NS cl1 dc1
-java/edctl/build/libs/edctl watch-dc -n $NS --reaper NONE -v
+java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --reaper NONE -v
 
 #downgrade_elassandra_datacenter cl1 dc1
 #java/edctl/build/libs/edctl watch-dc -p RUNNING
