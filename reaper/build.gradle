@@ -9,7 +9,6 @@ plugins {
 def reaperImageName = registryUrl + "strapdata/cassandra-reaper:${reaperVersion}-strapkop"
 
 task buildReaper(type: DockerBuildImage) {
-    dependsOn ':java:driver-addons'
     inputDir = file('.')
     images.add(reaperImageName)
     buildArgs = [
