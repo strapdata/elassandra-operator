@@ -7,6 +7,9 @@ NS="ns1"
 
 test_start
 install_elassandra_datacenter $NS cl1 dc1 1
+kubectl get all
+sleep 60
+kubectl get all
 java/edctl/build/libs/edctl watch-dc -n $NS --health GREEN -v
 
 scale_elassandra_datacenter $NS cl1 dc1 2
