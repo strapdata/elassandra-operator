@@ -118,7 +118,7 @@ install_elassandra_datacenter() {
     --set image.tag=$ELASSANDRA_NODE_TAG \
     --set dataVolumeClaim.storageClassName=${STORAGE_CLASS_NAME:-"standard"}$registry \
     --set elasticsearch.kibana.enabled="false" \
-    --set reaper.enabled="false",reaper.image="$REGISTRY_URL/strapdata/cassandra-reaper:2.0.3" \
+    --set reaper.enabled="false",reaper.image="$REGISTRY_URL/strapdata/cassandra-reaper:2.1.0-SNAPSHOT-strapkop" \
     --set cassandra.sslStoragePort="38001",jvm.jmxPort="35001",prometheus.port="34001" \
     --set externalDns.enabled="false",externalDns.root="xxxx.yyyy",externalDns.domain="test.strapkube.com" \
     --set replicas="$sz"$args \
