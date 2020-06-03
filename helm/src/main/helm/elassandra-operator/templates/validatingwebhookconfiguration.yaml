@@ -24,7 +24,7 @@ webhooks:
         namespace: {{ .Release.Namespace }}
         path: "/datacenter/validation"
     admissionReviewVersions: ["v1", "v1beta1"]
-    failurePolicy: "Ignore"
+    failurePolicy: "Fail"
     matchPolicy: "Equivalent"
     sideEffects: None
     timeoutSeconds: 10

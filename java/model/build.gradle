@@ -9,14 +9,14 @@ tasks.withType(JavaCompile) {
 }
 
 dependencies {
-    implementation 'org.projectlombok:lombok:1.18.10'
-    annotationProcessor "org.projectlombok:lombok:1.18.10"
+    implementation "org.projectlombok:lombok:${lombokVersion}"
+    annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
     annotationProcessor("io.micronaut.configuration:micronaut-openapi:1.5.0")
 
     implementation("io.swagger.core.v3:swagger-annotations")
 
-    implementation group: 'io.fabric8', name: 'kubernetes-client', version: '4.8.0'
-    implementation group: 'io.fabric8', name: 'kubernetes-model', version: '4.8.0'
+    implementation group: 'io.fabric8', name: 'kubernetes-client', version: fabric8ioVersion
+    implementation group: 'io.fabric8', name: 'kubernetes-model', version: fabric8ioVersion
 }
 
 jar {

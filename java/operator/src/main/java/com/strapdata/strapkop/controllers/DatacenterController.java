@@ -1,23 +1,19 @@
 package com.strapdata.strapkop.controllers;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.strapdata.strapkop.cache.CheckPointCache;
 import com.strapdata.strapkop.cql.CqlKeyspace;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRole;
 import com.strapdata.strapkop.cql.CqlRoleManager;
+import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.ClusterKey;
 import com.strapdata.strapkop.model.Key;
-import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
-import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
-import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.pipeline.WorkQueues;
+import io.fabric8.kubernetes.api.model.Status;
 import io.fabric8.kubernetes.api.model.admission.AdmissionResponseBuilder;
 import io.fabric8.kubernetes.api.model.admission.AdmissionReview;
 import io.fabric8.kubernetes.api.model.admission.AdmissionReviewBuilder;
-import io.fabric8.kubernetes.internal.KubernetesDeserializer;
 import io.kubernetes.client.openapi.ApiException;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
@@ -28,7 +24,6 @@ import io.reactivex.Single;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import java.util.Map;
 
@@ -53,7 +48,7 @@ public class DatacenterController {
     CqlRoleManager cqlRoleManager;
 
     @Inject
-    ObjectMapper mapper;
+    K8sResourceUtils k8sResourceUtils;
 
     /*
     @Post(value = "/{namespace}/{cluster}/{datacenter}/rollback", produces = MediaType.APPLICATION_JSON)
@@ -81,16 +76,6 @@ public class DatacenterController {
     }
     */
 
-    @PostConstruct
-    public void initCrds() {
-        KubernetesDeserializer.registerCustomKind(StrapdataCrdGroup.GROUP + "/" + Task.VERSION, Task.KIND, com.strapdata.strapkop.model.fabric8.task.Task.class);
-        KubernetesDeserializer.registerCustomKind(StrapdataCrdGroup.GROUP + "/" + DataCenter.VERSION, DataCenter.KIND, com.strapdata.strapkop.model.fabric8.datacenter.DataCenter.class);
-
-        SimpleModule module = new SimpleModule();
-        module.addDeserializer(Object.class, new KubernetesDeserializer());
-        mapper.registerModule(module);
-    }
-
     @Get(value = "/{namespace}/{cluster}/{datacenter}/_keyspace", produces = MediaType.APPLICATION_JSON)
     public Map<String, CqlKeyspace> managedKeyspaces(String namespace, String cluster, String datacenter) throws ApiException {
         ClusterKey clusterKey = new ClusterKey(cluster, namespace);
@@ -105,16 +90,58 @@ public class DatacenterController {
         return cqlRoleManager.get(namespace, cluster, datacenter);
     }
 
+    /**
+     * Use the fabric8 datacenter for webhook admission.
+     * @param admissionReview
+     * @return
+     * @throws ApiException
+     */
     @Post(value = "/validation", consumes = MediaType.APPLICATION_JSON)
     public Single<AdmissionReview> validate(@Body AdmissionReview admissionReview) throws ApiException {
-        //io.micronaut.jackson.codec.JsonMediaTypeCodec;
         logger.warn("input admissionReview={}", admissionReview);
-        AdmissionReview admissionReview1 = new AdmissionReviewBuilder()
-                .withResponse(new AdmissionResponseBuilder()
-                        .withAllowed(true)
-                        .withUid(admissionReview.getRequest().getUid()).build())
-                .build();
-        logger.warn("output admissionReview={}", admissionReview1);
-        return Single.just(admissionReview1);
+
+        if (admissionReview.getRequest().getName() == null) {
+            // resource created.
+            return Single.just(new AdmissionReviewBuilder()
+                    .withResponse(new AdmissionResponseBuilder()
+                            .withAllowed(true)
+                            .withUid(admissionReview.getRequest().getUid()).build())
+                    .build());
+        }
+
+        Key dcKey = new Key(admissionReview.getRequest().getName(), admissionReview.getRequest().getNamespace());
+        return k8sResourceUtils.readDatacenter(dcKey)
+                .map(dc -> {
+                    com.strapdata.strapkop.model.fabric8.datacenter.DataCenter datacenter = (com.strapdata.strapkop.model.fabric8.datacenter.DataCenter) admissionReview.getRequest().getObject();
+
+                    // Attempt to change the clusterName
+                    if (!datacenter.getSpec().getClusterName().equals(dc.getSpec().getClusterName())) {
+                        throw new IllegalArgumentException("Cannot change the cassandra cluster name");
+                    }
+
+                    // Attempt to change the datacenterName
+                    if (!datacenter.getSpec().getDatacenterName().equals(dc.getSpec().getDatacenterName())) {
+                        throw new IllegalArgumentException("Cannot change the cassandra datacenter name");
+                    }
+
+                    logger.debug("Accept datacenter={}", datacenter);
+                    return new AdmissionReviewBuilder()
+                            .withResponse(new AdmissionResponseBuilder()
+                                    .withAllowed(true)
+                                    .withUid(admissionReview.getRequest().getUid()).build())
+                            .build();
+                })
+                .onErrorReturn(t -> {
+                    logger.warn("Invalid datacenter key=" + dcKey, t);
+                    Status status = new Status();
+                    status.setCode(400);
+                    status.setMessage(t.getMessage());
+                    return new AdmissionReviewBuilder()
+                            .withResponse(new AdmissionResponseBuilder()
+                                    .withAllowed(false)
+                                    .withStatus(status)
+                                    .withUid(admissionReview.getRequest().getUid()).build())
+                            .build();
+                });
     }
 }

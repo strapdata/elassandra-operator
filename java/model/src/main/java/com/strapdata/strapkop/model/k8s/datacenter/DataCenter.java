@@ -5,6 +5,7 @@ import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -14,6 +15,7 @@ import lombok.With;
 @With
 @AllArgsConstructor
 @NoArgsConstructor
+@Schema(name="DataCenter", description="Elassandra DataCenter CRD")
 public class DataCenter {
 
     public static final String NAME = "elassandradatacenter";

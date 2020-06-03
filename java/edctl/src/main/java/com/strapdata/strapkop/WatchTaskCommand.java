@@ -13,10 +13,10 @@
 
     import java.util.concurrent.Callable;
 
-    @CommandLine.Command(name = "watch-task", description = "Watch task subcommand")
+    @CommandLine.Command(name = "watch-task", description = "Watch elassandra task subcommand")
     public class WatchTaskCommand implements Callable<Integer> {
 
-        @CommandLine.Option(names = {"-n", "--name"}, description = "Task name")
+        @CommandLine.Option(names = {"-n", "--name"}, description = "Elassandra task name")
         String name;
 
         @CommandLine.Option(names = {"-ns", "--namespace"}, description = "Kubernetes namespace", defaultValue = "default")

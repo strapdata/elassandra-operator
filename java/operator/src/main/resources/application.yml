@@ -10,6 +10,8 @@ micronaut:
                 type: "${OPERATOR_KEYSTORE_TYPE:PKCS12}"
                 path: "${OPERATOR_KEYSTORE_PATH:`file:/tls/operator.p12`}"
                 password: "${OPERATOR_KEYSTORE_PASSWORD:changeit}"
+#        netty:
+#            log-level: TRACE
     executors:
         authority:
             type: FIXED

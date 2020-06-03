@@ -69,8 +69,8 @@ compileTestJava {
 }
 
 dependencies {
-    compile 'org.projectlombok:lombok:1.18.10'
-    annotationProcessor "org.projectlombok:lombok:1.18.10"
+    compile "org.projectlombok:lombok:$lombokVersion"
+    annotationProcessor "org.projectlombok:lombok:$lombokVersion"
     annotationProcessor "io.micronaut:micronaut-inject-java"
     annotationProcessor "io.micronaut:micronaut-validation"
 
@@ -95,7 +95,7 @@ dependencies {
     testAnnotationProcessor "io.micronaut:micronaut-inject-java"
     compile "javax.annotation:javax.annotation-api"
 
-    compile "io.kubernetes:client-java:7.0.0"
+    compile "io.kubernetes:client-java:$kubernetesClientVersion"
     compile "javax.inject:javax.inject:1"
 
     compile "info.picocli:picocli"

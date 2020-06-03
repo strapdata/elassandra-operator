@@ -15,7 +15,7 @@ import picocli.CommandLine;
 
 import java.util.concurrent.Callable;
 
-@CommandLine.Command(name = "watch-dc", description = "Watch datacenter subcommand")
+@CommandLine.Command(name = "watch-dc", description = "Watch elassandra datacenter subcommand")
 public class WatchDcCommand implements Callable<Integer> {
 
     @CommandLine.Option(names = {"-n", "--name"}, description = "Elassandra datacenter name")

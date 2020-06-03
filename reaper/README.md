@@ -1,6 +1,6 @@
 # Cassandra Reaper
 
-Build the Cassandra reaper docker image including the driver-addons AddressTranslator.
+Build the Cassandra reaper docker image including the Cassandra AddressTranslator (see java:driver-addons).
 
 ## Build
 
