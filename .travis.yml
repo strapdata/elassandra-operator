@@ -55,6 +55,7 @@ script:
 - ./gradlew dockerPush -PregistryUrl="localhost:5000/" -PregistryInsecure
 - ./gradlew java:edctl:buildExec
 - integ-test/install_elassandra_operator.sh
+- integ-test/test-admission.sh
 - integ-test/test-scaleup-park-unpark-reaper.sh
 - integ-test/test-multiple-dc.sh
 # - (cd docs; make clean html SPHINXOPTS="-W")

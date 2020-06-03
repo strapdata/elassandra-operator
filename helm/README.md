@@ -22,7 +22,7 @@ openssl req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes \
   <(echo "[req]"; 
     echo distinguished_name=req; 
     echo "[san]"; 
-    echo subjectAltName=DNS:elassandra-operator.default.svc.cluster.local
+    echo subjectAltName=DNS:elassandra-operator.default.svc,DNS:elassandra-operator.default.svc.cluster.local,IP:127.0.0.1
     ) \
   -subj "/CN=localhost"
 ```
