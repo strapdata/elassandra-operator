@@ -56,7 +56,7 @@ before_install:
   - tar xzfv ${HELM_TGZ}
   - export PATH=$PATH:$PWD/linux-amd64/
   # Install sphinx
-  - pip3 install sphinx~=1.8.5 sphinx_rtd_theme sphinx-jsonschema
+  - pip3 install setuptools sphinx~=1.8.5 sphinx_rtd_theme sphinx-jsonschema
 install:
 - cd ${TRAVIS_BUILD_DIR}
 - ./gradlew --version
