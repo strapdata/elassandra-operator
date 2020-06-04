@@ -1,0 +1,761 @@
+{
+  "type" : "object",
+  "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:DataCenterSpec",
+  "properties" : {
+    "clusterName" : {
+      "type" : "string",
+      "description" : "Cassandra cluster name"
+    },
+    "datacenterName" : {
+      "type" : "string",
+      "description" : "Cassandra datacenter name"
+    },
+    "replicas" : {
+      "type" : "integer",
+      "description" : "Number of Cassandra nodes in this datacenter"
+    },
+    "parked" : {
+      "type" : "boolean",
+      "description" : "Park the datacenter by setting sts to zero replica, but keep PVC and replica unchanged."
+    },
+    "autoScaleMode" : {
+      "type" : "string",
+      "description" : "How the operator decide to spawn a new Elassandra node",
+      "enum" : [ "MANUAL", "NODEPOOL_SIZE" ]
+    },
+    "podsAffinityPolicy" : {
+      "type" : "string",
+      "description" : "Elassandra pods affinity policy with respect to the failure-domain.beta.kubernetes.io/zone label",
+      "enum" : [ "STRICT", "SLACK" ]
+    },
+    "elassandraImage" : {
+      "type" : "string",
+      "description" : "Elassandra docker image"
+    },
+    "imagePullPolicy" : {
+      "type" : "string",
+      "description" : "Image pull policy"
+    },
+    "imagePullSecrets" : {
+      "type" : "array",
+      "items" : {
+        "type" : "string"
+      }
+    },
+    "appServiceAccount" : {
+      "type" : "string",
+      "description" : "ServiceAccount used by the operator to deploy pods"
+    },
+    "priorityClassName" : {
+      "type" : "string",
+      "description" : "Elassandra pods priorityClassName"
+    },
+    "annotations" : {
+      "type" : "object",
+      "description" : "Elassandra pods additional annotations",
+      "additionalProperties" : {
+        "type" : "string"
+      }
+    },
+    "customLabels" : {
+      "type" : "object",
+      "description" : "Elassandra pods additional labels",
+      "additionalProperties" : {
+        "type" : "string"
+      }
+    },
+    "env" : {
+      "type" : "array",
+      "description" : "Elassandra pods environment variables",
+      "items" : {
+        "type" : "object",
+        "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1EnvVar",
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "value" : {
+            "type" : "string"
+          },
+          "valueFrom" : {
+            "type" : "object",
+            "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1EnvVarSource",
+            "properties" : {
+              "configMapKeyRef" : {
+                "type" : "object",
+                "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ConfigMapKeySelector",
+                "properties" : {
+                  "key" : {
+                    "type" : "string"
+                  },
+                  "name" : {
+                    "type" : "string"
+                  },
+                  "optional" : {
+                    "type" : "boolean"
+                  }
+                }
+              },
+              "fieldRef" : {
+                "type" : "object",
+                "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ObjectFieldSelector",
+                "properties" : {
+                  "apiVersion" : {
+                    "type" : "string"
+                  },
+                  "fieldPath" : {
+                    "type" : "string"
+                  }
+                }
+              },
+              "resourceFieldRef" : {
+                "type" : "object",
+                "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ResourceFieldSelector",
+                "properties" : {
+                  "containerName" : {
+                    "type" : "string"
+                  },
+                  "divisor" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:custom:Quantity",
+                    "properties" : {
+                      "number" : {
+                        "type" : "number"
+                      },
+                      "format" : {
+                        "type" : "string",
+                        "enum" : [ "DECIMAL_EXPONENT", "DECIMAL_SI", "BINARY_SI" ]
+                      }
+                    }
+                  },
+                  "resource" : {
+                    "type" : "string"
+                  }
+                }
+              },
+              "secretKeyRef" : {
+                "type" : "object",
+                "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1SecretKeySelector",
+                "properties" : {
+                  "key" : {
+                    "type" : "string"
+                  },
+                  "name" : {
+                    "type" : "string"
+                  },
+                  "optional" : {
+                    "type" : "boolean"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "resources" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ResourceRequirements",
+      "description" : "Resource requirements for Elassandra pods",
+      "properties" : {
+        "limits" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "object",
+            "$ref" : "urn:jsonschema:io:kubernetes:client:custom:Quantity"
+          }
+        },
+        "requests" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "object",
+            "$ref" : "urn:jsonschema:io:kubernetes:client:custom:Quantity"
+          }
+        }
+      }
+    },
+    "dataVolumeClaim" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1PersistentVolumeClaimSpec",
+      "description" : "Elassandra PVC",
+      "properties" : {
+        "accessModes" : {
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          }
+        },
+        "dataSource" : {
+          "type" : "object",
+          "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1TypedLocalObjectReference",
+          "properties" : {
+            "apiGroup" : {
+              "type" : "string"
+            },
+            "kind" : {
+              "type" : "string"
+            },
+            "name" : {
+              "type" : "string"
+            }
+          }
+        },
+        "resources" : {
+          "type" : "object",
+          "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ResourceRequirements"
+        },
+        "selector" : {
+          "type" : "object",
+          "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1LabelSelector",
+          "properties" : {
+            "matchExpressions" : {
+              "type" : "array",
+              "items" : {
+                "type" : "object",
+                "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1LabelSelectorRequirement",
+                "properties" : {
+                  "key" : {
+                    "type" : "string"
+                  },
+                  "operator" : {
+                    "type" : "string"
+                  },
+                  "values" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "string"
+                    }
+                  }
+                }
+              }
+            },
+            "matchLabels" : {
+              "type" : "object",
+              "additionalProperties" : {
+                "type" : "string"
+              }
+            }
+          }
+        },
+        "storageClassName" : {
+          "type" : "string"
+        },
+        "volumeMode" : {
+          "type" : "string"
+        },
+        "volumeName" : {
+          "type" : "string"
+        }
+      }
+    },
+    "decommissionPolicy" : {
+      "type" : "string",
+      "description" : "Decomission policy control PVC when node removed",
+      "enum" : [ "KEEP_PVC", "DELETE_PVC", "BACKUP_AND_DELETE_PVC" ]
+    },
+    "userConfigMapVolumeSource" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ConfigMapVolumeSource",
+      "description" : "Name of an optional config map that contains cassandra configuration in the form of yaml fragments",
+      "properties" : {
+        "defaultMode" : {
+          "type" : "integer"
+        },
+        "items" : {
+          "type" : "array",
+          "items" : {
+            "type" : "object",
+            "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1KeyToPath",
+            "properties" : {
+              "key" : {
+                "type" : "string"
+              },
+              "mode" : {
+                "type" : "integer"
+              },
+              "path" : {
+                "type" : "string"
+              }
+            }
+          }
+        },
+        "name" : {
+          "type" : "string"
+        },
+        "optional" : {
+          "type" : "boolean"
+        }
+      }
+    },
+    "userSecretVolumeSource" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1SecretVolumeSource",
+      "description" : "Name of an optional secret that contains cassandra related secrets",
+      "properties" : {
+        "defaultMode" : {
+          "type" : "integer"
+        },
+        "items" : {
+          "type" : "array",
+          "items" : {
+            "type" : "object",
+            "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1KeyToPath"
+          }
+        },
+        "optional" : {
+          "type" : "boolean"
+        },
+        "secretName" : {
+          "type" : "string"
+        }
+      }
+    },
+    "prometheus" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:Prometheus",
+      "description" : "Prometheus configuration",
+      "properties" : {
+        "enabled" : {
+          "type" : "boolean",
+          "description" : "Enable Prometheus support"
+        },
+        "port" : {
+          "type" : "integer",
+          "description" : "Prometheus agent listen port, default is 9500"
+        }
+      }
+    },
+    "reaper" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:Reaper",
+      "description" : "Cassandra reaper configuration",
+      "properties" : {
+        "image" : {
+          "type" : "string",
+          "description" : "reaper docker image"
+        },
+        "jwtSecret" : {
+          "type" : "string",
+          "description" : "Reaper JWT secret"
+        },
+        "enabled" : {
+          "type" : "boolean",
+          "description" : "Reaper enabled"
+        },
+        "loggingLevel" : {
+          "type" : "string",
+          "description" : "Reaper logging level"
+        },
+        "ingressSuffix" : {
+          "type" : "string",
+          "description" : "Reaper ingress suffix"
+        },
+        "ingressAnnotations" : {
+          "type" : "object",
+          "description" : "Reaper ingress annotations",
+          "additionalProperties" : {
+            "type" : "string"
+          }
+        },
+        "scheduledRepairs" : {
+          "type" : "array",
+          "description" : "Reaper scheduled repairs configuration",
+          "items" : {
+            "type" : "object",
+            "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:ReaperScheduledRepair",
+            "properties" : {
+              "owner" : {
+                "type" : "string"
+              },
+              "keyspace" : {
+                "type" : "string"
+              },
+              "tables" : {
+                "type" : "array",
+                "items" : {
+                  "type" : "string"
+                }
+              },
+              "blacklistedTables" : {
+                "type" : "array",
+                "items" : {
+                  "type" : "string"
+                }
+              },
+              "segmentCount" : {
+                "type" : "integer"
+              },
+              "repairParallelism" : {
+                "type" : "string",
+                "enum" : [ "SEQUENTIAL", "PARALLEL", "DATACENTER_AWARE" ]
+              },
+              "intensity" : {
+                "type" : "number"
+              },
+              "incrementalRepair" : {
+                "type" : "boolean"
+              },
+              "scheduleDaysBetween" : {
+                "type" : "integer"
+              },
+              "scheduleTriggerTime" : {
+                "type" : "string"
+              },
+              "repairThreadCount" : {
+                "type" : "integer"
+              }
+            }
+          }
+        }
+      }
+    },
+    "managedKeyspaces" : {
+      "type" : "array",
+      "description" : "Managed keyspaces configuration",
+      "items" : {
+        "type" : "object",
+        "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:ManagedKeyspace",
+        "properties" : {
+          "keyspace" : {
+            "type" : "string",
+            "description" : "Managed keyspace name"
+          },
+          "rf" : {
+            "type" : "integer",
+            "description" : "Managed keyspace replication factor"
+          },
+          "repair" : {
+            "type" : "boolean",
+            "description" : "Managed keyspace automatic repair"
+          },
+          "role" : {
+            "type" : "string",
+            "description" : "CQL Role name, may be null"
+          },
+          "superuser" : {
+            "type" : "boolean",
+            "description" : "CQL role is superuser, default is false"
+          },
+          "login" : {
+            "type" : "boolean",
+            "description" : "CQL role is authorized to login, default is true"
+          },
+          "secretName" : {
+            "type" : "string",
+            "description" : "K8s secret name for the role password"
+          },
+          "secretKey" : {
+            "type" : "string",
+            "description" : "K8s secret key for the role password"
+          },
+          "grantStatements" : {
+            "type" : "array",
+            "description" : "CQL grant statements",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      }
+    },
+    "networking" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:Networking",
+      "description" : "Networking configuration",
+      "properties" : {
+        "hostPortEnabled" : {
+          "type" : "boolean",
+          "description" : "Enable K8S hostPort"
+        },
+        "hostNetworkEnabled" : {
+          "type" : "boolean",
+          "description" : "Enable K8S hostNetwork"
+        },
+        "nodeLoadBalancerEnabled" : {
+          "type" : "boolean",
+          "description" : "Enable external LoadBalancer for each Elassandra node"
+        }
+      }
+    },
+    "elasticsearch" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:Elasticsearch",
+      "description" : "Elasticsearch configuration",
+      "properties" : {
+        "enabled" : {
+          "type" : "boolean",
+          "description" : "Enable Elasticsearch, default is true"
+        },
+        "httpPort" : {
+          "type" : "integer",
+          "description" : "Elasticsearch HTTP port, default is 9200"
+        },
+        "transportPort" : {
+          "type" : "integer",
+          "description" : "Elasticsearch transport port, default is 9300"
+        },
+        "loadBalancerEnabled" : {
+          "type" : "boolean",
+          "description" : "Create a Load balancer service with external IP for Elasticsearch, default is false"
+        },
+        "loadBalancerIp" : {
+          "type" : "string",
+          "description" : "Add a LoadBalancer exposing CQL and elasticsearch HTTP nodePorts"
+        },
+        "ingressEnabled" : {
+          "type" : "boolean",
+          "description" : "Enable Elasticsearch service ingress"
+        },
+        "datacenterGroup" : {
+          "type" : "string",
+          "description" : "Elassandra datacenter group"
+        },
+        "datacenterTags" : {
+          "type" : "array",
+          "description" : "Elassandra datacenter tags",
+          "items" : {
+            "type" : "string"
+          }
+        },
+        "enterprise" : {
+          "type" : "object",
+          "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:Enterprise",
+          "description" : "Elassandra enterprise configuration",
+          "properties" : {
+            "enabled" : {
+              "type" : "boolean",
+              "description" : "Enable Elassandra Enterprise"
+            },
+            "jmx" : {
+              "type" : "boolean",
+              "description" : "Enable JMX for Elasticsearch metrics"
+            },
+            "https" : {
+              "type" : "boolean",
+              "description" : "Enable HTTPS for Elasticsearch"
+            },
+            "ssl" : {
+              "type" : "boolean",
+              "description" : "Enable TLS for Elasticsearch transport connections"
+            },
+            "aaa" : {
+              "type" : "object",
+              "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:Aaa",
+              "description" : "Enable Elasticsearch Authentication, Authorization and Accounting",
+              "properties" : {
+                "enabled" : {
+                  "type" : "boolean"
+                },
+                "audit" : {
+                  "type" : "boolean"
+                }
+              }
+            },
+            "cbs" : {
+              "type" : "boolean",
+              "description" : "Enable Elasticsearch Content-Based security"
+            }
+          }
+        },
+        "kibana" : {
+          "type" : "object",
+          "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:Kibana",
+          "description" : "Kibana configuration",
+          "properties" : {
+            "image" : {
+              "type" : "string",
+              "description" : "Kibana docker image"
+            },
+            "enabled" : {
+              "type" : "boolean",
+              "description" : "Kibana enabled, default is true"
+            },
+            "spaces" : {
+              "type" : "array",
+              "description" : "Kibana user spaces",
+              "items" : {
+                "type" : "object",
+                "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:KibanaSpace",
+                "properties" : {
+                  "name" : {
+                    "type" : "string",
+                    "description" : "Kibana space name (default is \"\")"
+                  },
+                  "keyspaces" : {
+                    "type" : "array",
+                    "description" : "Kibana visible keyspaces",
+                    "items" : {
+                      "type" : "string"
+                    }
+                  },
+                  "replicas" : {
+                    "type" : "integer",
+                    "description" : "Number of kibana instance, default is 1"
+                  },
+                  "nodeOptions" : {
+                    "type" : "string",
+                    "description" : "Kibana nodeJS options"
+                  }
+                }
+              }
+            },
+            "ingressSuffix" : {
+              "type" : "string",
+              "description" : "Kibana space ingress suffix"
+            },
+            "ingressAnnotations" : {
+              "type" : "object",
+              "description" : "Kibana ingress annotations",
+              "additionalProperties" : {
+                "type" : "string"
+              }
+            },
+            "version" : {
+              "type" : "integer",
+              "description" : "Kibana upgrade version"
+            }
+          }
+        }
+      }
+    },
+    "externalDns" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:ExternalDns",
+      "description" : "External DNS configuration",
+      "properties" : {
+        "enabled" : {
+          "type" : "boolean",
+          "description" : "Enable External DNS configuration"
+        },
+        "root" : {
+          "type" : "string",
+          "description" : "Unique root for DNS hostname generation:\nFor cassandra seed nodes : cassandra-x-0.domain, cassandra-x-1.domain\nFor elasticsearch: elasticsearch-x.domain\nFor kibana: kibana-x.domain\nFor reaper: repear-x.domain\n"
+        },
+        "domain" : {
+          "type" : "string",
+          "description" : "External dns domain"
+        },
+        "ttl" : {
+          "type" : "integer",
+          "description" : "External DNS ttl"
+        }
+      }
+    },
+    "jvm" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:Jvm",
+      "description" : "JVM configuration",
+      "properties" : {
+        "computeJvmMemorySettings" : {
+          "type" : "boolean",
+          "description" : "Automatic heap and GC configuration"
+        },
+        "jmxPort" : {
+          "type" : "integer",
+          "description" : "Java JMX port"
+        },
+        "jmxmpEnabled" : {
+          "type" : "boolean",
+          "description" : "Enable JMXMP"
+        },
+        "jmxmpOverSSL" : {
+          "type" : "boolean",
+          "description" : "Enable SSL on JMXMP"
+        },
+        "jdbPort" : {
+          "type" : "integer",
+          "description" : "Java debugger port, default is disabled"
+        }
+      }
+    },
+    "cassandra" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:Cassandra",
+      "description" : "Cassandra configuration",
+      "properties" : {
+        "workload" : {
+          "type" : "string",
+          "enum" : [ "WRITE", "READ_WRITE", "READ" ]
+        },
+        "config" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "any"
+          }
+        },
+        "authentication" : {
+          "type" : "string",
+          "enum" : [ "NONE", "CASSANDRA", "LDAP" ]
+        },
+        "ssl" : {
+          "type" : "boolean"
+        },
+        "commitlogsInitContainer" : {
+          "type" : "boolean"
+        },
+        "snitchPreferLocal" : {
+          "type" : "boolean"
+        },
+        "remoteSeeds" : {
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          }
+        },
+        "remoteSeeders" : {
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          }
+        },
+        "nativePort" : {
+          "type" : "integer"
+        },
+        "storagePort" : {
+          "type" : "integer"
+        },
+        "sslStoragePort" : {
+          "type" : "integer"
+        }
+      }
+    },
+    "webHookUrl" : {
+      "type" : "string",
+      "description" : "Elassandra webhook URL called when the datacenter is reconcilied"
+    },
+    "scheduledBackups" : {
+      "type" : "array",
+      "description" : "Definition of Scheduled Backups",
+      "items" : {
+        "type" : "object",
+        "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:ScheduledBackup",
+        "properties" : {
+          "tagSuffix" : {
+            "type" : "string"
+          },
+          "cron" : {
+            "type" : "string"
+          },
+          "backup" : {
+            "type" : "object",
+            "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:task:BackupTaskSpec",
+            "properties" : {
+              "repository" : {
+                "type" : "string"
+              },
+              "keyspaceRegex" : {
+                "type" : "string"
+              },
+              "keyspaces" : {
+                "type" : "array",
+                "items" : {
+                  "type" : "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

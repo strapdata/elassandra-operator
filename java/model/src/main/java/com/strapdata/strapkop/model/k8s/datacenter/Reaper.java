@@ -1,5 +1,6 @@
 package com.strapdata.strapkop.model.k8s.datacenter;
 
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 import com.strapdata.strapkop.model.GsonUtils;
@@ -25,13 +26,15 @@ public class Reaper {
     /**
      * Reaper docker image;
      */
+    @JsonPropertyDescription("reaper docker image")
     @SerializedName("image")
     @Expose
-    private String image  = "thelastpickle/cassandra-reaper:1.4.8";
+    private String image  = "strapdata/cassandra-reaper:2.1.0";
 
     /**
      * Reaper JWT secret
      */
+    @JsonPropertyDescription("Reaper JWT secret")
     @SerializedName("jwtSecret")
     @Expose
     private String jwtSecret = null;
@@ -40,14 +43,12 @@ public class Reaper {
      * Enable Cassandra Reaper support.
      *
      */
+    @JsonPropertyDescription("Reaper enabled")
     @SerializedName("enabled")
     @Expose
     private Boolean enabled = false;
 
-    /**
-     * Enable Cassandra Reaper support.
-     *
-     */
+    @JsonPropertyDescription("Reaper logging level")
     @SerializedName("loggingLevel")
     @Expose
     private String loggingLevel = "INFO";
@@ -57,6 +58,7 @@ public class Reaper {
      * reaper-suffix
      * reaper-admin-suffix
      */
+    @JsonPropertyDescription("Reaper ingress suffix")
     @SerializedName("ingressSuffix")
     @Expose
     private String ingressSuffix = null;
@@ -64,10 +66,12 @@ public class Reaper {
     /**
      * Ingress annotations
      */
+    @JsonPropertyDescription("Reaper ingress annotations")
     @SerializedName("ingressAnnotations")
     @Expose
     private Map<String, String> ingressAnnotations = null;
 
+    @JsonPropertyDescription("Reaper scheduled repairs configuration")
     @SerializedName("scheduledRepairs")
     @Expose
     private List<ReaperScheduledRepair> scheduledRepairs = null;

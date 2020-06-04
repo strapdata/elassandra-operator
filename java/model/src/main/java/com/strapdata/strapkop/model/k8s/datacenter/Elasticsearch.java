@@ -1,5 +1,6 @@
 package com.strapdata.strapkop.model.k8s.datacenter;
 
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 import com.strapdata.strapkop.model.GsonUtils;
@@ -10,9 +11,7 @@ import lombok.With;
 import org.apache.commons.codec.digest.DigestUtils;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Elasticsearch configuration.
@@ -23,31 +22,22 @@ import java.util.Map;
 @NoArgsConstructor
 public class Elasticsearch {
 
-    /**
-     * Enable elasticsearch support.
-     *
-     */
+    @JsonPropertyDescription("Enable Elasticsearch, default is true")
     @SerializedName("enabled")
     @Expose
     private Boolean enabled = true;
 
-    /**
-     * Elasticsearch HTTP port
-     */
+    @JsonPropertyDescription("Elasticsearch HTTP port, default is 9200")
     @SerializedName("httpPort")
     @Expose
     private Integer httpPort = 9200;
 
-    /**
-     * Elasticsearch Transport port
-     */
+    @JsonPropertyDescription("Elasticsearch transport port, default is 9300")
     @SerializedName("transportPort")
     @Expose
     private Integer transportPort = 9300;
 
-    /**
-     * Create a Load balancer service with external IP for Elasticsearch
-     */
+    @JsonPropertyDescription("Create a Load balancer service with external IP for Elasticsearch, default is false")
     @SerializedName("loadBalancerEnabled")
     @Expose
     private Boolean loadBalancerEnabled = false;
@@ -55,6 +45,7 @@ public class Elasticsearch {
     /**
      * The LoadBalancer exposing cql + elasticsearch nodePorts
      */
+    @JsonPropertyDescription("Add a LoadBalancer exposing CQL and elasticsearch HTTP nodePorts")
     @SerializedName("loadBalancerIp")
     @Expose
     private String loadBalancerIp;
@@ -62,27 +53,23 @@ public class Elasticsearch {
     /**
      * Enable Elasticsearch service ingress
      */
+    @JsonPropertyDescription("Enable Elasticsearch service ingress")
     @SerializedName("ingressEnabled")
     @Expose
     private Boolean ingressEnabled = false;
 
     /**
-     * Elasticsearch YAML configuration map
-     */
-    @SerializedName("config")
-    @Expose
-    private Map<String, Object> config = new HashMap<>();
-
-    /**
      * Elassandra datacenter group
      */
+    @JsonPropertyDescription("Elassandra datacenter group")
     @SerializedName("datacenterGroup")
     @Expose
     private String datacenterGroup = null;
 
     /**
-     * Elassandra datacenter group
+     * Elassandra datacenter tags
      */
+    @JsonPropertyDescription("Elassandra datacenter tags")
     @SerializedName("datacenterTags")
     @Expose
     private List<String> datacenterTags = null;
@@ -90,6 +77,7 @@ public class Elasticsearch {
     /**
      * Elassandra Enterprise configuration
      */
+    @JsonPropertyDescription("Elassandra enterprise configuration")
     @SerializedName("enterprise")
     @Expose
     private Enterprise enterprise = new Enterprise()
@@ -103,6 +91,7 @@ public class Elasticsearch {
      * Kibana configuration.
      *
      */
+    @JsonPropertyDescription("Kibana configuration")
     @SerializedName("kibana")
     @Expose
     private Kibana kibana = new Kibana();

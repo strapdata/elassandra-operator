@@ -1,8 +1,10 @@
 package com.strapdata.strapkop.model.k8s.datacenter;
 
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 import lombok.*;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,6 +22,7 @@ public class ManagedKeyspace {
     /**
      * Keyspace name
      */
+    @JsonPropertyDescription("Managed keyspace name")
     @SerializedName("keyspace")
     @Expose
     @EqualsAndHashCode.Include
@@ -28,6 +31,7 @@ public class ManagedKeyspace {
     /**
      * Target replication factor
      */
+    @JsonPropertyDescription("Managed keyspace replication factor")
     @SerializedName("rf")
     @Expose
     private Integer rf = 1;
@@ -35,6 +39,7 @@ public class ManagedKeyspace {
     /**
      * Automatic repair
      */
+    @JsonPropertyDescription("Managed keyspace automatic repair")
     @SerializedName("repair")
     @Expose
     private Boolean repair = Boolean.FALSE;
@@ -42,6 +47,7 @@ public class ManagedKeyspace {
     /**
      * CQL Role name, may be null
      */
+    @JsonPropertyDescription("CQL Role name, may be null")
     @SerializedName("role")
     @Expose
     private String role;
@@ -49,6 +55,7 @@ public class ManagedKeyspace {
     /**
      * CQL role is superuser, default is false
      */
+    @JsonPropertyDescription("CQL role is superuser, default is false")
     @SerializedName("superuser")
     @Expose
     private Boolean superuser = false;
@@ -56,6 +63,7 @@ public class ManagedKeyspace {
     /**
      * CQL role is authorized to login, default is true
      */
+    @JsonPropertyDescription("CQL role is authorized to login, default is true")
     @SerializedName("login")
     @Expose
     private Boolean login = true;
@@ -63,6 +71,7 @@ public class ManagedKeyspace {
     /**
      * K8s secret name for the role password.
      */
+    @JsonPropertyDescription("K8s secret name for the role password")
     @SerializedName("secretName")
     @Expose
     private String secretName;
@@ -70,6 +79,7 @@ public class ManagedKeyspace {
     /**
      * K8s secret key for the role password
      */
+    @JsonPropertyDescription("K8s secret key for the role password")
     @SerializedName("secretKey")
     @Expose
     private String secretKey;
@@ -77,6 +87,7 @@ public class ManagedKeyspace {
     /**
      * CQL grant statements
      */
+    @JsonPropertyDescription("CQL grant statements")
     @SerializedName("grantStatements")
     @Expose
     private List<String> grantStatements = new ArrayList<>();

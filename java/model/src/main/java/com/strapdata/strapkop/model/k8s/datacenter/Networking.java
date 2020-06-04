@@ -1,5 +1,6 @@
 package com.strapdata.strapkop.model.k8s.datacenter;
 
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 import lombok.AllArgsConstructor;
@@ -18,6 +19,7 @@ public class Networking {
     /**
      * Enable hostPort for nativePort, storagePort and sslStoragePort
      */
+    @JsonPropertyDescription("Enable K8S hostPort")
     @SerializedName("hostPortEnabled")
     @Expose
     private Boolean hostPortEnabled = true;
@@ -25,6 +27,7 @@ public class Networking {
     /**
      * Enable hostNetwork, allowing to bind on host IP addresses.
      */
+    @JsonPropertyDescription("Enable K8S hostNetwork")
     @SerializedName("hostNetworkEnabled")
     @Expose
     private Boolean hostNetworkEnabled = false;
@@ -32,6 +35,7 @@ public class Networking {
     /**
      * Enable external LoadBalancer for each Elassandra node.
      */
+    @JsonPropertyDescription("Enable external LoadBalancer for each Elassandra node")
     @SerializedName("nodeLoadBalancerEnabled")
     @Expose
     private Boolean nodeLoadBalancerEnabled = false;

@@ -1,9 +1,11 @@
 package com.strapdata.strapkop.model.k8s.datacenter;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 import lombok.*;
+
 import java.util.HashSet;
 import java.util.Set;
 
@@ -27,6 +29,7 @@ public class KibanaSpace {
     /**
      * Kibana space name (default is "")
      */
+    @JsonPropertyDescription("Kibana space name (default is \"\")")
     @SerializedName("name")
     @Expose
     private String name;
@@ -34,6 +37,7 @@ public class KibanaSpace {
     /**
      * Visible keyspaces
      */
+    @JsonPropertyDescription("Kibana visible keyspaces")
     @SerializedName("keyspaces")
     @Expose
     private Set<String> keyspaces = new HashSet<>();
@@ -41,6 +45,7 @@ public class KibanaSpace {
     /**
      * Number of kibana instance, default is 1
      */
+    @JsonPropertyDescription("Number of kibana instance, default is 1")
     @SerializedName("replicas")
     @Expose
     private Integer replicas = 1;
@@ -48,6 +53,7 @@ public class KibanaSpace {
     /**
      * Kibana nodeJS options, NODE_OPTIONS="--max-old-space-size=4096"
      */
+    @JsonPropertyDescription("Kibana nodeJS options")
     @SerializedName("nodeOptions")
     @Expose
     private String nodeOptions;

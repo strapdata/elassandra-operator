@@ -17,6 +17,12 @@ dependencies {
 
     implementation group: 'io.fabric8', name: 'kubernetes-client', version: fabric8ioVersion
     implementation group: 'io.fabric8', name: 'kubernetes-model', version: fabric8ioVersion
+
+
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: "2.9.4"
+    implementation group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: "2.9.4"
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: "2.9.4"
+    implementation("com.fasterxml.jackson.module:jackson-module-jsonSchema:2.9.4")
 }
 
 jar {

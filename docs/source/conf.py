@@ -31,9 +31,13 @@ import sphinx_rtd_theme
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 #extensions = [ 'sphinxjp.themes.basicstrap' ]
+extensions = [
+    'sphinx.ext.autodoc',
+    'sphinx-jsonschema'
+]
 
 pdf_documents = [
-('index', u'Strapkop Documentation', u'Strapkop Documentation', u'Strapdata'),
+('index', u'Elassandra-Operator Documentation', u'Elassandra-Operator Documentation', u'Strapdata'),
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -44,7 +48,7 @@ source_parsers = {
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
-source_suffix = ['.rst', '.md']
+source_suffix = ['.rst']
 #source_suffix = '.rst'
 
 # The encoding of source files.
@@ -54,9 +58,9 @@ source_suffix = ['.rst', '.md']
 master_doc = 'index'
 
 # General information about the project.
-project = u'Strapkop'
-copyright = u'2019, Strapdata'
-author = u'Strapkop team'
+project = u'Elassandra-Opereator'
+copyright = u'2020, Strapdata'
+author = u'Strapdata team'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -146,10 +150,10 @@ html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 
 # The name for this set of Sphinx documents.
 # "<project> v<release> documentation" by default.
-html_title = u'Strapkube Documentation'
+html_title = u'Elassandra Operator Documentation'
 
 # A shorter title for the navigation bar.  Default is the same as html_title.
-html_short_title = u'Strapkube'
+html_short_title = u'Elassandra Operator'
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
@@ -258,7 +262,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'Strapkop.tex', u'Strapkop Documentation',
+    (master_doc, 'Elassandra-Operator.tex', u'Elassandra Operator Documentation',
      u'Strapdata', 'manual'),
 ]
 
@@ -288,7 +292,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'Strapkop', u'Strapkop Documentation',
+    (master_doc, 'Elassandra Operator', u'Elassandra Operator Documentation',
      [author], 1)
 ]
 
@@ -302,8 +306,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'Strapkop', u'Strapkop Documentation',
-     author, 'Strapkop', 'One line description of project.',
+    (master_doc, 'Elassandra Operator', 'Elassandra Operator Documentation',
+     author, 'Elassandra Operator', 'Elassandra Kubernetes operator.',
      'Miscellaneous'),
 ]
 

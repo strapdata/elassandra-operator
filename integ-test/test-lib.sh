@@ -33,15 +33,15 @@ setup_flavor() {
   case "$K8S_FLAVOR" in
   "aks")
     echo "Loading AKS library"
-    source $BASE_DIR/aks/test-lib-aks.sh
+    source $BASE_DIR/aks/aks.sh
     ;;
   "gke")
     echo "Loading GKE library"
-    source $BASE_DIR/gke/test-lib-gke.sh
+    source $BASE_DIR/gke/gke.sh
     ;;
   *)
     echo "Loading Kind library"
-    source $BASE_DIR/kind/test-lib-kind.sh
+    source $BASE_DIR/kind/kind.sh
     ;;
   esac
 }

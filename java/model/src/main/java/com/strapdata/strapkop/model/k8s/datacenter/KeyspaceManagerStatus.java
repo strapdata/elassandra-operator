@@ -1,5 +1,6 @@
 package com.strapdata.strapkop.model.k8s.datacenter;
 
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.gson.annotations.SerializedName;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -18,12 +19,14 @@ public class KeyspaceManagerStatus {
     /**
      * KeyspaceManager last update replicas count.
      */
+    @JsonPropertyDescription("KeyspaceManager last update replicas count")
     @SerializedName("replicas")
     private Integer replicas = 0;
 
     /**
      * Managed keyspaces with RF > 0
      */
+    @JsonPropertyDescription("Managed keyspaces with RF > 0")
     @SerializedName("keyspaces")
     private Set<String> keyspaces = new HashSet<>();
 }

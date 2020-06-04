@@ -1,0 +1,145 @@
+{
+  "type" : "object",
+  "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:DataCenterStatus",
+  "properties" : {
+    "observedGeneration" : {
+      "type" : "integer"
+    },
+    "currentOperation" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:Operation",
+      "properties" : {
+        "desc" : {
+          "type" : "string"
+        },
+        "submitDate" : {
+          "type" : "integer",
+          "format" : "utc-millisec"
+        },
+        "pendingInMs" : {
+          "type" : "integer"
+        },
+        "durationInMs" : {
+          "type" : "integer"
+        }
+      }
+    },
+    "operationHistory" : {
+      "type" : "array",
+      "items" : {
+        "type" : "object",
+        "$ref" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:Operation"
+      }
+    },
+    "phase" : {
+      "type" : "string",
+      "enum" : [ "RUNNING", "PARKED" ]
+    },
+    "health" : {
+      "type" : "string",
+      "enum" : [ "UNKNOWN", "GREEN", "YELLOW", "RED" ]
+    },
+    "needCleanup" : {
+      "type" : "boolean"
+    },
+    "needCleanupKeyspaces" : {
+      "type" : "array",
+      "items" : {
+        "type" : "string"
+      }
+    },
+    "bootstrapped" : {
+      "type" : "boolean"
+    },
+    "lastError" : {
+      "type" : "string"
+    },
+    "lastErrorTime" : {
+      "type" : "integer",
+      "format" : "utc-millisec"
+    },
+    "cqlStatus" : {
+      "type" : "string",
+      "enum" : [ "NOT_STARTED", "ESTABLISHED", "ERRORED" ]
+    },
+    "cqlStatusMessage" : {
+      "type" : "string"
+    },
+    "configMapFingerPrint" : {
+      "type" : "string"
+    },
+    "currentTask" : {
+      "type" : "string"
+    },
+    "zones" : {
+      "type" : "array",
+      "items" : {
+        "type" : "string"
+      }
+    },
+    "readyReplicas" : {
+      "type" : "integer"
+    },
+    "rackStatuses" : {
+      "type" : "object",
+      "additionalProperties" : {
+        "type" : "object",
+        "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:RackStatus",
+        "properties" : {
+          "name" : {
+            "type" : "string",
+            "description" : "Rack name (or availability zone name)"
+          },
+          "index" : {
+            "type" : "integer",
+            "description" : "Rack index starting at 0"
+          },
+          "health" : {
+            "type" : "string",
+            "description" : "Current DC heath",
+            "enum" : [ "UNKNOWN", "GREEN", "YELLOW", "RED" ]
+          },
+          "fingerprint" : {
+            "type" : "string",
+            "description" : "Datacenter spec and user configmap fingerprint"
+          },
+          "desiredReplicas" : {
+            "type" : "integer",
+            "description" : "Number of replica desired in the underlying StatefulSet"
+          },
+          "readyReplicas" : {
+            "type" : "integer",
+            "description" : "Number of replica ready in the underlying StatefulSet"
+          }
+        }
+      }
+    },
+    "keyspaceManagerStatus" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:KeyspaceManagerStatus",
+      "properties" : {
+        "replicas" : {
+          "type" : "integer",
+          "description" : "KeyspaceManager last update replicas count"
+        },
+        "keyspaces" : {
+          "type" : "array",
+          "description" : "Managed keyspaces with RF > 0",
+          "items" : {
+            "type" : "string"
+          }
+        }
+      }
+    },
+    "kibanaSpaceNames" : {
+      "type" : "array",
+      "items" : {
+        "type" : "string"
+      }
+    },
+    "reaperPhase" : {
+      "type" : "string",
+      "enum" : [ "NONE", "DEPLOYED", "RUNNING", "REGISTERED" ]
+    }
+  }
+}

@@ -102,11 +102,11 @@ cluster role ``elassandra-operator`` with the following restricted operations:
       verbs:
       - list
 
-In order to access Kubernetes nodes information about server type, storage type and optional public IP address,
-the Elassandra operator create a dedicated ServiceAccount suffixed by ``nodeinfo`` associated to the ClusterRole
-``node-reader``. When starting Elassandra pods, this allows an init container to retrieve these information.
+When Kubernetes ``hostNetwork`` or ``hostPort`` is enabled, the Elassandra operator adds an init container (named nodeinfo)
+to Elassandra nodes to get the node public IP address.
 
-The node-reader has the following permissions:
+In order to access Kubernetes these nodes information, the Elassandra operator create a dedicated ServiceAccount suffixed by ``nodeinfo``
+associated to the ClusterRole ``node-reader`` with the following permissions:
 
 .. code::
 
@@ -163,5 +163,5 @@ Authentication
 Elassandra operator can automatically setup a strong password for the default cassandra suuper user, and create the following
 Cassandra roles with a password defined as a Kubernetes secret.
 
-* ``admin`` with the cassandra superuser privilege
+* ``admin`` with the cassandra superuser privilege.
 * ``elassandra_operator`` with no superuser privilege.

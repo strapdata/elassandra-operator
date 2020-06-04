@@ -1,6 +1,17 @@
 Configuration
 -------------
 
+.. jsonschema:: datacenter-spec.json#/properties/podsAffinityPolicy
+
+.. jsonschema:: datacenter-spec.json#/properties/reaper
+
+.. jsonschema:: datacenter-spec.json#/properties/elasticsearch
+
+.. jsonschema:: datacenter-spec.json#/properties/jvm
+
+
+.. jsonschema:: datacenter-status.json
+
 Elassandra Operator
 ...................
 

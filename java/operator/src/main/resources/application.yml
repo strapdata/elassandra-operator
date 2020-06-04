@@ -44,6 +44,12 @@ endpoints:
     stop:
         enabled: true
         sensitive: false
+    cache:
+        enabled: true
+        sensitive: false
+    loggers:
+        enabled: true
+        sensitive: false
     metrics:
         enabled: true
         sensitive: false
