@@ -1,5 +1,6 @@
 package com.strapdata.strapkop.model.k8s.datacenter;
 
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 import lombok.AllArgsConstructor;
@@ -21,8 +22,9 @@ import java.util.Map;
 public class Kibana {
 
     /**
-     * Reaper docker image;
+     * Kibana docker image;
      */
+    @JsonPropertyDescription("Kibana docker image")
     @SerializedName("image")
     @Expose
     private String image  = "docker.elastic.co/kibana/kibana-oss:6.2.3";
@@ -31,6 +33,7 @@ public class Kibana {
      * Enable Kibana support.
      *
      */
+    @JsonPropertyDescription("Kibana enabled, default is true")
     @SerializedName("enabled")
     @Expose
     private Boolean enabled = true;
@@ -38,6 +41,7 @@ public class Kibana {
     /**
      * Kibana user spaces (key = space name)
      */
+    @JsonPropertyDescription("Kibana user spaces")
     @SerializedName("spaces")
     @Expose
     private List<KibanaSpace> spaces = new ArrayList<>();
@@ -46,6 +50,7 @@ public class Kibana {
      * Kibana ingress suffix (concatened with kibana spaces).
      * host: space-suffix
      */
+    @JsonPropertyDescription("Kibana space ingress suffix")
     @SerializedName("ingressSuffix")
     @Expose
     private String ingressSuffix = null;
@@ -53,6 +58,7 @@ public class Kibana {
     /**
      * Ingress annotations
      */
+    @JsonPropertyDescription("Kibana ingress annotations")
     @SerializedName("ingressAnnotations")
     @Expose
     private Map<String, String> ingressAnnotations = null;
@@ -62,6 +68,7 @@ public class Kibana {
      * Should be 1 starting with elasticsearch 6.8
      * See https://www.elastic.co/guide/en/kibana/current/upgrade-migrations.html
      */
+    @JsonPropertyDescription("Kibana upgrade version")
     @SerializedName("version")
     @Expose
     private Integer version = null;

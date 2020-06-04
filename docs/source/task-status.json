@@ -1,0 +1,27 @@
+{
+  "type" : "object",
+  "id" : "urn:jsonschema:com:strapdata:strapkop:model:fabric8:task:TaskStatus",
+  "properties" : {
+    "phase" : {
+      "type" : "string",
+      "enum" : [ "WAITING", "RUNNING", "SUCCEED", "FAILED", "IGNORED" ]
+    },
+    "startDate" : {
+      "type" : "integer",
+      "format" : "utc-millisec"
+    },
+    "durationInMs" : {
+      "type" : "integer"
+    },
+    "lastMessage" : {
+      "type" : "string"
+    },
+    "pods" : {
+      "type" : "object",
+      "additionalProperties" : {
+        "type" : "string",
+        "enum" : [ "WAITING", "RUNNING", "SUCCEED", "FAILED", "IGNORED" ]
+      }
+    }
+  }
+}

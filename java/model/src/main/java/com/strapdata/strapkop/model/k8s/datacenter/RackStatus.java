@@ -1,5 +1,6 @@
 package com.strapdata.strapkop.model.k8s.datacenter;
 
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 import lombok.AllArgsConstructor;
@@ -16,6 +17,7 @@ public class RackStatus {
     /**
      * Rack name (or availability zone name)
      */
+    @JsonPropertyDescription("Rack name (or availability zone name)")
     @SerializedName("name")
     @Expose
     private String name;
@@ -23,6 +25,7 @@ public class RackStatus {
     /**
      * Rack index starting at 0 (Build form the DataCenterStatus.zones)
      */
+    @JsonPropertyDescription("Rack index starting at 0")
     @SerializedName("index")
     @Expose
     private Integer index;
@@ -30,6 +33,7 @@ public class RackStatus {
     /**
      * Current DC heath
      */
+    @JsonPropertyDescription("Current DC heath")
     @SerializedName("health")
     @Expose
     private Health health = Health.UNKNOWN;
@@ -37,6 +41,7 @@ public class RackStatus {
     /**
      * Datacenter spec and user configmap fingerprint
      */
+    @JsonPropertyDescription("Datacenter spec and user configmap fingerprint")
     @SerializedName("fingerprint")
     @Expose
     private String fingerprint = null;
@@ -44,6 +49,7 @@ public class RackStatus {
     /**
      * Number of replica desired in the underlying sts.
      */
+    @JsonPropertyDescription("Number of replica desired in the underlying StatefulSet")
     @SerializedName("desiredReplicas")
     @Expose
     private Integer desiredReplicas = 0;
@@ -51,6 +57,7 @@ public class RackStatus {
     /**
      * Number of replica ready in the underlying sts.
      */
+    @JsonPropertyDescription("Number of replica ready in the underlying StatefulSet")
     @SerializedName("readyReplicas")
     @Expose
     private Integer readyReplicas = 0;

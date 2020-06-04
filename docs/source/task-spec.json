@@ -1,0 +1,121 @@
+{
+  "type" : "object",
+  "id" : "urn:jsonschema:com:strapdata:strapkop:model:fabric8:task:TaskSpec",
+  "properties" : {
+    "cluster" : {
+      "type" : "string"
+    },
+    "datacenter" : {
+      "type" : "string"
+    },
+    "cleanup" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:com:strapdata:strapkop:model:fabric8:task:CleanupTaskSpec",
+      "properties" : {
+        "keyspace" : {
+          "type" : "string"
+        }
+      }
+    },
+    "repair" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:com:strapdata:strapkop:model:fabric8:task:RepairTaskSpec",
+      "properties" : {
+        "keyspace" : {
+          "type" : "string"
+        }
+      }
+    },
+    "rebuild" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:com:strapdata:strapkop:model:fabric8:task:RebuildTaskSpec",
+      "properties" : {
+        "srcDcName" : {
+          "type" : "string"
+        },
+        "keyspace" : {
+          "type" : "string"
+        }
+      }
+    },
+    "elasticReset" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:com:strapdata:strapkop:model:fabric8:task:ElasticResetTaskSpec",
+      "properties" : {
+        "updateRoutingIndices" : {
+          "type" : "string"
+        }
+      }
+    },
+    "removeNodes" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:com:strapdata:strapkop:model:fabric8:task:RemoveNodesTaskSpec",
+      "properties" : {
+        "dcName" : {
+          "type" : "string"
+        }
+      }
+    },
+    "replication" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:com:strapdata:strapkop:model:fabric8:task:ReplicationTaskSpec",
+      "properties" : {
+        "action" : {
+          "type" : "string",
+          "enum" : [ "ADD", "REMOVE" ]
+        },
+        "dcName" : {
+          "type" : "string"
+        },
+        "dcSize" : {
+          "type" : "integer"
+        },
+        "replicationMap" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "integer"
+          }
+        }
+      }
+    },
+    "decommission" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:com:strapdata:strapkop:model:fabric8:task:DecommissionTaskSpec",
+      "properties" : {
+        "dcName" : {
+          "type" : "string"
+        }
+      }
+    },
+    "backup" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:task:BackupTaskSpec",
+      "properties" : {
+        "repository" : {
+          "type" : "string"
+        },
+        "keyspaceRegex" : {
+          "type" : "string"
+        },
+        "keyspaces" : {
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          }
+        }
+      }
+    },
+    "test" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:task:TestTaskSpec",
+      "properties" : {
+        "timeOut" : {
+          "type" : "integer"
+        },
+        "testSuite" : {
+          "type" : "string"
+        }
+      }
+    }
+  }
+}

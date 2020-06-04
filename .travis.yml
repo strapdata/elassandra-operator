@@ -1,6 +1,4 @@
-language: java
-jdk:
-- openjdk8
+sudo: required
 env:
   global:
   - CLOUDSDK_CORE_DISABLE_PROMPTS: 1
@@ -13,13 +11,27 @@ env:
   - HELM_URL=https://get.helm.sh
   - HELM_TGZ=helm-v2.14.3-linux-amd64.tar.gz
   - K8S_FLAVOR=kind
+language:
+  - java
+  - bash
+  - python
+python: 3
+addons:
+  apt:
+    update: true
+    packages:
+      - jq
+      - bash
+      - python3-pip
+jdk:
+  - openjdk8
+services:
+  - docker
 cache:
   directories:
   - "$HOME/.gradle/caches/"
   - "$HOME/.gradle/wrapper/"
   - "$HOME/google-cloud-sdk/"
-services:
-- docker
 before_install:
   # Enable swap
   - sudo fallocate -l 4G /swapfile
@@ -43,6 +55,8 @@ before_install:
   - wget -q ${HELM_URL}/${HELM_TGZ}
   - tar xzfv ${HELM_TGZ}
   - export PATH=$PATH:$PWD/linux-amd64/
+  # Install sphinx
+  - pip3 install sphinx~=1.8.5 sphinx_rtd_theme sphinx-jsonschema
 install:
 - cd ${TRAVIS_BUILD_DIR}
 - ./gradlew --version
@@ -59,6 +73,8 @@ script:
 - integ-test/test-scaleup-park-unpark-reaper.sh
 - integ-test/test-multiple-dc.sh
 # - (cd docs; make clean html SPHINXOPTS="-W")
+- ./gradlew uploadLicenseReport
+- ./gradlew uploadLicenseNotices
 deploy:
 #- provider: script
 #  skip_cleanup: true

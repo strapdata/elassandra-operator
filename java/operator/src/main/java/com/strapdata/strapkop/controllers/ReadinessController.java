@@ -14,9 +14,6 @@ public class ReadinessController {
     @Inject
     PreflightService preflightService;
 
-    public ReadinessController() {
-    }
-
     /**
      * @return OK whene preflight service are applied (CA and CRD installation)
      */

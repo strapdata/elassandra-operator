@@ -1,14 +1,12 @@
 package com.strapdata.strapkop.model.k8s.datacenter;
 
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.With;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * JVM settings
@@ -18,16 +16,11 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 public class Jvm {
-    /**
-     * JVM options properties
-     */
-    @SerializedName("options")
-    @Expose
-    private List<String> options = new ArrayList<>();
 
     /**
      * Automatic heap and GC configuration
      */
+    @JsonPropertyDescription("Automatic heap and GC configuration")
     @SerializedName("computeJvmMemorySettings")
     @Expose
     private boolean computeJvmMemorySettings = true;
@@ -35,6 +28,7 @@ public class Jvm {
     /**
      * Java JMX port
      */
+    @JsonPropertyDescription("Java JMX port")
     @SerializedName("jmxPort")
     @Expose
     private Integer jmxPort = 7199;
@@ -42,13 +36,15 @@ public class Jvm {
     /**
      * Enable JMXMP.
      */
+    @JsonPropertyDescription("Enable JMXMP")
     @SerializedName("jmxmpEnabled")
     @Expose
     private Boolean jmxmpEnabled = true;
 
     /**
-     * Enable SSL with JMXMP.
+     * Enable SSL on JMXMP.
      */
+    @JsonPropertyDescription("Enable SSL on JMXMP")
     @SerializedName("jmxmpOverSSL")
     @Expose
     private Boolean jmxmpOverSSL = true;
@@ -56,6 +52,7 @@ public class Jvm {
     /**
      * Java debugger port (also hostPort)
      */
+    @JsonPropertyDescription("Java debugger port, default is disabled")
     @SerializedName("jdbPort")
     @Expose
     private Integer jdbPort = -1;

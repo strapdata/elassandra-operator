@@ -7,7 +7,6 @@
 # az account set --subscription 72738c1b-8ae6-4f23-8531-5796fe866f2e
 set -x
 
-
 export RESOURCE_GROUP_NAME=${RESOURCE_GROUP_NAME:-"cluster1"}
 export K8S_CLUSTER_NAME=${K8S_CLUSTER_NAME:-"cluster1"}
 
@@ -25,12 +24,13 @@ create_registry() {
 
 function delete_cluster() {
   delete_aks_cluster $RESOURCE_GROUP_NAME $K8S_CLUSTER_NAME
+  destroy_resource_group $RESOURCE_GROUP_NAME
 }
 
 
 # $1 = $RESOURCE_GROUP_NAME
 function create_resource_group() {
-    az group create -l westeurope -n $1
+  az group create -l westeurope -n $1
 }
 
 # $1 = $RESOURCE_GROUP_NAME
@@ -41,7 +41,7 @@ function destroy_resource_group() {
 # $1 = $RESOURCE_GROUP_NAME
 # $1 = vnet name
 function create_vnet0() {
-    az network vnet create --name vnet0 -g $1 --address-prefix 10.0.0.0/17 --subnet-name subnet0 --subnet-prefix 10.0.0.0/24
+  az network vnet create --name vnet0 -g $1 --address-prefix 10.0.0.0/17 --subnet-name subnet0 --subnet-prefix 10.0.0.0/24
 }
 
 
