@@ -17,14 +17,10 @@ Contents:
 
    introduction
    quickstart
-   requirements
-   security
-   deployment
-   configuration
    operations
+   configuration
+   security
    monitoring
-   backup-restore
-   services
 
 Indices and tables
 ==================
@@ -33,6 +29,6 @@ Indices and tables
 * :ref:`modindex`
 * :ref:`search`
 
-.. _Cassandra: http://cassandra.apache.org/
+.. _Cassandra: https://cassandra.apache.org/
+.. _Cassandra Reaper: https://cassandra-reaper.io/
 .. _Elasticsearch: https://www.elastic.co/products/elasticsearch
-

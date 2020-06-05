@@ -1,11 +1,11 @@
-Monitoring and Alerting
------------------------
+Monitoring
+----------
 
-Elassandra operator monitoring
-..............................
+Elassandra Operator monitoring
+______________________________
 
 The Elassandra operator expose prometheus metrics on port 8081 by default, and the Operator HELM chart
-adds the annotation ``prometheus.io/scrape=true` to enable automatic scraping by the prometheus operator.
+adds the annotation ``prometheus.io/scrape=true`` to enable automatic scraping by the prometheus operator.
 
 The Elassandra opertor also expose the following mangement endpoints :
 
@@ -14,19 +14,15 @@ The Elassandra opertor also expose the following mangement endpoints :
 +==========+=============================================================================================================================================================================================+
 | /info    |  Returns static information about application build                                                                                                                                         |
 +----------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| /loggers | Returns information about available loggers and permits changing the configured log level (see `LoggersEndpoint<https://docs.micronaut.io/latest/guide/management.html#loggersEndpoint>`_)  |
+| /loggers | Returns information about available loggers and permits changing the configured log level (see `LoggersEndpoint <https://docs.micronaut.io/latest/guide/management.html#loggersEndpoint>`_) |
 +----------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | /env     | Returns information about the environment and its property sources (see `EnvironmentEndpoint <https://docs.micronaut.io/latest/guide/management.html#environmentEndpoint>`_)                |
 +----------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | /caches  | Returns information about the caches and permits invalidating them (see `CachesEndpoint <https://docs.micronaut.io/latest/guide/management.html#cachesEndpoint>`_)                          |
 +----------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| /stop    | Shuts down the application server (see `ServerStopEndpoint <https://docs.micronaut.io/latest/guide/management.html#stopEndpoint>`_)                                                         |
-+----------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
-Elassandra nodes monitoring
-...........................
+Elassandra Nodes monitoring
+___________________________
 
 Elassandra nodes expose JVM, Cassandra and Elasticsearch metrics on port 9500 by default, and the Elassandra HELM chart
-adds the annotation ``prometheus.io/scrape=true` to enable automatic scraping by the prometheus operator.
-
-
+adds the annotation ``prometheus.io/scrape=true`` to enable automatic scraping by the prometheus operator.

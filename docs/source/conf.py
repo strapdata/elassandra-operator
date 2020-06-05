@@ -58,7 +58,7 @@ source_suffix = ['.rst']
 master_doc = 'index'
 
 # General information about the project.
-project = u'Elassandra-Opereator'
+project = u'Elassandra-Operator'
 copyright = u'2020, Strapdata'
 author = u'Strapdata team'
 

@@ -1,19 +1,221 @@
 Configuration
 -------------
 
-.. jsonschema:: datacenter-spec.json#/properties/podsAffinityPolicy
+Resources configuration
+_______________________
 
-.. jsonschema:: datacenter-spec.json#/properties/reaper
+You can adjust CPU and Memory needs of your Elassandra nodes by updating the CRD elassandradatacenter as shown here:
+
+.. code::
+
+    kubectl patch elassandradatacenter elassandra-cl1-dc1 --type merge --patch '{"spec":{"resources":{"limits":{"memory":"4Gi"}}}}'
+
+Resources entry may receive "limits" and/or "requests" quantity description as describe in the `k8s documentation <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/>`_.
+
+.. code::
+
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+
+Pod affinity
+____________
+
+You can define the `NodeAffinity <https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#node-affinity>`_
+for the Elassandra pods using the ``nodeAffinityPolicy`` attribute of the DatacenterSpec. Possible values are :
+
+* STRICT : schedule elassandra pods only on nodes in the matching the ``failure-domain.beta.kubernetes.io/zone`` label (default value)
+* SLACK : schedule elassandra pods preferably on nodes in the matching the ``failure-domain.beta.kubernetes.io/zone`` label
+
+Of course, when ``hostNetwork`` or ``hostPort`` is enabled (see Networking), using the SLACK affinity is not possible because all Elassandra nodes
+of a cluster listen on the same TCP ports.
+
+Peristent Storage
+-----------------
+
+Elassandra nodes require persistent volumes to store Cassandra and Elasticsearch data.
+You can use various kubernetes storage class including local and attached volumes.
+Usage of SSD disks is recommended for better performances.
+
+Persistent volume attached to availability zones
+________________________________________________
+
+The Elassandra operator deploys one Cassandra rack per availability zone to ensure data consistency when a zone is unavailable.
+Each Cassandra rack is a Kubernetes StatefulSet, and rack names are Kubernetes node label ``failure-domain.beta.kubernetes.io/zone``.
+
+In order to create Persistent Volume in the same availability zone as the StatefulSet,
+you may create storage classes bound to availability zones of your cloud provider, as shown bellow using SSDs in GKE:
+
+.. code::
+
+    apiVersion: storage.k8s.io/v1
+    kind: StorageClass
+    metadata:
+      name: ssd-europe-west1-b
+      labels:
+        addonmanager.kubernetes.io/mode: EnsureExists
+        kubernetes.io/cluster-service: "true"
+    provisioner: kubernetes.io/gce-pd
+    parameters:
+      type: pd-ssd
+    allowVolumeExpansion: true
+    reclaimPolicy: Delete
+    volumeBindingMode: Immediate
+    allowedTopologies:
+      - matchLabelExpressions:
+          - key: failure-domain.beta.kubernetes.io/zone
+            values:
+              - europe-west1-b
+
+In the Elassandra datacenter spec, you can then specify a ``storageClassName`` ìncluding a **{zone}** variable replaced
+by the corresponding availability zone name.
+
+.. code::
+
+    dataVolumeClaim:
+      accessModes:
+        - ReadWriteOnce
+      storageClassName: "ssd-{zone}"
+      resources:
+        requests:
+          storage: 128Gi
+
+Peristent Volume decommission policy
+____________________________________
+
+By default, Elassandra nodes PVC are deleted when deleting an Elassandra datacenter, but you can keep PVCs with the following setting:
+
+.. code::
+
+    decommissionPolicy: KEEP_PVC
+
+Network Configuration
+---------------------
+
+The Elassandra Operator can deploy datacenters in 3 networking configuration controlled by the following datacenter spec block:
+
+.. code::
+
+    networking:
+      hostPortEnabled: false
+      hostNetworkEnabled: false
+
+In-cluster networking
+_____________________
+
+This is the default networking configuration where Cassandra and Elasticsearch pods listen on PODs private IP addresses.
+In such configuration, Elassandra pods can only be reached by applications deployed in the same Kubernetes cluster through a headless service.
+
+Out-of-cluster Networking with private IP addressing
+____________________________________________________
+
+In this configuration, Elassandra pods should be deployed with kubernetes ``hostPort`` enabled to allow the inbound traffic
+on Elassandra ports (Cassandra Native and Storage, Elasticsearch HTTP/HTTPS port) from the outside of the Kubernetes cluster.
+
+This allows Elassandra pod to bind and broadcast Kubernetes node private IP address to interconnect datacenters through VPN or PVC.
+
+Out-of-cluster Networking with Public IP addressing
+___________________________________________________
+
+In this configuration, Elassandra pods broadcast a public IP should be deployed with ``hostNetwork`` enabled, allowing Elassandra pods
+to bind and broadcast public IP address of their Kubernetes nodes. In such configuration, cross datacenter connection
+can rely on public IP a``dresses without the need of a VPN or a VPC.
+
+Managed Keyspaces
+-----------------
+
+The Elassandra-Operator can manage Cassandra keyspace replication for you:
+
+* Create keyspace if not exists, create Cassandra role and setup Cassandra permissions and Elasticsearch privileges.
+* Adjust the replication factor and run automatic repair/cleanup when Elassandra nodes are added or removed, or when a datacenter is added or removed.
+* Register the keyspace into Cassandra Reaper to schedule continuous repairs.
+
+Like the `Elasticsearch index.auto_expand_replicas <https://www.elastic.co/guide/en/elasticsearch/reference/current/index-modules.html#dynamic-index-settings>`_
+index settings, the Elassandra-Operator automatically adjust the keyspace replication factor to the desired number of copies and the current number of nodes in the datacenter:
+
+To create a Cassandra role, the Elassandra operator retreives its password in a Kubernetes secret named ``elassandra-[cluster_name]-keyspace`` by default, with
+a secret key equals to the role name or specified by the ``secretKey`` field, as shown below. Specify a ``secretName`` to use an alternate Kubernetes secret.
+
+.. code::
+
+    kubectl create secret generic elassandra-cl1-keyspaces -n mynamespace --from-literal=gravitee='xxxxxxx'
+
+Specify a managed keyspace in your datacenter CRD as shown below:
+
+.. code::
+
+    ...
+    managedKeyspaces:
+      - keyspace: gravitee
+        rf: 3
+        role: gravitee
+        login: true
+        superuser: false
+        secretKey: gravitee
+        repair: true
+        grantStatements:
+          - "GRANT gravitee TO gravitee"
+
+Check you keyspace is properly managed in the datacenter status:
+
+.. code::
+
+    status:
+      ...
+      keyspaceManagerStatus:
+        keyspaces:
+        - _kibana
+        - gravitee
+
+Configuration
+-------------
+
+JVM settings
+____________
+
+
+Cassandra
+_________
+
+Here is the datacenter spec to configure cassandra:
+
+.. jsonschema:: datacenter-spec.json#/properties/cassandra
+
+Elasticsearch
+_____________
+
+Here is the datacenter spec to configure elasticsearch:
 
 .. jsonschema:: datacenter-spec.json#/properties/elasticsearch
 
-.. jsonschema:: datacenter-spec.json#/properties/jvm
+Kibana
+______
+
+In order to visualize your Elassandra data, or interact with Elasticsearch, the Elassandra-Operator can deploy
+secured Kibana instances pointing to your Elassandra datacenter nodes.
+
+When Elasticsearch HTTPS is enabled in your Elassandra datacenter, Kibana is automatically configured to connect
+through HTTPS and trust the Elassandra datacenter root CA.
+
+Moreover, for each kibana space, the Elassandra-Operator creates a dedicated Cassandra role and a dedicated managed keyspace storing the kibana configuration.
+Thus, you can run separated kibana instances dedicated to specific usages or specific users.
+
+Here is the datacenter spec to configure kibana deployment:
 
 
-.. jsonschema:: datacenter-status.json
+Continous Cassandra repair
+__________________________
 
-Elassandra Operator
-...................
+In order to ensure data consistency, a continuous cassandra repair can be managed by a `Cassandra Reaper <https://http://cassandra-reaper.io/>`_
+instance running on each datacenter. The Elassandra-Operator automatically configure Cassandra Reaper, register the Cassandra cluster and schedule repairs for managed keyspaces.
+
+Here is the datacenter spec to configure kibana deployment:
+
+.. jsonschema:: datacenter-spec.json#/properties/reaper
 
 
 Minimal values file for the Elassandra Operator helm chart.
@@ -125,26 +327,7 @@ Here is an example to customize Cassandra settings from the cassandra.yaml file:
 
     If you patch the CRD with a wrong schema, the elassandra operator won't be able to parse and process it until you fix it.
 
-Resources configuration
-_______________________
 
-You can adjust CPU and Memory needs of your Elassandra nodes by updating the CRD elassandradatacenter as shown here:
-
-.. code::
-
-    kubectl patch elassandradatacenter elassandra-cl1-dc1 --type merge --patch '{"spec":{"resources":{"limits":{"memory":"4Gi"}}}}'
-
-Resources entry may receive "limits" and/or "requests" quantity description as describe in the `k8s documentation <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/>`_.
-
-.. code::
-
-    resources:
-      requests:
-        cpu: 500m
-        memory: 1Gi
-      limits:
-        cpu: 1000m
-        memory: 2Gi
 
 
 Pod affinity

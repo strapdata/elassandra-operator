@@ -2,7 +2,7 @@ Security
 --------
 
 Kuberenetes RBAC
-................
+________________
 
 The elassandra operator runs with a dedicated Kubernetes serviceaccount ``elassandra-operator`` and a
 cluster role ``elassandra-operator`` with the following restricted operations:
@@ -102,11 +102,11 @@ cluster role ``elassandra-operator`` with the following restricted operations:
       verbs:
       - list
 
-When Kubernetes ``hostNetwork`` or ``hostPort`` is enabled, the Elassandra operator adds an init container (named nodeinfo)
-to Elassandra nodes to get the node public IP address.
+When Kubernetes ``hostNetwork`` or ``hostPort`` is enabled (see Networking), the Elassandra operator adds an init container
+named **nodeinfo** allowing the Elassandra pods to get the node public IP address.
 
-In order to access Kubernetes these nodes information, the Elassandra operator create a dedicated ServiceAccount suffixed by ``nodeinfo``
-associated to the ClusterRole ``node-reader`` with the following permissions:
+In order to access Kubernetes these nodes information, the Elassandra Operator HELM chart creates a dedicated ServiceAccount
+suffixed by ``nodeinfo`` associated to the ClusterRole ``node-reader`` with the following permissions:
 
 .. code::
 
@@ -129,39 +129,38 @@ associated to the ClusterRole ``node-reader`` with the following permissions:
 
 
 Certificate management
-......................
+______________________
 
-In order to generate X509 certificates, the Elassandra operator use a root CA certificate and private key stored as
-Kubernetes secrets. If theses secrets does not exist when the operator is deployed, the operator automatically generates
-a self-signed root CA certificate:
+In order to dynamically generates X509 certificates, the Elassandra-Operator use a root CA certificate and private key stored as
+Kubernetes secrets. If theses CA secrets does not exist in the namespace where the datacenter is deployed, the operator automatically generates
+a self-signed root CA certificate in that namespace:
 
 * Secret **ca-pub** contains the root CA certificate as a PEM file and PKCS12 keystore. (respectively named *cacert.pem* and *truststore.p12*)
 * Secret **ca-key** contains the root CA private key in a PKCS12 keystore. (named *ca.key*)
 
 SSL/TLS Certificates
-....................
+____________________
 
-The Elassandra Operator can generate SSL/TLS keystores for Elassandra nodes:
-
-* On startup, the operator generates a self-signed root CA certificate stored in ca-pub and ca-key Kubernetes secrets if these does not exists.
-* When a datacenter is deployed, a SSL/TLS keystore is generated from the root CA certificate if it does not exists in the secret
-``elassandra-[cluster]-[dc]-keystore``. This certificate has a wildcard certificate subjectAltName extension matching all Elassandra datacenter pods.
+When an Elassandra datacenter is deployed, a SSL/TLS keystore is generated from the namespaced root CA certificate if it does not exists in the secret
+``elassandra-[clusterName]-[dcName]-keystore``. This certificate has a wildcard certificate subjectAltName extension matching all Elassandra datacenter pods.
 It also have the localhost and 127.0.0.1 extensions to allow local connections.
 
 This TLS certificates and keys are used to secure:
 
-* Cassandra node-to-node and client-to-node connections
-* Cassandra JMX connection for administration and monitoring
-* Elasticsearch client request overs HTTPS and Elasticsearch inter-node transport connections
+* Cassandra node-to-node and client-to-node connections.
+* Cassandra JMX connection for administration and monitoring.
+* Elasticsearch client request overs HTTPS and Elasticsearch inter-node transport connections.
 
-When your cluster have multiple datacenters located in several Kubernetes clusters, these datacenter must share the same root CA
-certificate secret. Thus, all nodes trust the same root CA.
+When your cluster have multiple datacenters located in several Kubernetes clusters, these datacenters must share
+the same namespaced root CA certificate secret. Thus, all Elassandra cluster nodes trust the same root CA.
 
 Authentication
-..............
+______________
 
-Elassandra operator can automatically setup a strong password for the default cassandra suuper user, and create the following
-Cassandra roles with a password defined as a Kubernetes secret.
+Elassandra operator can automatically setup a strong Cassandra password for the default Cassandra super user,
+and create the following Cassandra roles.
 
 * ``admin`` with the cassandra superuser privilege.
 * ``elassandra_operator`` with no superuser privilege.
+
+Passwords for these Cassandra roles comes form the folowing secret, created with random passwords if not yet existing when the datacenter is created.
