@@ -11,12 +11,12 @@ image:
   pullPolicy: Always
   pullSecrets: []
 
-# STRICT or SLACK
+# Elassandra node affinity STRICT or SLACK
 nodeAffinityPolicy: STRICT
 annotations: {}
 customLabels: {}
-priorityClassName:
 appServiceAccount:
+priorityClassName:
 
 # Resource config
 resources:
@@ -31,7 +31,7 @@ resources:
 dataVolumeClaim:
   accessModes:
     - ReadWriteOnce
-#  storageClassName: standard
+  storageClassName: standard
   resources:
     requests:
       storage: 500Mi
