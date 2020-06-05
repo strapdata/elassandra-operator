@@ -109,3 +109,12 @@ dependencies {
 task buildExec(type: ReallyExecutableJarTask) {
     dependsOn shadowJar
 }
+
+
+task uploadEdctl(type: com.strapdata.gradle.AzureStorageDeployTask) {
+    dependsOn buildExec
+    connectionString ***REMOVED***
+    container 'strapkop'
+    fileToDeploy 'build/libs/edctl'
+    mimeType 'application/octet-stream'
+}
