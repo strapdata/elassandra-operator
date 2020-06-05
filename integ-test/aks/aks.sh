@@ -7,24 +7,21 @@
 # az account set --subscription 72738c1b-8ae6-4f23-8531-5796fe866f2e
 set -x
 
-export RESOURCE_GROUP_NAME=${RESOURCE_GROUP_NAME:-"cluster1"}
+export RESOURCE_GROUP_NAME=${RESOURCE_GROUP_NAME:-"strapkop-test"}
 export K8S_CLUSTER_NAME=${K8S_CLUSTER_NAME:-"cluster1"}
 
-export REGISTRY_URL=strapdata.azurecr.io
-export REGISTRY_SECRET_NAME=${REGISTRY_SECRET_NAME:-"strapregistry"}
+export REGISTRY_NAME=strapdata
+export REGISTRY_URL=$REGISTRY_NAME.azurecr.io
+export REGISTRY_SECRET_NAME=""                # Registry is attached to AKS cluster
 
 function create_cluster() {
   create_resource_group $RESOURCE_GROUP_NAME
-  create_aks_cluster 1
-}
-
-create_registry() {
-  # assume Azure registry already exists
+  create_aks_cluster
 }
 
 function delete_cluster() {
   delete_aks_cluster $RESOURCE_GROUP_NAME $K8S_CLUSTER_NAME
-  destroy_resource_group $RESOURCE_GROUP_NAME
+  delete_resource_group $RESOURCE_GROUP_NAME
 }
 
 
@@ -34,7 +31,7 @@ function create_resource_group() {
 }
 
 # $1 = $RESOURCE_GROUP_NAME
-function destroy_resource_group() {
+function delete_resource_group() {
     az group delete -n $1
 }
 
@@ -44,6 +41,14 @@ function create_vnet0() {
   az network vnet create --name vnet0 -g $1 --address-prefix 10.0.0.0/17 --subnet-name subnet0 --subnet-prefix 10.0.0.0/24
 }
 
+create_registry() {
+  echo "Using registry=$REGISTRY_URL"
+}
+
+# see https://thorsten-hans.com/how-to-use-private-azure-container-registry-with-kubernetes
+create_azure_registry() {
+  az acr create --name $REGISTRY_NAME --resource-group $RESOURCE_GROUP_NAME --sku Basic
+}
 
 function create-acr-rbac() {
     eval $(az ad sp create-for-rbac \
@@ -53,15 +58,32 @@ function create-acr-rbac() {
 }
 
 function create-acr-secret() {
-    kubectl create secret docker-registry $REGISTRY_SECRET_NAME --docker-server=https://strapdata.azurecr.io --docker-username="$SPN_CLIENT_ID" --docker-password="$SPN_PW" --docker-email="vroyer@strapdata.com"
+    kubectl create secret docker-registry $REGISTRY_SECRET_NAME --docker-server=https://$REGISTRY_URL --docker-username="$SPN_CLIENT_ID" --docker-password="$SPN_PW" --docker-email="vroyer@strapdata.com"
 }
 
+function create_aks_cluster() {
+     az aks create --name "${K8S_CLUSTER_NAME}" \
+                  --resource-group $RESOURCE_GROUP_NAME \
+                  --network-plugin azure \
+                  --node-count 1 \
+                  --node-vm-size Standard_D2_v3 \
+                  --vm-set-type AvailabilitySet \
+                  --output table
+#                  --attach-acr "$ACR_ID"
+#                   --load-balancer-sku basic
+#                  --load-balancer-managed-outbound-ip-count 0 \
+    az aks update --name "${K8S_CLUSTER_NAME}" \
+                  --resource-group $RESOURCE_GROUP_NAME \
+                  --attach-acr $REGISTRY_NAME
+    kubectl create clusterrolebinding kubernetes-dashboard -n kube-system --clusterrole=cluster-admin --serviceaccount=kube-system:kubernetes-dashboard
+    use_aks_cluster $RESOURCE_GROUP_NAME "${K8S_CLUSTER_NAME}"
+}
 
 
 # AKS zone availability (require VM Scale Set) does not allow to add public IPs on nodes because of the standard LB.
 # So, keep AvailabilitySet deployment with no LB unless you deploy one.
 # $1 = k8s cluster IDX
-function create_aks_cluster() {
+function create_aks_cluster_advanced() {
      az network vnet subnet create -g $RESOURCE_GROUP_NAME --vnet-name vnet0 -n "subnet$1" --address-prefixes 10.0.$1.0/24
      local B3=$((64+($1 -1)*16))
 
@@ -81,8 +103,9 @@ function create_aks_cluster() {
 #                  --load-balancer-managed-outbound-ip-count 0 \
 
     kubectl create clusterrolebinding kubernetes-dashboard -n kube-system --clusterrole=cluster-admin --serviceaccount=kube-system:kubernetes-dashboard
-    use_k8s_cluster $1
+    use_aks_cluster $RESOURCE_GROUP_NAME "${K8S_CLUSTER_NAME}${1}"
 }
+
 
 # $1 = k8s cluster IDX
 # $2 = node index
@@ -113,9 +136,8 @@ function delete_aks_cluster() {
 
 # $1 = RESOURCE_GROUP_NAME
 # $2 = K8S_CLUSTER_NAME
-# $2 = namespace
 function use_aks_cluster() {
 	 az aks get-credentials --name "${2}" --resource-group $1 --output table
-	 kubectl config use-context $3
 	 kubectl config set-context $1 --cluster=${2}
+}
 }
