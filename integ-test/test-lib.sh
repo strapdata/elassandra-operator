@@ -73,13 +73,18 @@ init_helm() {
 install_elassandra_operator() {
     echo "Installing elassandra-operator in namespace ${1:-default}"
 
+    local registry=""
+    if [ "$REGISTRY_SECRET_NAME" != "" ]; then
+       registry=",image.pullSecrets[0]=$REGISTRY_SECRET_NAME"
+    fi
+
     local args=""
     if [ "$2" != "" ]; then
        args=",$2"
     fi
 
     helm install --namespace ${1:-default} --name strapkop \
-    --set image.repository=$REGISTRY_URL/strapdata/elassandra-operator-dev \
+    --set image.repository=$REGISTRY_URL/strapdata/elassandra-operator-dev${registry} \
     --set image.tag="$ELASSANDRA_OPERATOR_TAG" \
     --set image.pullSecrets[0]="$REGISTRY_SECRET_NAME"$args \
     --wait \
@@ -114,9 +119,9 @@ install_elassandra_datacenter() {
     fi
 
     helm install --namespace "$ns" --name "$ns-$cl-$dc" \
-    --set image.elassandraRepository=$REGISTRY_URL/strapdata/elassandra-node-dev \
+    --set image.elassandraRepository=$REGISTRY_URL/strapdata/elassandra-node-dev${registry} \
     --set image.tag=$ELASSANDRA_NODE_TAG \
-    --set dataVolumeClaim.storageClassName=${STORAGE_CLASS_NAME:-"standard"}$registry \
+    --set dataVolumeClaim.storageClassName=${STORAGE_CLASS_NAME:-"standard"} \
     --set elasticsearch.kibana.enabled="false" \
     --set reaper.enabled="false",reaper.image="$REGISTRY_URL/strapdata/cassandra-reaper:2.1.0-SNAPSHOT-strapkop" \
     --set cassandra.sslStoragePort="38001",jvm.jmxPort="35001",prometheus.port="34001" \
