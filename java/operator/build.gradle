@@ -28,7 +28,7 @@ jib {
         //image = 'gcr.io/distroless/java:8'
     }
     to {
-        image = rootProject.registryUrl + dockerImagePrefix + "operator" + dockerImageSuffix
+        image = rootProject.registryUrl + (rootProject.registryUrl.length() > 0 ? "/" : "" ) + dockerImagePrefix + "operator" + dockerImageSuffix
         tags = [ version, project.gitCommitHash, 'latest']
         // osxkeychain does not work on linux and CI environments
         // credHelper = 'osxkeychain'
