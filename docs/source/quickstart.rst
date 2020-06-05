@@ -1,17 +1,29 @@
-Quick start
-===========
+Quick Start
+-----------
 
-Deploy the Elassandra operator in the default namespace using HELM 2:
+Add the strapdata HELM repository
 
 .. code::
 
-    helm install --namespace default --name strapkop --wait helm/elassandra-operator
+    helm repo add strapdata https://charts.strapdata.com
+
+Update the strapdata HELM repository
+
+.. code::
+
+    helm repo update
+
+Deploy the Elassandra operator in the default namespace:
+
+.. code::
+
+    helm install --namespace default --name strapkop --wait strapdata/elassandra-operator
 
 Deploy an Elassandra Datacenter in a dedicated namespace **ns1** with 1 replica:
 
 .. code::
 
-    helm install --namespace "ns1" --name "ns1-cl1-dc1" --set replicas=1 --wait helm/elassandra-datacenter
+    helm install --namespace "ns1" --name "ns1-cl1-dc1" --set replicas=1 --wait strapdata/elassandra-datacenter
 
 .. note:
 
@@ -56,6 +68,3 @@ Watch the Elassandra Datacenter CRD status until it is green, meaning all pods a
 .. code::
 
     edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --health GREEN
-
-
-
