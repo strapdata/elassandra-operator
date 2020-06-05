@@ -1,14 +1,8 @@
 Configuration
 -------------
 
-Resources configuration
-_______________________
-
-You can adjust CPU and Memory needs of your Elassandra nodes by updating the CRD elassandradatacenter as shown here:
-
-.. code::
-
-    kubectl patch elassandradatacenter elassandra-cl1-dc1 --type merge --patch '{"spec":{"resources":{"limits":{"memory":"4Gi"}}}}'
+Resources
+_________
 
 Resources entry may receive "limits" and/or "requests" quantity description as describe in the `k8s documentation <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/>`_.
 
@@ -21,6 +15,12 @@ Resources entry may receive "limits" and/or "requests" quantity description as d
       limits:
         cpu: 1000m
         memory: 2Gi
+
+You can adjust CPU and Memory needs of your Elassandra nodes by updating the CRD elassandradatacenter as shown here:
+
+.. code::
+
+    kubectl patch elassandradatacenter elassandra-cl1-dc1 --type merge --patch '{"spec":{"resources":{"limits":{"memory":"4Gi"}}}}'
 
 Pod affinity
 ____________
@@ -216,60 +216,6 @@ instance running on each datacenter. The Elassandra-Operator automatically confi
 Here is the datacenter spec to configure kibana deployment:
 
 .. jsonschema:: datacenter-spec.json#/properties/reaper
-
-
-Minimal values file for the Elassandra Operator helm chart.
-
-.. code::
-
-    apiVersion: elassandra.strapdata.com/v1
-    image:
-      repository: strapdata/elassandra-operator
-      tag: 6.2.3.22
-    imagePullPolicy: Always
-    imagePullSecrets:
-    resources: {}
-
-Resource granted to the Operator may be defined through the resources section.
-
-.. code::
-
-    resources:
-      # Suggested resource limits for the operator itself (not elassandra), works with a reasonable sized minikube.
-      limits:
-        cpu: 500m
-        memory: 100Mi
-      requests:
-        cpu: 100m
-        memory: 50Mi
-
-Environment variables may also be define using the env section. Currently, only logging levels and the Operator Namespace are used.
-The Operator namespace allows to define the namespace in which the operator will create resources, usually it is the namespace in which the operator is deployed.
-
-.. code::
-
-    env:
-      OPERATOR_NAMESPACE: "default"
-
-Through the environment variables it is possible to define the logging level using the following variables.
-
-+--------------------------------------------+----------------------------------------------------------------------------------+
-| Variable                                   |  Description                                                                     |
-+============================================+==================================================================================+
-| LOGBACK_com_strapdata_strapkop             | Root package of the Elassandra Operator                                          |
-+--------------------------------------------+----------------------------------------------------------------------------------+
-| LOGBACK_com_strapdata_strapkop_controllers | Control the logging level of REST Endpoint                                       |
-+--------------------------------------------+----------------------------------------------------------------------------------+
-| LOGBACK_com_strapdata_strapkop_k8s         |  Control the logging level of K8s rest client                                    |
-+--------------------------------------------+----------------------------------------------------------------------------------+
-| LOGBACK_com_strapdata_strapkop_event       | Control the logging level of event sources coming from K8s                       |
-+--------------------------------------------+----------------------------------------------------------------------------------+
-| LOGBACK_com_strapdata_strapkop_handler     | Control the logging level of classes that evaluate an event before processing it |
-+--------------------------------------------+----------------------------------------------------------------------------------+
-| LOGBACK_com_strapdata_strapkop_pipeline    | Control the logging level of event pipeline                                      |
-+--------------------------------------------+----------------------------------------------------------------------------------+
-| LOGBACK_com_strapdata_strapkop_sidecar     | Control the logging level of the sidecat client                                  |
-+--------------------------------------------+----------------------------------------------------------------------------------+
 
 
 Elassandra DataCenter

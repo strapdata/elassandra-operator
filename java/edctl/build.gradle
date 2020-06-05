@@ -109,3 +109,12 @@ dependencies {
 task buildExec(type: ReallyExecutableJarTask) {
     dependsOn shadowJar
 }
+
+
+task uploadEdctl(type: com.strapdata.gradle.AzureStorageDeployTask) {
+    dependsOn buildExec
+    connectionString 'DefaultEndpointsProtocol=https;AccountName=strapdata;AccountKey=R83KvCF2MzZzzFXnqi6yi5MoUgS90/CcPMakbQBSJMpQJSyIBIn13QtfKQm/oC/CDplVKdgn11fEagGlcrpPIA==;EndpointSuffix=core.windows.net'
+    container 'strapkop'
+    fileToDeploy 'build/libs/edctl'
+    mimeType 'application/octet-stream'
+}
