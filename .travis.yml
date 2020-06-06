@@ -74,7 +74,7 @@ script:
 - integ-test/test-admission.sh
 - integ-test/test-scaleup-park-unpark-reaper.sh
 - integ-test/test-multiple-dc.sh
-- (cd docs; make clean html SPHINXOPTS="-W")
+- (cd docs; make clean html SPHINXOPTS="-W"; touch build/html/.nojekyll )
 
 deploy:
 #- provider: script
