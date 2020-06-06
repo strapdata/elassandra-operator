@@ -1,8 +1,8 @@
 Configuration
 -------------
 
-Resources
-_________
+Node Resources
+______________
 
 Resources entry may receive "limits" and/or "requests" quantity description as describe in the `k8s documentation <https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/>`_.
 
@@ -41,6 +41,9 @@ Elassandra nodes require persistent volumes to store Cassandra and Elasticsearch
 You can use various kubernetes storage class including local and attached volumes.
 Usage of SSD disks is recommended for better performances.
 
+To specify the persistence characteristics for each Elassandra node, you can describe a `PersistentVolumeClaimSpec <https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.12/#persistentvolumeclaimspec-v1-core>`_ as "dataVolumeClaim" value.
+
+
 Persistent volume attached to availability zones
 ________________________________________________
 
@@ -55,7 +58,7 @@ you may create storage classes bound to availability zones of your cloud provide
     apiVersion: storage.k8s.io/v1
     kind: StorageClass
     metadata:
-      name: ssd-europe-west1-b
+      name: ssd-b
       labels:
         addonmanager.kubernetes.io/mode: EnsureExists
         kubernetes.io/cluster-service: "true"
@@ -272,9 +275,6 @@ Here is an example to customize Cassandra settings from the cassandra.yaml file:
 .. CAUTION::
 
     If you patch the CRD with a wrong schema, the elassandra operator won't be able to parse and process it until you fix it.
-
-
-
 
 Pod affinity
 ____________

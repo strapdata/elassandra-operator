@@ -25,7 +25,7 @@ Requirements
 * Kubernetes nodes must be properly synchronized with NTP.
 * `ExternalDNS <https://github.com/kubernetes-sigs/external-dns>`_ to expose Elassandra datacenters to the internet world.
 * `Prometheus-Operator <https://github.com/coreos/prometheus-operator>`_ to monitor your the Elassandra operator and Elassandra cluster.
-* A Kubernetes `Ingress Controller <https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/>`_ to expose Kibana, Cassandra Reaper user interface.
+* A Kubernetes `Ingress Controller <https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/>`_ to expose Kibana, Cassandra Reaper user interface, and the Elassandra operator for cross kubernetes cluster discovery.
 
 How It works
 ------------
