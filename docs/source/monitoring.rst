@@ -7,7 +7,7 @@ ______________________________
 The Elassandra operator expose prometheus metrics on port 8081 by default, and the Operator HELM chart
 adds the annotation ``prometheus.io/scrape=true`` to enable automatic scraping by the prometheus operator.
 
-The Elassandra opertor also expose the following mangement endpoints :
+The Elassandra opertor also expose the following management endpoints on port 8080:
 
 +----------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | Name     | Description                                                                                                                                                                                 |

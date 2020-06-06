@@ -7,12 +7,6 @@ Add the strapdata HELM repository
 
     helm repo add strapdata https://charts.strapdata.com
 
-Update the strapdata HELM repository
-
-.. code::
-
-    helm repo update
-
 Deploy the Elassandra operator in the default namespace:
 
 .. code::
