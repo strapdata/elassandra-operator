@@ -106,7 +106,7 @@ deploy:
   skip_cleanup: true
   fqdn: operator.elassandra.io
   deployment_file: true
-  github_token: $GITHUB_TOKEN  # Set in the settings page of your repository, as a secure variable
+  github_token: $GITHUB_TOKEN
   keep_history: true
   verbose: true
   on:
