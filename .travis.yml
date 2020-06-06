@@ -68,6 +68,7 @@ install:
 - docker ps -a
 script:
 - ./gradlew dockerPush -PregistryUrl="localhost:5000" -PregistryInsecure
+- curl http://localhost:5000/v2/_catalog
 - ./gradlew java:edctl:buildExec
 - integ-test/install_elassandra_operator.sh
 - integ-test/test-admission.sh
@@ -85,6 +86,7 @@ deploy:
 #    tags: false
 #    all_branches: true
 #    condition: $TRAVIS_BRANCH =~ ^develop-.*
+# publish docker images, edctl executable, and license report
 - provider: script
   skip_cleanup: true
   script:
@@ -98,6 +100,7 @@ deploy:
     tags: true
     branch:
       - master
+# publish doc on github page
 - provider: pages
   local_dir: docs/build/html
   skip_cleanup: true

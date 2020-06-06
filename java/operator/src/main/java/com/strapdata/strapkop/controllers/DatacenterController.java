@@ -9,6 +9,7 @@ import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.ClusterKey;
 import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.k8s.datacenter.PodsAffinityPolicy;
 import com.strapdata.strapkop.pipeline.WorkQueues;
 import io.fabric8.kubernetes.api.model.Status;
 import io.fabric8.kubernetes.api.model.admission.AdmissionResponseBuilder;
@@ -122,6 +123,12 @@ public class DatacenterController {
                     // Attempt to change the datacenterName
                     if (!datacenter.getSpec().getDatacenterName().equals(dc.getSpec().getDatacenterName())) {
                         throw new IllegalArgumentException("Cannot change the cassandra datacenter name");
+                    }
+
+                    if (PodsAffinityPolicy.SLACK.equals(datacenter.getSpec().getPodsAffinityPolicy()) &&
+                                    (datacenter.getSpec().getNetworking().getHostNetworkEnabled() ||
+                                    datacenter.getSpec().getNetworking().getHostPortEnabled())) {
+                        throw new IllegalArgumentException("PodsAffinityPolicy cannot be SLACK when hostNetwork or hostPort is true, this would cause a TCP port conflict.");
                     }
 
                     logger.debug("Accept datacenter={}", datacenter);
