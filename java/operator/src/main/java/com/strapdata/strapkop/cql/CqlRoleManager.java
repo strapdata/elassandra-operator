@@ -18,6 +18,7 @@ import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenterStatus;
 import com.strapdata.strapkop.plugins.Plugin;
 import com.strapdata.strapkop.plugins.PluginRegistry;
+import com.strapdata.strapkop.reconcilier.DataCenterUpdateAction;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import com.strapdata.strapkop.ssl.utils.X509CertificateAndPrivateKey;
 import io.kubernetes.client.openapi.ApiException;
@@ -79,11 +80,12 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
     /**
      * Idempotent credentials reconciliation
      *
-     * @param dataCenter
+     * @param dataCenterUpdateAction
      * @throws ApiException
      * @throws StrapkopException
      */
-    public Single<Boolean> reconcileRole(DataCenter dataCenter, Boolean status, CqlSessionSupplier sessionSupplier, PluginRegistry pluginRegistry) {
+    public Single<Boolean> reconcileRole(DataCenterUpdateAction dataCenterUpdateAction, Boolean status, CqlSessionSupplier sessionSupplier, PluginRegistry pluginRegistry) {
+        DataCenter dataCenter = dataCenterUpdateAction.dataCenter;
         return Single.just(status)
                 .map(doUpdateStatus -> {
                     if (Authentication.NONE.equals(dataCenter.getSpec().getCassandra().getAuthentication()))
@@ -121,6 +123,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                                                 return r;
                                             }).ignoreElement()
                                     );
+                                    dataCenterUpdateAction.operation.getActions().add("Create or update role=["+role.getUsername()+"]");
                                 } catch (Exception ex) {
                                     logger.error("datacenter={} Cannot load password or apply for role={} error={}",
                                             dataCenter.id(), role.getUsername(), ex.getMessage());
@@ -328,7 +331,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
         }
 
         if (Objects.equals(dc.getSpec().getCassandra().getSsl(), Boolean.TRUE)) {
-            builder.withSSL(getSSLOptions(dc.getMetadata().getNamespace()));
+            builder.withSSL(getSSLOptions(dc.getMetadata().getNamespace(), dc.getSpec().getClusterName()));
         }
 
         if (optionalCqlRole.isPresent()) {
@@ -343,8 +346,8 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
         return builder.build();
     }
 
-    private SSLOptions getSSLOptions(String namespace) throws StrapkopException, ApiException, SSLException, ExecutionException, InterruptedException {
-        X509CertificateAndPrivateKey ca = authorityManager.get(namespace);
+    private SSLOptions getSSLOptions(String namespace, String clusterName) throws StrapkopException, ApiException, SSLException, ExecutionException, InterruptedException {
+        X509CertificateAndPrivateKey ca = authorityManager.get(namespace, clusterName);
         SslContext sslContext = SslContextBuilder
                 .forClient()
                 .sslProvider(SslProvider.JDK)

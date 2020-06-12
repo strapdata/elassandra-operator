@@ -49,14 +49,14 @@ public class WorkQueues {
      * @param key
      * @param completable
      */
-    public synchronized void submit(final ClusterKey key, Reconciliable.Kind kind, K8sWatchEvent.Type type, final Completable completable) {
+    public synchronized void submit(final ClusterKey key, String resourceVersion, Reconciliable.Kind kind, K8sWatchEvent.Type type, final Completable completable) {
 
         Reconciliable reconciliable = new Reconciliable()
                 .withKind(kind)
                 .withType(type)
                 .withCompletable(completable)
                 .withSubmitTime(System.currentTimeMillis())
-                .withId(ids.compute(key, (k, v) -> (v == null) ? BigInteger.ONE : v.add(BigInteger.ONE)));
+                .withResourceVersion(resourceVersion);
 
         Subject<Reconciliable> queue = queues.computeIfAbsent(key, k -> createQueue(k));
         queue.onNext(reconciliable);
@@ -73,12 +73,12 @@ public class WorkQueues {
                 // doOnError will be called if an error occurs within the subject (which is unlikely)
                 .doOnError(throwable -> logger.error("error in work queue for cluster " + key.getName(), throwable))
                 .subscribe(reconciliable -> {
-                            logger.debug("--- cluster={} id={} kind={} type={}", key, reconciliable.getId(), reconciliable.getKind(), reconciliable.getType());
+                            logger.debug("--- cluster={} resourceVersion={} kind={} type={}", key, reconciliable.getResourceVersion(), reconciliable.getKind(), reconciliable.getType());
                             reconciliable.setStartTime(System.currentTimeMillis());
                             Throwable e = reconciliable.getCompletable().blockingGet();
                             if (e == null) {
-                                logger.debug("--- cluster={} id={} kind={} type={} pending={}ms execution={}ms",
-                                        key, reconciliable.getId(),
+                                logger.debug("--- cluster={} resourceVersion={} kind={} type={} pending={}ms execution={}ms",
+                                        key, reconciliable.getResourceVersion(),
                                         reconciliable.getKind(), reconciliable.getType(),
                                         reconciliable.getStartTime() - reconciliable.getSubmitTime(),
                                         System.currentTimeMillis() - reconciliable.getStartTime());

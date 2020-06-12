@@ -2,6 +2,7 @@ package com.strapdata.strapkop.reconcilier;
 
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.DataCenterCache;
+import com.strapdata.strapkop.cache.DataCenterStatusCache;
 import com.strapdata.strapkop.cql.CqlRole;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.k8s.ElassandraPod;
@@ -45,10 +46,11 @@ public class BackupTaskReconcilier extends TaskReconcilier {
                                  final DataCenterController dataCenterController,
                                  final DataCenterCache dataCenterCache,
                                  final CqlRoleManager cqlRoleManager,
+                                 final DataCenterStatusCache dataCenterStatusCache,
                                  ExecutorFactory executorFactory,
                                  @Named("tasks") UserExecutorConfiguration userExecutorConfiguration ) {
         super(reconcilierObserver, operatorConfig, k8sResourceUtils, meterRegistry,
-                dataCenterController, dataCenterCache, executorFactory, userExecutorConfiguration);
+                dataCenterController, dataCenterCache, dataCenterStatusCache, executorFactory, userExecutorConfiguration);
         this.sidecarClientFactory = sidecarClientFactory;
         this.cqlRoleManager = cqlRoleManager;
     }

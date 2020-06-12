@@ -11,7 +11,8 @@ import javax.inject.Singleton;
 @Singleton
 public class DataCenterCache extends Cache<Key, DataCenter> {
 
-    DataCenterCache(MeterRegistry meterRegistry) {
+    DataCenterCache(final MeterRegistry meterRegistry) {
         meterRegistry.gaugeMapSize("cache.size", ImmutableList.of(new ImmutableTag("type", "datacenter")), this);
     }
+
 }

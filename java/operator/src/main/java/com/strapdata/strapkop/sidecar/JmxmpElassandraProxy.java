@@ -91,7 +91,7 @@ public class JmxmpElassandraProxy {
                         env.put("jmx.remote.profiles", "TLS SASL/PLAIN");
                         env.put("jmx.remote.sasl.callback.handler", new UserPasswordCallbackHandler("cassandra", jmxPassword));
 
-                        SSLSocketFactory sslsocketfactory = getSSLContext(pod.getNamespace()).getSocketFactory();
+                        SSLSocketFactory sslsocketfactory = getSSLContext(pod.getNamespace(), pod.getCluster()).getSocketFactory();
                         env.put("jmx.remote.tls.socket.factory", sslsocketfactory);
                         logger.trace("JMXMP over SSL, ciphersuites={}", Arrays.asList(sslsocketfactory.getDefaultCipherSuites()));
                     }
@@ -131,8 +131,8 @@ public class JmxmpElassandraProxy {
         }
     }
 
-    private SSLContext getSSLContext(String namespace) throws StrapkopException, ApiException, IOException, ExecutionException, InterruptedException, GeneralSecurityException {
-        X509CertificateAndPrivateKey ca = authorityManager.get(namespace);
+    private SSLContext getSSLContext(String namespace, String clusterName) throws StrapkopException, ApiException, IOException, ExecutionException, InterruptedException, GeneralSecurityException {
+        X509CertificateAndPrivateKey ca = authorityManager.get(namespace, clusterName);
         SSLContext context = SSLContext.getInstance("TLS");
         context.init(null, new TrustManager[] { new JmxmpTrustManager(ca.getCertificate()) }, new SecureRandom());
         return context;

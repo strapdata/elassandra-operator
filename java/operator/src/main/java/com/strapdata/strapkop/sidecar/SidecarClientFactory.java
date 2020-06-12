@@ -61,13 +61,13 @@ public class SidecarClientFactory {
         logger.debug("creating sidecar for pod={} in {}/{} url={}", pod.getName(), pod.getDataCenter(), pod.getNamespace(), url.toString());
         DefaultHttpClientConfiguration httpClientConfiguration = new DefaultHttpClientConfiguration();
         httpClientConfiguration.setReadTimeout(Duration.ofSeconds(30));
-        sidecarClient = new SidecarClient(url, httpClientConfiguration, getSslContext(pod.getNamespace()), cqlRole);
+        sidecarClient = new SidecarClient(url, httpClientConfiguration, getSslContext(pod.getNamespace(), pod.getCluster()), cqlRole);
         sidecarConnectionCache.put(pod, sidecarClient);
         return sidecarClient;
     }
 
-    private SslContext getSslContext(String namespace) throws StrapkopException, ApiException, SSLException, ExecutionException, InterruptedException {
-        X509CertificateAndPrivateKey ca = authorityManager.get(namespace);
+    private SslContext getSslContext(String namespace, String clusterName) throws StrapkopException, ApiException, SSLException, ExecutionException, InterruptedException {
+        X509CertificateAndPrivateKey ca = authorityManager.get(namespace, clusterName);
         return SslContextBuilder
                 .forClient()
                 .sslProvider(SslProvider.JDK)

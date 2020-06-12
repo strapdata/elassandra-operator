@@ -31,6 +31,14 @@ public class RackStatus {
     private Integer index;
 
     /**
+     * Rack progress state
+     */
+    @JsonPropertyDescription("Rack progress state")
+    @SerializedName("progressState")
+    @Expose
+    private ProgressState progressState = ProgressState.RUNNING;
+
+    /**
      * Current DC heath
      */
     @JsonPropertyDescription("Current DC heath")

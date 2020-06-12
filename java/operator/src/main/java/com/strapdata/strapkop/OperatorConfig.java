@@ -14,10 +14,10 @@ import java.time.Duration;
 public class OperatorConfig {
 
     /**
-     * Operator working namespace, listen on all namespaces if null
+     * Operator watching namespace, watch on all namespaces if null
      */
     @Nullable
-    String namespace;
+    String watchNamespace;
 
     /**
      * Operator JMXMP port
@@ -28,6 +28,11 @@ public class OperatorConfig {
      * Operator k8s service name used for callbacks
      */
     String serviceName;
+
+    /**
+     * Namespace where the operator is deployed
+     */
+    String operatorNamespace;
 
     @Nullable
     int k8sWatchPeriodInSec = 300;

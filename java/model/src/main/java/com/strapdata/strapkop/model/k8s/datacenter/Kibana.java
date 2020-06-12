@@ -10,7 +10,6 @@ import lombok.With;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Cassandra reaper default configuration.
@@ -45,31 +44,4 @@ public class Kibana {
     @SerializedName("spaces")
     @Expose
     private List<KibanaSpace> spaces = new ArrayList<>();
-
-    /**
-     * Kibana ingress suffix (concatened with kibana spaces).
-     * host: space-suffix
-     */
-    @JsonPropertyDescription("Kibana space ingress suffix")
-    @SerializedName("ingressSuffix")
-    @Expose
-    private String ingressSuffix = null;
-
-    /**
-     * Ingress annotations
-     */
-    @JsonPropertyDescription("Kibana ingress annotations")
-    @SerializedName("ingressAnnotations")
-    @Expose
-    private Map<String, String> ingressAnnotations = null;
-
-    /**
-     * Kibana upgrade version for Elasticsearch 6.5+
-     * Should be 1 starting with elasticsearch 6.8
-     * See https://www.elastic.co/guide/en/kibana/current/upgrade-migrations.html
-     */
-    @JsonPropertyDescription("Kibana upgrade version")
-    @SerializedName("version")
-    @Expose
-    private Integer version = null;
 }

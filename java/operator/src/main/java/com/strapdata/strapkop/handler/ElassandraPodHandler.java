@@ -117,6 +117,7 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
                             meterRegistry.counter("k8s.pod.unschedulable", tags).increment();
                             workQueues.submit(
                                     clusterKey,
+                                    pod.getMetadata().getResourceVersion(),
                                     Reconciliable.Kind.ELASSANDRA_POD, K8sWatchEvent.Type.MODIFIED,
                                     dataCenterController.unschedulablePod(new Pod(pod, CONTAINER_NAME)));
                         }
@@ -135,6 +136,7 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
                 DataCenter dc = dataCenterCache.get(new Key(parent, namespace));
                 workQueues.submit(
                         clusterKey,
+                        pod.getMetadata().getResourceVersion(),
                         Reconciliable.Kind.ELASSANDRA_POD, K8sWatchEvent.Type.DELETED,
                         freePodPvc(dc, new Pod(pod, CONTAINER_NAME)));
                 meterRegistry.counter("k8s.event.deleted", tags).increment();

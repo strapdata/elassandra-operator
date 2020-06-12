@@ -1,14 +1,12 @@
 package com.strapdata.strapkop.reconcilier;
 
-import com.strapdata.strapkop.StrapkopException;
-import com.strapdata.strapkop.cache.CheckPointCache;
-import com.strapdata.strapkop.cache.DataCenterCache;
-import com.strapdata.strapkop.cache.SidecarConnectionCache;
-import com.strapdata.strapkop.cache.TaskCache;
+import com.google.common.collect.ImmutableMap;
+import com.strapdata.strapkop.cache.*;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.cql.CqlSessionHandler;
-import com.strapdata.strapkop.k8s.Pod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
+import com.strapdata.strapkop.k8s.K8sSupplier;
+import com.strapdata.strapkop.k8s.Pod;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
@@ -31,9 +29,8 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 import java.util.Date;
-import java.util.Locale;
-import java.util.TreeMap;
-import java.util.concurrent.Callable;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 /**
  * DC controller
@@ -46,10 +43,10 @@ public class DataCenterController {
     private final ApplicationContext context;
     private final PluginRegistry pluginRegistry;
     private final CqlRoleManager cqlRoleManager;
-    private final CheckPointCache checkPointCache;
     private final DataCenterCache dataCenterCache;
+    private final DataCenterStatusCache dataCenterStatusCache;
+    private final StatefulsetCache statefulsetCache;
     private final SidecarConnectionCache sidecarConnectionCache;
-    private final TaskCache taskCache;
     private final MeterRegistry meterRegistry;
     private final K8sResourceUtils k8sResourceUtils;
     private final ReconcilierObserver reconcilierObserver;
@@ -59,11 +56,11 @@ public class DataCenterController {
                                 final ApplicationContext context,
                                 final CqlRoleManager cqlRoleManager,
                                 final PluginRegistry pluginRegistry,
-                                final CheckPointCache checkPointCache,
                                 final DataCenterCache dataCenterCache,
+                                final DataCenterStatusCache dataCenterStatusCache,
+                                final StatefulsetCache statefulsetCache,
                                 final K8sResourceUtils k8sResourceUtils,
                                 final SidecarConnectionCache sidecarConnectionCache,
-                                final TaskCache taskCache,
                                 final MeterRegistry meterRegistry,
                                 final ReaperPlugin reaperPlugin) {
         this.reconcilierObserver = reconcilierObserver;
@@ -71,10 +68,10 @@ public class DataCenterController {
         this.k8sResourceUtils = k8sResourceUtils;
         this.pluginRegistry = pluginRegistry;
         this.cqlRoleManager = cqlRoleManager;
-        this.checkPointCache = checkPointCache;
         this.dataCenterCache = dataCenterCache;
+        this.dataCenterStatusCache = dataCenterStatusCache;
+        this.statefulsetCache = statefulsetCache;
         this.sidecarConnectionCache = sidecarConnectionCache;
-        this.taskCache = taskCache;
         this.meterRegistry = meterRegistry;
         this.reaperPlugin = reaperPlugin;
     }
@@ -89,11 +86,10 @@ public class DataCenterController {
                     } catch (Exception e) {
                         logger.error("datacenter={} an error occurred while processing DataCenter update reconciliation", dc.id(), e);
                         if (dc != null) {
-                            if (dc.getStatus() == null) {
-                                dc.setStatus(new DataCenterStatus());
-                            }
-                            dc.getStatus().setLastError(e.toString());
-                            dc.getStatus().setLastErrorTime(new Date());
+                            Key key = new Key(dataCenter.getMetadata());
+                            DataCenterStatus dataCenterStatus = dataCenterStatusCache.getOrDefault(key, dataCenter.getStatus());
+                            dataCenterStatus.setLastError(e.toString());
+                            dataCenterStatus.setLastErrorTime(new Date());
                             return k8sResourceUtils.updateDataCenterStatus(dc, dc.getStatus()).flatMapCompletable(o -> { throw e; });
                         }
                         throw e;
@@ -107,46 +103,50 @@ public class DataCenterController {
     /**
      * Called when the DC CRD is updated, involving a rolling update of sts.
      */
-    public Completable initDatacenter(Operation op, DataCenter dc) throws Exception {
+    public Completable initDatacenter(DataCenter dc, Operation op) throws Exception {
         return reconcile(dc,
-                fetchExistingStatefulSetsByZone(dc)
-                        .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dc, op).setStatefulSetTreeMap(stsMap))
-                .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.initDatacenter()));
+                statefulsetCache.loadIfAbsent(dc)
+                .flatMap(t -> fetchDataCentersSameClusterAndNamespace(dc))
+                .flatMapCompletable(dcIterable -> context.createBean(DataCenterUpdateAction.class, dc, op)
+                        .setSibilingDc(StreamSupport.stream(dcIterable.spliterator(), false)
+                                .filter(d -> !d.getSpec().getDatacenterName().equals(dc.getSpec().getDatacenterName()))
+                                .map(d -> d.getSpec().getDatacenterName())
+                                .collect(Collectors.toList()))
+                        .initDatacenter()
+                )
+        );
     }
 
     /**
      * Called when the DC CRD is updated, involving a rolling update of sts.
      */
-    public Completable updateDatacenter(DataCenter dc, Long generation, Operation op) throws Exception {
+    public Completable updateDatacenter(DataCenter dc, Operation op) throws Exception {
         return reconcile(dc,
-                fetchExistingStatefulSetsByZone(dc)
-                        .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dc, op).setStatefulSetTreeMap(stsMap))
-                .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.updateDatacenter(generation)));
+                statefulsetCache.loadIfAbsent(dc)
+                .flatMap(t -> fetchDataCentersSameClusterAndNamespace(dc))
+                .flatMapCompletable(dcIterable -> context.createBean(DataCenterUpdateAction.class, dc, op)
+                        .setSibilingDc(StreamSupport.stream(dcIterable.spliterator(), false)
+                                .filter(d -> !d.getSpec().getDatacenterName().equals(dc.getSpec().getDatacenterName()))
+                                .map(d -> d.getSpec().getDatacenterName())
+                                .collect(Collectors.toList()))
+                        .updateDatacenterSpec()
+                )
+        );
     }
 
-    /**
-     * Called when a rack statefulset has the desired number of ready pod.
-     * DC Controller should do the next action to reach the desired state
-     * 1 - apply the desired spec to all sts
-     * 2 - scale up/down or park/unpark dc.
-     */
-    public Completable statefulsetUpdate(Operation op, DataCenter dataCenter, V1StatefulSet sts) throws Exception {
-        return reconcile(dataCenter,
-                fetchExistingStatefulSetsByZone(dataCenter)
-                        .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dataCenter, op).setStatefulSetTreeMap(stsMap))
-                .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.statefulsetUpdated(sts)));
+    public Completable statefulsetStatusUpdate(DataCenter dc, Operation op, V1StatefulSet sts) throws Exception {
+        return reconcile(dc, statefulsetCache.loadIfAbsent(dc)
+                .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dc, op))
+                .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.statefulsetStatusUpdated(sts)));
     }
 
-    public Completable deploymentAvailable(Operation op, DataCenter dataCenter, V1Deployment deployment) throws Exception {
+    public Completable deploymentAvailable(DataCenter dc, Operation op, V1Deployment deployment) throws Exception {
         String app = deployment.getMetadata().getLabels().get(OperatorLabels.APP);
         if ("reaper".equals(app)) {
-            // notify the reaper pligin that deployment is available
-            dataCenter.getStatus().setReaperPhase(ReaperPhase.RUNNING);
-            return reconcile(dataCenter,
-                    reaperPlugin.reconcile(dataCenter)
-                    .flatMapCompletable(b -> {
-                        return k8sResourceUtils.updateDataCenterStatus(dataCenter, dataCenter.getStatus()).ignoreElement();
-                    }));
+            dc.getStatus().setReaperPhase(ReaperPhase.RUNNING);
+            return reconcile(dc,
+                    reaperPlugin.reconcile(context.createBean(DataCenterUpdateAction.class, dc, op))
+                            .flatMapCompletable(b -> k8sResourceUtils.updateDataCenterStatus(dc, dc.getStatus()).ignoreElement()));
         }
         return Completable.complete();
     }
@@ -154,13 +154,17 @@ public class DataCenterController {
     public Completable unschedulablePod(Pod pod) throws Exception {
         final Key key = new Key(pod.getParent(), pod.getNamespace());
         DataCenter dc = dataCenterCache.get(key);
-        Operation op = new Operation().withSubmitDate(new Date()).withDesc("unschedulable pod="+pod.getName());
-        return reconcile(dc,
-                fetchExistingStatefulSetsByZone(dc)
-                        .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dc, op).setStatefulSetTreeMap(stsMap))
-                        .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.unschedulablePod(pod))
-                        .andThen(k8sResourceUtils.updateDataCenterStatus(dc, dc.getStatus()).ignoreElement())
-        );
+        if (dc != null) {
+            Operation op = new Operation()
+                    .withSubmitDate(new Date())
+                    .withTriggeredBy("unschedulable pod=" + pod.getName());
+            return reconcile(dc, statefulsetCache.loadIfAbsent(dc)
+                    .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dc, op))
+                    .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.unschedulablePod(pod))
+                    .andThen(k8sResourceUtils.updateDataCenterStatus(dc, dc.getStatus()).ignoreElement())
+            );
+        }
+        return Completable.complete();
     }
 
     /**
@@ -185,44 +189,29 @@ public class DataCenterController {
 
     public Completable taskDone(final DataCenter dc, final Task task) throws Exception {
         return reconcile(dc,
-                fetchExistingStatefulSetsByZone(dc)
+                statefulsetCache.loadIfAbsent(dc)
                         .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dc,
-                                new Operation().withSubmitDate(new Date()).withDesc("dc-after-task-"+task.getMetadata().getName()))
-                        .setStatefulSetTreeMap(stsMap))
-                        .flatMapCompletable(dataCenterUpdateAction ->  dataCenterUpdateAction.taskDone(task))
-                        .andThen(k8sResourceUtils.updateDataCenterStatus(dc, dc.getStatus()).ignoreElement()));
+                                new Operation()
+                                        .withSubmitDate(new Date())
+                                        .withTriggeredBy("dc-after-task-" + task.getMetadata().getName())))
+                .flatMapCompletable(dataCenterUpdateAction ->  dataCenterUpdateAction.taskDone(task))
+                .andThen(k8sResourceUtils.updateDataCenterStatus(dc, dc.getStatus()).ignoreElement()));
     }
 
     /**
-     * Fetch existing statefulsets from k8s api and sort then by zone name
-     *
-     * @return a map of zone name -> statefulset
-     * @throws ApiException      if there is an error with k8s api
-     * @throws StrapkopException if the statefulset has no RACK label or if two statefulsets has the same zone label
+     * Fetch datacenters of the same cluster in the same namespace to automatically add remoteSeeders
+     * @param dc
+     * @return
      */
-    public Single<TreeMap<String, V1StatefulSet>> fetchExistingStatefulSetsByZone(DataCenter dc) throws ApiException, StrapkopException {
-        return Single.fromCallable(new Callable<TreeMap<String, V1StatefulSet>>() {
+    public Single<Iterable<DataCenter>> fetchDataCentersSameClusterAndNamespace(DataCenter dc) throws ApiException {
+        return K8sResourceUtils.listNamespacedResources(dc.getMetadata().getNamespace(), new K8sSupplier<Iterable<DataCenter>>() {
             @Override
-            public TreeMap<String, V1StatefulSet> call() throws Exception {
-                final Iterable<V1StatefulSet> statefulSetsIterable = k8sResourceUtils.listNamespacedStatefulSets(
-                        dc.getMetadata().getNamespace(), null,
-                        OperatorLabels.toSelector(OperatorLabels.datacenter(dc)));
-
-                final TreeMap<String, V1StatefulSet> result = new TreeMap<>();
-
-                for (V1StatefulSet sts : statefulSetsIterable) {
-                    final String zone = sts.getMetadata().getLabels().get(OperatorLabels.RACK);
-
-                    if (zone == null) {
-                        throw new StrapkopException(String.format(Locale.ROOT, "statefulset %s has no RACK label", sts.getMetadata().getName()));
-                    }
-                    if (result.containsKey(zone)) {
-                        throw new StrapkopException(String.format(Locale.ROOT, "two statefulsets in the same zone=%s dc=%s", zone, dc.getMetadata().getName()));
-                    }
-                    result.put(zone, sts);
-                }
-
-                return result;
+            public Iterable<DataCenter> get() throws ApiException {
+                final String labelSelector = OperatorLabels.toSelector(ImmutableMap.of(
+                        OperatorLabels.MANAGED_BY, OperatorLabels.ELASSANDRA_OPERATOR,
+                        OperatorLabels.CLUSTER, dc.getSpec().getClusterName(),
+                        OperatorLabels.APP, OperatorLabels.ELASSANDRA_APP));
+                return k8sResourceUtils.listNamespacedDataCenters(dc.getMetadata().getNamespace(), labelSelector);
             }
         });
     }

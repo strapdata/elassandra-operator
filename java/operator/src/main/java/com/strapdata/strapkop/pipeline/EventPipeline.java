@@ -5,7 +5,6 @@ import com.google.common.collect.ImmutableSet;
 import com.strapdata.strapkop.event.EventSource;
 import io.reactivex.Observable;
 import io.reactivex.Observer;
-import io.reactivex.disposables.Disposable;
 import io.reactivex.observables.ConnectableObservable;
 import io.reactivex.schedulers.Schedulers;
 import org.slf4j.Logger;
@@ -22,13 +21,13 @@ import java.util.concurrent.TimeUnit;
  * @param <DataT> the event payload data
  */
 public class EventPipeline<DataT> {
-    
+
     private final Logger logger = LoggerFactory.getLogger(EventPipeline.class);
-    
+
     private EventSource<DataT> source;
     private ConnectableObservable<DataT> observable = null;
     private List<Observer<DataT>> subscribers = new ArrayList<>();
-    
+
     /**
      * Creating a new Pipeline is a simple as giving an EventSource to it.
      *
@@ -40,14 +39,14 @@ public class EventPipeline<DataT> {
 
     // we silent exceptions that are periodically triggered by k8s watch
     private static final Set<Class<?>> skippedExceptions = ImmutableSet.of(SocketTimeoutException.class);
-    
+
     /**
      * Create the actual rx observable and start emitting events (on the io scheduler).
      * The Observable will automatically be recreated and resubscribed each time onComplete or onError is invoked.
      */
     public void start() {
         logger.info("starting pipeline {} from thread {}", this.getClass().getName(), Thread.currentThread().getName());
-        
+
         // the defer operator combined with retry and repeat is used to recreate the observable after each complete or error.
         final Observable<DataT> coldObservable = Observable.defer(() -> source.createObservable())
                 .subscribeOn(Schedulers.io()) // seems that subscribeOn at this point is important, otherwise watches get executed on the compute scheduler
@@ -61,22 +60,19 @@ public class EventPipeline<DataT> {
                 .retryWhen(errors -> errors.delay(1, TimeUnit.SECONDS))
                 .repeatWhen(completed -> completed.delay(1, TimeUnit.SECONDS))
                 .doOnNext(event -> logger.debug("{} received event in thread {}", this.getClass().getSimpleName(), Thread.currentThread().getName()));
-        
+
         observable = decorate(coldObservable)
                 .doOnNext(event -> logger.debug("{} dispatching event to subscribers in thread {}", this.getClass().getSimpleName(), Thread.currentThread().getName()))
                 .subscribeOn(Schedulers.io())
                 .publish();
-        
+
         // subscribe controllers
         subscribers.forEach(s -> observable.subscribe(s));
-        
-        // subscribe in-house error handler
-        observable.subscribe(new ErrorHandler());
-        
+
         // start emitting event
         observable.connect();
     }
-    
+
     /**
      * Register an handler to the pipeline end
      *
@@ -85,7 +81,7 @@ public class EventPipeline<DataT> {
     public void subscribe(Observer<DataT> handler) {
         subscribers.add(handler);
     }
-    
+
     /**
      * Allows implementations to add logic before the event is sent to the handler
      *
@@ -94,27 +90,5 @@ public class EventPipeline<DataT> {
     protected Observable<DataT> decorate(Observable<DataT> observable) {
         return observable;
     }
-    
-    
-    private class ErrorHandler implements Observer<DataT> {
-        
-        @Override
-        public void onError(Throwable e) {
-            logger.error("pipeline=" + EventPipeline.this.getClass().getSimpleName() + " failed", e);
-        }
-        
-        @Override
-        public void onComplete() {
-            logger.debug("pipeline={} completed", EventPipeline.this.getClass().getSimpleName());
-        }
-        
-        @Override
-        public void onSubscribe(Disposable d) {
-        
-        }
-        
-        @Override
-        public void onNext(DataT data) {
-        }
-    }
+
 }

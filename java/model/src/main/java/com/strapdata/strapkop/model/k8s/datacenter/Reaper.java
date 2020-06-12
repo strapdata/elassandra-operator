@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 import com.strapdata.strapkop.model.GsonUtils;
+import io.kubernetes.client.openapi.models.V1PodTemplateSpec;
+import io.kubernetes.client.openapi.models.V1ResourceRequirements;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -30,6 +32,23 @@ public class Reaper {
     @SerializedName("image")
     @Expose
     private String image  = "strapdata/cassandra-reaper:2.1.0";
+
+    /**
+     * Resource requirements for the reaper container.
+     *
+     */
+    @JsonPropertyDescription("Resource requirements for reaper pod")
+    @SerializedName("resources")
+    @Expose
+    private V1ResourceRequirements resources = null;
+
+    /**
+     * PodTemplate provides pod customisation (labels, resource, annotations, affinity rules, resource, priorityClassName, serviceAccountName) for the reaper pods
+     */
+    @JsonPropertyDescription("Reaper pods template allowing customisation")
+    @SerializedName("podTemplate")
+    @Expose
+    private V1PodTemplateSpec podTemplate = new V1PodTemplateSpec();
 
     /**
      * Reaper JWT secret

@@ -33,7 +33,9 @@ import sphinx_rtd_theme
 #extensions = [ 'sphinxjp.themes.basicstrap' ]
 extensions = [
     'sphinx.ext.autodoc',
-    'sphinx-jsonschema'
+    'sphinx-jsonschema',
+    'sphinx.ext.autosectionlabel',
+    'sphinxcontrib.openapi'
 ]
 
 pdf_documents = [

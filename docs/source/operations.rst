@@ -1,5 +1,29 @@
 Operations
-----------
+**********
+
+Edctl utility
+=============
+
+The **edctl** utility (Elassandra Datacenter Ctl) allow to synchronously wait for status condition on an Elassandra Datacenter or Task.
+
+For example you can wait a datacenter reach the GREEN state with 3 replicas:
+
+.. code::
+
+    edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --health GREEN --replicas 2
+    Waiting elassandra datacenter name=elassandra-cl1-dc1 namespace=ns4 health=GREEN replicas=2 timeout=600s
+    ADDED : elassandra-cl1-dc1 phase=RUNNING heath=GREEN replicas=1 reaper=NONE
+    MODIFIED : elassandra-cl1-dc1 phase=RUNNING heath=GREEN replicas=2 reaper=NONE
+    done 111431ms
+
+Or wait an Elassandra task terminates:
+
+.. code::
+
+    edctl watch-task -n replication-add-$$ -ns $NS --phase SUCCEED
+
+Datacenter operation
+====================
 
 Check the datacenter status
 ___________________________
@@ -19,6 +43,21 @@ You can scale up or scale down a datacenter by setting the ``replicas`` attribut
 
    kubectl patch -n default elassandradatacenters elassandra-mycluster-mydatacenter --type merge --patch '{ "spec" : { "replicas" : 6 }}'
 
+Rolling update
+--------------
+
+You can upgrade/downgrade or change any setting by updating the datacenter spec. Such a change trigger a rolling restart of cassandra racks.
+The elassandra-operator trigger one statefulset rolling update at a time (update on Cassandra rack at a time, rackStatus.progressState=UPDATING).
+Each rack rolling restart is managed by the StatefulSet RollingUpdate
+
+In the following example, we upgrade the elassandra image.
+
+.. code-block:: bash
+
+    kubectl patch elassandradatacenter elassandra-cl1-dc1 -n $NS --type="merge" --patch '{"spec": { "elassandraImage": "strapdata/elassandra-node:6.8.4.5" }}'
+
+
+
 Park/Unpark a datacenter
 ________________________
 
@@ -35,11 +74,11 @@ To "unpark" an Elassandra datacenter :
     kubectl patch elassandradatacenters elassandra-cl1-dc1 --type merge --patch '{ "spec" : { "parked" : "false"}}'
 
 Elassandra Tasks
-----------------
+================
 
 The Elassandra operators adds an ElassandraTask CRD allowing to manage administration tasks on your Elassandra datacenter.
-With these task, you can properly automate adding or removing an Elassandra datacenter from an Elassandra cluster running in one or multiple
-Kubenetes clusters.
+With these tasks, you can properly automate adding or removing an Elassandra datacenter from an Elassandra cluster running in one or multiple
+Kubenetes clusters, and watch task status with **edctl**.
 
 Repair
 ______
@@ -165,8 +204,3 @@ The following task is executed on one node of the datacenter **dc1** to remove a
       removeNodes:
         dcName: "dc2"
     EOF
-
-Edctl utility
--------------
-
-The **edctl** utility (Elassandra Datacenter Ctl) allow to synchronously wait for status condition on Elassandra Datacenters and Tasks.

@@ -9,7 +9,9 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.With;
 
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 /**
  * Reconciliation operation started to reach the desired state.
@@ -23,9 +25,13 @@ public class Operation {
     /**
      * Operation description
      */
-    @SerializedName("desc")
+    @SerializedName("triggeredBy")
     @Expose
-    private String desc;
+    private String triggeredBy;
+
+    @SerializedName("actions")
+    @Expose
+    private List<String> actions = new ArrayList<>();
 
     /**
      * Submit datetime

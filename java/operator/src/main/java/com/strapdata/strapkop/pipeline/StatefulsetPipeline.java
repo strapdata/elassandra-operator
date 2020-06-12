@@ -1,7 +1,8 @@
 package com.strapdata.strapkop.pipeline;
 
 import com.strapdata.strapkop.OperatorConfig;
-import com.strapdata.strapkop.cache.StatefulsetCache;
+import com.strapdata.strapkop.event.K8sWatchEvent;
+import com.strapdata.strapkop.event.K8sWatchEventSource;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import io.kubernetes.client.openapi.ApiClient;
@@ -14,8 +15,6 @@ import io.kubernetes.client.openapi.models.V1StatefulSetList;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Infrastructure;
 import okhttp3.Call;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.inject.Named;
 import java.lang.reflect.Type;
@@ -23,12 +22,10 @@ import java.util.Collection;
 
 @Context
 @Infrastructure
-public class StatefulsetPipeline extends CachedK8sWatchPipeline<V1StatefulSet, V1StatefulSetList, Key> {
+public class StatefulsetPipeline extends EventPipeline<K8sWatchEvent<V1StatefulSet>> {
 
-    private final Logger logger = LoggerFactory.getLogger(StatefulsetPipeline.class);
-
-    public StatefulsetPipeline(@Named("apiClient")  ApiClient apiClient, StatefulsetCache cache, AppsV1Api appsV1Api, OperatorConfig config) {
-        super(apiClient, new StatefulsetAdapter(appsV1Api, config), cache);
+    public StatefulsetPipeline(@Named("apiClient") ApiClient apiClient, AppsV1Api appsV1Api, OperatorConfig operatorConfig) {
+        super(new K8sWatchEventSource<>(apiClient, new StatefulsetPipeline.StatefulsetAdapter(appsV1Api, operatorConfig)));
     }
 
     private static class StatefulsetAdapter extends K8sWatchResourceAdapter<V1StatefulSet, V1StatefulSetList, Key> {
@@ -53,7 +50,7 @@ public class StatefulsetPipeline extends CachedK8sWatchPipeline<V1StatefulSet, V
 
         @Override
         public Call createListApiCall(Boolean watch, String resourceVersion) throws ApiException {
-            return appsV1Api.listNamespacedStatefulSetCall(config.getNamespace(),
+            return appsV1Api.listNamespacedStatefulSetCall(config.getWatchNamespace(),
                     null, null, null, null, OperatorLabels.toSelector(OperatorLabels.MANAGED),
                     null, resourceVersion, null, watch, null);
         }

@@ -1,8 +1,10 @@
 package com.strapdata.strapkop.pipeline;
 
 import com.strapdata.strapkop.OperatorConfig;
-import com.strapdata.strapkop.cache.DataCenterCache;
+import com.strapdata.strapkop.event.K8sWatchEvent;
+import com.strapdata.strapkop.event.K8sWatchEventSource;
 import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenterList;
@@ -23,12 +25,12 @@ import java.util.Collection;
 
 @Context
 @Infrastructure
-public class DataCenterPipeline extends CachedK8sWatchPipeline<DataCenter, DataCenterList, Key> {
+public class DataCenterPipeline extends EventPipeline<K8sWatchEvent<DataCenter>> {
 
     private static final Logger logger = LoggerFactory.getLogger(DataCenterPipeline.class);
 
-    public DataCenterPipeline(@Named("apiClient") ApiClient apiClient, DataCenterCache cache, CustomObjectsApi customObjectsApi, OperatorConfig config) {
-        super(apiClient, new DataCenterAdapter(customObjectsApi, config), cache);
+    public DataCenterPipeline(@Named("apiClient") ApiClient apiClient, CustomObjectsApi customObjectsApi, OperatorConfig config) {
+        super(new K8sWatchEventSource<>(apiClient, new DataCenterPipeline.DataCenterAdapter(customObjectsApi, config)));
     }
 
     public static class DataCenterAdapter extends K8sWatchResourceAdapter<DataCenter, DataCenterList, Key> {
@@ -55,8 +57,8 @@ public class DataCenterPipeline extends CachedK8sWatchPipeline<DataCenter, DataC
         public Call createListApiCall(Boolean watch, String resourceVersion) throws ApiException {
             logger.trace("watch={} resourceVersion={}", watch, resourceVersion);
             return customObjectsApi.listNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, DataCenter.VERSION,
-                    config.getNamespace(), DataCenter.PLURAL, null, null, null,
-                    null, null, resourceVersion, null, watch, null);
+                    config.getWatchNamespace(), DataCenter.PLURAL, null, null, null,
+                    OperatorLabels.toSelector(OperatorLabels.MANAGED), null, resourceVersion, null, watch, null);
         }
 
         @Override

@@ -1,13 +1,12 @@
 package com.strapdata.strapkop.model.k8s.datacenter;
 
+import com.datastax.driver.core.utils.UUIDs;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.JsonAdapter;
 import com.google.gson.annotations.SerializedName;
 import com.strapdata.strapkop.model.GsonIsoDateAdapter;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.With;
+import lombok.*;
 
 import java.util.*;
 
@@ -15,25 +14,26 @@ import java.util.*;
 @With
 @AllArgsConstructor
 @NoArgsConstructor
+@Builder(toBuilder = true)
 public class DataCenterStatus {
 
     /**
      * The most recent datacenter generation observed by the Elassandra operator.
      */
+    @JsonPropertyDescription("Last observed datacenter spec generation")
     @SerializedName("observedGeneration")
     @Expose
     Long observedGeneration;
 
-    /**
-     *
-     */
-    @SerializedName("currentOperation")
+    @JsonPropertyDescription("Datacenter uuid")
+    @SerializedName("uuid")
     @Expose
-    private Operation currentOperation;
+    String uuid = UUIDs.random().toString();
 
     /**
-     * Last 10 operations starting from the last finished one.
+     * Last X operations starting from the last finished one.
      */
+    @JsonPropertyDescription("Last 16 operations history")
     @SerializedName("operationHistory")
     @Expose
     private List<Operation> operationHistory = new ArrayList<>();
@@ -41,6 +41,7 @@ public class DataCenterStatus {
     /**
      * Current desired DC phase
      */
+    @JsonPropertyDescription("Current desired datacenter phase")
     @SerializedName("phase")
     @Expose
     private DataCenterPhase phase = DataCenterPhase.RUNNING;
@@ -48,6 +49,7 @@ public class DataCenterStatus {
     /**
      * Current DC heath
      */
+    @JsonPropertyDescription("Current datacenter health status")
     @SerializedName("health")
     @Expose
     private Health health = Health.UNKNOWN;
@@ -69,15 +71,18 @@ public class DataCenterStatus {
     /**
      * A datacenter is bootstrapped when at least one node has joined the datacenter.
      */
+    @JsonPropertyDescription("True for the first datacenter of the cluster or when the datacenter has bootstrapped")
     @SerializedName("bootstrapped")
     @Expose
     private Boolean bootstrapped = false;
 
 
+    @JsonPropertyDescription("Last error message")
     @SerializedName("lastError")
     @Expose
     private String lastError = null;
 
+    @JsonPropertyDescription("Last error time")
     @SerializedName("lastErrorTime")
     @Expose
     @JsonAdapter(GsonIsoDateAdapter.class)
@@ -86,17 +91,20 @@ public class DataCenterStatus {
     /**
      * CQL connection status
      */
+    @JsonPropertyDescription("CQL connection status")
     @SerializedName("cqlStatus")
     @Expose
     private CqlStatus cqlStatus = CqlStatus.NOT_STARTED;
 
+    @JsonPropertyDescription("Last CQL status message")
     @SerializedName("cqlStatusMessage")
     @Expose
     private String cqlStatusMessage = null;
 
     /**
-     * Current config map spec fingerprint.
+     * Current config maps spec fingerprint.
      */
+    @JsonPropertyDescription("Current config maps spec fingerprint")
     @SerializedName("configMapFingerPrint")
     @Expose
     private String configMapFingerPrint = null;
@@ -108,13 +116,15 @@ public class DataCenterStatus {
     /**
      * Ordered availability zones
      */
+    @JsonPropertyDescription("Ordered list of availability zone")
     @SerializedName("zones")
     @Expose
     private List<String> zones = new ArrayList<>();
 
     /**
-     * Number of replica ready in the underlying sts.
+     * Number of replica ready in the datacenter.
      */
+    @JsonPropertyDescription("Number of Elassandra nodes ready in the datacenter")
     @SerializedName("readyReplicas")
     @Expose
     private Integer readyReplicas = 0;
@@ -122,27 +132,35 @@ public class DataCenterStatus {
     /**
      * State of cassandra racks by zone index.
      */
+    @JsonPropertyDescription("Cassandra rack statuses")
     @SerializedName("rackStatuses")
     @Expose
-    private TreeMap<Integer, RackStatus> rackStatuses = new TreeMap<>();
+    private SortedMap<Integer, RackStatus> rackStatuses =  new TreeMap<>();
 
     /**
      * keyspace manager status
      */
+    @JsonPropertyDescription("Keyspace manager status")
     @SerializedName("keyspaceManagerStatus")
     private KeyspaceManagerStatus keyspaceManagerStatus = new KeyspaceManagerStatus();
 
     /**
      * Kibana deployed space names
      */
+    @JsonPropertyDescription("Kibana space names")
     @SerializedName("kibanaSpaceNames")
     private Set<String> kibanaSpaceNames = new HashSet<>();
 
     /**
      * Cassandra reaper status
      */
+    @JsonPropertyDescription("Cassandra reaper phase")
     @SerializedName("reaperPhase")
     private ReaperPhase reaperPhase = ReaperPhase.NONE;
+
+    @JsonPropertyDescription("Cassandra remote seeders URLs")
+    @SerializedName("remoteSeeders")
+    private Set<String> remoteSeeders = new HashSet<>();
 
     public Health health() {
         if (DataCenterPhase.PARKED.equals(this.phase))

@@ -4,9 +4,11 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
+import io.kubernetes.client.openapi.models.V1PodTemplateSpec;
 import lombok.*;
 
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -51,12 +53,39 @@ public class KibanaSpace {
     private Integer replicas = 1;
 
     /**
-     * Kibana nodeJS options, NODE_OPTIONS="--max-old-space-size=4096"
+     * Kibana ingress suffix (concatened with kibana spaces).
+     * host: space-suffix
      */
-    @JsonPropertyDescription("Kibana nodeJS options")
-    @SerializedName("nodeOptions")
+    @JsonPropertyDescription("Kibana space ingress suffix")
+    @SerializedName("ingressSuffix")
     @Expose
-    private String nodeOptions;
+    private String ingressSuffix = null;
+
+    /**
+     * Ingress annotations
+     */
+    @JsonPropertyDescription("Kibana space ingress annotations")
+    @SerializedName("ingressAnnotations")
+    @Expose
+    private Map<String, String> ingressAnnotations = null;
+
+    /**
+     * Kibana upgrade version for Elasticsearch 6.5+
+     * Should be 1 starting with elasticsearch 6.8
+     * See https://www.elastic.co/guide/en/kibana/current/upgrade-migrations.html
+     */
+    @JsonPropertyDescription("Kibana space upgrade version")
+    @SerializedName("version")
+    @Expose
+    private Integer version = null;
+
+    /**
+     * PodTemplate provides pod customisation (labels, resource, annotations, affinity rules, resource, priorityClassName, serviceAccountName) for the kibana pods
+     */
+    @JsonPropertyDescription("Kibana pod template allowing customisation")
+    @SerializedName("podTemplate")
+    @Expose
+    private V1PodTemplateSpec podTemplate = new V1PodTemplateSpec();
 
 
     /**

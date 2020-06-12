@@ -57,7 +57,7 @@ before_install:
   - export PATH=$PATH:$PWD/linux-amd64/
   # Install sphinx
   - pip3 install setuptools
-  - pip3 install sphinx~=1.8.5 sphinx_rtd_theme sphinx-jsonschema
+  - pip3 install sphinx~=2.4.4 sphinx_rtd_theme sphinx-jsonschema sphinxcontrib-openapi
 install:
 - cd ${TRAVIS_BUILD_DIR}
 - ./gradlew --version
@@ -67,15 +67,16 @@ install:
 - kind get clusters
 - docker ps -a
 script:
-- ./gradlew dockerPush -PregistryUrl="localhost:5000" -PregistryInsecure
+- ./gradlew dockerPushAllVersions -PregistryUrl="localhost:5000" -PregistryInsecure
 - curl http://localhost:5000/v2/_catalog
 - ./gradlew java:edctl:buildExec
 - integ-test/install_elassandra_operator.sh
 - integ-test/test-admission.sh
 - integ-test/test-scaleup-park-unpark-reaper.sh
-- integ-test/test-multiple-dc.sh
+- integ-test/test-multiple-dc-1ns.sh
+- integ-test/test-multiple-dc-2ns.sh
+#- integ-test/test-rolling-upgrade.sh
 - (cd docs; make clean html SPHINXOPTS="-W"; touch build/html/.nojekyll )
-
 deploy:
 #- provider: script
 #  skip_cleanup: true
@@ -89,12 +90,12 @@ deploy:
 # publish docker images, edctl executable, and license report
 - provider: script
   skip_cleanup: true
-  script:
-    - ./gradlew dockerPush -PregistryUsername=$DOCKER_USERNAME -PregistryPassword=$DOCKER_PASSWORD -PregistryUrl=$DOCKER_URL
-    - ./gradlew java:model:publish -PrepoUsername=$NEXUS_USERNAME -PrepoPassword=$NEXUS_PASSWORD
-    - ./gradlew uploadEdctl
-    - ./gradlew uploadLicenseReport
-    - ./gradlew uploadLicenseNotices
+  script: >-
+    ./gradlew dockerPushAllVersions -PregistryUsername=$DOCKER_USERNAME -PregistryPassword=$DOCKER_PASSWORD -PregistryUrl=$DOCKER_URL &&
+    ./gradlew java:model:publish -PrepoUsername=$NEXUS_USERNAME -PrepoPassword=$NEXUS_PASSWORD &&
+    ./gradlew uploadEdctl &&
+    ./gradlew uploadLicenseReport &&
+    ./gradlew uploadLicenseNotices &&
   # push to GCR.IO done by the marketplace repository
   on:
     tags: true

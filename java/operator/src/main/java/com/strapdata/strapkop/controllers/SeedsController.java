@@ -9,9 +9,7 @@ import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Get;
-import io.micronaut.http.annotation.QueryValue;
+import io.micronaut.http.annotation.*;
 import io.reactivex.Single;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
@@ -52,16 +50,19 @@ public class SeedsController {
      * @param clusterName
      * @param datacenterName
      * @param externalDns
+     * @param remoteSeeder
      * @return
      */
-    @Get(value = "/{namespace}/{clusterName}/{datacenterName}", produces = MediaType.APPLICATION_JSON)
+    @Post(value = "/{namespace}/{clusterName}/{datacenterName}", consumes = MediaType.TEXT_PLAIN, produces = MediaType.APPLICATION_JSON)
     public Single<List<String>> seeds(@QueryValue("namespace") String namespace,
                                       @QueryValue("clusterName") String clusterName,
                                       @QueryValue("datacenterName") String datacenterName,
-                                      @QueryValue(value = "externalDns",defaultValue = "false") Boolean externalDns) throws ApiException {
+                                      @QueryValue(value = "externalDns",defaultValue = "false") Boolean externalDns,
+                                      @Body String remoteSeeder) throws ApiException {
         return k8sResourceUtils.readDatacenter(new Key(OperatorNames.dataCenterResource(clusterName, datacenterName), namespace))
                 .map(dataCenter -> {
                 List<String> seeds = new ArrayList<>();
+
                 k8sResourceUtils.listNamespacedStatefulSets(namespace, null, OperatorLabels.toSelector(OperatorLabels.datacenter(dataCenter)))
                         .forEach(statefulSet -> {
                                 if (statefulSet != null && statefulSet.getStatus() != null && statefulSet.getStatus().getCurrentReplicas() != null && statefulSet.getStatus().getCurrentReplicas() > 0) {
@@ -98,7 +99,7 @@ public class SeedsController {
                                     }
                                 }
                         });
-                logger.info("seeds="+seeds);
+                logger.info("remoteSeeder={} seeds={}", remoteSeeder, seeds);
                 return seeds;
         });
     }

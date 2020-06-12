@@ -1,6 +1,8 @@
 package com.strapdata.strapkop.pipeline;
 
 import com.strapdata.strapkop.cache.NodeCache;
+import com.strapdata.strapkop.event.K8sWatchEvent;
+import com.strapdata.strapkop.event.K8sWatchEventSource;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
@@ -20,12 +22,12 @@ import java.util.Collection;
 
 @Context
 @Infrastructure
-public class NodePipeline extends CachedK8sWatchPipeline<V1Node, V1NodeList, String> {
+public class NodePipeline extends EventPipeline<K8sWatchEvent<V1Node>> {
 
     private final Logger logger = LoggerFactory.getLogger(NodePipeline.class);
 
     public NodePipeline(@Named("apiClient") ApiClient apiClient, CoreV1Api coreV1Api, NodeCache cache) {
-        super(apiClient, new NodeAdapter(coreV1Api), cache);
+        super(new K8sWatchEventSource<>(apiClient, new NodeAdapter(coreV1Api)));
     }
 
     private static class NodeAdapter extends K8sWatchResourceAdapter<V1Node, V1NodeList, String> {

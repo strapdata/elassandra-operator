@@ -24,16 +24,19 @@ public class WatchDcCommand implements Callable<Integer> {
     @CommandLine.Option(names = {"-ns", "--namespace"}, description = "Kubernetes namespace", defaultValue = "default")
     String namespace;
 
-    @CommandLine.Option(names = {"-p", "--phase"}, description = "Elassandra datacenter phase")
+    @CommandLine.Option(names = {"-p", "--phase"}, description = "Expected elassandra datacenter phase")
     DataCenterPhase phase;
 
-    @CommandLine.Option(names = {"--health"}, description = "Elassandra datacenter health")
+    @CommandLine.Option(names = {"--health"}, description = "Expected elassandra datacenter health")
     Health health;
 
-    @CommandLine.Option(names = {"-r", "--replicas"}, description = "Elassandra datacenter ready replicas")
+    @CommandLine.Option(names = {"-r", "--replicas"}, description = "Expected number of ready replicas")
     Integer readyReplicas;
 
-    @CommandLine.Option(names = {"--reaper"}, description = "Elassandra reaper phase")
+    @CommandLine.Option(names = {"--min-replicas"}, description = "Minimum number of ready replicas")
+    Integer minReadyReplicas = -1;
+
+    @CommandLine.Option(names = {"--reaper"}, description = "Expected elassandra reaper phase")
     ReaperPhase reaperPhase;
 
     @CommandLine.Option(names = {"-t", "--timeout"}, description = "Wait timeout", defaultValue = "600")
@@ -88,6 +91,12 @@ public class WatchDcCommand implements Callable<Integer> {
 
             if (reaperPhase != null && !reaperPhase.equals(item.object.getStatus().getReaperPhase()))
                 conditionMet = false;
+
+            // error if minAvailableReplicas condition not met while watching a rolling restart
+            if (minReadyReplicas >= 0 && item.object.getStatus().getReadyReplicas() < minReadyReplicas) {
+                System.out.println("Error: readyReplicas=" + item.object.getStatus().getReadyReplicas() + " < minReadyReplicas=" + minReadyReplicas);
+                return 1;
+            }
 
             if (conditionMet) {
                 long end = System.currentTimeMillis();

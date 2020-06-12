@@ -2,7 +2,7 @@ package com.strapdata.strapkop.reconcilier;
 
 import com.google.gson.JsonSyntaxException;
 import com.strapdata.strapkop.backup.BackupScheduler;
-import com.strapdata.strapkop.cache.CheckPointCache;
+import com.strapdata.strapkop.cache.JMXConnectorCache;
 import com.strapdata.strapkop.cache.SidecarConnectionCache;
 import com.strapdata.strapkop.cache.StatefulsetCache;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
@@ -34,8 +34,8 @@ public class DataCenterDeleteAction {
     private final CoreV1Api coreV1Api;
     private final DataCenter dataCenter;
     private final SidecarConnectionCache sidecarConnectionCache;
+    private final JMXConnectorCache jmxConnectorCache;
     private final StatefulsetCache statefulsetCache;
-    private final CheckPointCache checkPointCache;
 
     private final CqlKeyspaceManager cqlKeyspaceManager;
     private final CqlRoleManager cqlRoleManager;
@@ -46,8 +46,8 @@ public class DataCenterDeleteAction {
                                   CoreV1Api coreV1Api,
                                   AppsV1Api appsV1Api,
                                   final SidecarConnectionCache sidecarConnectionCache,
+                                  final JMXConnectorCache jmxConnectorCache,
                                   final StatefulsetCache statefulsetCache,
-                                  final CheckPointCache checkPointCache,
                                   CqlKeyspaceManager cqlKeyspaceManager,
                                   CqlRoleManager cqlRoleManager,
                                   @Parameter("dataCenter") DataCenter dataCenter,
@@ -57,8 +57,8 @@ public class DataCenterDeleteAction {
         this.coreV1Api = coreV1Api;
         this.dataCenter = dataCenter;
         this.sidecarConnectionCache = sidecarConnectionCache;
-        this.checkPointCache = checkPointCache;
         this.statefulsetCache = statefulsetCache;
+        this.jmxConnectorCache = jmxConnectorCache;
         this.cqlKeyspaceManager = cqlKeyspaceManager;
         this.cqlRoleManager = cqlRoleManager;
         this.backupScheduler = backupScheduler;
@@ -75,8 +75,8 @@ public class DataCenterDeleteAction {
 
                 // cleanup local caches
                 Key key = new Key(dataCenter.getMetadata().getName(), dataCenter.getMetadata().getNamespace());
-                checkPointCache.remove(key);
                 sidecarConnectionCache.purgeDataCenter(dataCenter);
+                jmxConnectorCache.remove(key);
                 for(int i = 0; i < dataCenter.getStatus().getZones().size(); i++) {
                     statefulsetCache.remove(new Key(dataCenter.getMetadata().getName() + "-" + i, dataCenter.getMetadata().getNamespace()));
                 }
@@ -103,7 +103,8 @@ public class DataCenterDeleteAction {
                     } catch (final JsonSyntaxException e) {
                         logger.debug("Caught JSON exception while deleting ConfigMap. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
                     } catch (final ApiException e) {
-                        logger.error("Failed to delete ConfigMap.", e);
+                        if (e.getCode() != 404)
+                            logger.error("Failed to delete ConfigMap.", e);
                     }
                 });
 

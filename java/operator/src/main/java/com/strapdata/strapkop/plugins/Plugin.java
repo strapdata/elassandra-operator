@@ -4,6 +4,7 @@ import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
+import com.strapdata.strapkop.reconcilier.DataCenterUpdateAction;
 import io.kubernetes.client.openapi.ApiException;
 import io.reactivex.Completable;
 import io.reactivex.Single;
@@ -36,7 +37,7 @@ public interface Plugin {
     /**
      * Call on each reconciliation
      */
-    Single<Boolean> reconcile(final DataCenter dataCenter) throws ApiException, StrapkopException, IOException;
+    Single<Boolean> reconcile(final DataCenterUpdateAction dataCenterUpdateAction) throws ApiException, StrapkopException, IOException;
 
     /**
      * Call when datacenter is reconcilied after a start or scale up/down

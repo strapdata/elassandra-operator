@@ -36,7 +36,7 @@ public class ShutdownController {
      */
     @Post("/purge")
     public Single<List<String>> purge() throws ApiException {
-            return Observable.fromIterable(k8sResourceUtils.listNamespacedDataCenters(operatorConfig.getNamespace(), null))
+            return Observable.fromIterable(k8sResourceUtils.listNamespacedDataCenters(operatorConfig.getWatchNamespace(), null))
                     .flatMapSingle(dc -> {
                         logger.warn("Deleting datacenter={} in namespace={}", dc.getMetadata().getName(), dc.getMetadata().getNamespace());
                         return k8sResourceUtils.deleteDataCenter(dc.getMetadata()).map(dc2 -> dc2.getMetadata().getName());

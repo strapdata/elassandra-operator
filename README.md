@@ -88,7 +88,7 @@ Publish the docker images (operator + elassandra + cassandra reaper):
 
 Publish in local insecure registry
 ```bash
-./gradlew dockerPush -PregistryUrl="localhost:5000/" -PregistryInsecure
+./gradlew dockerPush -PregistryUrl="localhost:5000" -PregistryInsecure
 ```
 
 Build parameters are located in `gradle.properties`.

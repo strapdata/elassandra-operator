@@ -1,0 +1,12 @@
+openapi: 3.0.1
+info:
+  title: the title
+  description: A nice API
+  contact:
+    name: Fred
+    url: https://gigantic-server.com
+    email: Fred@gigagantic-server.com
+  license:
+    name: Apache 2.0
+    url: https://foo.bar
+  version: "v1.1"

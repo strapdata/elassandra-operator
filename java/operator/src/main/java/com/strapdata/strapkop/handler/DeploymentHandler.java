@@ -23,7 +23,6 @@ import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import java.util.Date;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * Notify datacenter controller when a deployment is ready (for plugins)
@@ -37,10 +36,10 @@ public class DeploymentHandler extends TerminalHandler<K8sWatchEvent<V1Deploymen
     WorkQueues workQueues;
 
     @Inject
-    DataCenterCache dataCenterCache;
+    DataCenterController dataCenterController;
 
     @Inject
-    DataCenterController dataCenterController;
+    DataCenterCache dataCenterCache;
 
     @Inject
     MeterRegistry meterRegistry;
@@ -55,42 +54,37 @@ public class DeploymentHandler extends TerminalHandler<K8sWatchEvent<V1Deploymen
 
     @Override
     public void accept(K8sWatchEvent<V1Deployment> event) throws Exception {
+        logger.debug("event type={} name={} generation={} resourceVersion={}",
+                event.getType(), event.getResource().getMetadata().getName(),
+                event.getResource().getMetadata().getGeneration(),
+                event.getResource().getMetadata().getResourceVersion());
         logger.trace("Deployment event={}", event);
         switch(event.getType()) {
             case INITIAL:
-                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 meterRegistry.counter("k8s.event.init", tags).increment();
                 managed++;
                 reconcileDeploymentIfAvailable(event.getResource());
                 break;
 
             case ADDED:
-                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 meterRegistry.counter("k8s.event.added", tags).increment();
                 managed++;
                 break;
 
             case MODIFIED:
-                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 meterRegistry.counter("k8s.event.modified", tags).increment();
                 reconcileDeploymentIfAvailable(event.getResource());
                 break;
 
             case DELETED:
-                logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 meterRegistry.counter("k8s.event.deleted", tags).increment();
                 managed--;
                 break;
 
             case ERROR:
-                logger.warn("event type={}", event.getType());
                 meterRegistry.counter("k8s.event.error", tags).increment();
                 throw new IllegalStateException("V1Deployment error");
         }
-    }
-
-    public static boolean isDeploymentReady(V1Deployment dep) {
-        return Objects.equals(dep.getSpec().getReplicas(), ObjectUtils.defaultIfNull(dep.getStatus().getReadyReplicas(), 0));
     }
 
     public static boolean isDeploymentAvailable(V1Deployment dep) {
@@ -100,18 +94,22 @@ public class DeploymentHandler extends TerminalHandler<K8sWatchEvent<V1Deploymen
     // trigger a dc reconciliation when plugin deployments become available (allow reaper to register)
     public void reconcileDeploymentIfAvailable(V1Deployment deployment) throws Exception {
         if (isDeploymentAvailable(deployment)) {
+            final String parent = deployment.getMetadata().getLabels().get(OperatorLabels.PARENT);
             final String clusterName = deployment.getMetadata().getLabels().get(OperatorLabels.CLUSTER);
-            DataCenter dataCenter = dataCenterCache.get(new Key(deployment.getMetadata().getLabels().get(OperatorLabels.PARENT), deployment.getMetadata().getNamespace()));
+            final String namespace = deployment.getMetadata().getNamespace();
+            final Key key = new Key(parent, namespace);
+            DataCenter dataCenter = dataCenterCache.get(key);
             if (dataCenter != null) {
-                logger.info("datacenter={} deployment={}/{} is available, triggering a dc deploymentAvailable",
-                        dataCenter.id(), deployment.getMetadata().getName(), deployment.getMetadata().getNamespace());
+                logger.info("datacenter={}/{} deployment={}/{} is available, triggering a dc deploymentAvailable",
+                        parent, namespace, deployment.getMetadata().getName(), deployment.getMetadata().getNamespace());
                 Operation op = new Operation()
                         .withSubmitDate(new Date())
-                        .withDesc("status update deployment="+deployment.getMetadata().getName());
+                        .withTriggeredBy("status update deployment=" + deployment.getMetadata().getName());
                 workQueues.submit(
                         new ClusterKey(clusterName, deployment.getMetadata().getNamespace()),
+                        deployment.getMetadata().getResourceVersion(),
                         Reconciliable.Kind.DATACENTER, K8sWatchEvent.Type.MODIFIED,
-                        dataCenterController.deploymentAvailable(op, dataCenter, deployment));
+                        dataCenterController.deploymentAvailable(dataCenter, op, deployment));
             }
         }
     }

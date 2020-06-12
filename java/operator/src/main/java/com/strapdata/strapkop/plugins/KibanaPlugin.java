@@ -18,17 +18,20 @@ import com.strapdata.strapkop.model.k8s.datacenter.Authentication;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenterSpec;
 import com.strapdata.strapkop.model.k8s.datacenter.KibanaSpace;
+import com.strapdata.strapkop.reconcilier.DataCenterUpdateAction;
 import com.strapdata.strapkop.ssl.AuthorityManager;
+import io.kubernetes.client.custom.IntOrString;
+import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.apis.AppsV1Api;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
-import io.kubernetes.client.custom.IntOrString;
 import io.kubernetes.client.openapi.models.*;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
 import io.reactivex.Completable;
 import io.reactivex.CompletableSource;
 import io.reactivex.Single;
+import org.apache.commons.lang3.ObjectUtils;
 
 import javax.inject.Singleton;
 import java.util.*;
@@ -68,16 +71,16 @@ public class KibanaPlugin extends AbstractPlugin {
     private static final KibanaSpace DEFAULT_KIBANA_SPACE = new KibanaSpace().withName("").withKeyspaces(ImmutableSet.of("_kibana"));
 
     private Map<String, KibanaSpace> getKibanaSpaces(final DataCenter dataCenter) {
-        Map<String, KibanaSpace> spaces = dataCenter.getSpec().getElasticsearch().getKibana().getSpaces().stream().collect(Collectors.toMap(KibanaSpace::getName, Function.identity()));
+        Map<String, KibanaSpace> spaces = dataCenter.getSpec().getKibana().getSpaces().stream().collect(Collectors.toMap(KibanaSpace::getName, Function.identity()));
         return (spaces.size() == 0) ? ImmutableMap.of(DEFAULT_KIBANA_SPACE.getName(), DEFAULT_KIBANA_SPACE) : spaces;
     }
 
     @Override
     public Completable syncKeyspaces(final CqlKeyspaceManager cqlKeyspaceManager, final DataCenter dataCenter) {
-        Integer version = dataCenter.getSpec().getElasticsearch().getKibana().getVersion();
-        for (KibanaSpace kibana : getKibanaSpaces(dataCenter).values()) {
-            cqlKeyspaceManager.addIfAbsent(dataCenter, kibana.keyspace(version), () -> new CqlKeyspace()
-                    .withName(kibana.keyspace(version))
+        for (KibanaSpace kibanaSpace : getKibanaSpaces(dataCenter).values()) {
+            Integer version = kibanaSpace.getVersion();
+            cqlKeyspaceManager.addIfAbsent(dataCenter, kibanaSpace.keyspace(version), () -> new CqlKeyspace()
+                    .withName(kibanaSpace.keyspace(version))
                     .withRf(3)
             );
         }
@@ -93,11 +96,11 @@ public class KibanaPlugin extends AbstractPlugin {
      */
     @Override
     public Completable syncRoles(final CqlRoleManager cqlRoleManager, final DataCenter dataCenter) throws ApiException {
-        Integer version = dataCenter.getSpec().getElasticsearch().getKibana().getVersion();
         List<CompletableSource> todoList = new ArrayList<>();
-        for (KibanaSpace kibana : getKibanaSpaces(dataCenter).values()) {
+        for (KibanaSpace kibanaSpace : getKibanaSpaces(dataCenter).values()) {
+            Integer version = kibanaSpace.getVersion();
             V1ObjectMeta v1SecretMeta = new V1ObjectMeta()
-                    .name(OperatorNames.clusterChildObjectName("%s-" + kibana.role(), dataCenter))
+                    .name(OperatorNames.clusterChildObjectName("%s-" + kibanaSpace.role(), dataCenter))
                     .namespace(dataCenter.getMetadata().getNamespace())
                     .addOwnerReferencesItem(OperatorNames.ownerReference(dataCenter))
                     .labels(OperatorLabels.cluster(dataCenter.getSpec().getClusterName()));
@@ -107,18 +110,18 @@ public class KibanaPlugin extends AbstractPlugin {
                 logger.debug("Created new cluster secret={}/{}", v1SecretMeta.getName(), v1SecretMeta.getNamespace());
                 return secret;
             }).map(secret -> {
-                cqlRoleManager.addIfAbsent(dataCenter, kibana.keyspace(version), () -> new CqlRole()
-                        .withUsername(kibana.role())
+                cqlRoleManager.addIfAbsent(dataCenter, kibanaSpace.keyspace(version), () -> new CqlRole()
+                        .withUsername(kibanaSpace.role())
                         .withSecretKey("kibana.kibana_password")
-                        .withSecretNameProvider(dc -> OperatorNames.clusterChildObjectName("%s-" + kibana.role(), dc))
+                        .withSecretNameProvider(dc -> OperatorNames.clusterChildObjectName("%s-" + kibanaSpace.role(), dc))
                         .withReconcilied(false)
                         .withSuperUser(true)
                         .withLogin(true)
                         .withGrantStatements(
                                 ImmutableList.of(
-                                        String.format(Locale.ROOT, "GRANT ALL PERMISSIONS ON KEYSPACE \"%s\" TO %s", kibana.keyspace(version), kibana.role()),
-                                        String.format(Locale.ROOT, "INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','cluster:monitor/.*','.*')", kibana.index(version)),
-                                        String.format(Locale.ROOT, "INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','indices:.*','.*')", kibana.index(version))
+                                        String.format(Locale.ROOT, "GRANT ALL PERMISSIONS ON KEYSPACE \"%s\" TO %s", kibanaSpace.keyspace(version), kibanaSpace.role()),
+                                        String.format(Locale.ROOT, "INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','cluster:monitor/.*','.*')", kibanaSpace.index(version)),
+                                        String.format(Locale.ROOT, "INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','indices:.*','.*')", kibanaSpace.index(version))
                                 )
                         )
                 );
@@ -152,19 +155,20 @@ public class KibanaPlugin extends AbstractPlugin {
 
     @Override
     public boolean isActive(final DataCenter dataCenter) {
-        return dataCenter.getSpec().getElasticsearch().getEnabled() && dataCenter.getSpec().getElasticsearch().getKibana().getEnabled();
+        return dataCenter.getSpec().getElasticsearch().getEnabled() && dataCenter.getSpec().getKibana().getEnabled();
     }
 
 
     @Override
-    public Single<Boolean> reconcile(DataCenter dataCenter) throws ApiException, StrapkopException {
-        logger.trace("datacenter={} kibana.spec={}", dataCenter.id(), dataCenter.getSpec().getElasticsearch().getKibana());
+    public Single<Boolean> reconcile(DataCenterUpdateAction dataCenterUpdateAction) throws ApiException, StrapkopException {
+        final DataCenter dataCenter = dataCenterUpdateAction.dataCenter;
+        logger.trace("datacenter={} kibana.spec={}", dataCenter.id(), dataCenter.getSpec().getKibana());
         Set<String> deployedKibanaSpaces = dataCenter.getStatus().getKibanaSpaceNames();
         Map<String, KibanaSpace> desiredKibanaMap = getKibanaSpaces(dataCenter);
 
         return this.listDeployments(dataCenter)
                 .flatMap(deployments -> {
-                    boolean kibanaEnabled = dataCenter.getSpec().getElasticsearch().getKibana() != null && dataCenter.getSpec().getElasticsearch().getKibana().getEnabled();
+                    boolean kibanaEnabled = dataCenter.getSpec().getKibana() != null && dataCenter.getSpec().getKibana().getEnabled();
                     logger.debug("datacenter={} enabled={} parked={} deployments.size={}",
                             dataCenter.id(), kibanaEnabled, dataCenter.getSpec().isParked(), deployments.size());
                     if ((kibanaEnabled == false || desiredKibanaMap.size() == 0 || dataCenter.getSpec().isParked())) {
@@ -181,6 +185,7 @@ public class KibanaPlugin extends AbstractPlugin {
                             io.reactivex.Observable.fromIterable(deletedSpaces)
                                     .flatMapCompletable(spaceToDelete -> {
                                         logger.debug("Deleting kibana space={}", spaceToDelete);
+                                        dataCenterUpdateAction.operation.getActions().add("Deleting kibana space=["+spaceToDelete+"]");
                                         dataCenter.getStatus().getKibanaSpaceNames().remove(spaceToDelete);
                                         return deleteSpace(dataCenter, spaceToDelete);
                                     });
@@ -191,6 +196,7 @@ public class KibanaPlugin extends AbstractPlugin {
                             io.reactivex.Observable.fromIterable(getKibanaSpaces(dataCenter).values().stream().filter(k -> newSpaces.contains(k.getName())).collect(Collectors.toList()))
                                     .flatMapCompletable(kibanaSpace -> {
                                         logger.debug("Adding kibana space={}", kibanaSpace);
+                                        dataCenterUpdateAction.operation.getActions().add("Adding kibana space=["+kibanaSpace.getName()+"]");
                                         dataCenter.getStatus().getKibanaSpaceNames().add(kibanaSpace.getName());
                                         return createOrReplaceKibanaObjects(dataCenter, kibanaSpace);
                                     });
@@ -205,6 +211,7 @@ public class KibanaPlugin extends AbstractPlugin {
                                 !newSpaces.contains(kibanaSpaceName) &&
                                 deployment.getSpec().getReplicas() != replicas) {
                             logger.debug("datacenter={} updating deployment={} replicas={}", dataCenter.id(), deployment.getMetadata().getName(), replicas);
+                            dataCenterUpdateAction.operation.getActions().add("Updating kibana space=["+kibanaSpace.getName()+"]");
                             deployment.getSpec().setReplicas(replicas);
                             createCompletable = createCompletable.andThen(
                                     k8sResourceUtils.updateNamespacedDeployment(deployment).ignoreElement()
@@ -248,59 +255,79 @@ public class KibanaPlugin extends AbstractPlugin {
         if (dataCenter.getSpec().isParked())
             return 0;
 
-        Integer version = dataCenter.getSpec().getElasticsearch().getKibana().getVersion();
+        Integer version = kibanaSpace.getVersion();
         return (dataCenter.getStatus().getPhase().isRunning() &&
                 dataCenter.getStatus().getBootstrapped() == true &&
                 dataCenter.getStatus().getKeyspaceManagerStatus().getKeyspaces().contains(kibanaSpace.keyspace(version))) ? kibanaSpace.getReplicas() : 0;
     }
 
 
-    public Completable createOrReplaceKibanaObjects(final DataCenter dataCenter, KibanaSpace space) throws
+    public Completable createOrReplaceKibanaObjects(final DataCenter dataCenter, KibanaSpace kibanaSpace) throws
             ApiException, StrapkopException {
         final V1ObjectMeta dataCenterMetadata = dataCenter.getMetadata();
         final DataCenterSpec dataCenterSpec = dataCenter.getSpec();
-        final Integer version = dataCenter.getSpec().getElasticsearch().getKibana().getVersion();
+        final Integer version = kibanaSpace.getVersion();
 
-        final Map<String, String> labels = kibanaSpaceLabels(dataCenter, space.getName());
+        final Map<String, String> labels = kibanaSpaceLabels(dataCenter, kibanaSpace.getName());
 
-        final V1ObjectMeta meta = new V1ObjectMeta()
-                .name(kibanaNameDc(dataCenter, space))
-                .namespace(dataCenterMetadata.getNamespace())
-                .labels(labels)
-                .putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, dataCenter.getMetadata().getGeneration().toString());
+        final V1ObjectMeta meta = ObjectUtils.defaultIfNull(kibanaSpace.getPodTemplate().getMetadata(), new V1ObjectMeta())
+                .name(kibanaNameDc(dataCenter, kibanaSpace))
+                .namespace(dataCenterMetadata.getNamespace());
+        for(Map.Entry<String, String> entry : labels.entrySet())
+            meta.putLabelsItem(entry.getKey(), entry.getValue());
+        meta.putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, dataCenter.getMetadata().getGeneration().toString());
 
         final V1Container container = new V1Container();
-
-        final V1PodSpec podSpec = new V1PodSpec()
-                .serviceAccountName(dataCenterSpec.getAppServiceAccount())
+        final V1PodSpec kibanaSpacePodSpec = ObjectUtils.defaultIfNull(kibanaSpace.getPodTemplate().getSpec(), new V1PodSpec())
                 .addContainersItem(container);
+        final V1PodSpec elassandraPodSpec = ObjectUtils.defaultIfNull(dataCenterSpec.getPodTemplate().getSpec(), new V1PodSpec());
+
+        // use podTemplate resources if available for the "kibana" container
+        Map<String, V1Container> containerTemplates = kibanaSpacePodSpec.getContainers().stream().collect(Collectors.toMap(V1Container::getName, Function.identity()));
+        V1Container kibanaContainerTemplate = containerTemplates.get("kibana");
+        if (kibanaContainerTemplate != null && kibanaContainerTemplate.getResources() != null) {
+            container.resources(kibanaContainerTemplate.getResources());
+        } else {
+            // default kibana resources
+            container.resources(new V1ResourceRequirements()
+                    .putRequestsItem("cpu", Quantity.fromString("500m"))
+                    .putRequestsItem( "memory", Quantity.fromString("1Gi"))
+                    .putLimitsItem("cpu", Quantity.fromString("1000m"))
+                    .putLimitsItem( "memory", Quantity.fromString("1Gi"))
+            );
+        }
+
+        // inherit service account
+        if (kibanaSpacePodSpec.getServiceAccountName() == null) {
+            kibanaSpacePodSpec.setServiceAccountName(dataCenterSpec.getServiceAccount());
+        }
+        // inherit the priorityClassName of the Elassandra datacenter if not specified
+        if (kibanaSpacePodSpec.getPriorityClassName() == null) {
+            kibanaSpacePodSpec.setPriorityClassName(elassandraPodSpec.getPriorityClassName());
+        }
 
         final V1Deployment deployment = new V1Deployment()
                 .metadata(meta)
                 .spec(new V1DeploymentSpec()
                         // delay the creation of the reaper pod, after we have created the reaper_db keyspace
-                        .replicas(kibanaReplicas(dataCenter, space))
+                        .replicas(kibanaReplicas(dataCenter, kibanaSpace))
                         .selector(new V1LabelSelector().matchLabels(labels))
                         .template(new V1PodTemplateSpec()
                                 .metadata(new V1ObjectMeta().labels(labels))
-                                .spec(podSpec)
+                                .spec(kibanaSpacePodSpec)
                         )
                 );
-
-        if (dataCenterSpec.getPriorityClassName() != null) {
-            podSpec.setPriorityClassName(dataCenterSpec.getPriorityClassName());
-        }
 
         if (dataCenterSpec.getImagePullSecrets() != null) {
             for (String secretName : dataCenterSpec.getImagePullSecrets()) {
                 final V1LocalObjectReference pullSecret = new V1LocalObjectReference().name(secretName);
-                podSpec.addImagePullSecretsItem(pullSecret);
+                kibanaSpacePodSpec.addImagePullSecretsItem(pullSecret);
             }
         }
 
         container
                 .name("kibana")
-                .image(dataCenter.getSpec().getElasticsearch().getKibana().getImage())
+                .image(dataCenter.getSpec().getKibana().getImage())
                 .terminationMessagePolicy("FallbackToLogsOnError")
                 .addPortsItem(new V1ContainerPort()
                         .name("kibana")
@@ -340,7 +367,7 @@ public class KibanaPlugin extends AbstractPlugin {
                 )
                 .addEnvItem(new V1EnvVar()
                         .name("KIBANA_INDEX")
-                        .value(space.index(null))
+                        .value(kibanaSpace.index(null))
                 )
                 .addEnvItem(new V1EnvVar().name("LOGGING_VERBOSE").value("true"))
         //.addEnvItem(new V1EnvVar().name("XPACK_MONITORING_ENABLED").value("false"))
@@ -348,20 +375,13 @@ public class KibanaPlugin extends AbstractPlugin {
         //.addEnvItem(new V1EnvVar().name("XPACK_MONITORING_UI_CONTAINER_ELASTICSEARCH_ENABLED").value("false"))
         ;
 
-        // add NODE_OPTIONS for memory tunning
-        if (!Strings.isNullOrEmpty(space.getNodeOptions())) {
-            container.addEnvItem(new V1EnvVar().name("NODE_OPTIONS").value(space.getNodeOptions()));
-        }
-
-
         // kibana with cassandra authentication
         if (!Objects.equals(dataCenterSpec.getCassandra().getAuthentication(), Authentication.NONE)) {
-            String kibanaSecretName = kibanaName(dataCenter, space);
-
+            String kibanaSecretName = kibanaName(dataCenter, kibanaSpace);
             container
                     .addEnvItem(new V1EnvVar()
                             .name("ELASTICSEARCH_USERNAME")
-                            .value(space.role())
+                            .value(kibanaSpace.role())
                     )
                     .addEnvItem(new V1EnvVar()
                             .name("ELASTICSEARCH_PASSWORD")
@@ -378,10 +398,10 @@ public class KibanaPlugin extends AbstractPlugin {
 
         // kibana with cassandra ssl on native port
         if (Boolean.TRUE.equals(dataCenterSpec.getCassandra().getSsl())) {
-            podSpec.addVolumesItem(new V1Volume()
+            kibanaSpacePodSpec.addVolumesItem(new V1Volume()
                     .name("truststore")
                     .secret(new V1SecretVolumeSource()
-                            .secretName(authorityManager.getPublicCaSecretName())
+                            .secretName(authorityManager.getPublicCaSecretName(dataCenterSpec.getClusterName()))
                     )
             );
             container
@@ -412,16 +432,16 @@ public class KibanaPlugin extends AbstractPlugin {
                             ));
                 })
                 .flatMap(s -> {
-                    if (!Strings.isNullOrEmpty(dataCenterSpec.getElasticsearch().getKibana().getIngressSuffix())) {
-                        String kibanaHost = space.name() + "-" + dataCenterSpec.getElasticsearch().getKibana().getIngressSuffix();
+                    if (!Strings.isNullOrEmpty(kibanaSpace.getIngressSuffix())) {
+                        String kibanaHost = kibanaSpace.name() + "-" + kibanaSpace.getIngressSuffix();
                         logger.info("Creating kibana ingress for host={}", kibanaHost);
                         final V1ObjectMeta ingressMeta = new V1ObjectMeta()
-                                .name(kibanaNameDc(dataCenter, space))
+                                .name(kibanaNameDc(dataCenter, kibanaSpace))
                                 .namespace(dataCenterMetadata.getNamespace())
                                 .labels(labels)
                                 .putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, dataCenter.getMetadata().getGeneration().toString());
-                        if (dataCenterSpec.getElasticsearch().getKibana().getIngressAnnotations() != null && !dataCenterSpec.getElasticsearch().getKibana().getIngressAnnotations().isEmpty()) {
-                            dataCenterSpec.getElasticsearch().getKibana().getIngressAnnotations().entrySet().stream()
+                        if (kibanaSpace.getIngressAnnotations() != null && !kibanaSpace.getIngressAnnotations().isEmpty()) {
+                            kibanaSpace.getIngressAnnotations().entrySet().stream()
                                     .map(e -> ingressMeta.putAnnotationsItem(e.getKey(), e.getValue()));
                         }
                         final ExtensionsV1beta1Ingress ingress = new ExtensionsV1beta1Ingress()
@@ -445,7 +465,7 @@ public class KibanaPlugin extends AbstractPlugin {
                     }
                     return Single.just(s);
                 })
-                .flatMap(s -> createKibanaSecretIfNotExists(dataCenter, space))
+                .flatMap(s -> createKibanaSecretIfNotExists(dataCenter, kibanaSpace))
                 .flatMapCompletable(s2 -> Completable.fromCallable(new Callable<V1Deployment>() {
                     /**
                      * Computes a result, or throws an exception if unable to do so.
