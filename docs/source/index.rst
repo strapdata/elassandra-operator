@@ -17,10 +17,15 @@ Contents:
 
    introduction
    quickstart
-   operations
-   configuration
+   helm-setup
+   operator-setup
+   provisioning
+   advanced-services
    security
+   operations
    monitoring
+   compute-resources
+
 
 Indices and tables
 ==================

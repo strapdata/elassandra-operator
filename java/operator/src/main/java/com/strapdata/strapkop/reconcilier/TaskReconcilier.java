@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.DataCenterCache;
+import com.strapdata.strapkop.cache.DataCenterStatusCache;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.Key;
@@ -40,6 +41,7 @@ public abstract class TaskReconcilier extends Reconcilier<Task> {
     final MeterRegistry meterRegistry;
     final DataCenterController dataCenterController;
     final DataCenterCache dataCenterCache;
+    final DataCenterStatusCache dataCenterStatusCache;
     final OperatorConfig operatorConfig;
     private volatile int runningTaskCount = 0;
     public final Scheduler tasksScheduler;
@@ -50,6 +52,7 @@ public abstract class TaskReconcilier extends Reconcilier<Task> {
                     final MeterRegistry meterRegistry,
                     final DataCenterController dataCenterController,
                     final DataCenterCache dataCenterCache,
+                    final DataCenterStatusCache dataCenterStatusCache,
                     ExecutorFactory executorFactory,
                     @Named("tasks") UserExecutorConfiguration userExecutorConfiguration) {
         super(reconcilierObserver);
@@ -57,6 +60,7 @@ public abstract class TaskReconcilier extends Reconcilier<Task> {
         this.meterRegistry = meterRegistry;
         this.dataCenterController = dataCenterController;
         this.dataCenterCache = dataCenterCache;
+        this.dataCenterStatusCache = dataCenterStatusCache;
         this.operatorConfig = operatorConfig;
         this.tasksScheduler = Schedulers.from(executorFactory.executorService(userExecutorConfiguration));
     }
@@ -70,10 +74,9 @@ public abstract class TaskReconcilier extends Reconcilier<Task> {
     @Override
     public Completable reconcile(final Task task) throws Exception {
         String dcName = OperatorNames.dataCenterResource(task.getSpec().getCluster(), task.getSpec().getDatacenter());
-        DataCenter dc = dataCenterCache.get(new Key(dcName, task.getMetadata().getNamespace()));
-        Operation op = new Operation().withSubmitDate(new Date()).withDesc("task-"+task.getMetadata().getName());
-        final DataCenterStatus dataCenterStatus = dc.getStatus();
-        dataCenterStatus.setCurrentOperation(op);
+        Key key = new Key(dcName, task.getMetadata().getNamespace());
+        DataCenter dc = dataCenterCache.get(key);
+        final DataCenterStatus dataCenterStatus = dataCenterStatusCache.get(key);
 
         logger.debug("datacenter={} task={} processing generation={}", dc.id(), task.id(), task.getMetadata().getGeneration());
         task.getStatus().setObservedGeneration(task.getMetadata().getGeneration());
@@ -126,15 +129,15 @@ public abstract class TaskReconcilier extends Reconcilier<Task> {
                     long endTime = System.currentTimeMillis();
                     task.getStatus().setDurationInMs(endTime - startTime);
 
-                    Operation currentOperation = dataCenterStatus.getCurrentOperation();
-                    if (currentOperation == null) {
-                        currentOperation = new Operation().withDesc("task-" + task.getMetadata().getName()).withSubmitDate(new Date());
-                    }
-                    currentOperation.setPendingInMs(startTime - currentOperation.getSubmitDate().getTime());
-                    currentOperation.setDurationInMs(endTime - startTime);
+                    Operation operation = new Operation()
+                            .withTriggeredBy("task " + task.getMetadata().getName())
+                            .withSubmitDate(new Date());
+                    operation.getActions().add("task " + task.getMetadata().getName());
+                    operation.setPendingInMs(startTime - operation.getSubmitDate().getTime());
+                    operation.setDurationInMs(endTime - startTime);
 
                     List<Operation> history = dataCenterStatus.getOperationHistory();
-                    history.add(0, currentOperation);
+                    history.add(0, operation);
                     if (history.size() > operatorConfig.getOperationHistoryDepth())
                         history.remove(operatorConfig.getOperationHistoryDepth());
                     dataCenterStatus.setOperationHistory(history);

@@ -31,8 +31,8 @@ public final class OperatorLabels {
     public static final String RACK = labelPrefix + "rack";
     public static final String RACKINDEX = labelPrefix + "rackindex";
 
-    // TODO: this is confusing with helm "release" label
-    public static final String RELEASE = labelPrefix + "release";
+    public static final String CREDENTIAL = labelPrefix + "credential";
+    public static final String KEYSTORE = labelPrefix + "keystore";
 
     public static final String DATACENTER_GENERATION = labelPrefix + "datacenter-generation";
     public static final String DATACENTER_FINGERPRINT = labelPrefix + "datacenter-fingerprint";

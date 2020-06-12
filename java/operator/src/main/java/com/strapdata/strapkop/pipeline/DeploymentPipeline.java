@@ -54,7 +54,7 @@ public class DeploymentPipeline extends EventPipeline<K8sWatchEvent<V1Deployment
 
         @Override
         public Call createListApiCall(Boolean watch, String resourceVersion) throws ApiException {
-            return appsV1Api.listNamespacedDeploymentCall(config.getNamespace(),
+            return appsV1Api.listNamespacedDeploymentCall(config.getWatchNamespace(),
                     null, null, null, null, OperatorLabels.toSelector(OperatorLabels.MANAGED),
                     null, resourceVersion, null, watch, null);
         }

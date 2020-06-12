@@ -58,7 +58,7 @@ public class ElasticClientFactory {
                                 }
 
                                 if (pod.isSsl()) {
-                                    httpClientBuilder.setSSLContext(getSSLContext(pod.getNamespace()));
+                                    httpClientBuilder.setSSLContext(getSSLContext(pod.getNamespace(), pod.getCluster()));
                                     // TODO: fix this workaround
                                     httpClientBuilder.setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE);
                                 }
@@ -68,8 +68,8 @@ public class ElasticClientFactory {
                         })));
     }
 
-    private SSLContext getSSLContext(String namespace) throws GeneralSecurityException, ExecutionException, InterruptedException, IOException {
-        X509CertificateAndPrivateKey ca = authorityManager.get(namespace);
+    private SSLContext getSSLContext(String namespace, String clusterName) throws GeneralSecurityException, ExecutionException, InterruptedException, IOException {
+        X509CertificateAndPrivateKey ca = authorityManager.get(namespace, clusterName);
         SSLContext sslContext = SSLContext.getInstance("TLS");
         sslContext.init(null, new TrustManager[] { ca.getX509TrustManager() }, null);
         return sslContext;

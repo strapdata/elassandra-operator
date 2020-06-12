@@ -1,106 +1,8 @@
 Security
---------
+********
 
-Kuberenetes RBAC
-________________
-
-The elassandra operator runs with a dedicated Kubernetes serviceaccount ``elassandra-operator`` and a
-cluster role ``elassandra-operator`` with the following restricted operations:
-
-.. code::
-
-    apiVersion: rbac.authorization.k8s.io/v1
-    kind: ClusterRole
-    metadata:
-      creationTimestamp: "2019-10-17T22:55:19Z"
-      labels:
-        app: elassandra-operator
-        chart: elassandra-operator-0.1.0
-        heritage: Tiller
-        release: strapkop
-      name: elassandra-operator
-      resourceVersion: "5345657"
-      selfLink: /apis/rbac.authorization.k8s.io/v1/clusterroles/elassandra-operator
-      uid: 311e5250-f131-11e9-a4ec-82615f3d8479
-    rules:
-    - apiGroups:
-      - extensions
-      resources:
-      - thirdpartyresources
-      verbs:
-      - '*'
-    - apiGroups:
-      - apiextensions.k8s.io
-      resources:
-      - customresourcedefinitions
-      verbs:
-      - '*'
-    - apiGroups:
-      - elassandra.strapdata.com
-      resources:
-      - elassandradatacenter
-      - elassandradatacenters
-      - elassandradatacenter/status
-      - elassandradatacenters/status
-      - elassandratask
-      - elassandratasks
-      - elassandratask/status
-      - elassandratasks/status
-      verbs:
-      - '*'
-    - apiGroups:
-      - apps
-      resources:
-      - statefulsets
-      - deployments
-      verbs:
-      - '*'
-    - apiGroups:
-      - ""
-      resources:
-      - configmaps
-      - secrets
-      verbs:
-      - '*'
-    - apiGroups:
-      - ""
-      resources:
-      - pods
-      verbs:
-      - list
-      - delete
-    - apiGroups:
-      - ""
-      resources:
-      - services
-      - endpoints
-      - persistentvolumeclaims
-      - persistentvolumes
-      - ingresses
-      verbs:
-      - get
-      - create
-      - update
-      - delete
-      - list
-    - nonResourceURLs:
-      - /version
-      - /version/*
-      verbs:
-      - get
-    - apiGroups:
-      - ""
-      resources:
-      - nodes
-      verbs:
-      - list
-      - watch
-    - apiGroups:
-      - ""
-      resources:
-      - namespaces
-      verbs:
-      - list
+Kubernetes RBAC
+===============
 
 When Kubernetes ``hostNetwork`` or ``hostPort`` is enabled (see Networking), the Elassandra operator adds an init container
 named **nodeinfo** allowing the Elassandra pods to get the node public IP address.
@@ -129,20 +31,34 @@ suffixed by ``nodeinfo`` associated to the ClusterRole ``node-reader`` with the 
 
 
 Certificate management
-______________________
+======================
+
+Datacenter CA
+-------------
 
 In order to dynamically generates X509 certificates, the Elassandra-Operator use a root CA certificate and private key stored as
 Kubernetes secrets. If theses CA secrets does not exist in the namespace where the datacenter is deployed, the operator automatically generates
 a self-signed root CA certificate in that namespace:
 
-* Secret **ca-pub** contains the root CA certificate as a PEM file and PKCS12 keystore. (respectively named *cacert.pem* and *truststore.p12*)
-* Secret **ca-key** contains the root CA private key in a PKCS12 keystore. (named *ca.key*)
+* Secret **elassandra-{clusterName}-ca-pub** contains the root CA certificate as a PEM file and PKCS12 keystore.
+* Secret **elassandra-{clusterName}-ca-key** contains the root CA private key in a PKCS12 keystore.
 
-SSL/TLS Certificates
-____________________
+Of course, multi-datacenter Elassandra cluster runing in different namespaces or different kubernetes clusters should share the same root CA.
+You can easily copy CA secrets from one namespace (NS) to another namespace (NS2) like this:
+
+.. code ::
+
+    kubectl get secret elassandra-cl1-ca-pub --namespace=$NS --export -o yaml | kubectl apply --namespace=$NS2 -f - || true
+    kubectl get secret elassandra-cl1-ca-key --namespace=$NS --export -o yaml | kubectl apply --namespace=$NS2 -f - || true
+
+To copy secrets from one kubernetes cluster to another one, you can probably use the
+`Multicluster-Service-Account <https://github.com/admiraltyio/multicluster-service-account>`_ from `Admiralty <https://admiralty.io/>`_.
+
+Generated Certificates
+----------------------
 
 When an Elassandra datacenter is deployed, a SSL/TLS keystore is generated from the namespaced root CA certificate if it does not exists in the secret
-``elassandra-[clusterName]-[dcName]-keystore``. This certificate has a wildcard certificate subjectAltName extension matching all Elassandra datacenter pods.
+``elassandra-{clusterName}-{dcName}-keystore``. This certificate has a wildcard certificate subjectAltName extension matching all Elassandra datacenter pods.
 It also have the localhost and 127.0.0.1 extensions to allow local connections.
 
 This TLS certificates and keys are used to secure:
@@ -151,16 +67,57 @@ This TLS certificates and keys are used to secure:
 * Cassandra JMX connection for administration and monitoring.
 * Elasticsearch client request overs HTTPS and Elasticsearch inter-node transport connections.
 
-When your cluster have multiple datacenters located in several Kubernetes clusters, these datacenters must share
-the same namespaced root CA certificate secret. Thus, all Elassandra cluster nodes trust the same root CA.
+Alternatively, your may use the `cert-manager <https://cert-manager.io/>`_ to manage theses certificates in a Kubernetes secret having the same name and content.
 
-Authentication
-______________
+.. note::
 
-Elassandra operator can automatically setup a strong Cassandra password for the default Cassandra super user,
-and create the following Cassandra roles.
+    In a multi-datacenter cluster, you don't need to copy this secret to all datacenters.
 
-* ``admin`` with the cassandra superuser privilege.
-* ``elassandra_operator`` with no superuser privilege.
+Elassandra Credentials
+======================
 
-Passwords for these Cassandra roles comes form the folowing secret, created with random passwords if not yet existing when the datacenter is created.
+Elassandra operator automatically create strong passwords in the ``elassandra-{clusterName}`` secret for the following account if they does not yet exists :
+
+* Cassandra **cassandra** superuser.
+* Cassandra **admin** role with the cassandra superuser privilege.
+* Cassandra **elassandra_operator** role with no superuser privilege.
+* Cassandra JMX password
+* Cassandra reaper admin password.
+
+Here is such kubernetes secret for an Elassandra cluster named **cl1**:
+
+.. code::
+
+    kubectl get secret -n ns1 elassandra-cl1 -o yaml
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      creationTimestamp: "2020-06-08T13:15:55Z"
+      labels:
+        app: elassandra
+        app.kubernetes.io/managed-by: elassandra-operator
+        elassandra.strapdata.com/cluster: cl1
+        elassandra.strapdata.com/credential: "true"
+      name: elassandra-cl1
+      namespace: ns4
+      ownerReferences:
+      - apiVersion: elassandra.strapdata.com/v1
+        blockOwnerDeletion: true
+        controller: true
+        kind: ElassandraDatacenter
+        name: elassandra-cl1-dc1
+        uid: 497b922d-874c-4f2d-bf05-a31a3f4682de
+      resourceVersion: "131584"
+      selfLink: /api/v1/namespaces/ns4/secrets/elassandra-cl1
+      uid: 8b27562c-54c3-48fb-8bfd-91ab253da775
+    type: Opaque
+    data:
+      cassandra.admin_password: MmY5N2IzYWUtNWYyYy00MGI0LTgwMmEtYjIzOTZlOGU2Yzhi
+      cassandra.cassandra_password: MzM5MTVhOTYtNTQyMC00ZmI0LTlkMjctMDE2Y2VhNmNmZDM0
+      cassandra.elassandra_operator_password: ZmQ2NTI5NGQtZTI1ZS00MzFhLWFkZTctYzE2ZjQwOGY5ZDU0
+      cassandra.jmx_password: NzRmYzUxM2YtYjkzNi00NzU2LWE3ZTEtNmVjMGM4Y2NlMTc4
+      cassandra.reaper_password: YWM0ZmM2ZGMtZWI5OC00ZWQxLWI1NTUtYjg1NjEyYTMwZGJl
+      shared-secret.yaml: YWFhLnNoYXJlZF9zZWNyZXQ6IDE0MjY0YjI4LWQ0ZTAtNGFkMC05MDUzLWE0NjUwMzk2MDI3Mg==
+
+Like for certificates, in a multi-datacenter Elassandra cluster deployed in different namespaces or different Kubernetes clusters,
+you should copy this secret to all Elassandra datacenters.

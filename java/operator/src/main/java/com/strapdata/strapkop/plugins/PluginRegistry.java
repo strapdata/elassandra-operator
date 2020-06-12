@@ -2,6 +2,7 @@ package com.strapdata.strapkop.plugins;
 
 import com.google.common.collect.ImmutableList;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
+import com.strapdata.strapkop.reconcilier.DataCenterUpdateAction;
 import io.reactivex.Completable;
 import io.reactivex.Single;
 import org.slf4j.Logger;
@@ -48,13 +49,14 @@ public class PluginRegistry {
         return Completable.mergeArray(pluginCompletables.toArray(new Completable[pluginCompletables.size()]));
     }
 
-    public Single<Boolean> reconcileAll(DataCenter dc) {
+    public Single<Boolean> reconcileAll(DataCenterUpdateAction dataCenterUpdateAction) {
         List<Single<Boolean>> pluginSingles = new ArrayList<>();
         for (Plugin plugin : plugins) {
             try {
-                pluginSingles.add(plugin.reconcile(dc)
+                pluginSingles.add(plugin.reconcile(dataCenterUpdateAction)
                         .onErrorResumeNext(t -> {
-                            logger.warn("datacenter={} plugin={} reconcile failed, error={}", dc.id(), plugin.getClass().getName(), t.toString());
+                            logger.warn("datacenter={} plugin={} reconcile failed, error={}",
+                                    dataCenterUpdateAction.dataCenter.id(), plugin.getClass().getName(), t.toString());
                             return Single.just(false);
                         }));
             } catch (Exception e) {

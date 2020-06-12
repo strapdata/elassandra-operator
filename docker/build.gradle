@@ -72,7 +72,7 @@ elassandraVersions.each { v ->
 
   task "dockerPushImage${normalizeVersion(v)}" (type: DockerPushImage) {
     dependsOn "dockerBuildImage${normalizeVersion(v)}"
-    images = [ registryUrl + elassandraImageName + ":" + v ]
+    images = [ elassandraImageName + ":" + v ]
   }
 }
 

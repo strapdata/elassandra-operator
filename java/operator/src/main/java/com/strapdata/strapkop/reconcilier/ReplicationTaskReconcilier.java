@@ -3,6 +3,7 @@ package com.strapdata.strapkop.reconcilier;
 import com.google.common.base.Strings;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.DataCenterCache;
+import com.strapdata.strapkop.cache.DataCenterStatusCache;
 import com.strapdata.strapkop.cql.CqlKeyspace;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRoleManager;
@@ -60,10 +61,11 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
                                       final MeterRegistry meterRegistry,
                                       final DataCenterController dataCenterController,
                                       final DataCenterCache dataCenterCache,
+                                      final DataCenterStatusCache dataCenterStatusCache,
                                       ExecutorFactory executorFactory,
                                       @Named("tasks") UserExecutorConfiguration userExecutorConfiguration) {
         super(reconcilierObserver, operatorConfig, k8sResourceUtils, meterRegistry,
-                dataCenterController, dataCenterCache, executorFactory, userExecutorConfiguration);
+                dataCenterController, dataCenterCache, dataCenterStatusCache, executorFactory, userExecutorConfiguration);
         this.context = context;
         this.cqlRoleManager = cqlRoleManager;
         this.cqlKeyspaceManager = cqlKeyspaceManager;

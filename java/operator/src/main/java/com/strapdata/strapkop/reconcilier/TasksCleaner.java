@@ -34,7 +34,7 @@ public class TasksCleaner {
         final int retentionInMs = (int) operatorConfig.getTaskRetention().getSeconds() * 1000;
         // start cleaner thread after 60s and execute it every retentionInMs/5
         logger.info("Starting task cleaner period={}", retentionInMs / 5);
-        cleanerThread.schedule(new Cleaner(retentionInMs, operatorConfig.getNamespace()), 60_000l, retentionInMs / 5);
+        cleanerThread.schedule(new Cleaner(retentionInMs, operatorConfig.getWatchNamespace()), 60_000l, retentionInMs / 5);
     }
 
     @EventListener

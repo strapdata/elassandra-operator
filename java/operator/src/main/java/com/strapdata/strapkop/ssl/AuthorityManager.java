@@ -51,8 +51,8 @@ public class AuthorityManager {
     public static final String OPERATOR_TRUSTORE_MOUNT_PATH = "/tmp/operator-truststore"; // operator truststore mount path
 
     // datacenter root CA used to generate interla certificates
-    public static final String DEFAULT_PUBLIC_CA_SECRET_NAME = "ca-pub"; // public CA certificate, secret available for all pods
-    public static final String DEFAULT_PRIVATE_CA_SECRET_NAME = "ca-key"; // secret for issuing certificates, only for some privileged pods
+    public static final String DEFAULT_PUBLIC_CA_SECRET_NAME = "elassandra-{clusterName}-ca-pub"; // public CA certificate, secret available for all pods
+    public static final String DEFAULT_PRIVATE_CA_SECRET_NAME = "elassandra-{clusterName}-ca-key"; // secret for issuing certificates, only for some privileged pods
 
     public static final String DEFAULT_PUBLIC_CA_MOUNT_PATH = "/tmp/datacenter-truststore"; // public CA certificate mount path
 
@@ -73,7 +73,7 @@ public class AuthorityManager {
     @Inject
     ServerSslConfiguration serverSslConfiguration;
 
-    private final AsyncLoadingCache<String, X509CertificateAndPrivateKey> cache;
+    private final AsyncLoadingCache<Tuple2<String,String>, X509CertificateAndPrivateKey> cache;
 
     public AuthorityManager(ExecutorFactory executorFactory,
                             @Named("authority") UserExecutorConfiguration userExecutorConfiguration) {
@@ -81,20 +81,20 @@ public class AuthorityManager {
                 .executor(executorFactory.executorService(userExecutorConfiguration))
                 .maximumSize(256)
                 .expireAfterWrite(1, TimeUnit.MINUTES)
-                .buildAsync(ns -> loadOrGenerateDatatcenterCa(ns).blockingGet());
+                .buildAsync(ns -> loadOrGenerateDatatcenterCa(ns._1, ns._2).blockingGet());
     }
 
-    public X509CertificateAndPrivateKey get(String namespace) throws ExecutionException, InterruptedException {
-        return getAsync(namespace).get();
+    public X509CertificateAndPrivateKey get(String namespace, String clusterName) throws ExecutionException, InterruptedException {
+        return getAsync(namespace, clusterName).get();
     }
 
-    public CompletableFuture<X509CertificateAndPrivateKey> getAsync(String namespace) {
+    public CompletableFuture<X509CertificateAndPrivateKey> getAsync(String namespace, String clusterName) {
         logger.debug("Get CA for namespace={}", namespace);
-        return cache.get(namespace);
+        return cache.get(new Tuple2<>(namespace, clusterName));
     }
 
-    public Single<X509CertificateAndPrivateKey> getSingle(String namespace) {
-        return Single.fromFuture(getAsync(namespace));
+    public Single<X509CertificateAndPrivateKey> getSingle(String namespace, String clusterName) {
+        return Single.fromFuture(getAsync(namespace, clusterName));
     }
 
     /**
@@ -102,9 +102,11 @@ public class AuthorityManager {
      *
      * @return
      */
-    public String getPublicCaSecretName() {
+    public String getPublicCaSecretName(String clusterName) {
         String caSecretName = System.getenv("PUBLIC_CA_SECRET_NAME");
-        return (caSecretName == null) ? AuthorityManager.DEFAULT_PUBLIC_CA_SECRET_NAME : caSecretName;
+        if (caSecretName == null)
+            caSecretName = AuthorityManager.DEFAULT_PUBLIC_CA_SECRET_NAME;
+        return caSecretName.replace("{clusterName}", clusterName);
     }
 
     /**
@@ -122,9 +124,11 @@ public class AuthorityManager {
      *
      * @return
      */
-    public String getPrivateCaSecretName() {
+    public String getPrivateCaSecretName(String clusterName) {
         String caSecretName = System.getenv("PRIVATE_CA_SECRET_NAME");
-        return (caSecretName == null) ? AuthorityManager.DEFAULT_PRIVATE_CA_SECRET_NAME : caSecretName;
+        if (caSecretName == null)
+            caSecretName = AuthorityManager.DEFAULT_PRIVATE_CA_SECRET_NAME;
+        return caSecretName.replace("{clusterName}", clusterName);
     }
 
     public String getCaKeyPass() {
@@ -146,34 +150,34 @@ public class AuthorityManager {
      * @throws IOException
      * @throws OperatorCreationException
      */
-    public Single<X509CertificateAndPrivateKey> storeCaAsSecret(String namespace, X509CertificateAndPrivateKey ca) throws ApiException, GeneralSecurityException, IOException, OperatorCreationException {
+    public Single<X509CertificateAndPrivateKey> storeCaAsSecret(String namespace, String clusterName, X509CertificateAndPrivateKey ca) throws ApiException, GeneralSecurityException, IOException, OperatorCreationException {
         final V1Secret publicSecret = new V1Secret()
                 .metadata(new V1ObjectMeta()
-                        .name(getPublicCaSecretName())
+                        .name(getPublicCaSecretName(clusterName))
                         .namespace(namespace)
                         .labels(OperatorLabels.MANAGED))
                 .type("Opaque")
                 .putStringDataItem(SECRET_CACERT_PEM, ca.getCertificateChainAsString())
                 .putDataItem(SECRET_TRUSTSTORE_P12, certManager.generateTruststoreBytes(ca, getCaTrustPass()));
-        logger.info("Storing public CA in secret {} in namespace {} secret={}", getPublicCaSecretName(), namespace, publicSecret);
+        logger.info("Storing public CA in secret {} in namespace {} secret={}", getPublicCaSecretName(clusterName), namespace, publicSecret);
         return k8sResourceUtils.createNamespacedSecret(publicSecret)
                 .flatMap(s -> {
                     final V1Secret privateSecret = new V1Secret()
                             .metadata(new V1ObjectMeta()
-                                    .name(getPrivateCaSecretName())
+                                    .name(getPrivateCaSecretName(clusterName))
                                     .namespace(namespace)
                                     .labels(OperatorLabels.MANAGED))
                             .type("Opaque")
                             .putStringDataItem(SECRET_CA_KEY, ca.getPrivateKeyAsString());
-                    logger.info("Storing private CA in secret {} in namespace {}", getPrivateCaSecretName(), namespace);
+                    logger.info("Storing private CA in secret {} in namespace {}", getPrivateCaSecretName(clusterName), namespace);
                     return k8sResourceUtils.createNamespacedSecret(privateSecret).map(s2 -> ca);
                 });
     }
 
 
-    private Single<X509CertificateAndPrivateKey> loadOrGenerateDatatcenterCa(String namespace) {
-        return k8sResourceUtils.readOptionalNamespacedSecret(namespace, getPublicCaSecretName())
-                .flatMap(caPub -> k8sResourceUtils.readOptionalNamespacedSecret(namespace, getPrivateCaSecretName()).map(caKey -> new Tuple2<>(caPub, caKey)))
+    private Single<X509CertificateAndPrivateKey> loadOrGenerateDatatcenterCa(String namespace, String clusterName) {
+        return k8sResourceUtils.readOptionalNamespacedSecret(namespace, getPublicCaSecretName(clusterName))
+                .flatMap(caPub -> k8sResourceUtils.readOptionalNamespacedSecret(namespace, getPrivateCaSecretName(clusterName)).map(caKey -> new Tuple2<>(caPub, caKey)))
                 .flatMap(tuple -> {
                     X509CertificateAndPrivateKey ca;
                     final byte[] certsBytes = tuple._1.map(sec -> sec.getData().get(SECRET_CACERT_PEM)).orElse(null);
@@ -181,7 +185,7 @@ public class AuthorityManager {
                     if (certsBytes == null || key == null) {
                         logger.info("Generating operator root ca for namespace={}", namespace);
                         ca = certManager.generateCa("AutoGeneratedRootCA", getCaKeyPass().toCharArray());
-                        return storeCaAsSecret(namespace, ca);
+                        return storeCaAsSecret(namespace, clusterName, ca);
                     } else {
                         return Single.just(new X509CertificateAndPrivateKey(new String(certsBytes), new String(key)));
                     }

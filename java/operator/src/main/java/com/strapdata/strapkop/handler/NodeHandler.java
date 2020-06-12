@@ -1,6 +1,7 @@
 package com.strapdata.strapkop.handler;
 
 import com.google.common.collect.ImmutableList;
+import com.strapdata.strapkop.cache.NodeCache;
 import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import io.kubernetes.client.openapi.models.V1Node;
@@ -23,6 +24,9 @@ public class NodeHandler extends TerminalHandler<K8sWatchEvent<V1Node>> {
     private final Logger logger = LoggerFactory.getLogger(NodeHandler.class);
 
     @Inject
+    NodeCache nodeCache;
+
+    @Inject
     MeterRegistry meterRegistry;
 
     Long managed = 0L;
@@ -33,6 +37,10 @@ public class NodeHandler extends TerminalHandler<K8sWatchEvent<V1Node>> {
         meterRegistry.gauge("k8s.managed",  tags, managed);
     }
 
+    public void updateCache(V1Node node) {
+        nodeCache.put(node.getMetadata().getName(), node);
+    }
+
     @Override
     public void accept(K8sWatchEvent<V1Node> event) throws Exception {
         logger.trace("event={}", event);
@@ -41,23 +49,27 @@ public class NodeHandler extends TerminalHandler<K8sWatchEvent<V1Node>> {
                 logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 managed++;
                 meterRegistry.counter("k8s.event.init", tags).increment();
+                updateCache(event.getResource());
                 break;
 
             case ADDED:
                 logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 managed++;
                 meterRegistry.counter("k8s.event.added", tags).increment();
+                updateCache(event.getResource());
                 break;
 
             case MODIFIED:
                 logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 meterRegistry.counter("k8s.event.modified", tags).increment();
+                updateCache(event.getResource());
                 break;
 
             case DELETED:
                 logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 meterRegistry.counter("k8s.event.deleted", tags).increment();
                 managed--;
+                nodeCache.remove(event.getResource().getMetadata().getName());
                 break;
 
             case ERROR:

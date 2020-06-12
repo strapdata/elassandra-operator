@@ -16,6 +16,7 @@ import com.strapdata.strapkop.model.k8s.datacenter.*;
 import com.strapdata.strapkop.reconcilier.DataCenterUpdateAction;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import io.kubernetes.client.custom.IntOrString;
+import io.kubernetes.client.custom.Quantity;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.apis.AppsV1Api;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
@@ -26,6 +27,7 @@ import io.micronaut.scheduling.executor.ExecutorFactory;
 import io.micronaut.scheduling.executor.UserExecutorConfiguration;
 import io.reactivex.*;
 import io.reactivex.schedulers.Schedulers;
+import org.apache.commons.lang3.ObjectUtils;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -129,14 +131,15 @@ public class ReaperPlugin extends AbstractPlugin {
     /**
      * Return true if datacenter.status is updated
      *
-     * @param dataCenter
+     * @param dataCenterUpdateAction
      * @return
      * @throws ApiException
      * @throws StrapkopException
      * @throws IOException
      */
     @Override
-    public Single<Boolean> reconcile(DataCenter dataCenter) throws StrapkopException {
+    public Single<Boolean> reconcile(DataCenterUpdateAction dataCenterUpdateAction) throws StrapkopException {
+        final DataCenter dataCenter = dataCenterUpdateAction.dataCenter;
         logger.trace("datacenter={} reaper.spec={}", dataCenter.id(), dataCenter.getSpec().getReaper());
 
         boolean reaperEnabled = dataCenter.getSpec().getReaper() != null && dataCenter.getSpec().getReaper().getEnabled();
@@ -146,6 +149,7 @@ public class ReaperPlugin extends AbstractPlugin {
                 .flatMap(deployments -> {
                     if ((!reaperEnabled || dataCenter.getSpec().isParked()) && !deployments.isEmpty()) {
                         return delete(dataCenter).map(b -> {
+                            dataCenterUpdateAction.operation.getActions().add("Undeploying cassandra reaper");
                             dataCenter.getStatus().setReaperPhase(ReaperPhase.NONE);
                             return true;
                         });
@@ -156,6 +160,7 @@ public class ReaperPlugin extends AbstractPlugin {
                             CqlRole reaperRole = cqlRoleManager.get(dataCenter, REAPER_ROLE.getUsername());
                             if (reaperRole != null && reaperRole.isReconcilied()) {
                                 return createOrReplaceReaperObjects(dataCenter).map(b -> {
+                                    dataCenterUpdateAction.operation.getActions().add("Deploying cassandra reaper");
                                     dataCenter.getStatus().setReaperPhase(ReaperPhase.DEPLOYED);
                                     return true;
                                 });
@@ -165,7 +170,13 @@ public class ReaperPlugin extends AbstractPlugin {
                             break;
 
                         case RUNNING:
-                            return register(dataCenter).toSingleDefault(true);
+                            return register(dataCenter)
+                                    .andThen(Single.just(true)
+                                            .map(b -> {
+                                                dataCenterUpdateAction.operation.getActions().add("Registering cassandra reaper");
+                                                return b;
+                                            })
+                                    );
 
                         case REGISTERED:
                             // TODO: schedule/unschedule repairs
@@ -208,11 +219,12 @@ public class ReaperPlugin extends AbstractPlugin {
         final Map<String, String> labels = reaperLabels(dataCenter);
 
         String datacenterGeneration = dataCenter.getMetadata().getGeneration().toString();
-        final V1ObjectMeta meta = new V1ObjectMeta()
+        final V1ObjectMeta meta = ObjectUtils.defaultIfNull(dataCenterSpec.getReaper().getPodTemplate().getMetadata(), new V1ObjectMeta())
                 .name(reaperName(dataCenter))
-                .namespace(dataCenterMetadata.getNamespace())
-                .labels(labels)
-                .putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, datacenterGeneration);
+                .namespace(dataCenterMetadata.getNamespace());
+        for(Map.Entry<String, String> entry : labels.entrySet())
+            meta.putLabelsItem(entry.getKey(), entry.getValue());
+        meta.putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, datacenterGeneration);
 
         // abort deployment replacement if it is already up to date (according to the annotation datacenter-generation and to spec.replicas)
         // this is important because otherwise it generate a "larsen" : deployment replace -> k8s event -> reconciliation -> deployment replace...
@@ -238,8 +250,18 @@ public class ReaperPlugin extends AbstractPlugin {
         if (!deployRepear)
             return Single.just(false);
 
-
         final V1Container container = new V1Container();
+        if (dataCenterSpec.getReaper().getResources() != null) {
+            container.resources(dataCenterSpec.getReaper().getResources());
+        } else {
+            // default reaper resources
+            container.resources(new V1ResourceRequirements()
+                    .putRequestsItem("cpu", Quantity.fromString("500m"))
+                    .putRequestsItem( "memory", Quantity.fromString("1Gi"))
+                    .putLimitsItem("cpu", Quantity.fromString("1000m"))
+                    .putLimitsItem( "memory", Quantity.fromString("1Gi"))
+            );
+        }
 
         // Create an accumulator for JAVA_OPTS
         // TODO do we have to make HEAP values configurable in the reaper section of DCSpec ??
@@ -253,19 +275,24 @@ public class ReaperPlugin extends AbstractPlugin {
             }
         }
 
-        final V1PodSpec podSpec = new V1PodSpec()
-                .serviceAccountName(dataCenterSpec.getAppServiceAccount())
+        final V1PodSpec reaperPodSpec = ObjectUtils.defaultIfNull(dataCenterSpec.getReaper().getPodTemplate().getSpec(), new V1PodSpec())
                 .addContainersItem(container);
 
         if (dataCenterSpec.getImagePullSecrets() != null) {
             for (String secretName : dataCenterSpec.getImagePullSecrets()) {
                 final V1LocalObjectReference pullSecret = new V1LocalObjectReference().name(secretName);
-                podSpec.addImagePullSecretsItem(pullSecret);
+                reaperPodSpec.addImagePullSecretsItem(pullSecret);
             }
         }
 
-        if (dataCenterSpec.getPriorityClassName() != null) {
-            podSpec.setPriorityClassName(dataCenterSpec.getPriorityClassName());
+        final V1PodSpec elassandraPodSpec = ObjectUtils.defaultIfNull(dataCenterSpec.getPodTemplate().getSpec(), new V1PodSpec());
+        // inherit service account
+        if (reaperPodSpec.getServiceAccountName() == null) {
+            reaperPodSpec.setServiceAccountName(dataCenterSpec.getServiceAccount());
+        }
+        // inherit the priorityClassName of the Elassandra datacenter if not specified
+        if (reaperPodSpec.getPriorityClassName() == null) {
+            reaperPodSpec.setPriorityClassName(elassandraPodSpec.getPriorityClassName());
         }
 
         final V1Deployment deployment = new V1Deployment()
@@ -276,7 +303,7 @@ public class ReaperPlugin extends AbstractPlugin {
                         .selector(new V1LabelSelector().matchLabels(labels))
                         .template(new V1PodTemplateSpec()
                                 .metadata(new V1ObjectMeta().labels(labels))
-                                .spec(podSpec)
+                                .spec(reaperPodSpec)
                         )
                 );
 
@@ -397,10 +424,10 @@ public class ReaperPlugin extends AbstractPlugin {
 
         // reaper with cassandra ssl on native port
         if (Boolean.TRUE.equals(dataCenterSpec.getCassandra().getSsl())) {
-            podSpec.addVolumesItem(new V1Volume()
+            reaperPodSpec.addVolumesItem(new V1Volume()
                     .name("truststore")
                     .secret(new V1SecretVolumeSource()
-                            .secretName(authorityManager.getPublicCaSecretName())
+                            .secretName(authorityManager.getPublicCaSecretName(dataCenterSpec.getClusterName()))
                             .addItemsItem(new V1KeyToPath().key(AuthorityManager.SECRET_CACERT_PEM).path(AuthorityManager.SECRET_CACERT_PEM))
                             .addItemsItem(new V1KeyToPath().key(AuthorityManager.SECRET_TRUSTSTORE_P12).path(AuthorityManager.SECRET_TRUSTSTORE_P12))
                     )

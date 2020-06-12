@@ -141,7 +141,7 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
             // keep a task ref to cancel it on delete
             completable.doFinally(() -> notTerminatedTasks.remove(key));
             notTerminatedTasks.put(key, completable.subscribe());
-            workQueues.submit(clusterKey, Reconciliable.Kind.TASK, eventType, completable);
+            workQueues.submit(clusterKey, task.getMetadata().getResourceVersion(), Reconciliable.Kind.TASK, eventType, completable);
         } else {
             // purge old task.
             org.joda.time.DateTime creation = task.getMetadata().getCreationTimestamp();
@@ -149,7 +149,7 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
             if (creation.isBefore(retentionInstant)) {
                 logger.info("Delete old terminated task={}", task.id());
                 Completable delete = k8sResourceUtils.deleteTask(task.getMetadata()).ignoreElement();
-                workQueues.submit(clusterKey, Reconciliable.Kind.TASK, DELETED, delete);
+                workQueues.submit(clusterKey, task.getMetadata().getResourceVersion(), Reconciliable.Kind.TASK, DELETED, delete);
             }
         }
     }

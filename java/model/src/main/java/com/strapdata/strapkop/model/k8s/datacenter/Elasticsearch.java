@@ -3,15 +3,13 @@ package com.strapdata.strapkop.model.k8s.datacenter;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
-import com.strapdata.strapkop.model.GsonUtils;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.With;
-import org.apache.commons.codec.digest.DigestUtils;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Elasticsearch configuration.
@@ -59,6 +57,14 @@ public class Elasticsearch {
     private Boolean ingressEnabled = false;
 
     /**
+     * Ingress annotations
+     */
+    @JsonPropertyDescription("Elasticsearch ingress annotations")
+    @SerializedName("ingressAnnotations")
+    @Expose
+    private Map<String, String> ingressAnnotations = null;
+
+    /**
      * Elassandra datacenter group
      */
     @JsonPropertyDescription("Elassandra datacenter group")
@@ -86,27 +92,4 @@ public class Elasticsearch {
             .setJmx(false)
             .setSsl(false)
             .setAaa(new Aaa().setEnabled(false));
-
-    /**
-     * Kibana configuration.
-     *
-     */
-    @JsonPropertyDescription("Kibana configuration")
-    @SerializedName("kibana")
-    @Expose
-    private Kibana kibana = new Kibana();
-
-    public String kibanaFingerprint() {
-        List<Object> acc = new ArrayList<>();
-
-        // we exclude :
-        // * Reaper config
-        // * Kibana config
-        // * parked attribute
-        // * scheduledBackups (DC reconciliation is useless in this case, we only want to update Scheduler)
-        acc.add(kibana);
-        String json = GsonUtils.toJson(acc);
-        String digest = DigestUtils.sha1Hex(json).substring(0,7);
-        return digest;
-    }
 }

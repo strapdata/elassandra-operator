@@ -13,6 +13,7 @@ import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenterPhase;
 import com.strapdata.strapkop.plugins.Plugin;
 import com.strapdata.strapkop.plugins.PluginRegistry;
+import com.strapdata.strapkop.reconcilier.DataCenterUpdateAction;
 import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -65,11 +66,12 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
     /**
      * Create and adjust keyspace RF
      *
-     * @param dataCenter
+     * @param dataCenterUpdateAction
      * @return
      * @throws StrapkopException
      */
-    public Single<Boolean> reconcileKeyspaces(final DataCenter dataCenter, Boolean updateStatus, final CqlSessionSupplier sessionSupplier, PluginRegistry pluginRegistry) {
+    public Single<Boolean> reconcileKeyspaces(final DataCenterUpdateAction dataCenterUpdateAction, Boolean updateStatus, final CqlSessionSupplier sessionSupplier, PluginRegistry pluginRegistry) {
+        DataCenter dataCenter = dataCenterUpdateAction.dataCenter;
         return Single.just(updateStatus)
                 .map(needDcStatusUpdate -> {
                     // init keyspaces for the datacenters
@@ -124,6 +126,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                             try {
                                 if (!keyspace.reconcilied() || keyspace.reconcileWithDcSize < keyspace.rf || dataCenter.getSpec().getReplicas() < keyspace.rf)
                                     todoList.add(updateKeyspaceReplicationMap(dataCenter, keyspace.name, effectiveRF(dataCenter, keyspace.rf), sessionSupplier));
+                                dataCenterUpdateAction.operation.getActions().add("update keyspace RF for ["+keyspace.getName()+"]");
                             } catch (Exception e) {
                                 logger.warn("datacenter=" + dataCenter.id() + " Failed to adjust RF for keyspace=" + keyspace, e);
                             }

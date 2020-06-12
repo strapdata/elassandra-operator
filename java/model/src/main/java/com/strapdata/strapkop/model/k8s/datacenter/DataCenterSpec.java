@@ -70,45 +70,31 @@ public class DataCenterSpec {
     @Expose
     private List<java.lang.String> imagePullSecrets;
 
+
+    @JsonPropertyDescription("PodDisruptionBudget max unavailable Elassandra pod")
+    @SerializedName("maxPodUnavailable")
+    @Expose
+    private Integer maxPodUnavailable = 1;
+
     /**
      * ServiceAccount used by the operator to deploy pods (Elassandra, Reaper, kibana...)
      */
-    @JsonPropertyDescription("ServiceAccount used by the operator to deploy pods")
-    @SerializedName("appServiceAccount")
+    @JsonPropertyDescription("ServiceAccount used by the operator to deploy pods, unless overwritten by podTemplate")
+    @SerializedName("serviceAccount")
     @Expose
-    private String appServiceAccount;
+    private String serviceAccount;
 
     /**
-     * Elassandra pods priorityClassName
+     * PodTemplate provides pod customisation (labels, resource, annotations, affinity rules, resource, priorityClassName, serviceAccountName) for the elassandra pods
      */
-    @JsonPropertyDescription("Elassandra pods priorityClassName")
-    @SerializedName("priorityClassName")
+    @JsonPropertyDescription("Elassandra pods template allowing customisation")
+    @SerializedName("podTemplate")
     @Expose
-    private String priorityClassName;
-
-    @JsonPropertyDescription("Elassandra pods additional annotations")
-    @SerializedName("annotations")
-    @Expose
-    private Map<String, String> annotations;
-
-    @JsonPropertyDescription("Elassandra pods additional labels")
-    @SerializedName("customLabels")
-    @Expose
-    private Map<String, String> customLabels;
+    private V1PodTemplateSpec podTemplate = new V1PodTemplateSpec();
 
     /**
-     * List of environment variables to inject in the Cassandra & Sidecar container.
-     *
-     */
-    @JsonPropertyDescription("Elassandra pods environment variables")
-    @SerializedName("env")
-    @Expose
-    private List<V1EnvVar> env = new ArrayList<>();
-
-    /**
-     * Resource requirements for the Cassandra container.
-     *
-     */
+     * Resource requirements for the Elassandra containers.
+     **/
     @JsonPropertyDescription("Resource requirements for Elassandra pods")
     @SerializedName("resources")
     @Expose
@@ -117,11 +103,10 @@ public class DataCenterSpec {
     /**
      * PVC spec
      */
-    @JsonPropertyDescription("Elassandra PVC")
+    @JsonPropertyDescription("Elassandra dataVolumeClaim")
     @SerializedName("dataVolumeClaim")
     @Expose
     private V1PersistentVolumeClaimSpec dataVolumeClaim;
-
 
     /**
      * Decomission policy control PVC when node removed.
@@ -158,6 +143,38 @@ public class DataCenterSpec {
     private Prometheus prometheus = new Prometheus();
 
     /**
+     * Kubernetes networking configuration
+     */
+    @JsonPropertyDescription("Networking configuration")
+    @SerializedName("networking")
+    @Expose
+    private Networking networking = new Networking();
+
+    /**
+     * External DNS config for public nodes and elasticsearch service.
+     */
+    @JsonPropertyDescription("External DNS configuration")
+    @SerializedName("externalDns")
+    @Expose
+    private ExternalDns externalDns = null;
+
+    /**
+     * Jvm configuration
+     */
+    @JsonPropertyDescription("JVM configuration")
+    @SerializedName("jvm")
+    @Expose
+    private Jvm jvm = new Jvm();
+
+    /**
+     * Cassandra configuration
+     */
+    @JsonPropertyDescription("Cassandra configuration")
+    @SerializedName("cassandra")
+    @Expose
+    private Cassandra cassandra = new Cassandra();
+
+    /**
      * Reaper configuration.
      *
      */
@@ -175,14 +192,6 @@ public class DataCenterSpec {
     private Set<ManagedKeyspace> managedKeyspaces = new HashSet<>();
 
     /**
-     * Kubernetes networking configuration
-     */
-    @JsonPropertyDescription("Networking configuration")
-    @SerializedName("networking")
-    @Expose
-    private Networking networking = new Networking();
-
-    /**
      * Elasticsearch configuration
      */
     @JsonPropertyDescription("Elasticsearch configuration")
@@ -191,29 +200,13 @@ public class DataCenterSpec {
     private Elasticsearch elasticsearch = new Elasticsearch();
 
     /**
-     * External DNS config for public nodes and elasticsearch service.
+     * Kibana configuration.
+     *
      */
-    @JsonPropertyDescription("External DNS configuration")
-    @SerializedName("externalDns")
+    @JsonPropertyDescription("Kibana configuration")
+    @SerializedName("kibana")
     @Expose
-    private ExternalDns externalDns = null;
-
-
-    /**
-     * Jvm configuration
-     */
-    @JsonPropertyDescription("JVM configuration")
-    @SerializedName("jvm")
-    @Expose
-    private Jvm jvm = new Jvm();
-
-    /**
-     * Cassandra configuration
-     */
-    @JsonPropertyDescription("Cassandra configuration")
-    @SerializedName("cassandra")
-    @Expose
-    private Cassandra cassandra = new Cassandra();
+    private Kibana kibana = new Kibana();
 
     /**
      * Elassandra webhook URL called when the datacenter is reconcilied.
@@ -244,19 +237,15 @@ public class DataCenterSpec {
         acc.add(imagePullPolicy);
         acc.add(imagePullSecrets);
         acc.add(webHookUrl);
-        acc.add(env);
-        acc.add(annotations);
-        acc.add(customLabels);
-        acc.add(priorityClassName);
-        acc.add(appServiceAccount);
+        acc.add(resources);
+        acc.add(podTemplate);
         acc.add(externalDns);
         acc.add(networking);
         acc.add(cassandra);
         acc.add(elasticsearch);
-        acc.add(resources);
         acc.add(prometheus);
         acc.add(jvm);
-        acc.add(managedKeyspaces);
+        acc.add(cassandra);
         acc.add(userSecretVolumeSource);
         if (userConfigMapVolumeSource != null) {
             acc.add(userConfigMapVolumeSource);
@@ -268,5 +257,16 @@ public class DataCenterSpec {
         return digest;
     }
 
+    public String kibanaFingerprint() {
+        List<Object> acc = new ArrayList<>();
+
+        // we exclude :
+        // * Reaper config
+        // * Kibana config
+        acc.add(kibana);
+        String json = GsonUtils.toJson(acc);
+        String digest = DigestUtils.sha1Hex(json).substring(0,7);
+        return digest;
+    }
 
 }

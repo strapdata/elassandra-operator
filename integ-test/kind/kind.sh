@@ -1,10 +1,4 @@
 #!/usr/bin/env bash
-#
-# Require az cli 2.0.76+
-# On  Mac: brew upgrade azure-cli
-# az extension update --name aks-preview
-# az feature register --name NodePublicIPPreview --namespace Microsoft.ContainerService
-# az account set --subscription 72738c1b-8ae6-4f23-8531-5796fe866f2e
 set -x
 
 export STORAGE_CLASS_NAME="server-storage"
@@ -13,7 +7,12 @@ export REGISTRY_PORT='5000'
 export REGISTRY_URL="localhost:5000"
 
 create_cluster() {
-  create_kind_cluster6_with_local_registry
+  case "${2:-6}" in
+  "3") create_kind_cluster3_with_local_registry ${1:-cluster1}
+    ;;
+  *) create_kind_cluster6_with_local_registry ${1:-cluster1}
+    ;;
+  esac
 }
 
 # $1 = cluster name
@@ -96,6 +95,40 @@ EOF
   kubectl label nodes cluster1-worker6 failure-domain.beta.kubernetes.io/zone=c
 }
 
+create_kind_cluster3_with_local_registry() {
+  # create a cluster with the local registry enabled in containerd
+  cat <<EOF | kind create cluster --name ${1:-cluster1} --image kindest/node:v1.15.11@sha256:6cc31f3533deb138792db2c7d1ffc36f7456a06f1db5556ad3b6927641016f50 --config=-
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+- role: worker
+- role: worker
+- role: worker
+containerdConfigPatches:
+- |-
+  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:${REGISTRY_PORT}"]
+    endpoint = ["http://${REGISTRY_NAME}:${REGISTRY_PORT}"]
+EOF
+
+  # connect the registry to the cluster network if the registry exist
+  docker network connect "kind" "${REGISTRY_NAME}" || true
+
+  # tell https://tilt.dev to use the registry
+  # https://docs.tilt.dev/choosing_clusters.html#discovering-the-registry
+  for node in $(kind get nodes --name ${1:-cluster1});
+  do
+    kubectl annotate node "${node}" "kind.x-k8s.io/registry=localhost:${REGISTRY_PORT}";
+  done
+
+  # create storageclass
+  kubectl apply -f integ-test/kind/kind-storageclass.yaml
+
+  # add zone label
+  kubectl label nodes cluster1-worker failure-domain.beta.kubernetes.io/zone=a
+  kubectl label nodes cluster1-worker2 failure-domain.beta.kubernetes.io/zone=b
+  kubectl label nodes cluster1-worker3 failure-domain.beta.kubernetes.io/zone=c
+}
 
 
 

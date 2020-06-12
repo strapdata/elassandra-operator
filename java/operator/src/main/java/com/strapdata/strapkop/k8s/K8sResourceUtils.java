@@ -6,6 +6,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterators;
 import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
+import com.strapdata.strapkop.cache.DataCenterStatusCache;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
@@ -55,11 +56,28 @@ public class K8sResourceUtils {
     @Inject
     protected PolicyV1beta1Api policyV1beta1Api;
 
+    @Inject
+    DataCenterStatusCache dataCenterStatusCache;
+
     @FunctionalInterface
     public interface ApiCallable {
         void call() throws ApiException;
     }
 
+
+    public static <T> Single<Iterable<T>> listNamespacedResources(String namespace, K8sSupplier<Iterable<T>> lister) throws ApiException {
+        return Single.fromCallable(new Callable<Iterable<T>>() {
+            @Override
+            public Iterable<T> call() throws Exception {
+                try {
+                    return lister.get();
+                } catch (final ApiException e) {
+                    logger.error("list error code={} namespace={}", e.getCode(), namespace);
+                    throw e;
+                }
+            }
+        });
+    }
 
     public static <T> Single<T> createNamespacedResource(String namespace, T t, K8sSupplier<T> create) throws ApiException {
         return Single.fromCallable(new Callable<T>() {
@@ -936,6 +954,7 @@ public class K8sResourceUtils {
         });
     }
 
+    /*
     public Single<DataCenter> updateDataCenter(final DataCenter dc) throws ApiException {
         return Single.fromCallable( () ->{
             try {
@@ -952,18 +971,23 @@ public class K8sResourceUtils {
             }
         });
     }
+     */
 
     public Single<Object> updateDataCenterStatus(final DataCenter dc, final DataCenterStatus dcStatus) throws ApiException {
         // read before write to avoid 409 conflict
-        return readDatacenter(new Key(dc.getMetadata()))
+        Key key = new Key(dc.getMetadata());
+        return readDatacenter(key)
                 .map(currentDc -> {
                     currentDc.setStatus(dcStatus);
                     return currentDc;
                 })
                 .flatMap(currentDc ->
-                        Single.fromCallable(() ->
+                        Single.fromCallable(() -> {
                                 customObjectsApi.replaceNamespacedCustomObjectStatus(StrapdataCrdGroup.GROUP, DataCenter.VERSION,
-                                        dc.getMetadata().getNamespace(), DataCenter.PLURAL, dc.getMetadata().getName(), currentDc)));
+                                        dc.getMetadata().getNamespace(), DataCenter.PLURAL, dc.getMetadata().getName(), currentDc);
+                            return dataCenterStatusCache.put(key, currentDc.getStatus());
+                        })
+                );
     }
 
 

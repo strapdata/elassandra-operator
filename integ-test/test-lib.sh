@@ -48,19 +48,16 @@ setup_flavor() {
 
 setup_cluster() {
   setup_flavor
-  create_cluster
+  create_cluster ${1:-cluster1} ${2:-6}
   create_registry
   init_helm
 }
 
 init_helm() {
    echo "Installing HELM"
-	 helm init
-	 kubectl -n kube-system get po || helm init
 	 kubectl create serviceaccount --namespace kube-system tiller
 	 kubectl create clusterrolebinding tiller-cluster-rule --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
-	 kubectl patch deploy --namespace kube-system tiller-deploy -p '{"spec":{"template":{"spec":{"serviceAccount":"tiller"}}}}'
-	 helm init --wait
+	 helm init --wait --service-account tiller
 
   # K8s 1.16+ apiVersion issue
 	# helm init --service-account tiller --override spec.selector.matchLabels.'name'='tiller',spec.selector.matchLabels.'app'='helm' --output yaml | sed 's@apiVersion: extensions/v1beta1@apiVersion: apps/v1@' | kubectl apply -f -

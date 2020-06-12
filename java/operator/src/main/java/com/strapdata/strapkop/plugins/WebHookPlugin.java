@@ -4,6 +4,7 @@ import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
+import com.strapdata.strapkop.reconcilier.DataCenterUpdateAction;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import io.kubernetes.client.openapi.apis.AppsV1Api;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
@@ -119,10 +120,10 @@ public class WebHookPlugin extends AbstractPlugin {
     /**
      * Call on each reconciliation
      *
-     * @param dataCenter
+     * @param dataCenterUpdateAction
      */
     @Override
-    public Single<Boolean> reconcile(DataCenter dataCenter) throws StrapkopException {
+    public Single<Boolean> reconcile(DataCenterUpdateAction dataCenterUpdateAction) throws StrapkopException {
         return Single.just(false);
     }
 

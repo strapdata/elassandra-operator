@@ -1,8 +1,10 @@
 package com.strapdata.strapkop.pipeline;
 
 import com.strapdata.strapkop.OperatorConfig;
-import com.strapdata.strapkop.cache.TaskCache;
+import com.strapdata.strapkop.event.K8sWatchEvent;
+import com.strapdata.strapkop.event.K8sWatchEventSource;
 import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskList;
@@ -23,12 +25,12 @@ import java.util.Collection;
 
 @Context
 @Infrastructure
-public class TaskPipeline extends CachedK8sWatchPipeline<Task, TaskList, Key> {
+public class TaskPipeline extends EventPipeline<K8sWatchEvent<Task>> {
 
     private final Logger logger = LoggerFactory.getLogger(TaskPipeline.class);
 
-    public TaskPipeline(@Named("apiClient") ApiClient apiClient, TaskCache cache, CustomObjectsApi customObjectsApi, OperatorConfig config) {
-        super(apiClient, new TaskAdapter(customObjectsApi, config), cache);
+    public TaskPipeline(@Named("apiClient") ApiClient apiClient, CustomObjectsApi customObjectsApi, OperatorConfig config) {
+        super(new K8sWatchEventSource<>(apiClient, new TaskAdapter(customObjectsApi, config)));
     }
 
     public static class TaskAdapter extends K8sWatchResourceAdapter<Task, TaskList, Key> {
@@ -54,8 +56,8 @@ public class TaskPipeline extends CachedK8sWatchPipeline<Task, TaskList, Key> {
         @Override
         public Call createListApiCall(Boolean watch, String resourceVersion) throws ApiException {
             return customObjectsApi.listNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, Task.VERSION,
-                    config.getNamespace(), Task.PLURAL, null, null, null,
-                    null, null, resourceVersion, null, watch, null);
+                    config.getWatchNamespace(), Task.PLURAL, null, null, null,
+                    OperatorLabels.toSelector(OperatorLabels.MANAGED), null, resourceVersion, null, watch, null);
         }
 
         @Override

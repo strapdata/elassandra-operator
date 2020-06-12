@@ -4,8 +4,6 @@ import com.strapdata.strapkop.event.K8sWatchEvent;
 import io.reactivex.Completable;
 import lombok.*;
 
-import java.math.BigInteger;
-
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
@@ -17,9 +15,10 @@ public class Reconciliable {
     Completable completable;
 
     Kind kind;
+
     K8sWatchEvent.Type type;
 
-    BigInteger id;
+    String resourceVersion;
 
     Long submitTime;
     Long startTime;
@@ -28,6 +27,7 @@ public class Reconciliable {
         TASK,
         DATACENTER,
         STATEFULSET,
-        ELASSANDRA_POD
+        ELASSANDRA_POD,
+        NODE;
     }
 }

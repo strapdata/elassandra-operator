@@ -10,6 +10,7 @@ import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
 import com.strapdata.strapkop.model.k8s.datacenter.ManagedKeyspace;
+import com.strapdata.strapkop.reconcilier.DataCenterUpdateAction;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import io.kubernetes.client.openapi.apis.AppsV1Api;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
@@ -52,6 +53,7 @@ public class ManagedKeyspacePlugin extends AbstractPlugin {
 
     @Override
     public Completable syncRoles(final CqlRoleManager cqlRoleManager, final DataCenter dataCenter) {
+
         for(ManagedKeyspace managedKeyspace : dataCenter.getSpec().getManagedKeyspaces()) {
             if (!Strings.isNullOrEmpty(managedKeyspace.getRole())) {
                 cqlRoleManager.addIfAbsent(dataCenter, managedKeyspace.getRole(), () -> new CqlRole()
@@ -74,10 +76,10 @@ public class ManagedKeyspacePlugin extends AbstractPlugin {
     /**
      * Call on each reconciliation
      *
-     * @param dataCenter
+     * @param dataCenterUpdateAction
      */
     @Override
-    public Single<Boolean> reconcile(DataCenter dataCenter) throws StrapkopException {
+    public Single<Boolean> reconcile(DataCenterUpdateAction dataCenterUpdateAction) throws StrapkopException {
         return Single.just(false);
     }
 
