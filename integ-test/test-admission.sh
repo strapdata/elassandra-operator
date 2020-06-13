@@ -6,7 +6,8 @@ setup_flavor
 NS="ns3"
 
 install_elassandra_datacenter $NS cl1 dc1 1
-sleep 2
+# wait for the DC to be managed by the operator
+java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --health GREEN -r 1
 
 # cannot change the cluster name
 kubectl patch elassandradatacenter elassandra-cl1-dc1 -n $NS --type="merge" --patch '{"spec": {"clusterName": "cl2" }}'
