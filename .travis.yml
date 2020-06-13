@@ -63,7 +63,7 @@ install:
 - ./gradlew --version
 # Create Kind cluster and a local registry
 - helm init --client-only
-- integ-test/setup_cluster.sh
+- integ-test/setup-cluster.sh
 - kind get clusters
 - docker ps -a
 script:
@@ -75,7 +75,7 @@ script:
 - integ-test/test-scaleup-park-unpark-reaper.sh
 - integ-test/test-multiple-dc-1ns.sh
 - integ-test/test-multiple-dc-2ns.sh
-#- integ-test/test-rolling-upgrade.sh
+- integ-test/test-rolling-upgrade.sh
 - (cd docs; make clean html SPHINXOPTS="-W"; touch build/html/.nojekyll )
 deploy:
 #- provider: script
