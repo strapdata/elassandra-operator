@@ -33,6 +33,23 @@ public class ValidationController {
     @Inject
     K8sResourceUtils k8sResourceUtils;
 
+    private void checkDatacenterSpecConsistency(DataCenterSpec dataCenterSpec) {
+        // Check pod affinity
+        if (PodsAffinityPolicy.SLACK.equals(dataCenterSpec.getPodsAffinityPolicy()) &&
+                (dataCenterSpec.getNetworking().getHostNetworkEnabled() ||
+                        dataCenterSpec.getNetworking().getHostPortEnabled())) {
+            throw new IllegalArgumentException("PodsAffinityPolicy cannot be SLACK when hostNetwork or hostPort is true, this would cause a TCP port conflict.");
+        }
+
+        // check externalDns
+        if (dataCenterSpec.getExternalDns() != null && dataCenterSpec.getExternalDns().getEnabled()) {
+            if (Strings.isNullOrEmpty(dataCenterSpec.getExternalDns().getDomain()))
+                throw new IllegalArgumentException("externalDns is enabled but no DNS domain is configured, please fix your elassandra CRD");
+            if (dataCenterSpec.getExternalDns().getTtl() == null || dataCenterSpec.getExternalDns().getTtl() < 0)
+                throw new IllegalArgumentException("externalDns is enabled but no DNS TTL is configured, please fix your elassandra CRD");
+        }
+    }
+    
     /**
      * Use the fabric8 datacenter for webhook admission.
      * @param admissionReview
@@ -43,8 +60,11 @@ public class ValidationController {
     public Single<AdmissionReview> validate(@QueryValue("timeout") Duration timeout,
                                             @Body AdmissionReview admissionReview) throws ApiException {
         logger.warn("input admissionReview={}", admissionReview);
+        com.strapdata.strapkop.model.fabric8.datacenter.DataCenter datacenter = (com.strapdata.strapkop.model.fabric8.datacenter.DataCenter) admissionReview.getRequest().getObject();
+        DataCenterSpec dataCenterSpec = datacenter.getSpec();
 
         if (admissionReview.getRequest().getName() == null) {
+            checkDatacenterSpecConsistency(dataCenterSpec);
             // resource created.
             return Single.just(new AdmissionReviewBuilder()
                     .withResponse(new AdmissionResponseBuilder()
@@ -55,34 +75,19 @@ public class ValidationController {
 
         Key dcKey = new Key(admissionReview.getRequest().getName(), admissionReview.getRequest().getNamespace());
         return k8sResourceUtils.readDatacenter(dcKey)
-                .map(dc -> {
-                    com.strapdata.strapkop.model.fabric8.datacenter.DataCenter datacenter = (com.strapdata.strapkop.model.fabric8.datacenter.DataCenter) admissionReview.getRequest().getObject();
-                    DataCenterSpec dataCenterSpec = datacenter.getSpec();
-
+                .map(deployedDc -> {
                     // Attempt to change the clusterName
-                    if (!dataCenterSpec.getClusterName().equals(dataCenterSpec.getClusterName())) {
+                    if (!deployedDc.getSpec().getClusterName().equals(dataCenterSpec.getClusterName())) {
                         throw new IllegalArgumentException("Cannot change the cassandra cluster name");
                     }
 
                     // Attempt to change the datacenterName
-                    if (!dataCenterSpec.getDatacenterName().equals(dataCenterSpec.getDatacenterName())) {
+                    if (!deployedDc.getSpec().getDatacenterName().equals(dataCenterSpec.getDatacenterName())) {
                         throw new IllegalArgumentException("Cannot change the cassandra datacenter name");
                     }
 
-                    // Check pod affinity
-                    if (PodsAffinityPolicy.SLACK.equals(dataCenterSpec.getPodsAffinityPolicy()) &&
-                                    (dataCenterSpec.getNetworking().getHostNetworkEnabled() ||
-                                            dataCenterSpec.getNetworking().getHostPortEnabled())) {
-                        throw new IllegalArgumentException("PodsAffinityPolicy cannot be SLACK when hostNetwork or hostPort is true, this would cause a TCP port conflict.");
-                    }
-
-                    // check externalDns
-                    if (dataCenterSpec.getExternalDns() != null && dataCenterSpec.getExternalDns().getEnabled()) {
-                        if (Strings.isNullOrEmpty(dataCenterSpec.getExternalDns().getDomain()))
-                            throw new IllegalArgumentException("externalDns is enabled but no DNS domain is configured, please fix your elassandra CRD");
-                        if (dataCenterSpec.getExternalDns().getTtl() == null || dataCenterSpec.getExternalDns().getTtl() < 0)
-                            throw new IllegalArgumentException("externalDns is enabled but no DNS TTL is configured, please fix your elassandra CRD");
-                    }
+                    // check dc spec consistency
+                    checkDatacenterSpecConsistency(dataCenterSpec);
 
                     logger.debug("Accept datacenter={}", datacenter);
                     return new AdmissionReviewBuilder()
