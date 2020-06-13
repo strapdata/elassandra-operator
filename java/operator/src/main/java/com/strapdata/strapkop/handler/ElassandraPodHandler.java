@@ -4,8 +4,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.event.K8sWatchEvent;
-import com.strapdata.strapkop.k8s.Pod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
+import com.strapdata.strapkop.k8s.Pod;
 import com.strapdata.strapkop.model.ClusterKey;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
@@ -28,6 +28,7 @@ import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /**
@@ -65,12 +66,12 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
     @Inject
     MeterRegistry meterRegistry;
 
-    Long managed = 0L;
+    AtomicInteger managed;
     List<Tag> tags = ImmutableList.of(new ImmutableTag("type", "pod"));
 
     @PostConstruct
     public void initGauge() {
-        meterRegistry.gauge("k8s.managed",  tags, managed);
+        managed = meterRegistry.gauge("k8s.managed", tags, new AtomicInteger(0));
     }
 
     @Override
@@ -80,13 +81,13 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
             case INITIAL:
                 logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 meterRegistry.counter("k8s.event.init", tags).increment();
-                managed++;
+                managed.incrementAndGet();
                 break;
 
             case ADDED:
                 logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 meterRegistry.counter("k8s.event.added", tags).increment();
-                managed++;
+                managed.incrementAndGet();
                 break;
 
             case MODIFIED:
@@ -140,7 +141,7 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
                         Reconciliable.Kind.ELASSANDRA_POD, K8sWatchEvent.Type.DELETED,
                         freePodPvc(dc, new Pod(pod, CONTAINER_NAME)));
                 meterRegistry.counter("k8s.event.deleted", tags).increment();
-                managed--;
+                managed.decrementAndGet();
                 break;
 
             case ERROR:

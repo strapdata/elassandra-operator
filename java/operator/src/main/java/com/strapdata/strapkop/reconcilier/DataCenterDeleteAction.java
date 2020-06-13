@@ -2,9 +2,7 @@ package com.strapdata.strapkop.reconcilier;
 
 import com.google.gson.JsonSyntaxException;
 import com.strapdata.strapkop.backup.BackupScheduler;
-import com.strapdata.strapkop.cache.JMXConnectorCache;
-import com.strapdata.strapkop.cache.SidecarConnectionCache;
-import com.strapdata.strapkop.cache.StatefulsetCache;
+import com.strapdata.strapkop.cache.*;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.cql.CqlSessionSupplier;
@@ -33,6 +31,8 @@ public class DataCenterDeleteAction {
     private final K8sResourceUtils k8sResourceUtils;
     private final CoreV1Api coreV1Api;
     private final DataCenter dataCenter;
+    private final DataCenterCache dataCenterCache;
+    private final DataCenterStatusCache dataCenterStatusCache;
     private final SidecarConnectionCache sidecarConnectionCache;
     private final JMXConnectorCache jmxConnectorCache;
     private final StatefulsetCache statefulsetCache;
@@ -45,6 +45,8 @@ public class DataCenterDeleteAction {
     public DataCenterDeleteAction(K8sResourceUtils k8sResourceUtils,
                                   CoreV1Api coreV1Api,
                                   AppsV1Api appsV1Api,
+                                  final DataCenterCache dataCenterCache,
+                                  final DataCenterStatusCache dataCenterStatusCache,
                                   final SidecarConnectionCache sidecarConnectionCache,
                                   final JMXConnectorCache jmxConnectorCache,
                                   final StatefulsetCache statefulsetCache,
@@ -56,6 +58,8 @@ public class DataCenterDeleteAction {
         this.k8sResourceUtils = k8sResourceUtils;
         this.coreV1Api = coreV1Api;
         this.dataCenter = dataCenter;
+        this.dataCenterCache = dataCenterCache;
+        this.dataCenterStatusCache = dataCenterStatusCache;
         this.sidecarConnectionCache = sidecarConnectionCache;
         this.statefulsetCache = statefulsetCache;
         this.jmxConnectorCache = jmxConnectorCache;
@@ -75,18 +79,21 @@ public class DataCenterDeleteAction {
 
                 // cleanup local caches
                 Key key = new Key(dataCenter.getMetadata().getName(), dataCenter.getMetadata().getNamespace());
+                dataCenterCache.remove(key);
+                dataCenterStatusCache.remove(key);
+                statefulsetCache.remove(key);
+
                 sidecarConnectionCache.purgeDataCenter(dataCenter);
                 jmxConnectorCache.remove(key);
-                for(int i = 0; i < dataCenter.getStatus().getZones().size(); i++) {
-                    statefulsetCache.remove(new Key(dataCenter.getMetadata().getName() + "-" + i, dataCenter.getMetadata().getNamespace()));
-                }
+
+                cqlRoleManager.remove(dataCenter);
+                cqlKeyspaceManager.remove(dataCenter);
 
                 final String labelSelector = OperatorLabels.toSelector(OperatorLabels.datacenter(dataCenter));
-
                 // delete StatefulSets
                 k8sResourceUtils.listNamespacedStatefulSets(dataCenter.getMetadata().getNamespace(), null, labelSelector).forEach(statefulSet -> {
                     try {
-                        k8sResourceUtils.deleteStatefulSet(statefulSet).subscribe();
+                        k8sResourceUtils.deleteStatefulSet(statefulSet).blockingGet();
                         logger.debug("Deleted StatefulSet namespace={} name={}", dataCenter.getMetadata().getNamespace(), statefulSet.getMetadata().getName());
                     } catch (final JsonSyntaxException e) {
                         logger.debug("Caught JSON exception while deleting StatefulSet. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
@@ -123,7 +130,7 @@ public class DataCenterDeleteAction {
                 // delete Services
                 k8sResourceUtils.deleteService(dataCenter.getMetadata().getNamespace(), null, labelSelector)
                         .onErrorComplete()
-                        .subscribe();
+                        .blockingGet();
 
                 // delete persistent volume claims
                 switch (dataCenter.getSpec().getDecommissionPolicy()) {
@@ -134,7 +141,7 @@ public class DataCenterDeleteAction {
                     case DELETE_PVC:
                         k8sResourceUtils.listNamespacedPodsPersitentVolumeClaims(dataCenter.getMetadata().getNamespace(), null, labelSelector).forEach(volumeClaim -> {
                             try {
-                                k8sResourceUtils.deletePersistentVolumeClaim(volumeClaim).subscribe();
+                                k8sResourceUtils.deletePersistentVolumeClaim(volumeClaim).blockingGet();
                                 logger.debug("PVC={} deleted", volumeClaim.getMetadata().getName());
                             } catch (final JsonSyntaxException e) {
                                 logger.debug("Caught JSON exception while deleting PVC. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
@@ -146,11 +153,7 @@ public class DataCenterDeleteAction {
                 }
 
                 // asynchrounous delete tasks
-                k8sResourceUtils.deleteTasks(dataCenter.getMetadata().getNamespace(), null).subscribe();
-
-                cqlRoleManager.remove(dataCenter);
-                cqlKeyspaceManager.remove(dataCenter);
-
+                k8sResourceUtils.deleteTasks(dataCenter.getMetadata().getNamespace(), null).blockingGet();
                 logger.info("Deleted DataCenter namespace={} name={}", dataCenter.getMetadata().getNamespace(), dataCenter.getMetadata().getName());
             }
         });

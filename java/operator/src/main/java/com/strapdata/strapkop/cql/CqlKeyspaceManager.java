@@ -103,13 +103,15 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                     logger.trace("manager={}", get(dataCenter));
                     if (get(dataCenter) != null) {
                         for (CqlKeyspace ks : get(dataCenter).values()) {
-                            if (!dataCenter.getStatus().getKeyspaceManagerStatus().getKeyspaces().contains(ks.name) && ks.createIfNotExists) {
-                                try {
-                                    needDcStatusUpdate = true;
-                                    todoList.add(ks.createIfNotExistsKeyspace(dataCenter, sessionSupplier).ignoreElement());
-                                    dataCenter.getStatus().getKeyspaceManagerStatus().getKeyspaces().add(ks.name);
-                                } catch (Exception e) {
-                                    logger.warn("datacenter=" + dataCenter.id() + " Failed to create keyspace=" + ks.name, e);
+                            if (!dataCenterUpdateAction.dataCenterStatus.getKeyspaceManagerStatus().getKeyspaces().contains(ks.name)) {
+                                dataCenterUpdateAction.dataCenterStatus.getKeyspaceManagerStatus().getKeyspaces().add(ks.name);
+                                needDcStatusUpdate = true;
+                                if (ks.createIfNotExists) {
+                                    try {
+                                        todoList.add(ks.createIfNotExistsKeyspace(dataCenter, sessionSupplier).ignoreElement());
+                                    } catch (Exception e) {
+                                        logger.warn("datacenter=" + dataCenter.id() + " Failed to create keyspace=" + ks.name, e);
+                                    }
                                 }
                             }
                         }
@@ -119,21 +121,23 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                 .flatMap(needDcStatusUpdate -> {
                     // reconcile keyspace according to the current DC size
                     // if the last observed replicas and current replicas differ, update keyspaces
-                    if (!Optional.ofNullable(dataCenter.getStatus().getKeyspaceManagerStatus().getReplicas()).orElse(0).equals(dataCenter.getSpec().getReplicas())) {
+                    if (!Optional.ofNullable(dataCenterUpdateAction.dataCenterStatus.getKeyspaceManagerStatus().getReplicas()).orElse(0).equals(dataCenter.getSpec().getReplicas())) {
                         List<CompletableSource> todoList = new ArrayList<>();
                         logger.debug("manager={}", get(dataCenter));
                         for (CqlKeyspace keyspace : get(dataCenter).values()) {
                             try {
                                 if (!keyspace.reconcilied() || keyspace.reconcileWithDcSize < keyspace.rf || dataCenter.getSpec().getReplicas() < keyspace.rf)
-                                    todoList.add(updateKeyspaceReplicationMap(dataCenter, keyspace.name, effectiveRF(dataCenter, keyspace.rf), sessionSupplier));
-                                dataCenterUpdateAction.operation.getActions().add("update keyspace RF for ["+keyspace.getName()+"]");
+                                    todoList.add(updateKeyspaceReplicationMap(dataCenter, keyspace.name, effectiveRF(dataCenter, keyspace.rf), sessionSupplier)
+                                            .andThen(Completable.fromAction(() -> dataCenterUpdateAction.operation.getActions().add("update keyspace RF for ["+keyspace.getName()+"]")))
+                                    );
                             } catch (Exception e) {
                                 logger.warn("datacenter=" + dataCenter.id() + " Failed to adjust RF for keyspace=" + keyspace, e);
                             }
                         }
                         // we set the current replicas in observed replicas to know if we need to update rf map
-                        dataCenter.getStatus().getKeyspaceManagerStatus().setReplicas(dataCenter.getSpec().getReplicas());
-                        return Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()])).toSingleDefault(true);
+                        return Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()]))
+                                .andThen(Completable.fromAction(() -> dataCenterUpdateAction.dataCenterStatus.getKeyspaceManagerStatus().setReplicas(dataCenter.getSpec().getReplicas())))
+                                .toSingleDefault(true);
                     } else {
                         return Single.just(needDcStatusUpdate);
                     }
@@ -154,7 +158,8 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
 
     public void removeDatacenter(final DataCenter dataCenter, CqlSessionSupplier sessionSupplier) throws Exception {
         // abort if dc is not running normally or not connected
-        if (dataCenter.getStatus().getPhase().equals(DataCenterPhase.RUNNING) && dataCenter.getStatus().getCqlStatus().equals(CqlStatus.ESTABLISHED)) {
+        if (dataCenter.getStatus().getPhase().equals(DataCenterPhase.RUNNING) &&
+                dataCenter.getStatus().getCqlStatus().equals(CqlStatus.ESTABLISHED)) {
             try {
                 // adjust RF for system keyspaces
                 for (CqlKeyspace keyspace : SYSTEM_KEYSPACES) {
