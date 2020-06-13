@@ -23,6 +23,7 @@ import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Notify datacenter controller when a deployment is ready (for plugins)
@@ -44,12 +45,12 @@ public class DeploymentHandler extends TerminalHandler<K8sWatchEvent<V1Deploymen
     @Inject
     MeterRegistry meterRegistry;
 
-    Long managed = 0L;
+    AtomicInteger managed;
     List<Tag> tags = ImmutableList.of(new ImmutableTag("type", "deployment"));
 
     @PostConstruct
     public void initGauge() {
-        meterRegistry.gauge("k8s.managed",  tags, managed);
+        managed = meterRegistry.gauge("k8s.managed", tags, new AtomicInteger(0));
     }
 
     @Override
@@ -62,13 +63,13 @@ public class DeploymentHandler extends TerminalHandler<K8sWatchEvent<V1Deploymen
         switch(event.getType()) {
             case INITIAL:
                 meterRegistry.counter("k8s.event.init", tags).increment();
-                managed++;
+                managed.incrementAndGet();
                 reconcileDeploymentIfAvailable(event.getResource());
                 break;
 
             case ADDED:
                 meterRegistry.counter("k8s.event.added", tags).increment();
-                managed++;
+                managed.incrementAndGet();
                 break;
 
             case MODIFIED:
@@ -78,7 +79,7 @@ public class DeploymentHandler extends TerminalHandler<K8sWatchEvent<V1Deploymen
 
             case DELETED:
                 meterRegistry.counter("k8s.event.deleted", tags).increment();
-                managed--;
+                managed.decrementAndGet();
                 break;
 
             case ERROR:

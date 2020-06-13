@@ -26,6 +26,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.strapdata.strapkop.event.K8sWatchEvent.Type.*;
 
@@ -43,14 +44,14 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
     private final TaskResolver taskReconcilierResolver;
     private final MeterRegistry meterRegistry;
 
-    Long managed = 0L;
+    AtomicInteger managed;
     List<Tag> tags = ImmutableList.of(new ImmutableTag("type", "task"));
 
     ConcurrentMap<Tuple2<Key, String>, Disposable> notTerminatedTasks = new ConcurrentHashMap<>();
 
     @PostConstruct
     public void initGauge() {
-        meterRegistry.gauge("k8s.managed",  tags, managed);
+        managed = meterRegistry.gauge("k8s.managed", tags, new AtomicInteger(0));
     }
 
     public TaskHandler(WorkQueues workQueues,
@@ -73,14 +74,14 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
             case INITIAL:
                 logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 meterRegistry.counter("k8s.event.init", tags).increment();
-                managed++;
+                managed.incrementAndGet();
                 reconcileTask(event.getResource(), event.getType());
                 break;
 
             case ADDED:
                 logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 meterRegistry.counter("k8s.event.added", tags).increment();
-                managed++;
+                managed.incrementAndGet();
                 reconcileTask(event.getResource(), event.getType());
                 break;
 
@@ -107,7 +108,7 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
                         disposable.dispose();
                     }
                     meterRegistry.counter("k8s.event.deleted", tags).increment();
-                    managed--;
+                    managed.decrementAndGet();
                 }
                 break;
 

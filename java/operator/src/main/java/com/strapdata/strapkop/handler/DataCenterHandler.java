@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Handler
 public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>> {
@@ -31,7 +32,7 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
     private final DataCenterCache dataCenterCache;
     private final DataCenterStatusCache dataCenterStatusCache;
 
-    Long managed = 0L;
+    final AtomicInteger managed;
     List<Tag> tags = ImmutableList.of(new ImmutableTag("type", "datacenter"));
 
     public DataCenterHandler(final WorkQueues workQueue,
@@ -44,7 +45,7 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
         this.dataCenterCache = dataCenterCache;
         this.dataCenterStatusCache = dataCenterStatusCache;
         this.meterRegistry = meterRegistry;
-        meterRegistry.gauge("k8s.managed", tags, managed);
+        this.managed = meterRegistry.gauge("k8s.managed", tags, new AtomicInteger(0));
     }
 
     DataCenterStatus updateCaches(DataCenter dataCenter) {
@@ -76,9 +77,7 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
                         dataCenterController.initDatacenter(dataCenter, new Operation()
                                 .withSubmitDate(new Date())
                                 .withTriggeredBy("Datacenter init"))
-                                .doOnComplete(() -> {
-                                    managed++;
-                                })
+                                .doOnComplete(() -> managed.incrementAndGet())
                                 .doFinally(() -> meterRegistry.counter("k8s.event.init", tags).increment()));
                 break;
 
@@ -92,7 +91,7 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
                         dataCenterController.initDatacenter(dataCenter, new Operation()
                                 .withSubmitDate(new Date())
                                 .withTriggeredBy("Datacenter added"))
-                                .doOnComplete(() -> { managed++; })
+                                .doOnComplete(() -> managed.incrementAndGet())
                                 .doFinally(() -> meterRegistry.counter("k8s.event.added", tags).increment())
                 );
             }
@@ -126,10 +125,8 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
                         Reconciliable.Kind.DATACENTER, event.getType(),
                         dataCenterController.deleteDatacenter(dataCenter)
                                 .doOnComplete(() -> {
-                                    managed--;
+                                    managed.decrementAndGet();
                                     final Key key = new Key(event.getResource().getMetadata());
-                                    dataCenterCache.remove(key);
-                                    dataCenterStatusCache.remove(key);
                                     workQueues.dispose(new ClusterKey(event.getResource()));
                                 })
                                 .doFinally(() -> meterRegistry.counter("k8s.event.deleted", tags).increment())

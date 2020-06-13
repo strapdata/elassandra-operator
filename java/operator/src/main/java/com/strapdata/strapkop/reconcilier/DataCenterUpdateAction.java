@@ -300,10 +300,11 @@ public class DataCenterUpdateAction {
                             // updateRack also call prepareDataCenterSnapshot
                             .andThen(builder.buildStatefulSetRack(rackStatus, configMapVolumeMounts)
                                     .flatMap(s -> {
-                                        endOperation();
+                                        endOperation("Datacenter resources deployed");
                                         return k8sResourceUtils.updateDataCenterStatus(dataCenter, dataCenterStatus);
                                     }));
-                }).ignoreElement();
+                })
+                .ignoreElement();
     }
 
 
@@ -2305,7 +2306,6 @@ public class DataCenterUpdateAction {
         TreeMap<String, Zone> zoneMap = new TreeMap<>();    // sort racks
 
         public Zones(DataCenterStatus dataCenterStatus, Collection<V1Node> nodes, TreeMap<String, V1StatefulSet> existingStatefulSetsByZone) {
-
             for (V1Node node : nodes) {
                 String zoneName = node.getMetadata().getLabels().get(OperatorLabels.ZONE);
                 if (zoneName == null) {

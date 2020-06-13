@@ -29,6 +29,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Trigger a DC reconciliation when STS event occurs
@@ -56,12 +57,12 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
     @Inject
     MeterRegistry meterRegistry;
 
-    Long managed = 0L;
+    AtomicInteger managed;
     List<Tag> tags = ImmutableList.of(new ImmutableTag("type", "statefulset"));
 
     @PostConstruct
     public void initGauge() {
-        meterRegistry.gauge("k8s.managed",  tags, managed);
+        managed = meterRegistry.gauge("k8s.managed", tags, new AtomicInteger(0));
     }
 
     public void updateCache(V1StatefulSet sts) {
@@ -95,7 +96,7 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
             case INITIAL: {
                 updateCache(event.getResource());
                 meterRegistry.counter("k8s.event.init", tags).increment();
-                managed++;
+                managed.incrementAndGet();
                 reconcile(event.getResource());
             }
             break;
@@ -103,7 +104,7 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
             case ADDED: {
                 updateCache(event.getResource());
                 meterRegistry.counter("k8s.event.added", tags).increment();
-                managed++;
+                managed.incrementAndGet();
                 reconcile(event.getResource());
             }
             break;
@@ -119,7 +120,7 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
                 Key key = new Key(event.getResource().getMetadata().getName(), event.getResource().getMetadata().getNamespace());
                 statefulsetCache.remove(key);
                 meterRegistry.counter("k8s.event.deleted", tags).increment();
-                managed--;
+                managed.decrementAndGet();
             }
             break;
 
@@ -136,32 +137,31 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
         final Key key = new Key(parent, namespace);
 
         DataCenter dataCenter = dataCenterCache.get(key);
-        DataCenterStatus dataCenterStatus = dataCenterStatusCache.getOrDefault(key, dataCenter.getStatus());
         if (dataCenter != null) {
+            DataCenterStatus dataCenterStatus = dataCenterStatusCache.getOrDefault(key, dataCenter.getStatus());
             RackStatus rackStatus = dataCenterStatus.getRackStatuses().get(Integer.parseInt(sts.getMetadata().getLabels().get(OperatorLabels.RACKINDEX)));
-            if (rackStatus == null
-                    || ObjectUtils.defaultIfNull(rackStatus.getReadyReplicas(), 0) != ObjectUtils.defaultIfNull(sts.getStatus().getReadyReplicas(), 0)
-                    || ObjectUtils.defaultIfNull(rackStatus.getDesiredReplicas(), 0) != ObjectUtils.defaultIfNull(sts.getStatus().getReplicas(), 0))
-            logger.info("datacenter={}/{} sts={} replicas={}/{}, triggering a dc statefulSetStatusUpdate",
-                    parent, namespace,
-                    sts.getMetadata().getName(),
-                    sts.getStatus().getReadyReplicas(), sts.getStatus().getReplicas());
-            Operation op = new Operation()
-                    .withSubmitDate(new Date())
-                    .withTriggeredBy("status update statefulset=" + sts.getMetadata().getName() + " replicas=" +
-                            sts.getStatus().getReadyReplicas() + "/" + sts.getStatus().getReplicas());
-            workQueues.submit(
-                    new ClusterKey(clusterName, namespace),
-                    sts.getMetadata().getResourceVersion(),
-                    Reconciliable.Kind.STATEFULSET, K8sWatchEvent.Type.MODIFIED,
-                    dataCenterController.statefulsetStatusUpdate(dataCenter, op, sts)
-                            .onErrorComplete(t -> {
-                                if (t instanceof NoSuchElementException) {
-                                    return true;
-                                }
-                                logger.warn("datacenter={}/{} statefulSetUpdate failed: {}", parent, namespace, t.toString());
-                                return false;
-                            }));
+            if (rackStatus == null || ObjectUtils.defaultIfNull(rackStatus.getReadyReplicas(), 0) != ObjectUtils.defaultIfNull(sts.getStatus().getReadyReplicas(), 0)) {
+                logger.info("datacenter={}/{} sts={} replicas={}/{}, triggering a dc statefulSetStatusUpdate",
+                        parent, namespace,
+                        sts.getMetadata().getName(),
+                        sts.getStatus().getReadyReplicas(), sts.getStatus().getReplicas());
+                Operation op = new Operation()
+                        .withSubmitDate(new Date())
+                        .withTriggeredBy("status update statefulset=" + sts.getMetadata().getName() + " replicas=" +
+                                sts.getStatus().getReadyReplicas() + "/" + sts.getStatus().getReplicas());
+                workQueues.submit(
+                        new ClusterKey(clusterName, namespace),
+                        sts.getMetadata().getResourceVersion(),
+                        Reconciliable.Kind.STATEFULSET, K8sWatchEvent.Type.MODIFIED,
+                        dataCenterController.statefulsetStatusUpdate(dataCenter, op, sts)
+                                .onErrorComplete(t -> {
+                                    if (t instanceof NoSuchElementException) {
+                                        return true;
+                                    }
+                                    logger.warn("datacenter={}/{} statefulSetUpdate failed: {}", parent, namespace, t.toString());
+                                    return false;
+                                }));
+            }
         }
     }
 }
