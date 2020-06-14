@@ -4,7 +4,6 @@ import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.event.K8sWatchEventSource;
 import com.strapdata.strapkop.model.Key;
-import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenterList;
@@ -58,7 +57,7 @@ public class DataCenterPipeline extends EventPipeline<K8sWatchEvent<DataCenter>>
             logger.trace("watch={} resourceVersion={}", watch, resourceVersion);
             return customObjectsApi.listNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, DataCenter.VERSION,
                     config.getWatchNamespace(), DataCenter.PLURAL, null, null, null,
-                    OperatorLabels.toSelector(OperatorLabels.MANAGED), null, resourceVersion, null, watch, null);
+                    null, null, resourceVersion, null, watch, null);
         }
 
         @Override

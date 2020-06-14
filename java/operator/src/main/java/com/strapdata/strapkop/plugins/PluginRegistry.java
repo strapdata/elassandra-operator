@@ -55,8 +55,9 @@ public class PluginRegistry {
             try {
                 pluginSingles.add(plugin.reconcile(dataCenterUpdateAction)
                         .onErrorResumeNext(t -> {
-                            logger.warn("datacenter={} plugin={} reconcile failed, error={}",
-                                    dataCenterUpdateAction.dataCenter.id(), plugin.getClass().getName(), t.toString());
+                            logger.warn("datacenter="+dataCenterUpdateAction.dataCenter.id()+
+                                            " plugin="+plugin.getClass().getName()+
+                                            " reconcile failed, error:", t);
                             return Single.just(false);
                         }));
             } catch (Exception e) {

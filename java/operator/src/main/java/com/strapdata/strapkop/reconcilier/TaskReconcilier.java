@@ -32,6 +32,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public abstract class TaskReconcilier extends Reconcilier<Task> {
@@ -106,7 +107,21 @@ public abstract class TaskReconcilier extends Reconcilier<Task> {
         return k8sResourceUtils.updateDataCenterStatus(dc, dataCenterStatus).ignoreElement();
     }
 
-    public Completable finalizeTaskStatus(final DataCenter dc, final DataCenterStatus dataCenterStatus, final Task task, TaskPhase taskPhase0, String taskTag) throws ApiException {
+    public Completable finalizeTaskStatus(final DataCenter dc,
+                                          final DataCenterStatus dataCenterStatus,
+                                          final Task task,
+                                          TaskPhase taskPhase0,
+                                          String taskTag) throws ApiException {
+        return finalizeTaskStatus(dc, dataCenterStatus, task, taskPhase0, taskTag, null);
+    }
+
+    public Completable finalizeTaskStatus(final DataCenter dc,
+                                          final DataCenterStatus dataCenterStatus,
+                                          final Task task,
+                                          TaskPhase taskPhase0,
+                                          String taskTag,
+                                          Consumer<DataCenterStatus> succeedHandler
+    ) throws ApiException {
         TaskStatus taskStatus = task.getStatus();
         TaskPhase taskPhase = taskPhase0;
         for (Map.Entry<String, TaskPhase> e : taskStatus.getPods().entrySet()) {
@@ -119,16 +134,18 @@ public abstract class TaskReconcilier extends Reconcilier<Task> {
         taskStatus.setPhase(taskPhaseFinal);
         logger.debug("task={} finalized phase={}", task.id(), taskPhaseFinal);
         updateMetrics(task, taskTag, taskPhaseFinal.isSucceed());
+
+        // update task duration
+        long startTime = task.getStatus().getStartDate().getTime();
+        long endTime = System.currentTimeMillis();
+        task.getStatus().setDurationInMs(endTime - startTime);
+
+        if (succeedHandler != null && taskPhaseFinal.isSucceed()) {
+            // update dc status if task succeed
+            succeedHandler.accept(dataCenterStatus);
+        }
         return k8sResourceUtils.updateTaskStatus(task)
                 .flatMapCompletable(p -> {
-                    if (task.getStatus() == null)
-                        task.setStatus(new TaskStatus().withStartDate(new Date()));
-                    if (task.getStatus().getStartDate() == null)
-                        task.getStatus().setStartDate(new Date());
-                    long startTime = task.getStatus().getStartDate().getTime();
-                    long endTime = System.currentTimeMillis();
-                    task.getStatus().setDurationInMs(endTime - startTime);
-
                     Operation operation = new Operation()
                             .withTriggeredBy("task " + task.getMetadata().getName())
                             .withSubmitDate(new Date());
