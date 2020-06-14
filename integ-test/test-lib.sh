@@ -31,6 +31,9 @@ finish() {
   if [ ! -z "$HELM_RELEASE" ]; then
      helm delete --purge $HELM_RELEASE
   fi
+  if [ ! -z "$HELM_RELEASE2" ]; then
+     helm delete --purge $HELM_RELEASE2
+  fi
   exit 1
 }
 

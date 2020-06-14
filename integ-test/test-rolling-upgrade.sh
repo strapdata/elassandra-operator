@@ -27,6 +27,7 @@ function upgrade() {
 }
 
 NS=${NS:-"ns6"}
+HELM_RELEASE="$NS-cl1-dc1"
 
 source integ-test/test-lib.sh
 setup_flavor
