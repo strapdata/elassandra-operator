@@ -26,6 +26,11 @@ test_end() {
 
 finish() {
   echo "ERROR occurs, test FAILED"
+  kubectl get all -n default
+  kubectl get all -n $NS
+  if [ ! -z "$HELM_RELEASE" ]; then
+     helm delete --purge $HELM_RELEASE
+  fi
   exit 1
 }
 
@@ -180,6 +185,22 @@ reaper_disable() {
     local dc=${3:-"dc1"}
     helm upgrade --reuse-values --set reaper.enabled="false" "$ns-$cl-$dc" $HELM_REPO/elassandra-datacenter
     echo "Datacenter $cl-$dc reaper disabled"
+}
+
+kibana_enable() {
+    local ns=${1:-"default"}
+    local cl=${2:-"cl1"}
+    local dc=${3:-"dc1"}
+    helm upgrade --reuse-values --set kibana.enabled="true" "$ns-$cl-$dc" $HELM_REPO/elassandra-datacenter
+    echo "Datacenter $cl-$dc kibana enabled"
+}
+
+kibana_disable() {
+    local ns=${1:-"default"}
+    local cl=${2:-"cl1"}
+    local dc=${3:-"dc1"}
+    helm upgrade --reuse-values --set kibana.enabled="false" "$ns-$cl-$dc" $HELM_REPO/elassandra-datacenter
+    echo "Datacenter $cl-$dc kibana disabled"
 }
 
 downgrade_elassandra_datacenter() {

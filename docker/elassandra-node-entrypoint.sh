@@ -101,14 +101,6 @@ if [ "x${STOP_AFTER_COMMILOG_REPLAY}" != "x" ]; then
   export JVM_OPTS="$JVM_OPTS -Dcassandra.stop_after_commitlog_replayed=${STOP_AFTER_COMMILOG_REPLAY} "
 fi
 
-# set the cassandra host_id
-if [ "x${CASSANDRA_DATACENTER_UUID}" != "x" ]; then
-  POD_INDEX=$(echo $POD_NAME | awk -F"-" '{print $NF}')
-  POD_RACK=$(echo $POD_NAME | awk -F"-" '{print $(NF-1)}')
-  HOST_ID=$(printf "%s-%04d-%08d" ${CASSANDRA_DATACENTER_UUID:0:18} ${POD_RACK} ${POD_INDEX})
-  export JVM_OPTS="$JVM_OPTS -Dcassandra.host_id=$HOST_ID"
-fi
-
 export JVM_OPTS="$JVM_OPTS $ES_USE_INTERNAL_ADDRESS"
 
 # Generate /etc/cassandra/jmxremote.password

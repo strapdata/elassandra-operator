@@ -28,6 +28,7 @@ import javax.inject.Named;
 import javax.inject.Singleton;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 /**
  * Sequentially cleanup nodes of a datacenter, waiting 10 secondes between node cleanup.
@@ -80,7 +81,20 @@ public final class CleanupTaskReconcilier extends TaskReconcilier {
                         })
                         .toSingleDefault(pod))
                 .toList()
-                .flatMapCompletable(list -> finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.SUCCEED, "cleanup"));
+                .flatMapCompletable(list -> finalizeTaskStatus(dc, dataCenterStatus,
+                        task, TaskPhase.SUCCEED, "cleanup",
+                        new Consumer<DataCenterStatus>() {
+                            @Override
+                            public void accept(DataCenterStatus dataCenterStatus) {
+                                if (cleanupTaskSpec.getKeyspace() == null) {
+                                    dataCenterStatus.setNeedCleanup(false);
+                                    dataCenterStatus.getNeedCleanupKeyspaces().clear();
+                                } else {
+                                    dataCenterStatus.getNeedCleanupKeyspaces().remove(cleanupTaskSpec.getKeyspace());
+                                }
+                            }
+                        }
+                ));
     }
 
     @Override

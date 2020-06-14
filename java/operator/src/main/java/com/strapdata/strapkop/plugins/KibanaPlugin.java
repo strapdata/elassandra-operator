@@ -31,7 +31,6 @@ import io.micronaut.context.ApplicationContext;
 import io.reactivex.Completable;
 import io.reactivex.CompletableSource;
 import io.reactivex.Single;
-import org.apache.commons.lang3.ObjectUtils;
 
 import javax.inject.Singleton;
 import java.util.*;
@@ -270,7 +269,9 @@ public class KibanaPlugin extends AbstractPlugin {
 
         final Map<String, String> labels = kibanaSpaceLabels(dataCenter, kibanaSpace.getName());
 
-        final V1ObjectMeta meta = ObjectUtils.defaultIfNull(kibanaSpace.getPodTemplate().getMetadata(), new V1ObjectMeta())
+        final V1ObjectMeta meta = (kibanaSpace.getPodTemplate() != null && kibanaSpace.getPodTemplate().getMetadata() != null
+                ? kibanaSpace.getPodTemplate().getMetadata()
+                : new V1ObjectMeta())
                 .name(kibanaNameDc(dataCenter, kibanaSpace))
                 .namespace(dataCenterMetadata.getNamespace());
         for(Map.Entry<String, String> entry : labels.entrySet())
@@ -278,9 +279,13 @@ public class KibanaPlugin extends AbstractPlugin {
         meta.putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, dataCenter.getMetadata().getGeneration().toString());
 
         final V1Container container = new V1Container();
-        final V1PodSpec kibanaSpacePodSpec = ObjectUtils.defaultIfNull(kibanaSpace.getPodTemplate().getSpec(), new V1PodSpec())
+        final V1PodSpec kibanaSpacePodSpec = (kibanaSpace.getPodTemplate() != null && kibanaSpace.getPodTemplate().getSpec() != null
+                ? kibanaSpace.getPodTemplate().getSpec()
+                : new V1PodSpec())
                 .addContainersItem(container);
-        final V1PodSpec elassandraPodSpec = ObjectUtils.defaultIfNull(dataCenterSpec.getPodTemplate().getSpec(), new V1PodSpec());
+        final V1PodSpec elassandraPodSpec = (dataCenterSpec.getPodTemplate() != null && dataCenterSpec.getPodTemplate().getSpec() != null
+                ? dataCenterSpec.getPodTemplate().getSpec()
+                : new V1PodSpec());
 
         // use podTemplate resources if available for the "kibana" container
         Map<String, V1Container> containerTemplates = kibanaSpacePodSpec.getContainers().stream().collect(Collectors.toMap(V1Container::getName, Function.identity()));

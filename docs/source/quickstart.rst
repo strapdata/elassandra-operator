@@ -191,17 +191,30 @@ Check the Elassandra DataCenter status:
       - a
       - b
 
+CQL connection to an Elassandra node (using the admin role):
+
+.. code::
+
+    kb exec -it -n ns1 elassandra-cl1-dc1-0-0 -- cqlsh
+    Connected to cl1 at 127.0.0.1:39042.
+    [cqlsh 5.0.1 | Cassandra 3.11.6.1 | CQL spec 3.4.4 | Native protocol v4]
+    Use HELP for help.
+    admin@cqlsh>
+
 List Elassandra datacenter secrets:
 
 .. code::
 
-    kubectl get secret -n ns1
-
-Connect to a Cassandra node:
-
-.. code::
-
-    kubecrtl exec -it elassandra-cl1-dc1-0-0 -- bash -l
+    kb get secret -n ns1
+    NAME                             TYPE                                  DATA   AGE
+    default-token-5tb48              kubernetes.io/service-account-token   3      30h
+    elassandra-cl1                   Opaque                                6      11m
+    elassandra-cl1-ca-key            Opaque                                1      30h
+    elassandra-cl1-ca-pub            Opaque                                2      30h
+    elassandra-cl1-dc1-keystore      Opaque                                2      11m
+    elassandra-cl1-rc                Opaque                                3      11m
+    elassandra-operator-truststore   Opaque                                3      30h
+    ns1-cl1-dc1-token-bls59          kubernetes.io/service-account-token   3      11m
 
 Connect to Kibana using port-forwarding:
 

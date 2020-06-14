@@ -4,7 +4,6 @@ import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.event.K8sWatchEventSource;
 import com.strapdata.strapkop.model.Key;
-import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskList;
@@ -57,7 +56,7 @@ public class TaskPipeline extends EventPipeline<K8sWatchEvent<Task>> {
         public Call createListApiCall(Boolean watch, String resourceVersion) throws ApiException {
             return customObjectsApi.listNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, Task.VERSION,
                     config.getWatchNamespace(), Task.PLURAL, null, null, null,
-                    OperatorLabels.toSelector(OperatorLabels.MANAGED), null, resourceVersion, null, watch, null);
+                    null, null, resourceVersion, null, watch, null);
         }
 
         @Override

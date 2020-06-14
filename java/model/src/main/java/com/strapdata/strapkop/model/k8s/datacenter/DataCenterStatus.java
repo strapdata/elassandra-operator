@@ -1,6 +1,5 @@
 package com.strapdata.strapkop.model.k8s.datacenter;
 
-import com.datastax.driver.core.utils.UUIDs;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.JsonAdapter;
@@ -24,11 +23,6 @@ public class DataCenterStatus {
     @SerializedName("observedGeneration")
     @Expose
     Long observedGeneration;
-
-    @JsonPropertyDescription("Datacenter uuid")
-    @SerializedName("uuid")
-    @Expose
-    String uuid = UUIDs.random().toString();
 
     /**
      * Last X operations starting from the last finished one.

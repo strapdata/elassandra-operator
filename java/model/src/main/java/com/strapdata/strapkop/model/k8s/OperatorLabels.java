@@ -31,6 +31,8 @@ public final class OperatorLabels {
     public static final String RACK = labelPrefix + "rack";
     public static final String RACKINDEX = labelPrefix + "rackindex";
 
+    public static final String JVM_OPTIONS = labelPrefix + "jvm.options";
+
     public static final String CREDENTIAL = labelPrefix + "credential";
     public static final String KEYSTORE = labelPrefix + "keystore";
 

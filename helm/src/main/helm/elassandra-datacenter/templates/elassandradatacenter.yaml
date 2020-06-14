@@ -93,12 +93,12 @@ spec:
 {{- end }}
 {{- if .Values.kibana }}
   kibana:
-    enabled: {{ .Values.elasticsearch.kibana.enabled | quote }}
-    {{- if .Values.elasticsearch.kibana.image }}
-    {{- if .Values.elasticsearch.kibana.tag }}
-    image:  "{{ .Values.elasticsearch.kibana.image }}:{{ .Values.elasticsearch.kibana.tag }}"
+    enabled: {{ .Values.kibana.enabled | quote }}
+    {{- if .Values.kibana.image }}
+    {{- if .Values.kibana.tag }}
+    image:  "{{ .Values.kibana.image }}:{{ .Values.kibana.tag }}"
     {{- else }}
-    image:  "{{ .Values.elasticsearch.kibana.image }}:{{ template "kibana.version" . }}"
+    image:  "{{ .Values.kibana.image }}:{{ template "kibana.version" . }}"
     {{- end }}
     {{- end }}
     {{- if .Values.kibana.spaces }}

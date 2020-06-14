@@ -27,7 +27,6 @@ import io.micronaut.scheduling.executor.ExecutorFactory;
 import io.micronaut.scheduling.executor.UserExecutorConfiguration;
 import io.reactivex.*;
 import io.reactivex.schedulers.Schedulers;
-import org.apache.commons.lang3.ObjectUtils;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -219,7 +218,9 @@ public class ReaperPlugin extends AbstractPlugin {
         final Map<String, String> labels = reaperLabels(dataCenter);
 
         String datacenterGeneration = dataCenter.getMetadata().getGeneration().toString();
-        final V1ObjectMeta meta = ObjectUtils.defaultIfNull(dataCenterSpec.getReaper().getPodTemplate().getMetadata(), new V1ObjectMeta())
+        final V1ObjectMeta meta = (dataCenterSpec.getReaper().getPodTemplate() != null && dataCenterSpec.getReaper().getPodTemplate().getMetadata() != null
+                ? dataCenterSpec.getReaper().getPodTemplate().getMetadata()
+                : new V1ObjectMeta())
                 .name(reaperName(dataCenter))
                 .namespace(dataCenterMetadata.getNamespace());
         for(Map.Entry<String, String> entry : labels.entrySet())
@@ -275,7 +276,9 @@ public class ReaperPlugin extends AbstractPlugin {
             }
         }
 
-        final V1PodSpec reaperPodSpec = ObjectUtils.defaultIfNull(dataCenterSpec.getReaper().getPodTemplate().getSpec(), new V1PodSpec())
+        final V1PodSpec reaperPodSpec = (dataCenterSpec.getReaper().getPodTemplate() != null && dataCenterSpec.getReaper().getPodTemplate().getSpec() != null
+                ? dataCenterSpec.getReaper().getPodTemplate().getSpec()
+                : new V1PodSpec())
                 .addContainersItem(container);
 
         if (dataCenterSpec.getImagePullSecrets() != null) {
@@ -285,7 +288,9 @@ public class ReaperPlugin extends AbstractPlugin {
             }
         }
 
-        final V1PodSpec elassandraPodSpec = ObjectUtils.defaultIfNull(dataCenterSpec.getPodTemplate().getSpec(), new V1PodSpec());
+        final V1PodSpec elassandraPodSpec = (dataCenterSpec.getPodTemplate() != null && dataCenterSpec.getPodTemplate().getSpec() != null
+                ? dataCenterSpec.getPodTemplate().getSpec()
+                : new V1PodSpec());
         // inherit service account
         if (reaperPodSpec.getServiceAccountName() == null) {
             reaperPodSpec.setServiceAccountName(dataCenterSpec.getServiceAccount());

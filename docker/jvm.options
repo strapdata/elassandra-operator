@@ -103,6 +103,7 @@
 
 # Enable heap-dump if there's an OOM
 -XX:+HeapDumpOnOutOfMemoryError
+-XX:+CrashOnOutOfMemoryError
 
 # Per-thread stack size (Elasticsearch set stack size to 1m)
 # -Xss256k
