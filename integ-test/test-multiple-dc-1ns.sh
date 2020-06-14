@@ -5,6 +5,7 @@ setup_flavor
 
 N=100
 NS="ns2"
+HELM_RELEASE="$NS-cl1-dc1"
 
 test_start
 install_elassandra_datacenter $NS cl1 dc1 1
