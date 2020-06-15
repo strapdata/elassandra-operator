@@ -459,12 +459,15 @@ public class DataCenterUpdateAction {
                     }
 
                     // check if need to scale up or down
-                    if (zones.totalReplicas() < dataCenter.getSpec().getReplicas())
+                    int totalReplicas = dataCenterStatus.getRackStatuses().values().stream()
+                            .map(r -> r.getDesiredReplicas())
+                            .reduce(0, (a, b) -> a + b);
+                    if (totalReplicas < dataCenter.getSpec().getReplicas())
                         return scaleUpDatacenter(configMapVolumeMounts);
 
                     // check if need to scale down (require a CQL connection to reduce some RF)
                     final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
-                    if (zones.totalReplicas() > dataCenter.getSpec().getReplicas())
+                    if (totalReplicas > dataCenter.getSpec().getReplicas())
                         return scaleDownDatacenter(configMapVolumeMounts, cqlSessionHandler)
                                 .doFinally(() -> cqlSessionHandler.close());
 
@@ -2199,7 +2202,7 @@ public class DataCenterUpdateAction {
     }
 
     /**
-     * This class holds information about a kubernetes zone (which is an elassandra rack)
+     * This class holds information about a kubernetes zone (all k8s nodes in a zone and deployed sts)
      */
     @Data
     public static class Zone {

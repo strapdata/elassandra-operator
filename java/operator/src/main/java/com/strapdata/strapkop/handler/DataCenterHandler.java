@@ -59,7 +59,7 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
 
     @Override
     public void accept(K8sWatchEvent<DataCenter> event) throws Exception {
-        logger.debug("event type={} name={} generation={} resourceVersion",
+        logger.debug("event type={} name={} generation={} resourceVersion={}",
                 event.getType(), event.getResource().getMetadata().getName(),
                 event.getResource().getMetadata().getGeneration(),
                 event.getResource().getMetadata().getResourceVersion());
