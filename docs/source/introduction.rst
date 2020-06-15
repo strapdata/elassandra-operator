@@ -49,11 +49,15 @@ Multi-datacenter cluster
 ------------------------
 
 The Elassandra operator can manage multiple Elassandra datacenters (or a Cassandra datacenter if Elasticsearch is disabled) in
-one or multiple Kubernetes clusters. You can join datacenters having the same clusterName in the following configuration:
+one or multiple Kubernetes clusters. To achieve this, the Elassandra operator expose an HTTP endpoint **/seeds/{namespace}/{clusterName}/{dcName}**
+returning the IP addresses of Elassandra seed pods (one seed per rack, the pod with ordinal index 0 in each statefulset), or their DNS names
+when the HTTP request includes the parameter ``externalDNS=true``.
 
-* When running in the same Kubernetes cluster, same namespace, the elassandra operator automatically join the datacenters together.
-* When running in the same Kubernetes cluster, but in different namespaces, you need to specify a list of **cassandra.remoteSeeders** URLs
-  in your datacenter spec, where each entry an URL of the form of https://elassandra-operator.default.svc/seeds/{remoteNamespace}/{clusterName}/{remoteDatacenterName}
+Thus, you can join datacenters having the same clusterName in the following configuration:
+
+* When running in the same Kubernetes cluster, same namespace, the elassandra operator automatically join the datacenters together (the remoteSeeder is automatically set).
+* When running in the same Kubernetes cluster, but in different namespaces, you need to specify a list of ``cassandra.remoteSeeders`` URLs
+  in your datacenter spec, where each entry an URL of the form of https://elassandra-operator.default.svc/seeds/{remoteNamespace}/{clusterName}/{remoteDcName}
 
   For example, if you run datacenter **dc1** in the cluster **cl1** in namespace **ns1**, you need to deploy **dc2** in namespace **ns2** with the following remoteSeeders:
 

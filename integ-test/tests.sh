@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
 
-source integ-test/test-lib.sh
-
-init_cluster
-
+integ-test/install_elassandra_operator.sh
 integ-test/test-admission.sh
-integ-test/test-scaleup-park-unpark-reaper.sh
-integ-test/test-mutliple-dc.sh
-
-delete_cluster
+integ-test/test-reaper-registration.sh
+integ-test/test-scaleup-park-unpark.sh
+integ-test/test-multiple-dc-1ns.sh
+integ-test/test-multiple-dc-2ns.sh
+integ-test/test-rolling-upgrade.sh

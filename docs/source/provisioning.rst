@@ -313,7 +313,7 @@ Out-of-cluster Networking with Public IP addressing
 
 In this configuration, Elassandra pods broadcast a public IP should be deployed with ``hostNetwork`` enabled, allowing Elassandra pods
 to bind and broadcast public IP address of their Kubernetes nodes. In such configuration, cross datacenter connection
-can rely on public IP a``dresses without the need of a VPN or a VPC.
+can rely on public IP addresses without the need of a VPN or a VPC.
 
 External DNS
 ------------
