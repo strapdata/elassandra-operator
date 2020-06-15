@@ -2,10 +2,7 @@ package com.strapdata.strapkop;
 
 import com.google.common.reflect.TypeToken;
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
-import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
-import com.strapdata.strapkop.model.k8s.datacenter.DataCenterPhase;
-import com.strapdata.strapkop.model.k8s.datacenter.Health;
-import com.strapdata.strapkop.model.k8s.datacenter.ReaperPhase;
+import com.strapdata.strapkop.model.k8s.datacenter.*;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.Configuration;
 import io.kubernetes.client.openapi.apis.CustomObjectsApi;
@@ -30,6 +27,9 @@ public class WatchDcCommand implements Callable<Integer> {
     @CommandLine.Option(names = {"--health"}, description = "Expected elassandra datacenter health")
     Health health;
 
+    @CommandLine.Option(names = {"--cql-status"}, description = "Expected elassandra datacenter CQL status")
+    CqlStatus cqlStatus;
+
     @CommandLine.Option(names = {"-r", "--replicas"}, description = "Expected number of ready replicas")
     Integer readyReplicas;
 
@@ -52,6 +52,7 @@ public class WatchDcCommand implements Callable<Integer> {
                 (namespace == null ? "" : " namespace=" + namespace) +
                 (phase == null ? "" : " phase=" + phase) +
                 (health == null ? "" : " health=" + health) +
+                (cqlStatus == null ? "" : " cqlStatus=" + cqlStatus) +
                 (readyReplicas == null ? "" : " replicas=" + readyReplicas) +
                 (reaperPhase == null ? "" : " reaper=" + reaperPhase) +
                 (timeout == null ? "" : " timeout=" + timeout + "s"));
@@ -70,11 +71,13 @@ public class WatchDcCommand implements Callable<Integer> {
 
         long start = System.currentTimeMillis();
         for (Watch.Response<DataCenter> item : watch) {
-            System.out.printf("%s : %s phase=%s heath=%s replicas=%d reaper=%s \n", item.type, item.object.getMetadata().getName(),
+            System.out.printf("%s : %s phase=%s heath=%s replicas=%d reaper=%s cqlStatus=%s\n",
+                    item.type, item.object.getMetadata().getName(),
                     item.object.getStatus().getPhase().name(),
                     item.object.getStatus().getHealth().name(),
                     item.object.getStatus().getReadyReplicas(),
-                    item.object.getStatus().getReaperPhase());
+                    item.object.getStatus().getReaperPhase(),
+                    item.object.getStatus().getCqlStatus());
             boolean conditionMet = true;
 
             if (Boolean.TRUE.equals(verbose))
@@ -84,6 +87,9 @@ public class WatchDcCommand implements Callable<Integer> {
                 conditionMet = false;
 
             if (health != null && !health.equals(item.object.getStatus().getHealth()))
+                conditionMet = false;
+
+            if (cqlStatus != null && !cqlStatus.equals(item.object.getStatus().getCqlStatus()))
                 conditionMet = false;
 
             if (readyReplicas != null && !readyReplicas.equals(item.object.getStatus().getReadyReplicas()))

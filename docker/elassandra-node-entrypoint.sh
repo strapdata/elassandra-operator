@@ -88,24 +88,6 @@ if [ -f "/nodeinfo/public-name" ] && [ -s "/nodeinfo/public-name" ]; then
     ES_USE_INTERNAL_ADDRESS="-Des.use_internal_address=true"
 fi
 
-# set the cassandra host_id if disk is empty
-if [ ! -d /var/lib/cassandra/data/system ]; then
-   RANDOM_UUID=$(cat /proc/sys/kernel/random/uuid)
-   POD_INDEX=$(echo $POD_NAME | awk -F"-" '{print $NF}')
-   HOST_ID=$(printf "%s-%04d-%08d" ${RANDOM_UUID:0:18} ${CASSANDRA_RACK_INDEX} ${POD_INDEX})
-   export JVM_OPTS="$JVM_OPTS -Dcassandra.host_id=$HOST_ID"
-
-   # check if we are replacing a pending dead node with same rack and pod index
-   printf "/Datacenter:/ { dc=\$2 }/^UN .*-%04d-%08d /{ if (dc == \"%s\") print \$2 }" ${CASSANDRA_RACK_INDEX} ${POD_INDEX} ${CASSANDRA_DATACENTER} > /tmp/filter.awk
-   DEAD_NODE_IP=$(nodetool $NODETOOL_OPTS -p $NODETOOL_JMX_PORT -h elassandra-cl1-dc1-admin status | awk -f /tmp/filter.awk)
-   if [ -z "$DEAD_NODE_IP" ]; then
-      echo "No pending dead node to replace"
-   else
-      echo "Replacing dead node with IP=$DEAD_NODE_IP"
-      JVM_OPTS="$JVM_OPTS -Dcassandra.replace_address_first_boot=$DEAD_NODE_IP"
-   fi
-fi
-
 # Define cassandra broadcast address
 echo "broadcast_address: $BROADCAST_ADDRESS" > /etc/cassandra/cassandra.yaml.d/002-broadcast_address.yaml
 echo "broadcast_rpc_address: $BROADCAST_RPC_ADDRESS" > /etc/cassandra/cassandra.yaml.d/002-broadcast_rpc_address.yaml
@@ -125,6 +107,25 @@ export JVM_OPTS="$JVM_OPTS $ES_USE_INTERNAL_ADDRESS"
 if [ -n "$JMX_PASSWORD" ]; then
    echo "cassandra $JMX_PASSWORD" > /etc/cassandra/jmxremote.password
    chmod 400 /etc/cassandra/jmxremote.password
+fi
+
+# set the cassandra host_id if disk is empty
+if [ ! -d /var/lib/cassandra/data/system ]; then
+   RANDOM_UUID=$(cat /proc/sys/kernel/random/uuid)
+   POD_INDEX=$(echo $POD_NAME | awk -F"-" '{print $NF}')
+   HOST_ID=$(printf "%s-%04d-%012d" ${RANDOM_UUID:0:18} ${CASSANDRA_RACK_INDEX} ${POD_INDEX})
+   export JVM_OPTS="$JVM_OPTS -Dcassandra.host_id=$HOST_ID"
+
+   # check if we are replacing a pending dead node with same rack and pod index
+   printf "/Datacenter:/ { dc=\$2 }/^DN .*-%04d-%012d /{ if (dc == \"%s\") print \$2 }" ${CASSANDRA_RACK_INDEX} ${POD_INDEX} ${CASSANDRA_DATACENTER} > /tmp/filter.awk
+   DEAD_NODE_IP=$(nodetool $NODETOOL_OPTS -p $NODETOOL_JMX_PORT -h elassandra-cl1-dc1-admin status | awk -f /tmp/filter.awk)
+   if [ -z "$DEAD_NODE_IP" ]; then
+      echo "No pending dead node to replace"
+   else
+      echo "Replacing dead node with IP=$DEAD_NODE_IP"
+      JVM_OPTS="$JVM_OPTS -Dcassandra.replace_address_first_boot=$DEAD_NODE_IP"
+      export REPLACE_POD_NAME="${POD_NAME}.${CASSANDRA_SERVICE}.${NAMESPACE}.svc"
+   fi
 fi
 
 config_injection CASSANDRA $CASSANDRA_CONFIG/cassandra.yaml

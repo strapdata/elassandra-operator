@@ -111,11 +111,15 @@ public class ElassandraOperatorSeedProvider implements org.apache.cassandra.loca
 
         logger.info("seeds={} remote_seeds={} remote_seeders={}", Arrays.toString(seeds), Arrays.toString(remoteSeeds), Arrays.toString(remoteSeeders));
 
+        String replacePodName = System.getenv("REPLACE_POD_NAME");
         for (String s : seeds) {
-            try {
-                Collections.addAll(seedAddresses, InetAddress.getAllByName(s.trim()));
-            } catch (final UnknownHostException e) {
-                logger.warn("Unable to resolve k8s service {}.", s, e);
+            // filter out seed that are replaced (required with cassandra.replace_address_first_boot)
+            if (replacePodName == null || !s.startsWith(replacePodName)) {
+                try {
+                    Collections.addAll(seedAddresses, InetAddress.getAllByName(s.trim()));
+                } catch (final UnknownHostException e) {
+                    logger.warn("Unable to resolve k8s service {}.", s, e);
+                }
             }
         }
 
