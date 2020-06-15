@@ -73,6 +73,10 @@ public class OperatorNames {
         return OperatorNames.dataCenterChildObjectName("%s-external", dataCenter);
     }
 
+    public static String adminService(final DataCenter dataCenter) {
+        return OperatorNames.dataCenterChildObjectName("%s-admin", dataCenter);
+    }
+
     public static String seedsService(DataCenter dataCenter) {
         return OperatorNames.dataCenterChildObjectName("%s-seeds", dataCenter);
     }

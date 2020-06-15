@@ -300,6 +300,15 @@ public class JmxmpElassandraProxy {
                 }));
     }
 
+    public Completable drain(ElassandraPod pod) throws MalformedURLException {
+        return storageServiceMBeanProvider(pod)
+                .map(storageServiceMBean -> {
+                    storageServiceMBean.drain();
+                    logger.info("drain pod={}", pod.id());
+                    return storageServiceMBean;
+                }).ignoreElement();
+    }
+
     public Completable decomission(ElassandraPod pod) throws MalformedURLException {
         return storageServiceMBeanProvider(pod)
                 .map(storageServiceMBean -> {

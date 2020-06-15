@@ -44,7 +44,7 @@ import io.reactivex.Completable;
 import io.reactivex.CompletableSource;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
-import io.vavr.Tuple3;
+import io.vavr.Tuple4;
 import lombok.Data;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.ObjectUtils;
@@ -225,8 +225,9 @@ public class DataCenterUpdateAction {
         return Single.zip(
                 k8sResourceUtils.createOrReplaceNamespacedService(builder.buildServiceNodes()),
                 k8sResourceUtils.createOrReplaceNamespacedService(builder.buildServiceElasticsearch()),
-                k8sResourceUtils.createOrReplaceNamespacedService(builder.buildElasticsearchService()),
-                Tuple3::new
+                k8sResourceUtils.createOrReplaceNamespacedService(builder.buildServiceExternal()),
+                k8sResourceUtils.createOrReplaceNamespacedService(builder.buildServiceAdmin()),
+                Tuple4::new
         )
                 .flatMap(tuple -> {
                     // create cluster secret if not exists
@@ -631,7 +632,7 @@ public class DataCenterUpdateAction {
         if (!scaleDownZone.isPresent()) {
             logger.warn("datacenter={} Cannot scale down, no more replicas", dataCenter.id(), dataCenterMetadata.getName(), dataCenterMetadata.getNamespace());
             return todo.toSingleDefault(dataCenterStatus).flatMapCompletable(dcs -> {
-                endOperation("scale-down impossible");
+                endOperation("Cannot scale-down, no more replicas");
                 return k8sResourceUtils.updateDataCenterStatus(dataCenter, dataCenterStatus).ignoreElement();
             });
         }
@@ -646,7 +647,7 @@ public class DataCenterUpdateAction {
             todo = cqlKeyspaceManager.decreaseRfBeforeScalingDownDc(dataCenter, zones.totalReplicas() - 1, cqlSessionHandler)
                     .andThen(Completable.fromAction(() -> {
                         // update the DC status after the decreaseRf because decreaseRf test DC phase is RUNNING...
-                        logger.debug("datacenter={} SCALE_DOWN started in rack={} size={}, decommissioning pod={}-{}",
+                        logger.info("datacenter={} SCALE_DOWN started in rack={} size={}, decommissioning pod={}-{}",
                                 dataCenter.id(), zone.name, zone.size, sts.getMetadata().getName(), sts.getSpec().getReplicas() - 1);
                     }))
                     .andThen(jmxmpElassandraProxy.decomission(new ElassandraPod(dataCenter, rackIndex, sts.getSpec().getReplicas() - 1))
@@ -956,7 +957,7 @@ public class DataCenterUpdateAction {
         // see https://github.com/kubernetes-sigs/cloud-provider-azure/blob/master/docs/services/README.md
         // see https://github.com/kubernetes-sigs/external-dns
         // Unfortunately, AKS does not allow to reuse a public IP for multiple LB.
-        public V1Service buildElasticsearchService() throws ApiException {
+        public V1Service buildServiceExternal() throws ApiException {
             V1ServiceSpec v1ServiceSpec = new V1ServiceSpec()
                     .type(dataCenterSpec.getElasticsearch().getLoadBalancerEnabled() ? "LoadBalancer" : "ClusterIP")
                     .addPortsItem(new V1ServicePort().name("cql").port(dataCenterSpec.getCassandra().getNativePort()))
@@ -982,6 +983,23 @@ public class DataCenterUpdateAction {
                         v1ObjectMeta.putAnnotationsItem("external-dns.alpha.kubernetes.io/ttl", Integer.toString(dataCenterSpec.getExternalDns().getTtl()));
                 }
             }
+
+            return new V1Service()
+                    .metadata(v1ObjectMeta)
+                    .spec(v1ServiceSpec);
+        }
+
+        // Build admin service for JMX only
+        public V1Service buildServiceAdmin() throws ApiException {
+            V1ServiceSpec v1ServiceSpec = new V1ServiceSpec()
+                    .type("ClusterIP")
+                    .addPortsItem(new V1ServicePort().name("jmx").port(dataCenterSpec.getJvm().getJmxPort()))
+                    .selector(ImmutableMap.of(
+                            OperatorLabels.CLUSTER, dataCenterSpec.getClusterName(),
+                            OperatorLabels.DATACENTER, dataCenter.getSpec().getDatacenterName(),
+                            OperatorLabels.APP, "elassandra"));
+
+            V1ObjectMeta v1ObjectMeta = dataCenterObjectMeta(OperatorNames.adminService(dataCenter));
 
             return new V1Service()
                     .metadata(v1ObjectMeta)
@@ -1669,8 +1687,8 @@ public class DataCenterUpdateAction {
             final V1ObjectMeta statefulSetMetadata = rackObjectMeta(rackStatus.getName(), rackStatus.getIndex(), OperatorNames.stsName(dataCenter, rackStatus.getIndex()));
 
             // create Elassandra container and the associated initContainer to replay commitlogs
-            final V1Container cassandraContainer = buildElassandraContainer(rackStatus.getName());
-            final V1Container commitlogInitContainer = buildInitContainerCommitlogReplayer(rackStatus.getName());
+            final V1Container cassandraContainer = buildElassandraContainer(rackStatus);
+            final V1Container commitlogInitContainer = buildInitContainerCommitlogReplayer(rackStatus);
 
             if (dataCenterSpec.getPrometheus().getEnabled()) {
                 cassandraContainer.addPortsItem(new V1ContainerPort().name(PROMETHEUS_PORT_NAME).containerPort(dataCenterSpec.getPrometheus().getPort()));
@@ -1943,7 +1961,7 @@ public class DataCenterUpdateAction {
                     });
         }
 
-        private V1Container buildElassandraContainer(String rack) {
+        private V1Container buildElassandraContainer(RackStatus rack) {
             final V1Container cassandraContainer = buildElassandraBaseContainer("elassandra", rack)
                     .readinessProbe(new V1Probe()
                             .exec(new V1ExecAction()
@@ -1964,12 +1982,12 @@ public class DataCenterUpdateAction {
             return cassandraContainer;
         }
 
-        private V1Container buildInitContainerCommitlogReplayer(String rack) {
+        private V1Container buildInitContainerCommitlogReplayer(RackStatus rack) {
             return buildElassandraBaseContainer("commitlog-replayer", rack)
                     .addEnvItem(new V1EnvVar().name("STOP_AFTER_COMMILOG_REPLAY").value("true"));
         }
 
-        private V1Container buildElassandraBaseContainer(String containerName, String rack) {
+        private V1Container buildElassandraBaseContainer(String containerName, RackStatus rack) {
             final V1Container cassandraContainer = new V1Container()
                     .name(containerName)
                     .image(dataCenterSpec.getElassandraImage())
@@ -2019,8 +2037,9 @@ public class DataCenterUpdateAction {
                     .addEnvItem(new V1EnvVar().name("POD_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.name"))))
                     .addEnvItem(new V1EnvVar().name("POD_IP").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("status.podIP"))))
                     .addEnvItem(new V1EnvVar().name("NODE_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("spec.nodeName"))))
-                    .addEnvItem(new V1EnvVar().name("CASSANDRA_RACK").value(rack))
-                    .addEnvItem(new V1EnvVar().name("CASSANDRA_DATACENTER").value(dataCenterMetadata.getName()))
+                    .addEnvItem(new V1EnvVar().name("CASSANDRA_RACK").value(rack.getName()))
+                    .addEnvItem(new V1EnvVar().name("CASSANDRA_RACK_INDEX").value(Integer.toString(rack.getIndex())))
+                    .addEnvItem(new V1EnvVar().name("CASSANDRA_DATACENTER").value(dataCenterSpec.getDatacenterName()))
                     .addEnvItem(new V1EnvVar().name("CASSANDRA_CLUSTER").value(dataCenterSpec.getClusterName()))
                     .addEnvItem(new V1EnvVar().name("SEEDER_TRUSTSTORE").value("/tmp/operator-truststore"))
                     .addEnvItem(new V1EnvVar().name("SEEDER_STORE_TYPE").valueFrom(new V1EnvVarSource()

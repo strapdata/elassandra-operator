@@ -71,7 +71,7 @@ Rolling update
 --------------
 
 You can upgrade/downgrade or change any setting by updating the datacenter spec. Such a change trigger a rolling restart of cassandra racks.
-The elassandra-operator trigger one statefulset rolling update at a time (update on Cassandra rack at a time, rackStatus.progressState=UPDATING).
+The elassandra-operator trigger one StatefulSet rolling update at a time (update on Cassandra rack at a time, rackStatus.progressState=UPDATING).
 Each rack rolling restart is managed by the StatefulSet RollingUpdate
 
 In the following example, we upgrade the elassandra image.
@@ -95,16 +95,50 @@ To "unpark" an Elassandra datacenter :
 
     kubectl patch elassandradatacenters elassandra-cl1-dc1 --type merge --patch '{ "spec" : { "parked" : "false"}}'
 
+Recover from a node failure
+___________________________
+
+When a Kubernetes node is out-of-order or marked unschedulable for some reason, Elassandra pods should move to another Kubernetes node in the same availability zone.
+
+Due to the `PodDisruptionBudged <https://kubernetes.io/docs/tasks/run-application/configure-pdb/>`_ associated to the Elassandra datacenter having
+a ``maxUnavailable=1`` by default, such move won't be possible if there is an ongoing
+disruption in the Elassandra datacenter. In such case, check the PDB status and react accordingly if needed:
+
+.. code::
+
+    kubectl get pdb elassandra-cl1-dc1 -o yaml
+
+
 Recover from a disk failure
 ___________________________
 
-When the PVC used by an Elassandra node is corrupted or lost, you can delete it and the associated pod may restart an empty disk.
-In order to avoid useless data movement, you can use the annotation ``elassandra.strapdata.com/jvm.options`` to
-add the Cassandra system property ``cassandra.replace_address_first_boot=<old_pod_ip>`` to the failed pod, as shown below.
+The Elassandra operator generates Cassandra host ID in the form of XXXXXXXX-XXXX-XXX-YYYY-ZZZZZZZZZZZZ where:
 
-.. code-block:: bash
+* XXXXXXXX-XXXX-XXX is random to uniquely identify the Cassandra node
+* YYYY is the rack index starting from 0
+* ZZZZZZZZZZZZ is the pod index in the underlying rack StatefulSet.
 
-    kubectl annotate pods elassandra-cl1-dc1 elassandra.strapdata.com/jvm.options=-Dcassandra.replace_address_first_boot=<old_pod_ip>
+When a node starts with an empty data disk (a new Peristent Volume), if a node with the same rack and pod index is found DEAD NORMAL in the datacenter,
+the Cassandra system property -Dcassandra.replace_address_first_boot=<old_node_ip> is automatically added to replace the dead node.
+
+So, in the case of a disk failure (lost or corrupted), you just need to delete the PV and restart the pod, as shown here for the Elassandra pod **elassandra-cl1-dc1-1-0**.
+
+.. code::
+
+    PVC=data-volume-elassandra-cl1-dc1-1-0
+    PV=$(kubectl get pvc $PVC -o jsonpath='{.spec.volumeName}')
+
+    kubectl patch pv $PV -p '{"metadata":{"finalizers":null}}'
+    kubectl patch pvc $PVC -p '{"metadata":{"finalizers":null}}'
+
+    kubectl delete pv $PV
+    kubectl delete pvc $PVC
+
+Once the Persistent Volume and Peristent Volume Claim are deleted, delete the pod to trigger a restart with an empty disk and recover.
+
+.. code::
+
+    kubectl delete pod elassandra-cl1-dc1-1-0
 
 Elassandra Tasks
 ================
@@ -164,7 +198,8 @@ on all nodes of a datacenter, with waiting by default 10s between each cleanup:
 Replication
 ___________
 
-The **replication** task adds or removes a datacenter in the Cassandra schema by updating keyspace replication map.
+The **replication** task adds or removes a datacenter in the Cassandra schema by updating the keyspace replication map.
+
 The following replication task adds the datacenter dc2 in the replication maps of system keyspaces and the **foo** user keyspace.
 
 .. code::

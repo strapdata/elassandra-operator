@@ -4,7 +4,7 @@ source integ-test/test-lib.sh
 setup_flavor
 
 NS="reaper1"
-#HELM_RELEASE="$NS-cl1-dc1"
+HELM_RELEASE="$NS-cl1-dc1"
 
 test_start $0
 install_elassandra_datacenter $NS cl1 dc1 3
