@@ -32,7 +32,7 @@ HELM_RELEASE="$NS-cl1-dc1"
 source integ-test/test-lib.sh
 setup_flavor
 
-test_start
+test_start $0
 install_elassandra_datacenter $NS cl1 dc1 6
 java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --health GREEN -r 6
 
@@ -41,4 +41,4 @@ upgrade "6.8.4.5"
 
 # cleanup
 uninstall_elassandra_datacenter $NS cl1 dc1
-echo "Test SUCCESSFUL"
+echo "### Test SUCCESSFUL"

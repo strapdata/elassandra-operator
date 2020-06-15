@@ -7,7 +7,7 @@ N=100
 NS="ns2"
 HELM_RELEASE="$NS-cl1-dc1"
 
-test_start
+test_start $0
 install_elassandra_datacenter $NS cl1 dc1 1
 java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --health GREEN
 
@@ -136,5 +136,5 @@ kubectl exec -it elassandra-cl1-dc1-0-0 -n $NS -- bash -lc "nodetool -u cassandr
 uninstall_elassandra_datacenter $NS cl1 dc1
 
 
-echo "Test SUCCESSFUL"
+echo "### Test SUCCESSFUL"
 test_end
