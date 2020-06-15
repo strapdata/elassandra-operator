@@ -67,9 +67,8 @@ install:
 - kind get clusters
 - docker ps -a
 script:
-- ./gradlew dockerPush dockerPushAllVersions -PregistryUrl="localhost:5000" -PregistryInsecure
+- ./gradlew java:edctl:buildExec dockerPush dockerPushAllVersions -PregistryUrl="localhost:5000" -PregistryInsecure
 - curl http://localhost:5000/v2/_catalog
-- ./gradlew java:edctl:buildExec
 - integ-test/install_elassandra_operator.sh
 - integ-test/test-admission.sh
 - integ-test/test-reaper-registration.sh
