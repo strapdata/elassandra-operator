@@ -14,6 +14,7 @@ export ELASSANDRA_OPERATOR_TAG=$(awk -F "=" '/version/ { print $2 }' gradle.prop
 export ELASSANDRA_NODE_TAG=$(head -n 1 docker/supportedElassandraVersions.txt)
 
 test_start() {
+  echo "### Starting $1"
   set -x
   set -o pipefail
   trap finish ERR
@@ -127,7 +128,7 @@ install_elassandra_datacenter() {
     --set image.elassandraRepository=$REGISTRY_URL/strapdata/elassandra-node-dev${registry} \
     --set image.tag=$ELASSANDRA_NODE_TAG \
     --set dataVolumeClaim.storageClassName=${STORAGE_CLASS_NAME:-"standard"} \
-    --set elasticsearch.kibana.enabled="false" \
+    --set kibana.enabled="false" \
     --set reaper.enabled="false",reaper.image="$REGISTRY_URL/strapdata/cassandra-reaper:2.1.0-SNAPSHOT-strapkop" \
     --set cassandra.sslStoragePort="38001",jvm.jmxPort="35001",prometheus.port="34001" \
     --set externalDns.enabled="false",externalDns.root="xxxx.yyyy",externalDns.domain="test.strapkube.com" \
