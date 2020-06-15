@@ -11,7 +11,7 @@ HELM_RELEASE2="NS2-cl1-dc2"
 
 test_start $0
 install_elassandra_datacenter $NS cl1 dc1 1
-java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --health GREEN
+java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --health GREEN --cql-status=ESTABLISHED
 
 # create an index
 kubectl exec -it elassandra-cl1-dc1-0-0 -n $NS -- bash -l -c "for i in {1..$N}; do post foo/bar '{\"foo\":\"bar\"}'; done"
@@ -24,7 +24,7 @@ kubectl get secret elassandra-cl1 --namespace=$NS --export -o yaml | kubectl app
 
 # create dc2 in another namespace NS2
 install_elassandra_datacenter $NS2 cl1 dc2 1 "cassandra.remoteSeeders[0]=https://elassandra-operator.default.svc.cluster.local/seeds/$NS/cl1/dc1"
-java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc2 -ns $NS2 --health GREEN
+java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc2 -ns $NS2 --health GREEN --cql-status=ESTABLISHED
 
 # update replication map for keyspace foo on dc2 (and system keyspaces)
 cat <<EOF | kubectl apply -f -

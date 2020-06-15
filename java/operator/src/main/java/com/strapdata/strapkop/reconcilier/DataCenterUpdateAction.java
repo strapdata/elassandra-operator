@@ -4,6 +4,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.net.InetAddresses;
+import com.strapdata.cassandra.k8s.ElassandraOperatorSeedProvider;
 import com.strapdata.cassandra.k8s.ElassandraOperatorSeedProviderAndNotifier;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.backup.BackupScheduler;
@@ -1222,12 +1223,12 @@ public class DataCenterUpdateAction {
                 parameters.put("remote_seeders", String.join(", ", remoteSeeders));
             }
             // Status callback URL allowing Cassandra nodes to notify the operator synchronously
-            parameters.put(ElassandraOperatorSeedProviderAndNotifier.STATUS_NOTIFIER_URL,
-                    "https://" + operatorConfig.getServiceName() + "." + operatorConfig.getOperatorNamespace()+ ".svc/node/" + dataCenterMetadata.getNamespace() + "/" + dataCenterSpec.getClusterName());
+            //parameters.put(ElassandraOperatorSeedProviderAndNotifier.STATUS_NOTIFIER_URL,
+            //        "https://" + operatorConfig.getServiceName() + "." + operatorConfig.getOperatorNamespace()+ ".svc/node/" + dataCenterMetadata.getNamespace() + "/" + dataCenterSpec.getClusterName());
             logger.debug("seed parameters={}", parameters);
             final Map<String, Object> config = new HashMap<>(); // can't use ImmutableMap as some values are null
             config.put("seed_provider", ImmutableList.of(ImmutableMap.of(
-                    "class_name", ElassandraOperatorSeedProviderAndNotifier.class.getName(),
+                    "class_name", ElassandraOperatorSeedProvider.class.getName(),
                     "parameters", ImmutableList.of(parameters))
             ));
             // if datacenter is not boostrapped, add nodes with auto_bootstrap = false
@@ -2041,6 +2042,7 @@ public class DataCenterUpdateAction {
                     .addEnvItem(new V1EnvVar().name("CASSANDRA_RACK_INDEX").value(Integer.toString(rack.getIndex())))
                     .addEnvItem(new V1EnvVar().name("CASSANDRA_DATACENTER").value(dataCenterSpec.getDatacenterName()))
                     .addEnvItem(new V1EnvVar().name("CASSANDRA_CLUSTER").value(dataCenterSpec.getClusterName()))
+                    .addEnvItem(new V1EnvVar().name("CASSANDRA_SERVICE").value(dataCenterMetadata.getName()))
                     .addEnvItem(new V1EnvVar().name("SEEDER_TRUSTSTORE").value("/tmp/operator-truststore"))
                     .addEnvItem(new V1EnvVar().name("SEEDER_STORE_TYPE").valueFrom(new V1EnvVarSource()
                             .secretKeyRef(new V1SecretKeySelector()
