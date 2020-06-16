@@ -90,13 +90,18 @@ public class JmxmpElassandraProxy {
     AuthorityManager authorityManager;
 
     private Single<JMXConnector> getMbeanServerConn(ElassandraPod pod) throws MalformedURLException {
-        DataCenter dc = getDataCenter(pod);
-        String jmxUrl = UriTemplate.of("service:jmx:jmxmp://{jmxHost}:{jmxPort}/").expand(ImmutableMap.of(
-                "jmxHost", pod.getFqdn(),
-                "jmxPort", dc.getSpec().getJvm().getJmxPort()));
-        JMXConnector jmxConnector = null; //jmxConnectorCache.get(pod);
+        JMXConnector jmxConnector = jmxConnectorCache.get(pod);
         if (jmxConnector != null)
             return Single.just(jmxConnector);
+
+        DataCenter dc = getDataCenter(pod);
+        Integer jmxPort = 7199;
+        if (dc != null && dc.getSpec() != null && dc.getSpec().getJvm() != null && dc.getSpec().getJvm().getJmxPort() != null)
+            jmxPort = dc.getSpec().getJvm().getJmxPort();
+
+        String jmxUrl = UriTemplate.of("service:jmx:jmxmp://{jmxHost}:{jmxPort}/").expand(ImmutableMap.of(
+                "jmxHost", pod.getFqdn(),
+                "jmxPort", jmxPort));
 
         final JMXServiceURL jmxServiceURL = new JMXServiceURL(jmxUrl);
         return loadPassword(dc, this.k8sResourceUtils, OperatorNames.clusterSecret(dc), DataCenterUpdateAction.KEY_JMX_PASSWORD)

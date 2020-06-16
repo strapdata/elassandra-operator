@@ -5,7 +5,8 @@ setup_flavor
 
 N=100
 NS="replacenode"
-HELM_RELEASE="$NS-cl1-dc1"
+HELM_RELEASES=("$NS-cl1-dc1")
+NAMESPACES=("$NS")
 
 test_start $0
 install_elassandra_datacenter $NS cl1 dc1 3
