@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-
-cd `dirname "$BASH_SOURCE"`/../..
-source test/config
-
-kubectl delete pod $(./test/lib/get-operator-pod-name) --force --grace-period=0

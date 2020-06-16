@@ -1,9 +1,0 @@
-#!/usr/bin/env bash
-
-cd `dirname "$BASH_SOURCE"`/../..
-source test/config
-
-name=${1:-${DEFAULT_NAME}}
-index=${2:-0}
-
-kubectl port-forward $(./test/lib/get-pod-name ${name} ${index}) 5006:5005
