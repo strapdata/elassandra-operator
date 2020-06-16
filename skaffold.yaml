@@ -4,7 +4,7 @@ metadata:
   name: strapkop
 build:
   artifacts:
-  - image: localhost:5000/strapdata/elassandra-operator-dev
+  - image: localhost:5000/strapdata/elassandra-operator
     context: java/operator
     jib:
       project: java:operator
@@ -21,7 +21,7 @@ deploy:
       wait: false
       version: "0.3.0"
       values:
-        images: localhost:5000/strapdata/elassandra-operator-dev
+        images: localhost:5000/strapdata/elassandra-operator
 profiles:
   - name: dev
     activation:
