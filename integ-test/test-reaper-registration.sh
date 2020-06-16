@@ -8,7 +8,7 @@ HELM_RELEASE="$NS-cl1-dc1"
 
 test_start $0
 install_elassandra_datacenter $NS cl1 dc1 3
-java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --health GREEN -r 3
+java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --health GREEN -r 3 --cql-status=ESTABLISHED
 test "$(kubectl get edc elassandra-cl1-dc1 -n $NS -o jsonpath='{.status.reaperPhase}')" == "NONE"
 
 reaper_enable $NS cl1 dc1
