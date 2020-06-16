@@ -113,7 +113,7 @@ task buildExec(type: ReallyExecutableJarTask) {
 
 task uploadEdctl(type: com.strapdata.gradle.AzureStorageDeployTask) {
     dependsOn buildExec
-    connectionString ***REMOVED***
+    connectionString connectionString
     container 'strapkop'
     fileToDeploy 'build/libs/edctl'
     mimeType 'application/octet-stream'
