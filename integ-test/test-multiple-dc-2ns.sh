@@ -24,7 +24,7 @@ kubectl get secret elassandra-cl1 --namespace=$NS --export -o yaml | kubectl app
 
 # create dc2 in another namespace NS2
 install_elassandra_datacenter $NS2 cl1 dc2 1 "cassandra.remoteSeeders[0]=https://elassandra-operator.default.svc.cluster.local/seeds/$NS/cl1/dc1"
-java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc2 -ns $NS2 --health GREEN --cql-status=ESTABLISHED
+java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc2 -ns $NS2 --health GREEN
 
 # update replication map for keyspace foo on dc2 (and system keyspaces)
 cat <<EOF | kubectl apply -f -
