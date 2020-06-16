@@ -91,7 +91,7 @@ install_elassandra_operator() {
     fi
 
     helm install --namespace ${1:-default} --name strapkop \
-    --set image.repository=$REGISTRY_URL/strapdata/elassandra-operator-dev${registry} \
+    --set image.repository=$REGISTRY_URL/strapdata/elassandra-operator${registry} \
     --set image.tag="$ELASSANDRA_OPERATOR_TAG" \
     --set image.pullSecrets[0]="$REGISTRY_SECRET_NAME"$args \
     --wait \
@@ -126,7 +126,7 @@ install_elassandra_datacenter() {
     fi
 
     helm install --namespace "$ns" --name "$ns-$cl-$dc" \
-    --set image.elassandraRepository=$REGISTRY_URL/strapdata/elassandra-node-dev${registry} \
+    --set image.elassandraRepository=$REGISTRY_URL/strapdata/elassandra-node${registry} \
     --set image.tag=$ELASSANDRA_NODE_TAG \
     --set dataVolumeClaim.storageClassName=${STORAGE_CLASS_NAME:-"standard"} \
     --set kibana.enabled="false" \
