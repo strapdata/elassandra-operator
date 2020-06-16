@@ -6,76 +6,23 @@ The Elassandra Kubernetes Operator automate the deployment and management of Ela
 
 ## Features
 
-* Elassandra Operator features:
-  
-  * Manage one `Kubernetes StatefulSet <https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/>`_ per Cassandra rack to ensure data consistency across cloud-provider availability zones.
-  * Manage mutliple cassandra datacenters in the same or different Kubernetes clusters.
-  * Manage rolling configuration changes, rolling upgrade/downgrade of Elassandra, scale up/down Elassandra datacenters.
-  * Deploy `Cassandra Reaper <http://cassandra-reaper.io/>`_ to run continuous Cassandra repairs.
-  * Deploy multiple `Kibana <https://www.elastic.co/fr/products/kibana>`_ instances with a dedicated Elasticserach index in Elassandra.
-  * Park/Unpark Elassandra datacenters (and associated Kibana and Cassandra reaper instances).
-  * Expose Elassandra metrics for the `Prometheus Operator <https://prometheus.io/docs/prometheus/latest/querying/operators/>`_.
-  * Publish public DNS names allowing Elassandra nodes to be reachable from the internet (Cassandra CQL and Elasticsearch REST API).
-  * Automatically generates SSL/TLS certificates and strong passwords stored as Kubernetes secrets.
-  * Create Cassandra roles and automatically grants the desired permissions on Cassandra keyspaces.
-  * Automatically adjust the Cassandra Replication Factor for managed keyspaces, repair and cleanup after scale up/down.
+Elassandra Operator features:
 
-## Requirement
+* Manage one [Kubernetes StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) per Cassandra rack to ensure data consistency across cloud-provider availability zones.
+* Manage mutliple Cassandra datacenters in the same or different Kubernetes clusters.
+* Manage rolling configuration changes, rolling upgrade/downgrade of Elassandra, scale up/down Elassandra datacenters.
+* Deploy [Cassandra Reaper](http://cassandra-reaper.io/) to run continuous Cassandra repairs.
+* Deploy multiple [Kibana](<https://www.elastic.co/fr/products/kibana>) instances with a dedicated Elasticserach index in Elassandra.
+* Park/Unpark Elassandra datacenters (and associated Kibana and Cassandra reaper instances).
+* Expose Elassandra metrics for the [Prometheus Operator](https://prometheus.io/docs/prometheus/latest/querying/operators/).
+* Publish public DNS names allowing Elassandra nodes to be reachable from the internet (Cassandra CQL and Elasticsearch REST API).
+* Automatically generates SSL/TLS certificates and strong passwords stored as Kubernetes secrets.
+* Create Cassandra roles and automatically grants the desired permissions on Cassandra keyspaces.
+* Automatically adjust the Cassandra Replication Factor for managed keyspaces, repair and cleanup after scale up/down.
 
-* Kubernetes cluster 1.15 or newer
-* External-DNS to expose your datacenter to the internet world
-* Prometheus-Operator to monitor your cluster
-* An ingress controller to expose Kibana, Cassandra Reaper interfaces.
+## Documentation
 
-## Quick start
-
-Deploy the Elassandra operator in the default namespace using HELM 2:
-
-    helm install --namespace default --name strapkop --wait helm/elassandra-operator
-
-Deploy an Elassandra Datacenter in a dedicated namespace **ns1** with 1 replica:
-
-    helm install --namespace "ns1" --name "ns1-cl1-dc1" --set replicas=1 --wait helm/elassandra-datacenter
-
-Notes:
-* To avoid mistakes, HELM release name MUST include the cluster name and datacenter name separated by a dash.
-* The default storageclass is **standard**, but your can use any available storageclass.
-* Cassandra reaper, Elasticsearch and Kibana are enable by default.
-
-Check Elassandra pods status:
-
-    kubectl get pod -n ns1
-
-Check the Elassandra DataCenter status:
-
-    kubectl get edc elassandra-cl1-dc1 -o yaml
-
-List Elassandra datacenter secrets:
-
-    kubectl get secret -n ns1
-
-Connect to a Cassandra node:
-
-    kubecrtl exec -it elassandra-cl1-dc1-0-0 -- bash -l
-
-Connect to Kibana using port-forwarding:
-
-    kubectl port-forward pod/kibana 5601:5601
-
-Alternatively, you can setup an ingress controller for the kibana instance.
-
-## Public Elassandra Datacenter
-
-If your Kubernetes nodes have public IP addresses, your can expose Elassandra nodes to the internet by using 
-the hostNetwork mode of Kubernetes. In this case, each Elassandra cluster must have a dedicated set of TCP ports,
-and a Kubernetes node can run more than one pod of a given Elassandra cluster.
-
-    networking.hostNetwork: true
-
-When hostNetwork or hostPort is enabled, the Elassandra operator enable an init container (named nodeinfo) to get 
-the Kubernetes node public IP address and use it as the Cassandra broadcast address. 
-
-You can then enabled external DNS configuration to automatically publish public DNS names for Elassandra nodes.
+Please see the [Elassandra-Operator documentation](https://operator.elassandra.io)
 
 ## Build from source
 
@@ -91,12 +38,31 @@ Publish in local insecure registry
 
 Build parameters are located in `gradle.properties`.
 
-## License Report
+## Support
 
-Generate a [license report](build/reports/dependency-license/index.html):
-```bash
-./gradlew generateLicenseReport
-```
-
+ * Commercial support is available through [Strapdata](http://www.strapdata.com/).
+ * Community support available via [elassandra google groups](https://groups.google.com/forum/#!forum/elassandra).
+ * Post feature requests and bugs on https://github.com/strapdata/elassandra-operator/issues
+ 
 ## License
 
+Copyright (C) 2020 Strapdata SAS (support@strapdata.com)
+
+The Elassandra-Operator is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+The Elassandra-Operator is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with the Elassandra-Operator.  If not, see <http://www.gnu.org/licenses/>.
+
+## Acknowledgments
+
+* Elasticsearch, Logstash, Beats and Kibana are trademarks of Elasticsearch BV, registered in the U.S. and in other countries.
+* Apache Cassandra, Apache Lucene, Apache, Lucene and Cassandra are trademarks of the Apache Software Foundation.
+* Elassandra is a trademark of Strapdata SAS.
