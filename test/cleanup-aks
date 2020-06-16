@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-
-cd `dirname "$BASH_SOURCE"`/..
-source test/config
-
-./test/aks/delete-cluster
-./test/aks/delete-storage

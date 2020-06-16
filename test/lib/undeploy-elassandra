@@ -1,8 +1,0 @@
-#!/usr/bin/env bash
-
-cd `dirname "$BASH_SOURCE"`/../..
-source test/config
-
-name=${1:-${DEFAULT_NAME}}
-
-helm delete ${name} --purge
