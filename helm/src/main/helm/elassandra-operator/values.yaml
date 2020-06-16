@@ -3,7 +3,7 @@
 # Declare variables to be passed into your templates.
 image:
   repository: strapdata/elassandra-operator
-  tag: 6.8.4.5
+  tag: 0.1.0
   pullPolicy: Always
   pullSecrets: []
 
