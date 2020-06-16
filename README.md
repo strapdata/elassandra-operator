@@ -1,6 +1,6 @@
-[![Build Status](https://travis-ci.com/strapdata/strapkop.svg?token=PzEdBQpdXSgcm2zGdxUn&branch=master)](https://travis-ci.com/strapdata/strapkop)
+# Elassandra Operator [![Build Status](https://travis-ci.com/strapdata/strapkop.svg?token=PzEdBQpdXSgcm2zGdxUn&branch=master)](https://travis-ci.com/strapdata/strapkop)
 
-# Elassandra Operator
+![Elassandra Logo](elassandra-operator.png)
 
 The Elassandra Kubernetes Operator automate the deployment and management of Elassandra datacenters in one or multiple Kubernetes clusters. 
 
@@ -77,8 +77,6 @@ the Kubernetes node public IP address and use it as the Cassandra broadcast addr
 
 You can then enabled external DNS configuration to automatically publish public DNS names for Elassandra nodes.
 
-## 
-
 ## Build from source
 
 Publish the docker images (operator + elassandra + cassandra reaper):
@@ -93,28 +91,11 @@ Publish in local insecure registry
 
 Build parameters are located in `gradle.properties`.
 
-## Integration Tests
-
-
-## Elassandra operator architecture
-
-The Elassandra Operator is base on Micronaut, an RxJava server using the Kubernetes java client to watch Kubernetes resources.
-
-The Elassandra Operator expose several HTTP endpoints described in the swagger descriptor.
-
-
-
 ## License Report
 
 Generate a [license report](build/reports/dependency-license/index.html):
 ```bash
 ./gradlew generateLicenseReport
-```
-
-Upload the license report the the strapdata azure blobstore (available on web):
-```bash
-./gradlew uploadLicenseReport
-./gradlew uploadLicenseNotices
 ```
 
 ## License
