@@ -4,15 +4,15 @@ Quick Start
 Once HELM 2 is deployed in your kubernetes cluster and you have added the strapdata HELM repository (see :ref:`helm-setup`),
 deploy the Elassandra operator in the default namespace:
 
-.. code::
+.. parsed-literal::
 
     helm install --namespace default --name elassandra-operator --wait strapdata/elassandra-operator
 
-Deploy an Elassandra Datacenter in a dedicated namespace **ns1** with 1 replica:
+Deploy an Elassandra Datacenter in a dedicated namespace **ns1** with 6 nodes in 3 racks:
 
-.. code::
+.. parsed-literal::
 
-    helm install --namespace "ns1" --name "ns1-cl1-dc1" --set replicas=1 --wait strapdata/elassandra-datacenter
+    helm install --namespace "ns1" --name "ns1-cl1-dc1" --set replicas=6 --wait strapdata/elassandra-datacenter
 
 .. note:
 
