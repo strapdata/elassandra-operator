@@ -21,7 +21,7 @@ kubectl exec -it elassandra-cl1-dc1-1-0 -n $NS -- bash -l -c 'nodetool $NODETOOL
 kubectl exec -it elassandra-cl1-dc1-2-0 -n $NS -- bash -l -c 'nodetool $NODETOOL_OPTS -p $NODETOOL_JMX_PORT flush'
 
 # delete PVC
-kb get pvc -n $NS
+kubectl get pvc -n $NS
 PVC=data-volume-elassandra-cl1-dc1-0-0
 kubectl delete pvc $PVC -n $NS --force --grace-period=0 &
 kubectl patch pvc $PVC -n $NS -p '{"metadata":{"finalizers": []}}' --type=merge
