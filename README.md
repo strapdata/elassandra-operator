@@ -2,7 +2,8 @@
 
 ![Elassandra Logo](docs/source/images/elassandra-operator.png)
 
-The Elassandra Kubernetes Operator automate the deployment and management of Elassandra datacenters in one or multiple Kubernetes clusters. 
+The Elassandra Kubernetes Operator automate the deployment and management of [Elassandra](https://github.com/strapdata/elassandra) datacenters 
+in one or multiple Kubernetes clusters. 
 
 ## Features
 
