@@ -1,6 +1,6 @@
-# Elassandra Operator [![Build Status](https://travis-ci.com/strapdata/strapkop.svg?token=PzEdBQpdXSgcm2zGdxUn&branch=master)](https://travis-ci.com/strapdata/strapkop)
+# Elassandra Operator [![Build Status](https://travis-ci.com/strapdata/strapkop.svg?token=PzEdBQpdXSgcm2zGdxUn&branch=master)](https://travis-ci.com/strapdata/strapkop) [![Twitter](https://img.shields.io/twitter/follow/strapdataio?style=social)](https://twitter.com/strapdataio)
 
-![Elassandra Logo](elassandra-operator.png)
+![Elassandra Logo](docs/source/images/elassandra-operator.png)
 
 The Elassandra Kubernetes Operator automate the deployment and management of Elassandra datacenters in one or multiple Kubernetes clusters. 
 
