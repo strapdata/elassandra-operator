@@ -23,6 +23,7 @@ test_start() {
 test_end() {
   set +e
   trap - ERR
+  sleep 10
 }
 
 finish() {
