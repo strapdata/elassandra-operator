@@ -22,8 +22,8 @@ Or wait an Elassandra task terminates:
 
     edctl watch-task -n replication-add-$$ -ns $NS --phase SUCCEED
 
-Datacenter operation
-====================
+Datacenter operations
+=====================
 
 Check the datacenter status
 ___________________________
@@ -63,9 +63,9 @@ be greater than the number of nodes in the datacenter).
     If you scale-up and re-use these old PVCs, Elassandra nodes won't start until you delete old PVCs because Cassandra
     hosts IDs stored on these disks were previously used in the cluster, and you will get the following error message:
 
-    ..code::
+..code::
 
-        org.apache.cassandra.exceptions.ConfigurationException: This node was decommissioned and will not rejoin the ring unless cassandra.override_decommission=true has been set, or all existing data is removed and the node is bootstrapped again
+    org.apache.cassandra.exceptions.ConfigurationException: This node was decommissioned and will not rejoin the ring unless cassandra.override_decommission=true has been set, or all existing data is removed and the node is bootstrapped again
 
 Rolling update
 --------------
@@ -139,6 +139,12 @@ Once the Persistent Volume and Peristent Volume Claim are deleted, delete the po
 .. code::
 
     kubectl delete pod elassandra-cl1-dc1-1-0
+
+When the Elassandra node is restarted, you must update the elasticsearch routing right after data are streamed from the other nodes.
+
+.. code::
+
+    kubectl exec -it elassandra-cl1-dc1-1-0 -- bash -l -c "post _updaterouting"
 
 Elassandra Tasks
 ================

@@ -32,11 +32,14 @@ import sphinx_rtd_theme
 # ones.
 #extensions = [ 'sphinxjp.themes.basicstrap' ]
 extensions = [
+    'sphinx.ext.autosectionlabel',
     'sphinx.ext.autodoc',
     'sphinx-jsonschema',
     'sphinx.ext.autosectionlabel',
     'sphinxcontrib.openapi'
 ]
+
+autosectionlabel_prefix_document = True
 
 pdf_documents = [
 ('index', u'Elassandra-Operator Documentation', u'Elassandra-Operator Documentation', u'Strapdata'),
@@ -113,7 +116,7 @@ exclude_patterns = []
 #show_authors = False
 
 # The name of the Pygments (syntax highlighting) style to use.
-pygments_style = 'sphinx'
+pygments_style = 'default'
 
 # A list of ignored prefixes for module index sorting.
 #modindex_common_prefix = []
@@ -124,6 +127,9 @@ pygments_style = 'sphinx'
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = False
 
+# Add custom javascript
+def setup(app):
+    app.add_javascript('custom.js')
 
 # -- Options for HTML output ----------------------------------------------
 
@@ -159,7 +165,7 @@ html_short_title = u'Elassandra Operator'
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-#html_logo = None
+html_logo = 'images/elassandra-operator.png'
 
 # The name of an image file (relative to this directory) to use as a favicon of
 # the docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
@@ -174,9 +180,11 @@ html_static_path = ['_static']
 # tricks from https://rackerlabs.github.io/docs-rackspace/tools/rtd-tables.html
 html_context = {
     'css_files': [
+        'https://media.readthedocs.org/css/sphinx_rtd_theme.css',
+        'https://media.readthedocs.org/css/readthedocs-doc-embed.css',
         '_static/theme_overrides.css',  # override wide tables in RTD theme
-        ],
-     }
+    ],
+}
 
 # Add any extra paths that contain custom files (such as robots.txt or
 # .htaccess) here, relative to this directory. These files are copied
@@ -215,7 +223,7 @@ html_sidebars = {'**': ['searchbox.html', 'globaltoc.html'] }
 html_show_sphinx = False
 
 # If true, "(C) Copyright ..." is shown in the HTML footer. Default is True.
-#html_show_copyright = True
+html_show_copyright = True
 
 # If true, an OpenSearch description file will be output, and all pages will
 # contain a <link> tag referring to it.  The value of this option must be the
@@ -241,7 +249,7 @@ html_show_sphinx = False
 #html_search_scorer = 'scorer.js'
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'docs'
+htmlhelp_basename = 'ElassandraOperatorDoc'
 
 
 # -- Options for LaTeX output ---------------------------------------------
