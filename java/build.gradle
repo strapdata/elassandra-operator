@@ -4,6 +4,7 @@ plugins {
   id "io.spring.dependency-management" version "1.0.6.RELEASE" apply false
   id "com.github.johnrengelman.shadow" version "4.0.2" apply false
   id "net.ltgt.apt-idea" version "0.21" apply false
+  id 'net.minecrell.licenser' version '0.4.1'
 }
 
 
@@ -13,6 +14,7 @@ subprojects {
   apply plugin: 'io.spring.dependency-management'
   apply plugin: 'com.github.johnrengelman.shadow'
   apply plugin: "net.ltgt.apt-idea"
+  apply plugin: "net.minecrell.licenser"
 
   repositories {
     mavenLocal()
@@ -101,6 +103,15 @@ subprojects {
     version = null
     zip64 = true
     mergeServiceFiles()
+  }
+
+  license {
+    header = new File(rootProject.projectDir, 'java/LICENSE.header')
+    ext {
+      name = 'Strapdata SAS'
+      email = 'support@strapdata.com'
+      year = Calendar.getInstance().get(Calendar.YEAR)
+    }
   }
 }
 
