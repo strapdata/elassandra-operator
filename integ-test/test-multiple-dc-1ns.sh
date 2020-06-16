@@ -16,7 +16,7 @@ kubectl exec -it elassandra-cl1-dc1-0-0 -n $NS -- bash -l -c "for i in {1..$N}; 
 
 # create dc2 in same namespace
 install_elassandra_datacenter $NS cl1 dc2 1
-java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc2 -ns $NS --health GREEN --cql-status=ESTABLISHED
+java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc2 -ns $NS --health GREEN
 
 # update replication map for keyspace foo on dc2 (and system keyspaces)
 cat <<EOF | kubectl apply -f -
