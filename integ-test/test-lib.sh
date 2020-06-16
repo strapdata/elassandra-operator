@@ -17,26 +17,28 @@ test_start() {
   echo "### Starting $1"
   set -x
   set -o pipefail
-  trap finish ERR
+  trap error ERR
 }
 
 test_end() {
   set +e
   trap - ERR
-  sleep 10
+  finish
+}
+
+error() {
+  echo "ERROR occurs, test FAILED"
+  finish
+  exit 1
 }
 
 finish() {
-  echo "ERROR occurs, test FAILED"
-  kubectl get all -n default
-  kubectl get all -n $NS
-  if [ ! -z "$HELM_RELEASE" ]; then
-     helm delete --purge $HELM_RELEASE
-  fi
-  if [ ! -z "$HELM_RELEASE2" ]; then
-     helm delete --purge $HELM_RELEASE2
-  fi
-  exit 1
+  for i in "${HELM_RELEASES[@]}"; do
+    helm delete --purge $i
+  done
+  for i in "${NAMESPACES[@]}"; do
+    kubectl delete namespace $i
+  done
 }
 
 setup_flavor() {
@@ -65,12 +67,12 @@ setup_cluster() {
 
 init_helm() {
    echo "Installing HELM"
-	 kubectl create serviceaccount --namespace kube-system tiller
-	 kubectl create clusterrolebinding tiller-cluster-rule --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
-	 helm init --wait --service-account tiller
+   kubectl create serviceaccount --namespace kube-system tiller
+   kubectl create clusterrolebinding tiller-cluster-rule --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
+   helm init --wait --service-account tiller
 
   # K8s 1.16+ apiVersion issue
-	# helm init --service-account tiller --override spec.selector.matchLabels.'name'='tiller',spec.selector.matchLabels.'app'='helm' --output yaml | sed 's@apiVersion: extensions/v1beta1@apiVersion: apps/v1@' | kubectl apply -f -
+  # helm init --service-account tiller --override spec.selector.matchLabels.'name'='tiller',spec.selector.matchLabels.'app'='helm' --output yaml | sed 's@apiVersion: extensions/v1beta1@apiVersion: apps/v1@' | kubectl apply -f -
   echo "HELM installed"
 }
 
@@ -233,9 +235,9 @@ create_namespace() {
 }
 
 generate_ca_cert() {
-	echo "generating root CA"
-	openssl genrsa -out MyRootCA.key 2048
-	openssl req -x509 -new -nodes -key MyRootCA.key -sha256 -days 1024 -out MyRootCA.pem
+  echo "generating root CA"
+  openssl genrsa -out MyRootCA.key 2048
+  openssl req -x509 -new -nodes -key MyRootCA.key -sha256 -days 1024 -out MyRootCA.pem
 }
 
 generate_client_cert() {
@@ -248,4 +250,30 @@ generate_client_cert() {
 
 view_cert() {
     openssl x509 -text -in $1
+}
+
+unction deploy_prometheus_operator() {
+  helm install $HELM_DEBUG --name promop \
+    --set prometheus.ingress.enabled=true,prometheus.ingress.hosts[0]="prometheus.${DNS_DOMAIN}",prometheus.ingress.annotations."kubernetes\.io/ingress\.class"="traefik" \
+    --set alertmanager.ingress.enabled=true,alertmanager.ingress.hosts[0]="alertmanager.${DNS_DOMAIN}",alertmanager.ingress.annotations."kubernetes\.io/ingress\.class"="traefik" \
+    --set grafana.ingress.enabled=true,grafana.ingress.hosts[0]="grafana.${DNS_DOMAIN}",grafana.ingress.annotations."kubernetes\.io/ingress\.class"="traefik" \
+    -f prometheus-operator-values.yaml \
+  /Users/vroyer/dev/git/helm/charts/stable/prometheus-operator
+}
+
+function upgrade_prometheus_operator() {
+  helm upgrade $HELM_DEBUG \
+    --set prometheus.ingress.enabled=true,prometheus.ingress.hosts[0]="prometheus.${DNS_DOMAIN}",prometheus.ingress.annotations."kubernetes\.io/ingress\.class"="traefik" \
+    --set alertmanager.ingress.enabled=true,alertmanager.ingress.hosts[0]="alertmanager.${DNS_DOMAIN}",alertmanager.ingress.annotations."kubernetes\.io/ingress\.class"="traefik" \
+    --set grafana.ingress.enabled=true,grafana.ingress.hosts[0]="grafana.${DNS_DOMAIN}",grafana.ingress.annotations."kubernetes\.io/ingress\.class"="traefik" \
+    -f prometheus-operator-values.yaml \
+  promop /Users/vroyer/dev/git/helm/charts/stable/prometheus-operator
+}
+
+function undeploy_prometheus_operator() {
+  kubectl delete crd prometheuses.monitoring.coreos.com
+  kubectl delete crd prometheusrules.monitoring.coreos.com
+  kubectl delete crd servicemonitors.monitoring.coreos.com
+  kubectl delete crd alertmanagers.monitoring.coreos.com
+  helm delete --purge promop
 }

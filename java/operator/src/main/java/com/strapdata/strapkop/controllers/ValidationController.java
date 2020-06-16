@@ -66,7 +66,7 @@ public class ValidationController {
                 throw new IllegalArgumentException("externalDns is enabled but no DNS TTL is configured, please fix your elassandra CRD");
         }
     }
-    
+
     /**
      * Use the fabric8 datacenter for webhook admission.
      * @param admissionReview
@@ -101,6 +101,11 @@ public class ValidationController {
                     // Attempt to change the datacenterName
                     if (!deployedDc.getSpec().getDatacenterName().equals(dataCenterSpec.getDatacenterName())) {
                         throw new IllegalArgumentException("Cannot change the cassandra datacenter name");
+                    }
+
+                    // Attempt to change the storageClassName
+                    if (!deployedDc.getSpec().getDataVolumeClaim().getStorageClassName().equals(dataCenterSpec.getDataVolumeClaim().getStorageClassName())) {
+                        throw new IllegalArgumentException("Cannot change the storageClassName");
                     }
 
                     // check dc spec consistency

@@ -101,7 +101,7 @@ public class DataCenterDeleteAction {
                 statefulsetCache.remove(key);
 
                 sidecarConnectionCache.purgeDataCenter(dataCenter);
-                jmxConnectorCache.remove(key);
+                jmxConnectorCache.purgeDataCenter(dataCenter);
 
                 cqlRoleManager.remove(dataCenter);
                 cqlKeyspaceManager.remove(dataCenter);

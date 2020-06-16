@@ -6,8 +6,8 @@ setup_flavor
 N=100
 NS="ns4"
 NS2="ns4bis"
-HELM_RELEASE="$NS-cl1-dc1"
-HELM_RELEASE2="NS2-cl1-dc2"
+HELM_RELEASES=("$NS-cl1-dc1" "$NS2-cl1-dc2")
+NAMESPACES=("$NS" "$NS2")
 
 test_start $0
 install_elassandra_datacenter $NS cl1 dc1 1

@@ -7,6 +7,8 @@ create_cluster cluster2
 
 N=100
 NS="ns5"
+HELM_RELEASES=("$NS-cl1-dc1")
+NAMESPACES=("$NS")
 
 test_start $0
 kubectx kind-cluster1
