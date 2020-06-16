@@ -34,7 +34,7 @@ cache:
   - "$HOME/google-cloud-sdk/"
 before_install:
   # Enable swap
-  - sudo fallocate -l 4G /swapfile
+  - sudo fallocate -l 6G /swapfile
   - sudo chmod 600 /swapfile
   - sudo mkswap /swapfile
   - sudo swapon /swapfile
