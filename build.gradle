@@ -24,6 +24,8 @@ ext {
   repoUsername = project.hasProperty("repoUsername") ? project.getProperty("repoUsername") : System.getenv("NEXUS_USERNAME")
   repoPassword = project.hasProperty("repoPassword") ? project.getProperty("repoPassword") : System.getenv("NEXUS_PASSWORD")
   println "repoUsername=$repoUsername"
+
+  connectionString = project.hasProperty("connectionString") ? project.getProperty("connectionString") : System.getenv("AZURE_CONNECTION_STRING")
 }
 
 configure(subprojects.findAll { it.name.contains("docker") }) {
@@ -54,17 +56,34 @@ if (!ext.javaElassandraVersion) {
   ext.javaElassandraVersion = ext.latestElassandraVersion
 }
 
+
+task prepareDependenciesSources(type:Exec) {
+  // download the source code of the thirdparty libraries under GPL & LGPL license
+  commandLine './download-sources.sh', 'sources-url.csv'
+}
+
 licenseReport {
-  renderers = [new CsvReportRenderer(separator:';'), new TextReportRenderer(), new InventoryHtmlReportRenderer('index.html', 'Strapkop License Report')]
+  renderers = [new CsvReportRenderer(separator:';'), new TextReportRenderer(), new InventoryHtmlReportRenderer('index.html', 'Elassandra Operator License Report')]
   filters = [new LicenseBundleNormalizer(bundlePath: rootProject.file('license-normalizer-bundle.json'))]
   projects = [project] + project.subprojects
   excludes = [  ]
 }
 
+// see storage account -> access keys for connectionString
+task uploadLicenseReport(type: com.strapdata.gradle.AzureStorageDeployTask) {
+  dependsOn generateLicenseReport
+  connectionString connectionString
+  container 'elassandra-operator'
+  fileToDeploy 'build/reports/dependency-license/index.html'
+  mimeType 'text/html'
+}
 
-task prepareDependenciesSources(type:Exec) {
-  // download the source code of the thirdparty libraries under GPL & LGPL license
-  commandLine './download-sources.sh', 'sources-url.csv'
+task uploadLicenseNotices(type: com.strapdata.gradle.AzureStorageDeployTask) {
+  dependsOn generateLicenseReport
+  connectionString connectionString
+  container 'elassandra-operator'
+  fileToDeploy 'build/reports/dependency-license/THIRD-PARTY-NOTICES.txt'
+  mimeType 'text/plain'
 }
 
 task dockerBuild {
@@ -88,21 +107,4 @@ task dockerBuildAllVersions {
 task dockerPushAllVersions {
   dependsOn ':java:operator:jib'
   dependsOn ':docker:dockerPushAllVersions'
-}
-
-// see storage account -> access keys for connectionString
-task uploadLicenseReport(type: com.strapdata.gradle.AzureStorageDeployTask) {
-  dependsOn generateLicenseReport
-  connectionString 'DefaultEndpointsProtocol=https;AccountName=strapdata;AccountKey=R83KvCF2MzZzzFXnqi6yi5MoUgS90/CcPMakbQBSJMpQJSyIBIn13QtfKQm/oC/CDplVKdgn11fEagGlcrpPIA==;EndpointSuffix=core.windows.net'
-  container 'strapkop'
-  fileToDeploy 'build/reports/dependency-license/index.html'
-  mimeType 'text/html'
-}
-
-task uploadLicenseNotices(type: com.strapdata.gradle.AzureStorageDeployTask) {
-  dependsOn generateLicenseReport
-  connectionString 'DefaultEndpointsProtocol=https;AccountName=strapdata;AccountKey=R83KvCF2MzZzzFXnqi6yi5MoUgS90/CcPMakbQBSJMpQJSyIBIn13QtfKQm/oC/CDplVKdgn11fEagGlcrpPIA==;EndpointSuffix=core.windows.net'
-  container 'strapkop'
-  fileToDeploy 'build/reports/dependency-license/THIRD-PARTY-NOTICES.txt'
-  mimeType 'text/plain'
 }
