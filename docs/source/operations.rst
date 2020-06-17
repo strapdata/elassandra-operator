@@ -46,16 +46,16 @@ You can scale up or scale down a datacenter by setting the ``replicas`` attribut
 When scaling up:
 
 * The datacenter ``status.needCleanup`` is set to true right after adding an Elassandra node, indicating a cleanup should be
-done on all nodes in the datacenter. This is up to the administrator to later run a **cleanup** task to cleanup keys no longer belonging to the nodes.
+  done on all nodes in the datacenter. This is up to the administrator to later run a **cleanup** task to cleanup keys no longer belonging to the nodes.
 * Once the datacenter runs the desired number of nodes, the replication factor of managed keyspaces are automatically
-increased up to the target replication factor, and, in order to get consistent reads with consistency level of two or more,
-a repair task is played each time the replication factor is increased by one up to the target replication factor.
+  increased up to the target replication factor, and, in order to get consistent reads with consistency level of two or more,
+  a repair task is played each time the replication factor is increased by one up to the target replication factor.
 
 When scaling down:
 
 * The removed Elassandra nodes are decommissioned and their data are streamed to the remaining nodes (it can takes a while depending on the data volumes hosted on the removed nodes).
 * Once the datacenter runs the desired number of nodes, the replication factor of managed keyspaces are adjusted to the number of nodes if needed (The Replication Factor of a keyspace should not
-be greater than the number of nodes in the datacenter).
+  be greater than the number of nodes in the datacenter).
 
 .. warning::
 
