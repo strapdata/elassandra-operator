@@ -14,7 +14,7 @@ install_elassandra_datacenter $NS cl1 dc1 1
 java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --health GREEN --cql-status=ESTABLISHED
 
 # create an index
-kubectl exec -it elassandra-cl1-dc1-0-0 -n $NS -- bash -l -c "for i in {1..$N}; do post foo/bar '{\"foo\":\"bar\"}'; done"
+kubectl exec elassandra-cl1-dc1-0-0 -n $NS -- bash -l -c "for i in {1..$N}; do post foo/bar '{\"foo\":\"bar\"}'; done"
 
 # create namespace NS2 and copy cluster secrets
 kubectl create namespace $NS2 || true
@@ -76,22 +76,22 @@ java/edctl/build/libs/edctl watch-task -n updaterouting-dc2-$$ -ns $NS2 --phase 
 sleep 5
 
 # check index
-TOTAL_HIT=$(kubectl exec -it elassandra-cl1-dc2-0-0 -n $NS2 -- bash -l -c "get 'foo/bar/_search?pretty'" | tail -n +4 | jq ".hits.total")
+TOTAL_HIT=$(kubectl exec elassandra-cl1-dc2-0-0 -n $NS2 -- bash -l -c "get 'foo/bar/_search?pretty'" | tail -n +4 | jq ".hits.total")
 if [ "$TOTAL_HIT" != "$N" ]; then
    finish
 fi
 
 # create a new elasticsearch index replicated on dc1 and dc2
-kubectl exec -it elassandra-cl1-dc2-0-0 -n $NS2 -- bash -l -c "put _template/replicated '{ \"index_patterns\": [\"foo*\"],\"settings\": { \"index.replication\":\"dc1:1,dc2:1\" }}'"
-kubectl exec -it elassandra-cl1-dc2-0-0 -n $NS2 -- bash -l -c "for i in {1..$N}; do post foo2/bar '{\"foo\":\"bar\"}'; done"
+kubectl exec elassandra-cl1-dc2-0-0 -n $NS2 -- bash -l -c "put _template/replicated '{ \"index_patterns\": [\"foo*\"],\"settings\": { \"index.replication\":\"dc1:1,dc2:1\" }}'"
+kubectl exec elassandra-cl1-dc2-0-0 -n $NS2 -- bash -l -c "for i in {1..$N}; do post foo2/bar '{\"foo\":\"bar\"}'; done"
 # wait for async replication en ES refresh
 sleep 5
-TOTAL_HIT=$(kubectl exec -it elassandra-cl1-dc1-0-0 -n $NS -- bash -l -c "get 'foo/bar/_search?pretty'" | tail -n +4 | jq ".hits.total")
+TOTAL_HIT=$(kubectl exec elassandra-cl1-dc1-0-0 -n $NS -- bash -l -c "get 'foo/bar/_search?pretty'" | tail -n +4 | jq ".hits.total")
 if [ "$TOTAL_HIT" != "$N" ]; then
    echo "Error, expecting $N docs in foo on dc1/$NS"
    finish
 fi
-TOTAL_HIT=$(kubectl exec -it elassandra-cl1-dc2-0-0 -n $NS2 -- bash -l -c "get 'foo/bar/_search?pretty'" | tail -n +4 | jq ".hits.total")
+TOTAL_HIT=$(kubectl exec elassandra-cl1-dc2-0-0 -n $NS2 -- bash -l -c "get 'foo/bar/_search?pretty'" | tail -n +4 | jq ".hits.total")
 if [ "$TOTAL_HIT" != "$N" ]; then
    echo "Error, expecting $N docs in foo on dc2/$NS2"
    finish
@@ -138,7 +138,7 @@ EOF
 sleep 15
 
 # check dead nodes are removed
-kubectl exec -it elassandra-cl1-dc1-0-0 -n $NS -- bash -lc "nodetool -u cassandra -pwf /etc/cassandra/jmxremote.password  --jmxmp  --ssl status" | grep -v "DN "
+kubectl exec elassandra-cl1-dc1-0-0 -n $NS -- bash -lc "nodetool -u cassandra -pwf /etc/cassandra/jmxremote.password  --jmxmp  --ssl status" | grep -v "DN "
 
 # cleanup
 uninstall_elassandra_datacenter $NS cl1 dc1
