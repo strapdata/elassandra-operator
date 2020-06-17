@@ -57,7 +57,7 @@ before_install:
   - export PATH=$PATH:$PWD/linux-amd64/
   # Install sphinx
   - pip3 install setuptools
-  - pip3 install sphinx~=2.4.4 sphinx_rtd_theme sphinx-jsonschema sphinxcontrib-openapi
+  - pip3 install sphinx~=2.4.4 sphinx_rtd_theme sphinx-jsonschema sphinxcontrib-openapi~=0.7.0
 install:
 - cd ${TRAVIS_BUILD_DIR}
 - ./gradlew --version
