@@ -20,6 +20,7 @@ package com.strapdata.strapkop.handler;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.strapdata.strapkop.cache.DataCenterCache;
+import com.strapdata.strapkop.cache.PodCache;
 import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.Pod;
@@ -78,6 +79,9 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
     DataCenterCache dataCenterCache;
 
     @Inject
+    PodCache podCache;
+
+    @Inject
     K8sResourceUtils k8sResourceUtils;
 
     @Inject
@@ -91,6 +95,10 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
         managed = meterRegistry.gauge("k8s.managed", tags, new AtomicInteger(0));
     }
 
+    public void updateCache(V1Pod pod) {
+        podCache.put(new Key(pod.getMetadata()), pod);
+    }
+
     @Override
     public void accept(K8sWatchEvent<V1Pod> event) throws Exception {
         logger.trace("ElassandraPod event={}", event);
@@ -99,17 +107,20 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
                 logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 meterRegistry.counter("k8s.event.init", tags).increment();
                 managed.incrementAndGet();
+                updateCache(event.getResource());
                 break;
 
             case ADDED:
                 logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 meterRegistry.counter("k8s.event.added", tags).increment();
                 managed.incrementAndGet();
+                updateCache(event.getResource());
                 break;
 
             case MODIFIED:
                 logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 meterRegistry.counter("k8s.event.modified", tags).increment();
+                updateCache(event.getResource());
                 if (POD_PENDING_PHASE.equalsIgnoreCase(event.getResource().getStatus().getPhase())) {
                     if (event.getResource().getStatus() != null && event.getResource().getStatus().getConditions() != null) {
                         List<V1PodCondition> conditions = event.getResource().getStatus().getConditions();
@@ -146,6 +157,7 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
             case DELETED:
                 logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 V1Pod pod = event.getResource();
+                podCache.remove(new Key(pod.getMetadata()));
                 String parent = Pod.extractLabel(pod, OperatorLabels.PARENT);
                 String clusterName = Pod.extractLabel(pod, OperatorLabels.CLUSTER);
                 String datacenterName = Pod.extractLabel(pod, OperatorLabels.DATACENTER);

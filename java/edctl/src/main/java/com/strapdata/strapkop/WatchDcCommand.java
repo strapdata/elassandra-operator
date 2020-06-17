@@ -27,6 +27,7 @@ import io.kubernetes.client.util.Config;
 import io.kubernetes.client.util.Watch;
 import picocli.CommandLine;
 
+import java.util.Date;
 import java.util.concurrent.Callable;
 
 @CommandLine.Command(name = "watch-dc", description = "Watch elassandra datacenter subcommand")
@@ -46,6 +47,9 @@ public class WatchDcCommand implements Callable<Integer> {
 
     @CommandLine.Option(names = {"--cql-status"}, description = "Expected elassandra datacenter CQL status")
     CqlStatus cqlStatus;
+
+    @CommandLine.Option(names = {"--managed-keyspace"}, description = "Expected managed keyspace")
+    String managedKeyspace = null;
 
     @CommandLine.Option(names = {"-r", "--replicas"}, description = "Expected number of ready replicas")
     Integer readyReplicas;
@@ -70,6 +74,7 @@ public class WatchDcCommand implements Callable<Integer> {
                 (phase == null ? "" : " phase=" + phase) +
                 (health == null ? "" : " health=" + health) +
                 (cqlStatus == null ? "" : " cqlStatus=" + cqlStatus) +
+                (managedKeyspace == null ? "" : " managedKeyspace=" + managedKeyspace) +
                 (readyReplicas == null ? "" : " replicas=" + readyReplicas) +
                 (reaperPhase == null ? "" : " reaper=" + reaperPhase) +
                 (timeout == null ? "" : " timeout=" + timeout + "s"));
@@ -88,13 +93,15 @@ public class WatchDcCommand implements Callable<Integer> {
 
         long start = System.currentTimeMillis();
         for (Watch.Response<DataCenter> item : watch) {
-            System.out.printf("%s : %s phase=%s heath=%s replicas=%d reaper=%s cqlStatus=%s\n",
+            System.out.printf("%tT %s: %s phase=%s heath=%s replicas=%d reaper=%s cqlStatus=%s managedKeyspaces=%s\n",
+                    new Date(),
                     item.type, item.object.getMetadata().getName(),
                     item.object.getStatus().getPhase().name(),
                     item.object.getStatus().getHealth().name(),
                     item.object.getStatus().getReadyReplicas(),
                     item.object.getStatus().getReaperPhase(),
-                    item.object.getStatus().getCqlStatus());
+                    item.object.getStatus().getCqlStatus(),
+                    item.object.getStatus().getKeyspaceManagerStatus().getKeyspaces());
             boolean conditionMet = true;
 
             if (Boolean.TRUE.equals(verbose))
@@ -107,6 +114,9 @@ public class WatchDcCommand implements Callable<Integer> {
                 conditionMet = false;
 
             if (cqlStatus != null && !cqlStatus.equals(item.object.getStatus().getCqlStatus()))
+                conditionMet = false;
+
+            if (managedKeyspace != null && !item.object.getStatus().getKeyspaceManagerStatus().getKeyspaces().contains(managedKeyspace))
                 conditionMet = false;
 
             if (readyReplicas != null && !readyReplicas.equals(item.object.getStatus().getReadyReplicas()))

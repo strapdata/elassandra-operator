@@ -49,30 +49,82 @@ Multi-datacenter cluster
 ------------------------
 
 The Elassandra operator can manage multiple Elassandra datacenters (or a Cassandra datacenter if Elasticsearch is disabled) in
-one or multiple Kubernetes clusters. To achieve this, the Elassandra operator expose an HTTP endpoint **/seeds/{namespace}/{clusterName}/{dcName}**
-returning the IP addresses of Elassandra seed pods (one seed per rack, the pod with ordinal index 0 in each statefulset), or their DNS names
-when the HTTP request includes the parameter ``externalDNS=true``.
+one or multiple Kubernetes clusters. In order to connect multiple Elassandra datacenters, you can use the DNS names of seed nodes, or
+use the operator to get IP addresses of seed nodes.
 
-Thus, you can join datacenters having the same clusterName in the following configuration:
+Using DNS names of seed nodes
+_____________________________
 
-* When running in the same Kubernetes cluster, same namespace, the elassandra operator automatically join the datacenters together (the remoteSeeder is automatically set).
-* When running in the same Kubernetes cluster, but in different namespaces, you need to specify a list of ``cassandra.remoteSeeders`` URLs
-  in your datacenter spec, where each entry an URL of the form of https://elassandra-operator.default.svc/seeds/{remoteNamespace}/{clusterName}/{remoteDcName}
+Basically, seeds nodes are Elassandra pods with index 0 in each StatefulSet, and DNS names for these seed nodes are:
 
-  For example, if you run datacenter **dc1** in the cluster **cl1** in namespace **ns1**, you need to deploy **dc2** in namespace **ns2** with the following remoteSeeders:
+* From inside the Kubernetes cluster, seeds DNS names are in the form:
+
+  .. code::
+     elassandra-[clusterName]-[dcName]-[rackIndex]-0.elassandra-[clusterName]-[dcName]-[rackIndex].[namespace].svc
+
+* From outside the Kubernetes cluster, when the externalDns publication is enabled in your datacenter spec, DNS names for
+  pods are in the following form, where **podIndex=0** for seed nodes:
+
+  .. code::
+     cassandra-[externalDns.root]-[rackIndex]-[podIndex].[externalDns.domain]
+
+When an Elassandra node restarts with another IP address, the Kubernetes internal DNS is automatically updated, and the
+``ExternalDNS <https://github.com/kubernetes-sigs/external-dns>`_ operator also update your DNS zone.
+
+In order to connect a datacenter **dc1** to another datacenter **dc2** in the Cassandra cluster **cl1**, you need to specify the remote seeds names in your datacenter spec.
+For example, if dc1 and dc2 respectively running in namespaces **ns1** and **ns2** in the same kubernetes cluster, you would have the following spec on dc1:
+
+    .. code::
+        remoteSeeds:
+          - elassandra-cl1-dc2-0-0.elassandra-cl1-dc2-0.ns2.svc
+          - elassandra-cl1-dc2-1-0.elassandra-cl1-dc2-1.ns2.svc
+          - elassandra-cl1-dc2-2-0.elassandra-cl1-dc2-2.ns2.svc
+
+If **dc1** and **dc2** are deployed in two Kubernetes clusters, you would have the following spec on **dc1**.
+Of course, the ``externalDns.root`` must different in dc1 and dc2 to avoid DNS naming conflicts.
+
+    .. code::
+        externalDns:
+          root: dc1
+          domain: my-domain.com
+        remoteSeeds:
+          - cassandra-dc2-0-0.my-domain.com
+          - cassandra-dc2-1-0.my-domain.com
+          - cassandra-dc2-2-0.my-domain.com
+
+And on **dc2**:
+
+    .. code::
+        externalDns:
+          root: dc2
+          domain: my-domain.com
+        remoteSeeds:
+          - cassandra-dc1-0-0.my-domain.com
+          - cassandra-dc1-1-0.my-domain.com
+          - cassandra-dc1-2-0.my-domain.com
+
+Using the Elassandra operator
+_____________________________
+
+Elassandra nodes run a SeedProvider that can request multiple Elassandra operators to get seed node IP addresses for each datacenters.
+
+.. image:: ./images/multi-dc-architecture.png
+
+The Elassandra operator HTTP endpoint **/seeds/{namespace}/{clusterName}/{dcName}** returns
+the Cassandra RPC broadcast IP addresses of Elassandra seed pods, which are pods IP addresses by default.
+If ``networking.hostNetworkEnabled=true`` or ``networking.hostPortEnabled=true`` in your Elassandra datacenter spec,
+the Cassandra RPC broadcast address of an Elassandra pod running on the Kubernetes node will be :
+
+* The Kubernetes node external-IP if available,
+* or the IP address defined by the node label ``kubernetes.strapdata.com/public-ip`` if available,
+* or the Kubernetes node internal IP address in last resort.
+
+For example, if you run datacenter **dc1** in the cluster **cl1** in namespace **ns1**, you can connect to
+a remote datacenter **dc2** deployed in namespace **ns2** with the following datacenter spec. Of course,
+the elassandra-operator.my-domain.com must be properly resolved in your Kubernetes infrastructure.
 
 .. code::
 
-  cassandra.remoteSeeders[0]=https://elassandra-operator.default.svc/seeds/ns1/cl1/dc1
+    remoteSeeders:
+    - https://elassandra-operator.my-domain.com/seeds/ns2/cl1/dc2
 
-* When running in different Kubernetes clusters, you need to run the Elassandra operator in each Kubernetes cluster
-  with an ingress controller allowing elassandra nodes to request the remote operator **/seeds** endpoint to discover remote seeds IP addresses.
-
-As show in the following figure, each Elassandra operator expose a **/seeds** endpoint returning the DNS names of seed nodes:
-
-* When datacenters are in the same Kubernetes cluster, DNS names of seed nodes are internal DNS names.
-* When running in distinct Kubernetes clusters, the Elassandra operator returns DNS names managed in a DNS zone updated by the ExternalDNS operator. On the Elassandra nodes, an init-container
-  publishes a `DNSEndpoint <https://github.com/kubernetes-sigs/external-dns/blob/master/docs/contributing/crd-source.md>`_ manifest to
-  register its IP address in the DNS zone (see the ExternalDNS block in the Elassandra datacenter spec).
-
-.. image:: ./images/multi-dc-architecture.png

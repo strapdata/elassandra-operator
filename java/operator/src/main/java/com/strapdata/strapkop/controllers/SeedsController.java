@@ -1,23 +1,49 @@
+/*
+ * Copyright (C) 2020 Strapdata SAS (support@strapdata.com)
+ *
+ * The Elassandra-Operator is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * The Elassandra-Operator is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with the Elassandra-Operator.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package com.strapdata.strapkop.controllers;
 
-import com.google.common.collect.ImmutableMap;
+import com.strapdata.strapkop.cache.DataCenterCache;
+import com.strapdata.strapkop.cache.NodeCache;
+import com.strapdata.strapkop.cache.PodCache;
+import com.strapdata.strapkop.cache.StatefulsetCache;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
+import io.kubernetes.client.openapi.models.V1Node;
+import io.kubernetes.client.openapi.models.V1NodeAddress;
+import io.kubernetes.client.openapi.models.V1Pod;
+import io.kubernetes.client.openapi.models.V1StatefulSet;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Error;
 import io.micronaut.http.annotation.*;
 import io.reactivex.Single;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 
 /**
  * Return nodes IP of pod 0 for active racks
@@ -30,10 +56,23 @@ public class SeedsController {
 
     private final K8sResourceUtils k8sResourceUtils;
     private final CoreV1Api coreApi;
+    private final DataCenterCache dataCenterCache;
+    private final StatefulsetCache statefulsetCache;
+    private final NodeCache nodeCache;
+    private final PodCache podCache;
 
-    public SeedsController(CoreV1Api coreApi, K8sResourceUtils k8sResourceUtils) {
+    public SeedsController(final CoreV1Api coreApi,
+                           final K8sResourceUtils k8sResourceUtils,
+                           final DataCenterCache dataCenterCache,
+                           final StatefulsetCache statefulsetCache,
+                           final PodCache podCache,
+                           final NodeCache nodeCache) {
         this.coreApi= coreApi;
         this.k8sResourceUtils = k8sResourceUtils;
+        this.dataCenterCache = dataCenterCache;
+        this.statefulsetCache = statefulsetCache;
+        this.podCache = podCache;
+        this.nodeCache = nodeCache;
     }
 
     /**
@@ -49,7 +88,6 @@ public class SeedsController {
      * @param namespace
      * @param clusterName
      * @param datacenterName
-     * @param externalDns
      * @param remoteSeeder
      * @return
      */
@@ -57,50 +95,64 @@ public class SeedsController {
     public Single<List<String>> seeds(@QueryValue("namespace") String namespace,
                                       @QueryValue("clusterName") String clusterName,
                                       @QueryValue("datacenterName") String datacenterName,
-                                      @QueryValue(value = "externalDns",defaultValue = "false") Boolean externalDns,
                                       @Body String remoteSeeder) throws ApiException {
-        return k8sResourceUtils.readDatacenter(new Key(OperatorNames.dataCenterResource(clusterName, datacenterName), namespace))
-                .map(dataCenter -> {
-                List<String> seeds = new ArrayList<>();
+        Key dcKey = new Key(OperatorNames.dataCenterResource(clusterName, datacenterName), namespace);
+        DataCenter dataCenter = dataCenterCache.get(dcKey);
+        if (dataCenter == null)
+            throw new IllegalArgumentException("Datacenter not found");
 
-                k8sResourceUtils.listNamespacedStatefulSets(namespace, null, OperatorLabels.toSelector(OperatorLabels.datacenter(dataCenter)))
-                        .forEach(statefulSet -> {
-                                if (statefulSet != null && statefulSet.getStatus() != null && statefulSet.getStatus().getCurrentReplicas() != null && statefulSet.getStatus().getCurrentReplicas() > 0) {
-                                    String podName = OperatorNames.podName(dataCenter, Integer.parseInt(statefulSet.getMetadata().getLabels().get(OperatorLabels.RACKINDEX)), 0);
-                                    // retreive pod node IP
-                                    final String labelSelector = OperatorLabels.toSelector(ImmutableMap.of(OperatorLabels.POD, podName));
-                                    try {
-                                        k8sResourceUtils.listNamespacedPods(namespace, null, labelSelector).forEach(pod -> {
-                                            String nodeName = pod.getSpec().getNodeName();
-                                            logger.debug("found node={}", nodeName);
-                                            if (pod.getStatus() != null && pod.getStatus().getHostIP() != null) {
-                                                if (dataCenter.getSpec().getNetworking().getHostPortEnabled() == true ||
-                                                        dataCenter.getSpec().getNetworking().getHostNetworkEnabled() == true) {
-                                                    if (externalDns && dataCenter.getSpec().getExternalDns() != null && dataCenter.getSpec().getExternalDns().getEnabled()) {
-                                                        String seedHostname =
-                                                                "elassandra-" + dataCenter.getMetadata().getNamespace()+
-                                                                        "-" + dataCenter.getSpec().getClusterName().toLowerCase(Locale.ROOT) +
-                                                                        "-" + dataCenter.getSpec().getDatacenterName().toLowerCase(Locale.ROOT) +
-                                                                        "-" + statefulSet.getMetadata().getLabels().get(OperatorLabels.RACK).toLowerCase(Locale.ROOT) +
-                                                                        "-0";
-                                                        logger.debug("Add external hostname={}", seedHostname);
-                                                    } else {
-                                                        logger.debug("Add hostIp={}", pod.getStatus().getHostIP());
-                                                        seeds.add(pod.getStatus().getHostIP());
-                                                    }
-                                                } else {
-                                                    logger.debug("Add podIp={}", pod.getStatus().getPodIP());
-                                                    seeds.add(pod.getStatus().getPodIP());
-                                                }
-                                            }
-                                        });
-                                    } catch (ApiException e) {
-                                        logger.warn("Failed to get pod list", e);
-                                    }
-                                }
-                        });
-                logger.info("remoteSeeder={} seeds={}", remoteSeeder, seeds);
-                return seeds;
-        });
+        TreeMap<String, V1StatefulSet> stsMap = statefulsetCache.get(dcKey);
+        if (stsMap == null)
+            throw new IllegalArgumentException("no StatefulSet not found");
+
+        List<String> seeds = new ArrayList<>();
+        Map<String, String> hostIpToExternalIp = new HashMap<>();
+        for(V1Node node : nodeCache.values()) {
+            String internalIp = null;
+            String externalIp = null;
+            if (node.getStatus() != null && node.getStatus().getAddresses() != null) {
+                for(V1NodeAddress v1NodeAddress : node.getStatus().getAddresses()) {
+                    if (v1NodeAddress.getType().equals("InternalIP")) {
+                        internalIp = v1NodeAddress.getAddress();
+                    }
+                    if (v1NodeAddress.getType().equals("ExternalIP")) {
+                        externalIp = v1NodeAddress.getAddress();
+                    }
+                }
+            }
+            String publicIp = node.getMetadata().getAnnotations().get("kubernetes.strapdata.com/public-ip");
+            if (publicIp != null)
+                externalIp = publicIp;
+
+            if (internalIp != null)
+                hostIpToExternalIp.put(internalIp, (externalIp == null) ? internalIp : externalIp);
+        }
+
+        for(V1StatefulSet statefulSet : stsMap.values()) {
+            if (statefulSet.getStatus() != null && statefulSet.getStatus().getCurrentReplicas() != null && statefulSet.getStatus().getCurrentReplicas() > 0) {
+                String podName = OperatorNames.podName(dataCenter, Integer.parseInt(statefulSet.getMetadata().getLabels().get(OperatorLabels.RACKINDEX)), 0);
+                Key podKey = new Key(podName, namespace);
+                V1Pod pod = podCache.get(podKey);
+                if (pod != null && pod.getStatus() != null && pod.getStatus().getHostIP() != null) {
+                    String hostIp = pod.getStatus().getHostIP();
+                    String externalIp = hostIpToExternalIp.get(hostIp);
+                    if (dataCenter.getSpec().getNetworking().getHostNetworkEnabled() || dataCenter.getSpec().getNetworking().getHostPortEnabled()) {
+                        seeds.add(externalIp == null ? hostIp : externalIp);
+                    } else {
+                        seeds.add(pod.getStatus().getPodIP());
+                    }
+                }
+            }
+        }
+        logger.info("remoteSeeder={} seeds={}", remoteSeeder, seeds);
+        return Single.just(seeds);
+    }
+
+    @Error
+    @SuppressWarnings("rawtypes")
+    public HttpResponse<String> handleError(HttpRequest request, Throwable e) {
+        if (e instanceof IllegalArgumentException)
+            return HttpResponse.<String>status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        return HttpResponse.<String>status(HttpStatus.BAD_REQUEST).body(e.getMessage());
     }
 }

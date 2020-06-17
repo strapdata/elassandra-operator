@@ -48,12 +48,4 @@ public class Networking {
     @SerializedName("hostNetworkEnabled")
     @Expose
     private Boolean hostNetworkEnabled = false;
-
-    /**
-     * Enable external LoadBalancer for each Elassandra node.
-     */
-    @JsonPropertyDescription("Enable external LoadBalancer for each Elassandra node")
-    @SerializedName("nodeLoadBalancerEnabled")
-    @Expose
-    private Boolean nodeLoadBalancerEnabled = false;
 }
