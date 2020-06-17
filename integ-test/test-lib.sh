@@ -29,6 +29,7 @@ test_end() {
 error() {
   echo "ERROR occurs, test FAILED"
   finish
+  kubectl logs --tail=500 -l app=elassandra-operator -n default
   exit 1
 }
 
