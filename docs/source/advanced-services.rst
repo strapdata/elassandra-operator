@@ -87,12 +87,13 @@ Here is the datacenter spec to configure kibana deployment:
 
 .. jsonschema:: datacenter-spec.json#/properties/elasticsearch
 
-You can adjust Kibana memory by adding the following environment variable:
+You can adjust Kibana memory by adding the following podTemplate to set environment variables:
 
 .. code::
 
     kibana:
       spaces:
+      - name: ""
         podTemplate:
           spec:
             containers:
@@ -100,3 +101,4 @@ You can adjust Kibana memory by adding the following environment variable:
               env:
               - name: NODE_OPTIONS
                 value: "--max-old-space-size=4096"
+

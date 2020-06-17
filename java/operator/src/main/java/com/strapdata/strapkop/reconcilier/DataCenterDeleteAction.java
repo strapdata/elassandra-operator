@@ -53,6 +53,7 @@ public class DataCenterDeleteAction {
     private final SidecarConnectionCache sidecarConnectionCache;
     private final JMXConnectorCache jmxConnectorCache;
     private final StatefulsetCache statefulsetCache;
+    private final PodCache podCache;
 
     private final CqlKeyspaceManager cqlKeyspaceManager;
     private final CqlRoleManager cqlRoleManager;
@@ -67,6 +68,7 @@ public class DataCenterDeleteAction {
                                   final SidecarConnectionCache sidecarConnectionCache,
                                   final JMXConnectorCache jmxConnectorCache,
                                   final StatefulsetCache statefulsetCache,
+                                  final PodCache podCache,
                                   CqlKeyspaceManager cqlKeyspaceManager,
                                   CqlRoleManager cqlRoleManager,
                                   @Parameter("dataCenter") DataCenter dataCenter,
@@ -80,6 +82,7 @@ public class DataCenterDeleteAction {
         this.sidecarConnectionCache = sidecarConnectionCache;
         this.statefulsetCache = statefulsetCache;
         this.jmxConnectorCache = jmxConnectorCache;
+        this.podCache = podCache;
         this.cqlKeyspaceManager = cqlKeyspaceManager;
         this.cqlRoleManager = cqlRoleManager;
         this.backupScheduler = backupScheduler;
@@ -102,6 +105,7 @@ public class DataCenterDeleteAction {
 
                 sidecarConnectionCache.purgeDataCenter(dataCenter);
                 jmxConnectorCache.purgeDataCenter(dataCenter);
+                podCache.purgeDataCenter(dataCenter);
 
                 cqlRoleManager.remove(dataCenter);
                 cqlKeyspaceManager.remove(dataCenter);
