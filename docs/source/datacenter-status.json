@@ -3,40 +3,46 @@
   "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:DataCenterStatus",
   "properties" : {
     "observedGeneration" : {
-      "type" : "integer"
-    },
-    "currentOperation" : {
-      "type" : "object",
-      "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:Operation",
-      "properties" : {
-        "desc" : {
-          "type" : "string"
-        },
-        "submitDate" : {
-          "type" : "integer",
-          "format" : "utc-millisec"
-        },
-        "pendingInMs" : {
-          "type" : "integer"
-        },
-        "durationInMs" : {
-          "type" : "integer"
-        }
-      }
+      "type" : "integer",
+      "description" : "Last observed datacenter spec generation"
     },
     "operationHistory" : {
       "type" : "array",
+      "description" : "Last 16 operations history",
       "items" : {
         "type" : "object",
-        "$ref" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:Operation"
+        "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:Operation",
+        "properties" : {
+          "triggeredBy" : {
+            "type" : "string"
+          },
+          "actions" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "submitDate" : {
+            "type" : "integer",
+            "format" : "utc-millisec"
+          },
+          "pendingInMs" : {
+            "type" : "integer"
+          },
+          "durationInMs" : {
+            "type" : "integer"
+          }
+        }
       }
     },
     "phase" : {
       "type" : "string",
+      "description" : "Current desired datacenter phase",
       "enum" : [ "RUNNING", "PARKED" ]
     },
     "health" : {
       "type" : "string",
+      "description" : "Current datacenter health status",
       "enum" : [ "UNKNOWN", "GREEN", "YELLOW", "RED" ]
     },
     "needCleanup" : {
@@ -49,39 +55,48 @@
       }
     },
     "bootstrapped" : {
-      "type" : "boolean"
+      "type" : "boolean",
+      "description" : "True for the first datacenter of the cluster or when the datacenter has bootstrapped"
     },
     "lastError" : {
-      "type" : "string"
+      "type" : "string",
+      "description" : "Last error message"
     },
     "lastErrorTime" : {
       "type" : "integer",
+      "description" : "Last error time",
       "format" : "utc-millisec"
     },
     "cqlStatus" : {
       "type" : "string",
+      "description" : "CQL connection status",
       "enum" : [ "NOT_STARTED", "ESTABLISHED", "ERRORED" ]
     },
     "cqlStatusMessage" : {
-      "type" : "string"
+      "type" : "string",
+      "description" : "Last CQL status message"
     },
     "configMapFingerPrint" : {
-      "type" : "string"
+      "type" : "string",
+      "description" : "Current config maps spec fingerprint"
     },
     "currentTask" : {
       "type" : "string"
     },
     "zones" : {
       "type" : "array",
+      "description" : "Ordered list of availability zone",
       "items" : {
         "type" : "string"
       }
     },
     "readyReplicas" : {
-      "type" : "integer"
+      "type" : "integer",
+      "description" : "Number of Elassandra nodes ready in the datacenter"
     },
     "rackStatuses" : {
       "type" : "object",
+      "description" : "Cassandra rack statuses",
       "additionalProperties" : {
         "type" : "object",
         "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:RackStatus",
@@ -93,6 +108,11 @@
           "index" : {
             "type" : "integer",
             "description" : "Rack index starting at 0"
+          },
+          "progressState" : {
+            "type" : "string",
+            "description" : "Rack progress state",
+            "enum" : [ "RUNNING", "UPDATING" ]
           },
           "health" : {
             "type" : "string",
@@ -117,6 +137,7 @@
     "keyspaceManagerStatus" : {
       "type" : "object",
       "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:KeyspaceManagerStatus",
+      "description" : "Keyspace manager status",
       "properties" : {
         "replicas" : {
           "type" : "integer",
@@ -133,13 +154,29 @@
     },
     "kibanaSpaceNames" : {
       "type" : "array",
+      "description" : "Kibana space names",
       "items" : {
         "type" : "string"
       }
     },
     "reaperPhase" : {
       "type" : "string",
+      "description" : "Cassandra reaper phase",
       "enum" : [ "NONE", "DEPLOYED", "RUNNING", "REGISTERED" ]
+    },
+    "remoteSeeds" : {
+      "type" : "array",
+      "description" : "Cassandra remote seeds",
+      "items" : {
+        "type" : "string"
+      }
+    },
+    "remoteSeeders" : {
+      "type" : "array",
+      "description" : "Cassandra remote seeders URLs",
+      "items" : {
+        "type" : "string"
+      }
     }
   }
 }

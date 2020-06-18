@@ -59,7 +59,6 @@ public class DataCenterSpec {
     /**
      * How the operator decide to spawn a new E* node
      * MANUAL : based on the rplicas value
-     * N - 1 : based on the Number of nodes minus one (with min to 1)
      * N : based on the Number of nodes
      */
     @JsonPropertyDescription("How the operator decide to spawn a new Elassandra node")

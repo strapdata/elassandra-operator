@@ -21,7 +21,7 @@
     "autoScaleMode" : {
       "type" : "string",
       "description" : "How the operator decide to spawn a new Elassandra node",
-      "enum" : [ "MANUAL", "NODEPOOL_SIZE" ]
+      "enum" : [ "MANUAL", "NODEPOOL" ]
     },
     "podsAffinityPolicy" : {
       "type" : "string",
@@ -42,109 +42,1839 @@
         "type" : "string"
       }
     },
-    "appServiceAccount" : {
+    "maxPodUnavailable" : {
+      "type" : "integer",
+      "description" : "PodDisruptionBudget max unavailable Elassandra pod"
+    },
+    "serviceAccount" : {
       "type" : "string",
-      "description" : "ServiceAccount used by the operator to deploy pods"
+      "description" : "ServiceAccount used by the operator to deploy pods, unless overwritten by podTemplate"
     },
-    "priorityClassName" : {
-      "type" : "string",
-      "description" : "Elassandra pods priorityClassName"
-    },
-    "annotations" : {
+    "podTemplate" : {
       "type" : "object",
-      "description" : "Elassandra pods additional annotations",
-      "additionalProperties" : {
-        "type" : "string"
-      }
-    },
-    "customLabels" : {
-      "type" : "object",
-      "description" : "Elassandra pods additional labels",
-      "additionalProperties" : {
-        "type" : "string"
-      }
-    },
-    "env" : {
-      "type" : "array",
-      "description" : "Elassandra pods environment variables",
-      "items" : {
-        "type" : "object",
-        "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1EnvVar",
-        "properties" : {
-          "name" : {
-            "type" : "string"
-          },
-          "value" : {
-            "type" : "string"
-          },
-          "valueFrom" : {
-            "type" : "object",
-            "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1EnvVarSource",
-            "properties" : {
-              "configMapKeyRef" : {
-                "type" : "object",
-                "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ConfigMapKeySelector",
-                "properties" : {
-                  "key" : {
-                    "type" : "string"
-                  },
-                  "name" : {
-                    "type" : "string"
-                  },
-                  "optional" : {
-                    "type" : "boolean"
+      "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1PodTemplateSpec",
+      "description" : "Elassandra pods template allowing customisation",
+      "properties" : {
+        "metadata" : {
+          "type" : "object",
+          "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ObjectMeta",
+          "properties" : {
+            "annotations" : {
+              "type" : "object",
+              "additionalProperties" : {
+                "type" : "string"
+              }
+            },
+            "clusterName" : {
+              "type" : "string"
+            },
+            "creationTimestamp" : {
+              "type" : "object",
+              "id" : "urn:jsonschema:org:joda:time:DateTime",
+              "properties" : {
+                "millisOfDay" : {
+                  "type" : "integer"
+                },
+                "monthOfYear" : {
+                  "type" : "integer"
+                },
+                "hourOfDay" : {
+                  "type" : "integer"
+                },
+                "minuteOfHour" : {
+                  "type" : "integer"
+                },
+                "secondOfMinute" : {
+                  "type" : "integer"
+                },
+                "millisOfSecond" : {
+                  "type" : "integer"
+                },
+                "weekOfWeekyear" : {
+                  "type" : "integer"
+                },
+                "weekyear" : {
+                  "type" : "integer"
+                },
+                "yearOfEra" : {
+                  "type" : "integer"
+                },
+                "yearOfCentury" : {
+                  "type" : "integer"
+                },
+                "centuryOfEra" : {
+                  "type" : "integer"
+                },
+                "secondOfDay" : {
+                  "type" : "integer"
+                },
+                "minuteOfDay" : {
+                  "type" : "integer"
+                },
+                "dayOfMonth" : {
+                  "type" : "integer"
+                },
+                "era" : {
+                  "type" : "integer"
+                },
+                "dayOfYear" : {
+                  "type" : "integer"
+                },
+                "dayOfWeek" : {
+                  "type" : "integer"
+                },
+                "year" : {
+                  "type" : "integer"
+                },
+                "chronology" : {
+                  "type" : "object",
+                  "id" : "urn:jsonschema:org:joda:time:Chronology",
+                  "properties" : {
+                    "zone" : {
+                      "type" : "object",
+                      "id" : "urn:jsonschema:org:joda:time:DateTimeZone",
+                      "properties" : {
+                        "id" : {
+                          "type" : "string"
+                        },
+                        "fixed" : {
+                          "type" : "boolean"
+                        }
+                      }
+                    }
+                  }
+                },
+                "zone" : {
+                  "type" : "object",
+                  "$ref" : "urn:jsonschema:org:joda:time:DateTimeZone"
+                },
+                "millis" : {
+                  "type" : "integer"
+                },
+                "afterNow" : {
+                  "type" : "boolean"
+                },
+                "beforeNow" : {
+                  "type" : "boolean"
+                },
+                "equalNow" : {
+                  "type" : "boolean"
+                }
+              }
+            },
+            "deletionGracePeriodSeconds" : {
+              "type" : "integer"
+            },
+            "deletionTimestamp" : {
+              "type" : "object",
+              "$ref" : "urn:jsonschema:org:joda:time:DateTime"
+            },
+            "finalizers" : {
+              "type" : "array",
+              "items" : {
+                "type" : "string"
+              }
+            },
+            "generateName" : {
+              "type" : "string"
+            },
+            "generation" : {
+              "type" : "integer"
+            },
+            "initializers" : {
+              "type" : "object",
+              "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1Initializers",
+              "properties" : {
+                "pending" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1Initializer",
+                    "properties" : {
+                      "name" : {
+                        "type" : "string"
+                      }
+                    }
+                  }
+                },
+                "result" : {
+                  "type" : "object",
+                  "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1Status",
+                  "properties" : {
+                    "apiVersion" : {
+                      "type" : "string"
+                    },
+                    "code" : {
+                      "type" : "integer"
+                    },
+                    "details" : {
+                      "type" : "object",
+                      "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1StatusDetails",
+                      "properties" : {
+                        "causes" : {
+                          "type" : "array",
+                          "items" : {
+                            "type" : "object",
+                            "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1StatusCause",
+                            "properties" : {
+                              "field" : {
+                                "type" : "string"
+                              },
+                              "message" : {
+                                "type" : "string"
+                              },
+                              "reason" : {
+                                "type" : "string"
+                              }
+                            }
+                          }
+                        },
+                        "group" : {
+                          "type" : "string"
+                        },
+                        "kind" : {
+                          "type" : "string"
+                        },
+                        "name" : {
+                          "type" : "string"
+                        },
+                        "retryAfterSeconds" : {
+                          "type" : "integer"
+                        },
+                        "uid" : {
+                          "type" : "string"
+                        }
+                      }
+                    },
+                    "kind" : {
+                      "type" : "string"
+                    },
+                    "message" : {
+                      "type" : "string"
+                    },
+                    "metadata" : {
+                      "type" : "object",
+                      "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ListMeta",
+                      "properties" : {
+                        "remainingItemCount" : {
+                          "type" : "integer"
+                        },
+                        "resourceVersion" : {
+                          "type" : "string"
+                        },
+                        "selfLink" : {
+                          "type" : "string"
+                        },
+                        "continue" : {
+                          "type" : "string"
+                        }
+                      }
+                    },
+                    "reason" : {
+                      "type" : "string"
+                    },
+                    "status" : {
+                      "type" : "string"
+                    }
                   }
                 }
-              },
-              "fieldRef" : {
+              }
+            },
+            "labels" : {
+              "type" : "object",
+              "additionalProperties" : {
+                "type" : "string"
+              }
+            },
+            "managedFields" : {
+              "type" : "array",
+              "items" : {
                 "type" : "object",
-                "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ObjectFieldSelector",
+                "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ManagedFieldsEntry",
                 "properties" : {
                   "apiVersion" : {
                     "type" : "string"
                   },
-                  "fieldPath" : {
-                    "type" : "string"
-                  }
-                }
-              },
-              "resourceFieldRef" : {
-                "type" : "object",
-                "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ResourceFieldSelector",
-                "properties" : {
-                  "containerName" : {
+                  "fields" : {
+                    "type" : "any"
+                  },
+                  "manager" : {
                     "type" : "string"
                   },
-                  "divisor" : {
+                  "operation" : {
+                    "type" : "string"
+                  },
+                  "time" : {
                     "type" : "object",
-                    "id" : "urn:jsonschema:io:kubernetes:client:custom:Quantity",
-                    "properties" : {
-                      "number" : {
-                        "type" : "number"
-                      },
-                      "format" : {
-                        "type" : "string",
-                        "enum" : [ "DECIMAL_EXPONENT", "DECIMAL_SI", "BINARY_SI" ]
-                      }
-                    }
-                  },
-                  "resource" : {
-                    "type" : "string"
+                    "$ref" : "urn:jsonschema:org:joda:time:DateTime"
                   }
                 }
-              },
-              "secretKeyRef" : {
+              }
+            },
+            "name" : {
+              "type" : "string"
+            },
+            "namespace" : {
+              "type" : "string"
+            },
+            "ownerReferences" : {
+              "type" : "array",
+              "items" : {
                 "type" : "object",
-                "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1SecretKeySelector",
+                "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1OwnerReference",
                 "properties" : {
-                  "key" : {
+                  "apiVersion" : {
+                    "type" : "string"
+                  },
+                  "blockOwnerDeletion" : {
+                    "type" : "boolean"
+                  },
+                  "controller" : {
+                    "type" : "boolean"
+                  },
+                  "kind" : {
                     "type" : "string"
                   },
                   "name" : {
                     "type" : "string"
                   },
-                  "optional" : {
+                  "uid" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            },
+            "resourceVersion" : {
+              "type" : "string"
+            },
+            "selfLink" : {
+              "type" : "string"
+            },
+            "uid" : {
+              "type" : "string"
+            }
+          }
+        },
+        "spec" : {
+          "type" : "object",
+          "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1PodSpec",
+          "properties" : {
+            "activeDeadlineSeconds" : {
+              "type" : "integer"
+            },
+            "affinity" : {
+              "type" : "object",
+              "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1Affinity",
+              "properties" : {
+                "nodeAffinity" : {
+                  "type" : "object",
+                  "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1NodeAffinity",
+                  "properties" : {
+                    "preferredDuringSchedulingIgnoredDuringExecution" : {
+                      "type" : "array",
+                      "items" : {
+                        "type" : "object",
+                        "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1PreferredSchedulingTerm",
+                        "properties" : {
+                          "preference" : {
+                            "type" : "object",
+                            "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1NodeSelectorTerm",
+                            "properties" : {
+                              "matchExpressions" : {
+                                "type" : "array",
+                                "items" : {
+                                  "type" : "object",
+                                  "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1NodeSelectorRequirement",
+                                  "properties" : {
+                                    "key" : {
+                                      "type" : "string"
+                                    },
+                                    "operator" : {
+                                      "type" : "string"
+                                    },
+                                    "values" : {
+                                      "type" : "array",
+                                      "items" : {
+                                        "type" : "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "matchFields" : {
+                                "type" : "array",
+                                "items" : {
+                                  "type" : "object",
+                                  "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1NodeSelectorRequirement"
+                                }
+                              }
+                            }
+                          },
+                          "weight" : {
+                            "type" : "integer"
+                          }
+                        }
+                      }
+                    },
+                    "requiredDuringSchedulingIgnoredDuringExecution" : {
+                      "type" : "object",
+                      "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1NodeSelector",
+                      "properties" : {
+                        "nodeSelectorTerms" : {
+                          "type" : "array",
+                          "items" : {
+                            "type" : "object",
+                            "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1NodeSelectorTerm"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "podAffinity" : {
+                  "type" : "object",
+                  "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1PodAffinity",
+                  "properties" : {
+                    "preferredDuringSchedulingIgnoredDuringExecution" : {
+                      "type" : "array",
+                      "items" : {
+                        "type" : "object",
+                        "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1WeightedPodAffinityTerm",
+                        "properties" : {
+                          "podAffinityTerm" : {
+                            "type" : "object",
+                            "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1PodAffinityTerm",
+                            "properties" : {
+                              "labelSelector" : {
+                                "type" : "object",
+                                "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1LabelSelector",
+                                "properties" : {
+                                  "matchExpressions" : {
+                                    "type" : "array",
+                                    "items" : {
+                                      "type" : "object",
+                                      "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1LabelSelectorRequirement",
+                                      "properties" : {
+                                        "key" : {
+                                          "type" : "string"
+                                        },
+                                        "operator" : {
+                                          "type" : "string"
+                                        },
+                                        "values" : {
+                                          "type" : "array",
+                                          "items" : {
+                                            "type" : "string"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "matchLabels" : {
+                                    "type" : "object",
+                                    "additionalProperties" : {
+                                      "type" : "string"
+                                    }
+                                  }
+                                }
+                              },
+                              "namespaces" : {
+                                "type" : "array",
+                                "items" : {
+                                  "type" : "string"
+                                }
+                              },
+                              "topologyKey" : {
+                                "type" : "string"
+                              }
+                            }
+                          },
+                          "weight" : {
+                            "type" : "integer"
+                          }
+                        }
+                      }
+                    },
+                    "requiredDuringSchedulingIgnoredDuringExecution" : {
+                      "type" : "array",
+                      "items" : {
+                        "type" : "object",
+                        "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1PodAffinityTerm"
+                      }
+                    }
+                  }
+                },
+                "podAntiAffinity" : {
+                  "type" : "object",
+                  "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1PodAntiAffinity",
+                  "properties" : {
+                    "preferredDuringSchedulingIgnoredDuringExecution" : {
+                      "type" : "array",
+                      "items" : {
+                        "type" : "object",
+                        "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1WeightedPodAffinityTerm"
+                      }
+                    },
+                    "requiredDuringSchedulingIgnoredDuringExecution" : {
+                      "type" : "array",
+                      "items" : {
+                        "type" : "object",
+                        "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1PodAffinityTerm"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "automountServiceAccountToken" : {
+              "type" : "boolean"
+            },
+            "containers" : {
+              "type" : "array",
+              "items" : {
+                "type" : "object",
+                "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1Container",
+                "properties" : {
+                  "args" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "string"
+                    }
+                  },
+                  "command" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "string"
+                    }
+                  },
+                  "env" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "object",
+                      "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1EnvVar",
+                      "properties" : {
+                        "name" : {
+                          "type" : "string"
+                        },
+                        "value" : {
+                          "type" : "string"
+                        },
+                        "valueFrom" : {
+                          "type" : "object",
+                          "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1EnvVarSource",
+                          "properties" : {
+                            "configMapKeyRef" : {
+                              "type" : "object",
+                              "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ConfigMapKeySelector",
+                              "properties" : {
+                                "key" : {
+                                  "type" : "string"
+                                },
+                                "name" : {
+                                  "type" : "string"
+                                },
+                                "optional" : {
+                                  "type" : "boolean"
+                                }
+                              }
+                            },
+                            "fieldRef" : {
+                              "type" : "object",
+                              "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ObjectFieldSelector",
+                              "properties" : {
+                                "apiVersion" : {
+                                  "type" : "string"
+                                },
+                                "fieldPath" : {
+                                  "type" : "string"
+                                }
+                              }
+                            },
+                            "resourceFieldRef" : {
+                              "type" : "object",
+                              "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ResourceFieldSelector",
+                              "properties" : {
+                                "containerName" : {
+                                  "type" : "string"
+                                },
+                                "divisor" : {
+                                  "type" : "object",
+                                  "id" : "urn:jsonschema:io:kubernetes:client:custom:Quantity",
+                                  "properties" : {
+                                    "number" : {
+                                      "type" : "number"
+                                    },
+                                    "format" : {
+                                      "type" : "string",
+                                      "enum" : [ "DECIMAL_EXPONENT", "DECIMAL_SI", "BINARY_SI" ]
+                                    }
+                                  }
+                                },
+                                "resource" : {
+                                  "type" : "string"
+                                }
+                              }
+                            },
+                            "secretKeyRef" : {
+                              "type" : "object",
+                              "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1SecretKeySelector",
+                              "properties" : {
+                                "key" : {
+                                  "type" : "string"
+                                },
+                                "name" : {
+                                  "type" : "string"
+                                },
+                                "optional" : {
+                                  "type" : "boolean"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "envFrom" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "object",
+                      "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1EnvFromSource",
+                      "properties" : {
+                        "configMapRef" : {
+                          "type" : "object",
+                          "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ConfigMapEnvSource",
+                          "properties" : {
+                            "name" : {
+                              "type" : "string"
+                            },
+                            "optional" : {
+                              "type" : "boolean"
+                            }
+                          }
+                        },
+                        "prefix" : {
+                          "type" : "string"
+                        },
+                        "secretRef" : {
+                          "type" : "object",
+                          "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1SecretEnvSource",
+                          "properties" : {
+                            "name" : {
+                              "type" : "string"
+                            },
+                            "optional" : {
+                              "type" : "boolean"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "image" : {
+                    "type" : "string"
+                  },
+                  "imagePullPolicy" : {
+                    "type" : "string"
+                  },
+                  "lifecycle" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1Lifecycle",
+                    "properties" : {
+                      "postStart" : {
+                        "type" : "object",
+                        "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1Handler",
+                        "properties" : {
+                          "exec" : {
+                            "type" : "object",
+                            "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ExecAction",
+                            "properties" : {
+                              "command" : {
+                                "type" : "array",
+                                "items" : {
+                                  "type" : "string"
+                                }
+                              }
+                            }
+                          },
+                          "httpGet" : {
+                            "type" : "object",
+                            "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1HTTPGetAction",
+                            "properties" : {
+                              "host" : {
+                                "type" : "string"
+                              },
+                              "httpHeaders" : {
+                                "type" : "array",
+                                "items" : {
+                                  "type" : "object",
+                                  "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1HTTPHeader",
+                                  "properties" : {
+                                    "name" : {
+                                      "type" : "string"
+                                    },
+                                    "value" : {
+                                      "type" : "string"
+                                    }
+                                  }
+                                }
+                              },
+                              "path" : {
+                                "type" : "string"
+                              },
+                              "port" : {
+                                "type" : "object",
+                                "id" : "urn:jsonschema:io:kubernetes:client:custom:IntOrString",
+                                "properties" : {
+                                  "strValue" : {
+                                    "type" : "string"
+                                  },
+                                  "intValue" : {
+                                    "type" : "integer"
+                                  },
+                                  "integer" : {
+                                    "type" : "boolean"
+                                  }
+                                }
+                              },
+                              "scheme" : {
+                                "type" : "string"
+                              }
+                            }
+                          },
+                          "tcpSocket" : {
+                            "type" : "object",
+                            "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1TCPSocketAction",
+                            "properties" : {
+                              "host" : {
+                                "type" : "string"
+                              },
+                              "port" : {
+                                "type" : "object",
+                                "$ref" : "urn:jsonschema:io:kubernetes:client:custom:IntOrString"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "preStop" : {
+                        "type" : "object",
+                        "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1Handler"
+                      }
+                    }
+                  },
+                  "livenessProbe" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1Probe",
+                    "properties" : {
+                      "exec" : {
+                        "type" : "object",
+                        "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ExecAction"
+                      },
+                      "failureThreshold" : {
+                        "type" : "integer"
+                      },
+                      "httpGet" : {
+                        "type" : "object",
+                        "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1HTTPGetAction"
+                      },
+                      "initialDelaySeconds" : {
+                        "type" : "integer"
+                      },
+                      "periodSeconds" : {
+                        "type" : "integer"
+                      },
+                      "successThreshold" : {
+                        "type" : "integer"
+                      },
+                      "tcpSocket" : {
+                        "type" : "object",
+                        "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1TCPSocketAction"
+                      },
+                      "timeoutSeconds" : {
+                        "type" : "integer"
+                      }
+                    }
+                  },
+                  "name" : {
+                    "type" : "string"
+                  },
+                  "ports" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "object",
+                      "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ContainerPort",
+                      "properties" : {
+                        "containerPort" : {
+                          "type" : "integer"
+                        },
+                        "hostIP" : {
+                          "type" : "string"
+                        },
+                        "hostPort" : {
+                          "type" : "integer"
+                        },
+                        "name" : {
+                          "type" : "string"
+                        },
+                        "protocol" : {
+                          "type" : "string"
+                        }
+                      }
+                    }
+                  },
+                  "readinessProbe" : {
+                    "type" : "object",
+                    "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1Probe"
+                  },
+                  "resources" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ResourceRequirements",
+                    "properties" : {
+                      "limits" : {
+                        "type" : "object",
+                        "additionalProperties" : {
+                          "type" : "object",
+                          "$ref" : "urn:jsonschema:io:kubernetes:client:custom:Quantity"
+                        }
+                      },
+                      "requests" : {
+                        "type" : "object",
+                        "additionalProperties" : {
+                          "type" : "object",
+                          "$ref" : "urn:jsonschema:io:kubernetes:client:custom:Quantity"
+                        }
+                      }
+                    }
+                  },
+                  "securityContext" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1SecurityContext",
+                    "properties" : {
+                      "allowPrivilegeEscalation" : {
+                        "type" : "boolean"
+                      },
+                      "capabilities" : {
+                        "type" : "object",
+                        "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1Capabilities",
+                        "properties" : {
+                          "add" : {
+                            "type" : "array",
+                            "items" : {
+                              "type" : "string"
+                            }
+                          },
+                          "drop" : {
+                            "type" : "array",
+                            "items" : {
+                              "type" : "string"
+                            }
+                          }
+                        }
+                      },
+                      "privileged" : {
+                        "type" : "boolean"
+                      },
+                      "procMount" : {
+                        "type" : "string"
+                      },
+                      "readOnlyRootFilesystem" : {
+                        "type" : "boolean"
+                      },
+                      "runAsGroup" : {
+                        "type" : "integer"
+                      },
+                      "runAsNonRoot" : {
+                        "type" : "boolean"
+                      },
+                      "runAsUser" : {
+                        "type" : "integer"
+                      },
+                      "seLinuxOptions" : {
+                        "type" : "object",
+                        "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1SELinuxOptions",
+                        "properties" : {
+                          "level" : {
+                            "type" : "string"
+                          },
+                          "role" : {
+                            "type" : "string"
+                          },
+                          "type" : {
+                            "type" : "string"
+                          },
+                          "user" : {
+                            "type" : "string"
+                          }
+                        }
+                      },
+                      "windowsOptions" : {
+                        "type" : "object",
+                        "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1WindowsSecurityContextOptions",
+                        "properties" : {
+                          "gmsaCredentialSpec" : {
+                            "type" : "string"
+                          },
+                          "gmsaCredentialSpecName" : {
+                            "type" : "string"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "stdin" : {
                     "type" : "boolean"
+                  },
+                  "stdinOnce" : {
+                    "type" : "boolean"
+                  },
+                  "terminationMessagePath" : {
+                    "type" : "string"
+                  },
+                  "terminationMessagePolicy" : {
+                    "type" : "string"
+                  },
+                  "tty" : {
+                    "type" : "boolean"
+                  },
+                  "volumeDevices" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "object",
+                      "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1VolumeDevice",
+                      "properties" : {
+                        "devicePath" : {
+                          "type" : "string"
+                        },
+                        "name" : {
+                          "type" : "string"
+                        }
+                      }
+                    }
+                  },
+                  "volumeMounts" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "object",
+                      "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1VolumeMount",
+                      "properties" : {
+                        "mountPath" : {
+                          "type" : "string"
+                        },
+                        "mountPropagation" : {
+                          "type" : "string"
+                        },
+                        "name" : {
+                          "type" : "string"
+                        },
+                        "readOnly" : {
+                          "type" : "boolean"
+                        },
+                        "subPath" : {
+                          "type" : "string"
+                        },
+                        "subPathExpr" : {
+                          "type" : "string"
+                        }
+                      }
+                    }
+                  },
+                  "workingDir" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            },
+            "dnsConfig" : {
+              "type" : "object",
+              "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1PodDNSConfig",
+              "properties" : {
+                "nameservers" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "string"
+                  }
+                },
+                "options" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1PodDNSConfigOption",
+                    "properties" : {
+                      "name" : {
+                        "type" : "string"
+                      },
+                      "value" : {
+                        "type" : "string"
+                      }
+                    }
+                  }
+                },
+                "searches" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            },
+            "dnsPolicy" : {
+              "type" : "string"
+            },
+            "enableServiceLinks" : {
+              "type" : "boolean"
+            },
+            "hostAliases" : {
+              "type" : "array",
+              "items" : {
+                "type" : "object",
+                "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1HostAlias",
+                "properties" : {
+                  "hostnames" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "string"
+                    }
+                  },
+                  "ip" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            },
+            "hostIPC" : {
+              "type" : "boolean"
+            },
+            "hostNetwork" : {
+              "type" : "boolean"
+            },
+            "hostPID" : {
+              "type" : "boolean"
+            },
+            "hostname" : {
+              "type" : "string"
+            },
+            "imagePullSecrets" : {
+              "type" : "array",
+              "items" : {
+                "type" : "object",
+                "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1LocalObjectReference",
+                "properties" : {
+                  "name" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            },
+            "initContainers" : {
+              "type" : "array",
+              "items" : {
+                "type" : "object",
+                "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1Container"
+              }
+            },
+            "nodeName" : {
+              "type" : "string"
+            },
+            "nodeSelector" : {
+              "type" : "object",
+              "additionalProperties" : {
+                "type" : "string"
+              }
+            },
+            "preemptionPolicy" : {
+              "type" : "string"
+            },
+            "priority" : {
+              "type" : "integer"
+            },
+            "priorityClassName" : {
+              "type" : "string"
+            },
+            "readinessGates" : {
+              "type" : "array",
+              "items" : {
+                "type" : "object",
+                "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1PodReadinessGate",
+                "properties" : {
+                  "conditionType" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            },
+            "restartPolicy" : {
+              "type" : "string"
+            },
+            "runtimeClassName" : {
+              "type" : "string"
+            },
+            "schedulerName" : {
+              "type" : "string"
+            },
+            "securityContext" : {
+              "type" : "object",
+              "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1PodSecurityContext",
+              "properties" : {
+                "fsGroup" : {
+                  "type" : "integer"
+                },
+                "runAsGroup" : {
+                  "type" : "integer"
+                },
+                "runAsNonRoot" : {
+                  "type" : "boolean"
+                },
+                "runAsUser" : {
+                  "type" : "integer"
+                },
+                "seLinuxOptions" : {
+                  "type" : "object",
+                  "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1SELinuxOptions"
+                },
+                "supplementalGroups" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "integer"
+                  }
+                },
+                "sysctls" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1Sysctl",
+                    "properties" : {
+                      "name" : {
+                        "type" : "string"
+                      },
+                      "value" : {
+                        "type" : "string"
+                      }
+                    }
+                  }
+                },
+                "windowsOptions" : {
+                  "type" : "object",
+                  "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1WindowsSecurityContextOptions"
+                }
+              }
+            },
+            "serviceAccount" : {
+              "type" : "string"
+            },
+            "serviceAccountName" : {
+              "type" : "string"
+            },
+            "shareProcessNamespace" : {
+              "type" : "boolean"
+            },
+            "subdomain" : {
+              "type" : "string"
+            },
+            "terminationGracePeriodSeconds" : {
+              "type" : "integer"
+            },
+            "tolerations" : {
+              "type" : "array",
+              "items" : {
+                "type" : "object",
+                "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1Toleration",
+                "properties" : {
+                  "effect" : {
+                    "type" : "string"
+                  },
+                  "key" : {
+                    "type" : "string"
+                  },
+                  "operator" : {
+                    "type" : "string"
+                  },
+                  "tolerationSeconds" : {
+                    "type" : "integer"
+                  },
+                  "value" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            },
+            "volumes" : {
+              "type" : "array",
+              "items" : {
+                "type" : "object",
+                "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1Volume",
+                "properties" : {
+                  "awsElasticBlockStore" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1AWSElasticBlockStoreVolumeSource",
+                    "properties" : {
+                      "fsType" : {
+                        "type" : "string"
+                      },
+                      "partition" : {
+                        "type" : "integer"
+                      },
+                      "readOnly" : {
+                        "type" : "boolean"
+                      },
+                      "volumeID" : {
+                        "type" : "string"
+                      }
+                    }
+                  },
+                  "azureDisk" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1AzureDiskVolumeSource",
+                    "properties" : {
+                      "cachingMode" : {
+                        "type" : "string"
+                      },
+                      "diskName" : {
+                        "type" : "string"
+                      },
+                      "diskURI" : {
+                        "type" : "string"
+                      },
+                      "fsType" : {
+                        "type" : "string"
+                      },
+                      "kind" : {
+                        "type" : "string"
+                      },
+                      "readOnly" : {
+                        "type" : "boolean"
+                      }
+                    }
+                  },
+                  "azureFile" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1AzureFileVolumeSource",
+                    "properties" : {
+                      "readOnly" : {
+                        "type" : "boolean"
+                      },
+                      "secretName" : {
+                        "type" : "string"
+                      },
+                      "shareName" : {
+                        "type" : "string"
+                      }
+                    }
+                  },
+                  "cephfs" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1CephFSVolumeSource",
+                    "properties" : {
+                      "monitors" : {
+                        "type" : "array",
+                        "items" : {
+                          "type" : "string"
+                        }
+                      },
+                      "path" : {
+                        "type" : "string"
+                      },
+                      "readOnly" : {
+                        "type" : "boolean"
+                      },
+                      "secretFile" : {
+                        "type" : "string"
+                      },
+                      "secretRef" : {
+                        "type" : "object",
+                        "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1LocalObjectReference"
+                      },
+                      "user" : {
+                        "type" : "string"
+                      }
+                    }
+                  },
+                  "cinder" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1CinderVolumeSource",
+                    "properties" : {
+                      "fsType" : {
+                        "type" : "string"
+                      },
+                      "readOnly" : {
+                        "type" : "boolean"
+                      },
+                      "secretRef" : {
+                        "type" : "object",
+                        "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1LocalObjectReference"
+                      },
+                      "volumeID" : {
+                        "type" : "string"
+                      }
+                    }
+                  },
+                  "configMap" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ConfigMapVolumeSource",
+                    "properties" : {
+                      "defaultMode" : {
+                        "type" : "integer"
+                      },
+                      "items" : {
+                        "type" : "array",
+                        "items" : {
+                          "type" : "object",
+                          "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1KeyToPath",
+                          "properties" : {
+                            "key" : {
+                              "type" : "string"
+                            },
+                            "mode" : {
+                              "type" : "integer"
+                            },
+                            "path" : {
+                              "type" : "string"
+                            }
+                          }
+                        }
+                      },
+                      "name" : {
+                        "type" : "string"
+                      },
+                      "optional" : {
+                        "type" : "boolean"
+                      }
+                    }
+                  },
+                  "csi" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1CSIVolumeSource",
+                    "properties" : {
+                      "driver" : {
+                        "type" : "string"
+                      },
+                      "fsType" : {
+                        "type" : "string"
+                      },
+                      "nodePublishSecretRef" : {
+                        "type" : "object",
+                        "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1LocalObjectReference"
+                      },
+                      "readOnly" : {
+                        "type" : "boolean"
+                      },
+                      "volumeAttributes" : {
+                        "type" : "object",
+                        "additionalProperties" : {
+                          "type" : "string"
+                        }
+                      }
+                    }
+                  },
+                  "downwardAPI" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1DownwardAPIVolumeSource",
+                    "properties" : {
+                      "defaultMode" : {
+                        "type" : "integer"
+                      },
+                      "items" : {
+                        "type" : "array",
+                        "items" : {
+                          "type" : "object",
+                          "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1DownwardAPIVolumeFile",
+                          "properties" : {
+                            "fieldRef" : {
+                              "type" : "object",
+                              "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ObjectFieldSelector"
+                            },
+                            "mode" : {
+                              "type" : "integer"
+                            },
+                            "path" : {
+                              "type" : "string"
+                            },
+                            "resourceFieldRef" : {
+                              "type" : "object",
+                              "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ResourceFieldSelector"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "emptyDir" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1EmptyDirVolumeSource",
+                    "properties" : {
+                      "medium" : {
+                        "type" : "string"
+                      },
+                      "sizeLimit" : {
+                        "type" : "object",
+                        "$ref" : "urn:jsonschema:io:kubernetes:client:custom:Quantity"
+                      }
+                    }
+                  },
+                  "fc" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1FCVolumeSource",
+                    "properties" : {
+                      "fsType" : {
+                        "type" : "string"
+                      },
+                      "lun" : {
+                        "type" : "integer"
+                      },
+                      "readOnly" : {
+                        "type" : "boolean"
+                      },
+                      "targetWWNs" : {
+                        "type" : "array",
+                        "items" : {
+                          "type" : "string"
+                        }
+                      },
+                      "wwids" : {
+                        "type" : "array",
+                        "items" : {
+                          "type" : "string"
+                        }
+                      }
+                    }
+                  },
+                  "flexVolume" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1FlexVolumeSource",
+                    "properties" : {
+                      "driver" : {
+                        "type" : "string"
+                      },
+                      "fsType" : {
+                        "type" : "string"
+                      },
+                      "options" : {
+                        "type" : "object",
+                        "additionalProperties" : {
+                          "type" : "string"
+                        }
+                      },
+                      "readOnly" : {
+                        "type" : "boolean"
+                      },
+                      "secretRef" : {
+                        "type" : "object",
+                        "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1LocalObjectReference"
+                      }
+                    }
+                  },
+                  "flocker" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1FlockerVolumeSource",
+                    "properties" : {
+                      "datasetName" : {
+                        "type" : "string"
+                      },
+                      "datasetUUID" : {
+                        "type" : "string"
+                      }
+                    }
+                  },
+                  "gcePersistentDisk" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1GCEPersistentDiskVolumeSource",
+                    "properties" : {
+                      "fsType" : {
+                        "type" : "string"
+                      },
+                      "partition" : {
+                        "type" : "integer"
+                      },
+                      "pdName" : {
+                        "type" : "string"
+                      },
+                      "readOnly" : {
+                        "type" : "boolean"
+                      }
+                    }
+                  },
+                  "gitRepo" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1GitRepoVolumeSource",
+                    "properties" : {
+                      "directory" : {
+                        "type" : "string"
+                      },
+                      "repository" : {
+                        "type" : "string"
+                      },
+                      "revision" : {
+                        "type" : "string"
+                      }
+                    }
+                  },
+                  "glusterfs" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1GlusterfsVolumeSource",
+                    "properties" : {
+                      "endpoints" : {
+                        "type" : "string"
+                      },
+                      "path" : {
+                        "type" : "string"
+                      },
+                      "readOnly" : {
+                        "type" : "boolean"
+                      }
+                    }
+                  },
+                  "hostPath" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1HostPathVolumeSource",
+                    "properties" : {
+                      "path" : {
+                        "type" : "string"
+                      },
+                      "type" : {
+                        "type" : "string"
+                      }
+                    }
+                  },
+                  "iscsi" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ISCSIVolumeSource",
+                    "properties" : {
+                      "chapAuthDiscovery" : {
+                        "type" : "boolean"
+                      },
+                      "chapAuthSession" : {
+                        "type" : "boolean"
+                      },
+                      "fsType" : {
+                        "type" : "string"
+                      },
+                      "initiatorName" : {
+                        "type" : "string"
+                      },
+                      "iqn" : {
+                        "type" : "string"
+                      },
+                      "iscsiInterface" : {
+                        "type" : "string"
+                      },
+                      "lun" : {
+                        "type" : "integer"
+                      },
+                      "portals" : {
+                        "type" : "array",
+                        "items" : {
+                          "type" : "string"
+                        }
+                      },
+                      "readOnly" : {
+                        "type" : "boolean"
+                      },
+                      "secretRef" : {
+                        "type" : "object",
+                        "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1LocalObjectReference"
+                      },
+                      "targetPortal" : {
+                        "type" : "string"
+                      }
+                    }
+                  },
+                  "name" : {
+                    "type" : "string"
+                  },
+                  "nfs" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1NFSVolumeSource",
+                    "properties" : {
+                      "path" : {
+                        "type" : "string"
+                      },
+                      "readOnly" : {
+                        "type" : "boolean"
+                      },
+                      "server" : {
+                        "type" : "string"
+                      }
+                    }
+                  },
+                  "persistentVolumeClaim" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1PersistentVolumeClaimVolumeSource",
+                    "properties" : {
+                      "claimName" : {
+                        "type" : "string"
+                      },
+                      "readOnly" : {
+                        "type" : "boolean"
+                      }
+                    }
+                  },
+                  "photonPersistentDisk" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1PhotonPersistentDiskVolumeSource",
+                    "properties" : {
+                      "fsType" : {
+                        "type" : "string"
+                      },
+                      "pdID" : {
+                        "type" : "string"
+                      }
+                    }
+                  },
+                  "portworxVolume" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1PortworxVolumeSource",
+                    "properties" : {
+                      "fsType" : {
+                        "type" : "string"
+                      },
+                      "readOnly" : {
+                        "type" : "boolean"
+                      },
+                      "volumeID" : {
+                        "type" : "string"
+                      }
+                    }
+                  },
+                  "projected" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ProjectedVolumeSource",
+                    "properties" : {
+                      "defaultMode" : {
+                        "type" : "integer"
+                      },
+                      "sources" : {
+                        "type" : "array",
+                        "items" : {
+                          "type" : "object",
+                          "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1VolumeProjection",
+                          "properties" : {
+                            "configMap" : {
+                              "type" : "object",
+                              "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ConfigMapProjection",
+                              "properties" : {
+                                "items" : {
+                                  "type" : "array",
+                                  "items" : {
+                                    "type" : "object",
+                                    "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1KeyToPath"
+                                  }
+                                },
+                                "name" : {
+                                  "type" : "string"
+                                },
+                                "optional" : {
+                                  "type" : "boolean"
+                                }
+                              }
+                            },
+                            "downwardAPI" : {
+                              "type" : "object",
+                              "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1DownwardAPIProjection",
+                              "properties" : {
+                                "items" : {
+                                  "type" : "array",
+                                  "items" : {
+                                    "type" : "object",
+                                    "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1DownwardAPIVolumeFile"
+                                  }
+                                }
+                              }
+                            },
+                            "secret" : {
+                              "type" : "object",
+                              "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1SecretProjection",
+                              "properties" : {
+                                "items" : {
+                                  "type" : "array",
+                                  "items" : {
+                                    "type" : "object",
+                                    "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1KeyToPath"
+                                  }
+                                },
+                                "name" : {
+                                  "type" : "string"
+                                },
+                                "optional" : {
+                                  "type" : "boolean"
+                                }
+                              }
+                            },
+                            "serviceAccountToken" : {
+                              "type" : "object",
+                              "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ServiceAccountTokenProjection",
+                              "properties" : {
+                                "audience" : {
+                                  "type" : "string"
+                                },
+                                "expirationSeconds" : {
+                                  "type" : "integer"
+                                },
+                                "path" : {
+                                  "type" : "string"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "quobyte" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1QuobyteVolumeSource",
+                    "properties" : {
+                      "group" : {
+                        "type" : "string"
+                      },
+                      "readOnly" : {
+                        "type" : "boolean"
+                      },
+                      "registry" : {
+                        "type" : "string"
+                      },
+                      "tenant" : {
+                        "type" : "string"
+                      },
+                      "user" : {
+                        "type" : "string"
+                      },
+                      "volume" : {
+                        "type" : "string"
+                      }
+                    }
+                  },
+                  "rbd" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1RBDVolumeSource",
+                    "properties" : {
+                      "fsType" : {
+                        "type" : "string"
+                      },
+                      "image" : {
+                        "type" : "string"
+                      },
+                      "keyring" : {
+                        "type" : "string"
+                      },
+                      "monitors" : {
+                        "type" : "array",
+                        "items" : {
+                          "type" : "string"
+                        }
+                      },
+                      "pool" : {
+                        "type" : "string"
+                      },
+                      "readOnly" : {
+                        "type" : "boolean"
+                      },
+                      "secretRef" : {
+                        "type" : "object",
+                        "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1LocalObjectReference"
+                      },
+                      "user" : {
+                        "type" : "string"
+                      }
+                    }
+                  },
+                  "scaleIO" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ScaleIOVolumeSource",
+                    "properties" : {
+                      "fsType" : {
+                        "type" : "string"
+                      },
+                      "gateway" : {
+                        "type" : "string"
+                      },
+                      "protectionDomain" : {
+                        "type" : "string"
+                      },
+                      "readOnly" : {
+                        "type" : "boolean"
+                      },
+                      "secretRef" : {
+                        "type" : "object",
+                        "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1LocalObjectReference"
+                      },
+                      "sslEnabled" : {
+                        "type" : "boolean"
+                      },
+                      "storageMode" : {
+                        "type" : "string"
+                      },
+                      "storagePool" : {
+                        "type" : "string"
+                      },
+                      "system" : {
+                        "type" : "string"
+                      },
+                      "volumeName" : {
+                        "type" : "string"
+                      }
+                    }
+                  },
+                  "secret" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1SecretVolumeSource",
+                    "properties" : {
+                      "defaultMode" : {
+                        "type" : "integer"
+                      },
+                      "items" : {
+                        "type" : "array",
+                        "items" : {
+                          "type" : "object",
+                          "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1KeyToPath"
+                        }
+                      },
+                      "optional" : {
+                        "type" : "boolean"
+                      },
+                      "secretName" : {
+                        "type" : "string"
+                      }
+                    }
+                  },
+                  "storageos" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1StorageOSVolumeSource",
+                    "properties" : {
+                      "fsType" : {
+                        "type" : "string"
+                      },
+                      "readOnly" : {
+                        "type" : "boolean"
+                      },
+                      "secretRef" : {
+                        "type" : "object",
+                        "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1LocalObjectReference"
+                      },
+                      "volumeName" : {
+                        "type" : "string"
+                      },
+                      "volumeNamespace" : {
+                        "type" : "string"
+                      }
+                    }
+                  },
+                  "vsphereVolume" : {
+                    "type" : "object",
+                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1VsphereVirtualDiskVolumeSource",
+                    "properties" : {
+                      "fsType" : {
+                        "type" : "string"
+                      },
+                      "storagePolicyID" : {
+                        "type" : "string"
+                      },
+                      "storagePolicyName" : {
+                        "type" : "string"
+                      },
+                      "volumePath" : {
+                        "type" : "string"
+                      }
+                    }
                   }
                 }
               }
@@ -155,29 +1885,13 @@
     },
     "resources" : {
       "type" : "object",
-      "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ResourceRequirements",
-      "description" : "Resource requirements for Elassandra pods",
-      "properties" : {
-        "limits" : {
-          "type" : "object",
-          "additionalProperties" : {
-            "type" : "object",
-            "$ref" : "urn:jsonschema:io:kubernetes:client:custom:Quantity"
-          }
-        },
-        "requests" : {
-          "type" : "object",
-          "additionalProperties" : {
-            "type" : "object",
-            "$ref" : "urn:jsonschema:io:kubernetes:client:custom:Quantity"
-          }
-        }
-      }
+      "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ResourceRequirements",
+      "description" : "Resource requirements for Elassandra pods"
     },
     "dataVolumeClaim" : {
       "type" : "object",
       "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1PersistentVolumeClaimSpec",
-      "description" : "Elassandra PVC",
+      "description" : "Elassandra dataVolumeClaim",
       "properties" : {
         "accessModes" : {
           "type" : "array",
@@ -206,36 +1920,7 @@
         },
         "selector" : {
           "type" : "object",
-          "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1LabelSelector",
-          "properties" : {
-            "matchExpressions" : {
-              "type" : "array",
-              "items" : {
-                "type" : "object",
-                "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1LabelSelectorRequirement",
-                "properties" : {
-                  "key" : {
-                    "type" : "string"
-                  },
-                  "operator" : {
-                    "type" : "string"
-                  },
-                  "values" : {
-                    "type" : "array",
-                    "items" : {
-                      "type" : "string"
-                    }
-                  }
-                }
-              }
-            },
-            "matchLabels" : {
-              "type" : "object",
-              "additionalProperties" : {
-                "type" : "string"
-              }
-            }
-          }
+          "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1LabelSelector"
         },
         "storageClassName" : {
           "type" : "string"
@@ -251,64 +1936,17 @@
     "decommissionPolicy" : {
       "type" : "string",
       "description" : "Decomission policy control PVC when node removed",
-      "enum" : [ "KEEP_PVC", "DELETE_PVC", "BACKUP_AND_DELETE_PVC" ]
+      "enum" : [ "KEEP_PVC", "DELETE_PVC", "SNAPSHOT_AND_DELETE_PVC" ]
     },
     "userConfigMapVolumeSource" : {
       "type" : "object",
-      "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ConfigMapVolumeSource",
-      "description" : "Name of an optional config map that contains cassandra configuration in the form of yaml fragments",
-      "properties" : {
-        "defaultMode" : {
-          "type" : "integer"
-        },
-        "items" : {
-          "type" : "array",
-          "items" : {
-            "type" : "object",
-            "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1KeyToPath",
-            "properties" : {
-              "key" : {
-                "type" : "string"
-              },
-              "mode" : {
-                "type" : "integer"
-              },
-              "path" : {
-                "type" : "string"
-              }
-            }
-          }
-        },
-        "name" : {
-          "type" : "string"
-        },
-        "optional" : {
-          "type" : "boolean"
-        }
-      }
+      "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ConfigMapVolumeSource",
+      "description" : "Name of an optional config map that contains cassandra configuration in the form of yaml fragments"
     },
     "userSecretVolumeSource" : {
       "type" : "object",
-      "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1SecretVolumeSource",
-      "description" : "Name of an optional secret that contains cassandra related secrets",
-      "properties" : {
-        "defaultMode" : {
-          "type" : "integer"
-        },
-        "items" : {
-          "type" : "array",
-          "items" : {
-            "type" : "object",
-            "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1KeyToPath"
-          }
-        },
-        "optional" : {
-          "type" : "boolean"
-        },
-        "secretName" : {
-          "type" : "string"
-        }
-      }
+      "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1SecretVolumeSource",
+      "description" : "Name of an optional secret that contains cassandra related secrets"
     },
     "prometheus" : {
       "type" : "object",
@@ -325,6 +1963,122 @@
         }
       }
     },
+    "networking" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:Networking",
+      "description" : "Networking configuration",
+      "properties" : {
+        "hostPortEnabled" : {
+          "type" : "boolean",
+          "description" : "Enable K8S hostPort"
+        },
+        "hostNetworkEnabled" : {
+          "type" : "boolean",
+          "description" : "Enable K8S hostNetwork"
+        },
+        "externalDns" : {
+          "type" : "object",
+          "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:ExternalDns",
+          "description" : "External DNS configuration",
+          "properties" : {
+            "enabled" : {
+              "type" : "boolean",
+              "description" : "Enable External DNS configuration"
+            },
+            "root" : {
+              "type" : "string",
+              "description" : "Unique root used to publish DNS names for elassandra seed nodes in the form cassandra-{root}-{idx}.{domain}"
+            },
+            "domain" : {
+              "type" : "string",
+              "description" : "External DNS domain"
+            },
+            "ttl" : {
+              "type" : "integer",
+              "description" : "External DNS record TTL"
+            }
+          }
+        }
+      }
+    },
+    "jvm" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:Jvm",
+      "description" : "JVM configuration",
+      "properties" : {
+        "computeJvmMemorySettings" : {
+          "type" : "boolean",
+          "description" : "Automatic heap and GC configuration"
+        },
+        "jmxPort" : {
+          "type" : "integer",
+          "description" : "Java JMX port"
+        },
+        "jmxmpEnabled" : {
+          "type" : "boolean",
+          "description" : "Enable JMXMP"
+        },
+        "jmxmpOverSSL" : {
+          "type" : "boolean",
+          "description" : "Enable SSL on JMXMP"
+        },
+        "jdbPort" : {
+          "type" : "integer",
+          "description" : "Java debugger port, default is disabled"
+        }
+      }
+    },
+    "cassandra" : {
+      "type" : "object",
+      "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:Cassandra",
+      "description" : "Cassandra configuration",
+      "properties" : {
+        "workload" : {
+          "type" : "string",
+          "enum" : [ "WRITE", "READ_WRITE", "READ" ]
+        },
+        "config" : {
+          "type" : "object",
+          "additionalProperties" : {
+            "type" : "any"
+          }
+        },
+        "authentication" : {
+          "type" : "string",
+          "enum" : [ "NONE", "CASSANDRA", "LDAP" ]
+        },
+        "ssl" : {
+          "type" : "boolean"
+        },
+        "commitlogsInitContainer" : {
+          "type" : "boolean"
+        },
+        "snitchPreferLocal" : {
+          "type" : "boolean"
+        },
+        "remoteSeeds" : {
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          }
+        },
+        "remoteSeeders" : {
+          "type" : "array",
+          "items" : {
+            "type" : "string"
+          }
+        },
+        "nativePort" : {
+          "type" : "integer"
+        },
+        "storagePort" : {
+          "type" : "integer"
+        },
+        "sslStoragePort" : {
+          "type" : "integer"
+        }
+      }
+    },
     "reaper" : {
       "type" : "object",
       "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:Reaper",
@@ -333,6 +2087,16 @@
         "image" : {
           "type" : "string",
           "description" : "reaper docker image"
+        },
+        "resources" : {
+          "type" : "object",
+          "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ResourceRequirements",
+          "description" : "Resource requirements for reaper pod"
+        },
+        "podTemplate" : {
+          "type" : "object",
+          "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1PodTemplateSpec",
+          "description" : "Reaper pods template allowing customisation"
         },
         "jwtSecret" : {
           "type" : "string",
@@ -458,25 +2222,6 @@
         }
       }
     },
-    "networking" : {
-      "type" : "object",
-      "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:Networking",
-      "description" : "Networking configuration",
-      "properties" : {
-        "hostPortEnabled" : {
-          "type" : "boolean",
-          "description" : "Enable K8S hostPort"
-        },
-        "hostNetworkEnabled" : {
-          "type" : "boolean",
-          "description" : "Enable K8S hostNetwork"
-        },
-        "nodeLoadBalancerEnabled" : {
-          "type" : "boolean",
-          "description" : "Enable external LoadBalancer for each Elassandra node"
-        }
-      }
-    },
     "elasticsearch" : {
       "type" : "object",
       "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:Elasticsearch",
@@ -505,6 +2250,13 @@
         "ingressEnabled" : {
           "type" : "boolean",
           "description" : "Enable Elasticsearch service ingress"
+        },
+        "ingressAnnotations" : {
+          "type" : "object",
+          "description" : "Elasticsearch ingress annotations",
+          "additionalProperties" : {
+            "type" : "string"
+          }
         },
         "datacenterGroup" : {
           "type" : "string",
@@ -556,166 +2308,66 @@
               "description" : "Enable Elasticsearch Content-Based security"
             }
           }
-        },
-        "kibana" : {
-          "type" : "object",
-          "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:Kibana",
-          "description" : "Kibana configuration",
-          "properties" : {
-            "image" : {
-              "type" : "string",
-              "description" : "Kibana docker image"
-            },
-            "enabled" : {
-              "type" : "boolean",
-              "description" : "Kibana enabled, default is true"
-            },
-            "spaces" : {
-              "type" : "array",
-              "description" : "Kibana user spaces",
-              "items" : {
-                "type" : "object",
-                "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:KibanaSpace",
-                "properties" : {
-                  "name" : {
-                    "type" : "string",
-                    "description" : "Kibana space name (default is \"\")"
-                  },
-                  "keyspaces" : {
-                    "type" : "array",
-                    "description" : "Kibana visible keyspaces",
-                    "items" : {
-                      "type" : "string"
-                    }
-                  },
-                  "replicas" : {
-                    "type" : "integer",
-                    "description" : "Number of kibana instance, default is 1"
-                  },
-                  "nodeOptions" : {
-                    "type" : "string",
-                    "description" : "Kibana nodeJS options"
-                  }
-                }
-              }
-            },
-            "ingressSuffix" : {
-              "type" : "string",
-              "description" : "Kibana space ingress suffix"
-            },
-            "ingressAnnotations" : {
-              "type" : "object",
-              "description" : "Kibana ingress annotations",
-              "additionalProperties" : {
-                "type" : "string"
-              }
-            },
-            "version" : {
-              "type" : "integer",
-              "description" : "Kibana upgrade version"
-            }
-          }
         }
       }
     },
-    "externalDns" : {
+    "kibana" : {
       "type" : "object",
-      "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:ExternalDns",
-      "description" : "External DNS configuration",
+      "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:Kibana",
+      "description" : "Kibana configuration",
       "properties" : {
+        "image" : {
+          "type" : "string",
+          "description" : "Kibana docker image"
+        },
         "enabled" : {
           "type" : "boolean",
-          "description" : "Enable External DNS configuration"
+          "description" : "Kibana enabled, default is true"
         },
-        "root" : {
-          "type" : "string",
-          "description" : "Unique root for DNS hostname generation:\nFor cassandra seed nodes : cassandra-x-0.domain, cassandra-x-1.domain\nFor elasticsearch: elasticsearch-x.domain\nFor kibana: kibana-x.domain\nFor reaper: repear-x.domain\n"
-        },
-        "domain" : {
-          "type" : "string",
-          "description" : "External dns domain"
-        },
-        "ttl" : {
-          "type" : "integer",
-          "description" : "External DNS ttl"
-        }
-      }
-    },
-    "jvm" : {
-      "type" : "object",
-      "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:Jvm",
-      "description" : "JVM configuration",
-      "properties" : {
-        "computeJvmMemorySettings" : {
-          "type" : "boolean",
-          "description" : "Automatic heap and GC configuration"
-        },
-        "jmxPort" : {
-          "type" : "integer",
-          "description" : "Java JMX port"
-        },
-        "jmxmpEnabled" : {
-          "type" : "boolean",
-          "description" : "Enable JMXMP"
-        },
-        "jmxmpOverSSL" : {
-          "type" : "boolean",
-          "description" : "Enable SSL on JMXMP"
-        },
-        "jdbPort" : {
-          "type" : "integer",
-          "description" : "Java debugger port, default is disabled"
-        }
-      }
-    },
-    "cassandra" : {
-      "type" : "object",
-      "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:Cassandra",
-      "description" : "Cassandra configuration",
-      "properties" : {
-        "workload" : {
-          "type" : "string",
-          "enum" : [ "WRITE", "READ_WRITE", "READ" ]
-        },
-        "config" : {
-          "type" : "object",
-          "additionalProperties" : {
-            "type" : "any"
-          }
-        },
-        "authentication" : {
-          "type" : "string",
-          "enum" : [ "NONE", "CASSANDRA", "LDAP" ]
-        },
-        "ssl" : {
-          "type" : "boolean"
-        },
-        "commitlogsInitContainer" : {
-          "type" : "boolean"
-        },
-        "snitchPreferLocal" : {
-          "type" : "boolean"
-        },
-        "remoteSeeds" : {
+        "spaces" : {
           "type" : "array",
+          "description" : "Kibana user spaces",
           "items" : {
-            "type" : "string"
+            "type" : "object",
+            "id" : "urn:jsonschema:com:strapdata:strapkop:model:k8s:datacenter:KibanaSpace",
+            "properties" : {
+              "name" : {
+                "type" : "string",
+                "description" : "Kibana space name (default is \"\")"
+              },
+              "keyspaces" : {
+                "type" : "array",
+                "description" : "Kibana visible keyspaces",
+                "items" : {
+                  "type" : "string"
+                }
+              },
+              "replicas" : {
+                "type" : "integer",
+                "description" : "Number of kibana instance, default is 1"
+              },
+              "ingressSuffix" : {
+                "type" : "string",
+                "description" : "Kibana space ingress suffix"
+              },
+              "ingressAnnotations" : {
+                "type" : "object",
+                "description" : "Kibana space ingress annotations",
+                "additionalProperties" : {
+                  "type" : "string"
+                }
+              },
+              "version" : {
+                "type" : "integer",
+                "description" : "Kibana space upgrade version"
+              },
+              "podTemplate" : {
+                "type" : "object",
+                "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1PodTemplateSpec",
+                "description" : "Kibana pod template allowing customisation"
+              }
+            }
           }
-        },
-        "remoteSeeders" : {
-          "type" : "array",
-          "items" : {
-            "type" : "string"
-          }
-        },
-        "nativePort" : {
-          "type" : "integer"
-        },
-        "storagePort" : {
-          "type" : "integer"
-        },
-        "sslStoragePort" : {
-          "type" : "integer"
         }
       }
     },
