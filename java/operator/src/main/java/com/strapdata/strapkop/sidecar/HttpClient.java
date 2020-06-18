@@ -69,7 +69,7 @@ public class HttpClient {
                 httpClientConfiguration,
                 null,
                 new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                new SidecarNettyClientSslBuilder(new ResourceResolver(), sslContext),
+                new HttpNettyClientSslBuilder(new ResourceResolver(), sslContext),
                 createDefaultMediaTypeRegistry(),
                 AnnotationMetadataResolver.DEFAULT);
         this.cqlRole = cqlRole;

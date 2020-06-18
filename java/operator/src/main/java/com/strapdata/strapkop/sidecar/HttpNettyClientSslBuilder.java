@@ -25,13 +25,13 @@ import io.netty.handler.ssl.SslContext;
 import java.util.Optional;
 
 @SuppressWarnings("all")
-public class SidecarNettyClientSslBuilder extends NettyClientSslBuilder {
+public class HttpNettyClientSslBuilder extends NettyClientSslBuilder {
     Optional<SslContext> sslContextOptional;
 
     /**
      * @param resourceResolver The resource resolver
      */
-    public SidecarNettyClientSslBuilder(ResourceResolver resourceResolver, SslContext sslContext) {
+    public HttpNettyClientSslBuilder(ResourceResolver resourceResolver, SslContext sslContext) {
         super(resourceResolver);
         this.sslContextOptional = Optional.ofNullable(sslContext);
     }

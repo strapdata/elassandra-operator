@@ -277,18 +277,17 @@ by the corresponding availability zone name.
 Peristent volume decommission policy
 ------------------------------------
 
-By default, Kubernetes does not delete PVCs when scaling down a StatefulSet, but the Elassandra Operator
-automatically delete PVCs when scaling down the datacenter according to the ``decommissionPolicy`` defined in your datacenter spec,
-which is ``delete-pvc`` by default. If you want to keep PVCs when scaling down, add the following in your datacenter spec.
+When deleting an Elassandra datacenter CRD, Elassandra PVCs are deleted.
+If you want to keep PVCs, add the following in your datacenter spec.
 
 .. code::
 
     decommissionPolicy: keep-pvc
 
-.. note::
+.. tip::
 
-    Deleting PVCs is actually controlled by the annotation ``elassandra.strapdata.com/pvc-decommission-policy`` that you can
-    alter on an Elassandra pod if you want to change the initial setting.
+    When scaling down the datacenter, PVC of removed Elassandra nodes are kept and you must delete these PVCs before scaling up,
+    otherwise persistent volume are re-used.
 
 Network Configuration
 =====================

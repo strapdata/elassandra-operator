@@ -177,7 +177,7 @@ public class DataCenterUpdateAction {
 
         this.operation = operation;
         this.startTime = System.currentTimeMillis();
-        this.operation.setPendingInMs(startTime - operation.getSubmitDate().getTime());
+        this.operation.setPendingInMs(startTime - operation.getLastTransitionTime().getTime());
 
         this.dataCenter = dataCenter;
         this.dataCenterMetadata = dataCenter.getMetadata();
@@ -380,7 +380,7 @@ public class DataCenterUpdateAction {
         V1StatefulSetStatus stsStatus = sts.getStatus();
         int replicas = ObjectUtils.defaultIfNull(stsStatus.getReplicas(), 0);
         int readyReplicas = ObjectUtils.defaultIfNull(stsStatus.getReadyReplicas(), 0);
-        if (readyReplicas == replicas) {
+        if (readyReplicas >= replicas) {
             logger.debug("datacenter={} sts={} ready", dataCenter.id(), sts.getMetadata().getName());
             return true;
         }

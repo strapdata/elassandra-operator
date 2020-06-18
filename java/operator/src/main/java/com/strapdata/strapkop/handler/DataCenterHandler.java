@@ -92,7 +92,7 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
                         dataCenter.getMetadata().getResourceVersion(),
                         Reconciliable.Kind.DATACENTER, event.getType(),
                         dataCenterController.initDatacenter(dataCenter, new Operation()
-                                .withSubmitDate(new Date())
+                                .withLastTransitionTime(new Date())
                                 .withTriggeredBy("Datacenter init"))
                                 .doOnComplete(() -> managed.incrementAndGet())
                                 .doFinally(() -> meterRegistry.counter("k8s.event.init", tags).increment()));
@@ -106,7 +106,7 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
                         Reconciliable.Kind.DATACENTER,
                         event.getType(),
                         dataCenterController.initDatacenter(dataCenter, new Operation()
-                                .withSubmitDate(new Date())
+                                .withLastTransitionTime(new Date())
                                 .withTriggeredBy("Datacenter added"))
                                 .doOnComplete(() -> managed.incrementAndGet())
                                 .doFinally(() -> meterRegistry.counter("k8s.event.added", tags).increment())
@@ -127,7 +127,7 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
                             dataCenterController.updateDatacenter(
                                     dataCenter,
                                     new Operation()
-                                            .withSubmitDate(new Date())
+                                            .withLastTransitionTime(new Date())
                                             .withTriggeredBy("Datacenter modified spec generation=" + dataCenter.getMetadata().getGeneration()))
                                     .doFinally(() -> meterRegistry.counter("k8s.event.modified", tags).increment())
                     );

@@ -323,8 +323,8 @@ public class K8sResourceUtils {
                         if (e.getCode() == 404) {
                             throw new NoSuchElementException("statefulset="+statefulset.getMetadata().getName()+"/"+namespace+" not found");
                         }
-                        logger.warn("Created namespaced statefulset={} in namespace={} error: {}",
-                                statefulset.getMetadata().getName(), statefulset.getMetadata().getNamespace(), e.getMessage());
+                        logger.warn("Created namespaced statefulset=" + statefulset.getMetadata().getName() +
+                                    " in namespace=" + statefulset.getMetadata().getNamespace() + " error:", e.getMessage());
                         throw e;
                     }
                 }
