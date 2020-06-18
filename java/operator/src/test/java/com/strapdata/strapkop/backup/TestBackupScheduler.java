@@ -24,6 +24,7 @@ import com.strapdata.strapkop.model.k8s.datacenter.DataCenterSpec;
 import com.strapdata.strapkop.model.k8s.datacenter.ScheduledBackup;
 import com.strapdata.strapkop.model.k8s.task.BackupTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
+import com.strapdata.strapkop.utils.BackupScheduler;
 import io.kubernetes.client.models.V1ObjectMeta;
 import io.micronaut.scheduling.ScheduledExecutorTaskScheduler;
 import org.junit.jupiter.api.AfterAll;

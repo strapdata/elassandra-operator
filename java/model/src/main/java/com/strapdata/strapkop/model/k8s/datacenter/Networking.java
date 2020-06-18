@@ -17,6 +17,7 @@
 
 package com.strapdata.strapkop.model.k8s.datacenter;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
@@ -48,4 +49,18 @@ public class Networking {
     @SerializedName("hostNetworkEnabled")
     @Expose
     private Boolean hostNetworkEnabled = false;
+
+    /**
+     * External DNS config for public nodes and elasticsearch service.
+     */
+    @JsonPropertyDescription("External DNS configuration")
+    @SerializedName("externalDns")
+    @Expose
+    private ExternalDns externalDns = null;
+
+    @JsonIgnore
+    public boolean nodeInfoRequired() {
+        return hostPortEnabled || hostNetworkEnabled || (externalDns != null && externalDns.getEnabled());
+    }
+
 }

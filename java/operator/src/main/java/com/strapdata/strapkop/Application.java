@@ -28,6 +28,7 @@ import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.runtime.Micronaut;
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.info.Info;
+import io.swagger.v3.oas.annotations.info.License;
 
 import javax.inject.Singleton;
 
@@ -36,7 +37,7 @@ import javax.inject.Singleton;
                 title = "Elassandra Operator",
                 version = "0.1",
                 description = "Strapdata Elassandra Kubernetes Operator"
-                //license = @License(name = "Strapdata license", url = "http://petstore.notreal")
+                license = @License(name = "AGPL", url = "http://petstore.notreal")
         )
 )
 public class Application {

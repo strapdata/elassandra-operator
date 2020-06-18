@@ -17,7 +17,6 @@
 
 package com.strapdata.strapkop.controllers;
 
-import com.google.common.base.Strings;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenterSpec;
@@ -59,13 +58,12 @@ public class ValidationController {
         }
 
         // check externalDns
-        if (dataCenterSpec.getExternalDns() != null && dataCenterSpec.getExternalDns().getEnabled()) {
-            if (Strings.isNullOrEmpty(dataCenterSpec.getExternalDns().getDomain()))
-                throw new IllegalArgumentException("externalDns is enabled but no DNS domain is configured, please fix your elassandra CRD");
-            if (dataCenterSpec.getExternalDns().getTtl() == null || dataCenterSpec.getExternalDns().getTtl() < 0)
-                throw new IllegalArgumentException("externalDns is enabled but no DNS TTL is configured, please fix your elassandra CRD");
+        if (dataCenterSpec.getNetworking() != null && dataCenterSpec.getNetworking().getExternalDns() != null) {
+            dataCenterSpec.getNetworking().getExternalDns().validate();
         }
     }
+
+
 
     /**
      * Use the fabric8 datacenter for webhook admission.

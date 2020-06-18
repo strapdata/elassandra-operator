@@ -18,6 +18,7 @@
 package com.strapdata.strapkop.k8s;
 
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenterSpec;
 import io.kubernetes.client.openapi.models.V1OwnerReference;
 
 import java.util.Locale;
@@ -39,12 +40,20 @@ public class OperatorNames {
         return String.format(nameFormat, "elassandra-" + dataCenter.getSpec().getClusterName());
     }
 
+    public static String dataCenterResource(final DataCenterSpec dataCenterSpec) {
+        return dataCenterResource(dataCenterSpec.getClusterName(), dataCenterSpec.getDatacenterName());
+    }
+
     public static String dataCenterResource(final String clusterName, final String datacenterName) {
         return "elassandra-" + clusterName + "-" + datacenterName;
     }
 
     public static String rackResource(final String clusterName, final String datacenterName, final String rack) {
         return "elassandra-" + clusterName + "-" + datacenterName + "-" +rack;
+    }
+
+    public static String nodeInfoServiceAccount(final DataCenter dataCenter) {
+        return dataCenterResource(dataCenter.getSpec()) + "-nodeinfo";
     }
 
     public static String dataCenterChildObjectName(final String nameFormat, final DataCenter dataCenter) {
@@ -138,10 +147,10 @@ public class OperatorNames {
 
     public static String externalPodFqdn(DataCenter dc, int rackIndex, int podIndex) {
         return String.format(Locale.ROOT, "cassandra-%s-%d-%d.%s",
-                dc.getSpec().getExternalDns().getRoot(),
+                dc.getSpec().getNetworking().getExternalDns().getRoot(),
                 rackIndex,
                 podIndex,
-                dc.getSpec().getExternalDns().getDomain());
+                dc.getSpec().getNetworking().getExternalDns().getDomain());
     }
 
     public static String generateTaskName(DataCenter dc, String taskType) {

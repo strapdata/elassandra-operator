@@ -20,7 +20,7 @@ package com.strapdata.strapkop.cache;
 import com.google.common.collect.ImmutableList;
 import com.strapdata.strapkop.k8s.ElassandraPod;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
-import com.strapdata.strapkop.sidecar.SidecarClient;
+import com.strapdata.strapkop.sidecar.HttpClient;
 import io.micrometer.core.instrument.ImmutableTag;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
@@ -33,11 +33,11 @@ import java.util.Objects;
  * This cache associate a sidecar client to an elassandra pod.
  */
 @Singleton
-public class SidecarConnectionCache extends Cache<ElassandraPod, SidecarClient> {
+public class HttpConnectionCache extends Cache<ElassandraPod, HttpClient> {
 
-    private static final Logger logger = LoggerFactory.getLogger(SidecarConnectionCache.class);
+    private static final Logger logger = LoggerFactory.getLogger(HttpConnectionCache.class);
 
-    SidecarConnectionCache(MeterRegistry meterRegistry) {
+    HttpConnectionCache(MeterRegistry meterRegistry) {
         meterRegistry.gaugeMapSize("cache.size", ImmutableList.of(new ImmutableTag("type", "sidecar_client")), this);
     }
 

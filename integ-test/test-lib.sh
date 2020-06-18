@@ -226,7 +226,6 @@ add_memory_elassandra_datacenter() {
     echo "Datacenter $cl-$dc update memory to 3Gi"
 }
 
-
 create_namespace() {
     echo "Creating namespace $1"
     kubectl create namespace $1
@@ -250,30 +249,4 @@ generate_client_cert() {
 
 view_cert() {
     openssl x509 -text -in $1
-}
-
-unction deploy_prometheus_operator() {
-  helm install $HELM_DEBUG --name promop \
-    --set prometheus.ingress.enabled=true,prometheus.ingress.hosts[0]="prometheus.${DNS_DOMAIN}",prometheus.ingress.annotations."kubernetes\.io/ingress\.class"="traefik" \
-    --set alertmanager.ingress.enabled=true,alertmanager.ingress.hosts[0]="alertmanager.${DNS_DOMAIN}",alertmanager.ingress.annotations."kubernetes\.io/ingress\.class"="traefik" \
-    --set grafana.ingress.enabled=true,grafana.ingress.hosts[0]="grafana.${DNS_DOMAIN}",grafana.ingress.annotations."kubernetes\.io/ingress\.class"="traefik" \
-    -f prometheus-operator-values.yaml \
-  /Users/vroyer/dev/git/helm/charts/stable/prometheus-operator
-}
-
-function upgrade_prometheus_operator() {
-  helm upgrade $HELM_DEBUG \
-    --set prometheus.ingress.enabled=true,prometheus.ingress.hosts[0]="prometheus.${DNS_DOMAIN}",prometheus.ingress.annotations."kubernetes\.io/ingress\.class"="traefik" \
-    --set alertmanager.ingress.enabled=true,alertmanager.ingress.hosts[0]="alertmanager.${DNS_DOMAIN}",alertmanager.ingress.annotations."kubernetes\.io/ingress\.class"="traefik" \
-    --set grafana.ingress.enabled=true,grafana.ingress.hosts[0]="grafana.${DNS_DOMAIN}",grafana.ingress.annotations."kubernetes\.io/ingress\.class"="traefik" \
-    -f prometheus-operator-values.yaml \
-  promop /Users/vroyer/dev/git/helm/charts/stable/prometheus-operator
-}
-
-function undeploy_prometheus_operator() {
-  kubectl delete crd prometheuses.monitoring.coreos.com
-  kubectl delete crd prometheusrules.monitoring.coreos.com
-  kubectl delete crd servicemonitors.monitoring.coreos.com
-  kubectl delete crd alertmanagers.monitoring.coreos.com
-  helm delete --purge promop
 }

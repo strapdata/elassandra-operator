@@ -17,11 +17,27 @@
 
 package com.strapdata.strapkop.model.k8s.datacenter;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
 /**
  * PVC decommissioning policy
  */
+@AllArgsConstructor
 public enum DecommissionPolicy {
-    KEEP_PVC,
-    DELETE_PVC,
-    BACKUP_AND_DELETE_PVC
+    KEEP_PVC("keep-pvc"),
+    DELETE_PVC("delete-pvc"),
+    SNAPSHOT_AND_DELETE_PVC("snapshot-and-delete-pvc");
+
+    @Getter
+    private String value;
+
+    public static DecommissionPolicy fromString(String s)
+    {
+        if (s != null)
+            for (DecommissionPolicy e : DecommissionPolicy.values())
+                if (e.toString().equals(s))
+                    return e;
+        return null;
+    }
 }

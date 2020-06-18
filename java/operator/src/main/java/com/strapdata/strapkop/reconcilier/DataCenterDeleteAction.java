@@ -18,7 +18,7 @@
 package com.strapdata.strapkop.reconcilier;
 
 import com.google.gson.JsonSyntaxException;
-import com.strapdata.strapkop.backup.BackupScheduler;
+import com.strapdata.strapkop.utils.BackupScheduler;
 import com.strapdata.strapkop.cache.*;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRoleManager;
@@ -50,9 +50,10 @@ public class DataCenterDeleteAction {
     private final DataCenter dataCenter;
     private final DataCenterCache dataCenterCache;
     private final DataCenterStatusCache dataCenterStatusCache;
-    private final SidecarConnectionCache sidecarConnectionCache;
+    private final HttpConnectionCache sidecarConnectionCache;
     private final JMXConnectorCache jmxConnectorCache;
     private final StatefulsetCache statefulsetCache;
+    private final ServiceAccountCache serviceAccountCache;
     private final PodCache podCache;
 
     private final CqlKeyspaceManager cqlKeyspaceManager;
@@ -65,9 +66,10 @@ public class DataCenterDeleteAction {
                                   AppsV1Api appsV1Api,
                                   final DataCenterCache dataCenterCache,
                                   final DataCenterStatusCache dataCenterStatusCache,
-                                  final SidecarConnectionCache sidecarConnectionCache,
+                                  final HttpConnectionCache sidecarConnectionCache,
                                   final JMXConnectorCache jmxConnectorCache,
                                   final StatefulsetCache statefulsetCache,
+                                  final ServiceAccountCache serviceAccountCache,
                                   final PodCache podCache,
                                   CqlKeyspaceManager cqlKeyspaceManager,
                                   CqlRoleManager cqlRoleManager,
@@ -80,6 +82,7 @@ public class DataCenterDeleteAction {
         this.dataCenterCache = dataCenterCache;
         this.dataCenterStatusCache = dataCenterStatusCache;
         this.sidecarConnectionCache = sidecarConnectionCache;
+        this.serviceAccountCache = serviceAccountCache;
         this.statefulsetCache = statefulsetCache;
         this.jmxConnectorCache = jmxConnectorCache;
         this.podCache = podCache;
@@ -106,6 +109,7 @@ public class DataCenterDeleteAction {
                 sidecarConnectionCache.purgeDataCenter(dataCenter);
                 jmxConnectorCache.purgeDataCenter(dataCenter);
                 podCache.purgeDataCenter(dataCenter);
+                serviceAccountCache.purgeServiceAccount(dataCenter);
 
                 cqlRoleManager.remove(dataCenter);
                 cqlKeyspaceManager.remove(dataCenter);
@@ -153,11 +157,14 @@ public class DataCenterDeleteAction {
                         .onErrorComplete()
                         .blockingGet();
 
+                // delete tasks
+                k8sResourceUtils.deleteTasks(dataCenter.getMetadata().getNamespace(), null).blockingGet();
+
                 // delete persistent volume claims
                 switch (dataCenter.getSpec().getDecommissionPolicy()) {
                     case KEEP_PVC:
                         break;
-                    case BACKUP_AND_DELETE_PVC:
+                    case SNAPSHOT_AND_DELETE_PVC:
                         // TODO: backup
                     case DELETE_PVC:
                         k8sResourceUtils.listNamespacedPodsPersitentVolumeClaims(dataCenter.getMetadata().getNamespace(), null, labelSelector).forEach(volumeClaim -> {
@@ -172,9 +179,6 @@ public class DataCenterDeleteAction {
                         });
                         break;
                 }
-
-                // asynchrounous delete tasks
-                k8sResourceUtils.deleteTasks(dataCenter.getMetadata().getNamespace(), null).blockingGet();
                 logger.info("Deleted DataCenter namespace={} name={}", dataCenter.getMetadata().getNamespace(), dataCenter.getMetadata().getName());
             }
         });

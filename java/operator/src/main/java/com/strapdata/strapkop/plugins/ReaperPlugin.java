@@ -410,7 +410,7 @@ public class ReaperPlugin extends AbstractPlugin {
                 .addEnvItem(new V1EnvVar().name("REAPER_AUTO_SCHEDULING_EXCLUDED_CLUSTERS").value("[]"))
         ;
 
-        if (dataCenterSpec.getExternalDns() != null && dataCenterSpec.getExternalDns().getEnabled() == true) {
+        if (dataCenterSpec.getNetworking().getExternalDns() != null && dataCenterSpec.getNetworking().getExternalDns().getEnabled() == true) {
             container
                     .addEnvItem(new V1EnvVar().name("REAPER_CASS_ADDRESS_TRANSLATOR_ENABLED").value("true"))
                     .addEnvItem(new V1EnvVar().name("REAPER_CASS_ADDRESS_TRANSLATOR_TYPE").value("kubernetesDnsTranslator"))

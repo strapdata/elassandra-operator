@@ -29,7 +29,7 @@ import com.strapdata.strapkop.model.k8s.datacenter.DataCenterStatus;
 import com.strapdata.strapkop.model.k8s.task.BackupTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
-import com.strapdata.strapkop.sidecar.SidecarClientFactory;
+import com.strapdata.strapkop.sidecar.HttpClientFactory;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -52,13 +52,13 @@ import java.util.List;
 @Infrastructure
 public class BackupTaskReconcilier extends TaskReconcilier {
     private static final Logger logger = LoggerFactory.getLogger(BackupTaskReconcilier.class);
-    private final SidecarClientFactory sidecarClientFactory;
+    private final HttpClientFactory httpClientFactory;
     private final CqlRoleManager cqlRoleManager;
 
     public BackupTaskReconcilier(ReconcilierObserver reconcilierObserver,
                                  final OperatorConfig operatorConfig,
                                  final K8sResourceUtils k8sResourceUtils,
-                                 final SidecarClientFactory sidecarClientFactory,
+                                 final HttpClientFactory httpClientFactory,
                                  final MeterRegistry meterRegistry,
                                  final DataCenterController dataCenterController,
                                  final DataCenterCache dataCenterCache,
@@ -68,7 +68,7 @@ public class BackupTaskReconcilier extends TaskReconcilier {
                                  @Named("tasks") UserExecutorConfiguration userExecutorConfiguration ) {
         super(reconcilierObserver, operatorConfig, k8sResourceUtils, meterRegistry,
                 dataCenterController, dataCenterCache, dataCenterStatusCache, executorFactory, userExecutorConfiguration);
-        this.sidecarClientFactory = sidecarClientFactory;
+        this.httpClientFactory = httpClientFactory;
         this.cqlRoleManager = cqlRoleManager;
     }
 
@@ -89,7 +89,7 @@ public class BackupTaskReconcilier extends TaskReconcilier {
                 .subscribeOn(Schedulers.io())
                 .flatMapSingle(pod -> {
 
-                    return sidecarClientFactory.clientForPod(ElassandraPod.fromV1Pod(pod), cqlRoleManager.get(dc, CqlRole.STRAPKOP_ROLE.getUsername()))
+                    return httpClientFactory.clientForPod(ElassandraPod.fromV1Pod(pod), cqlRoleManager.get(dc, CqlRole.STRAPKOP_ROLE.getUsername()))
                             .snapshot(backupSpec.getRepository(), backupSpec.getKeyspaces())
                             .map(backupResponse -> {
                                 logger.debug("Received backupSpec response with status = {}", backupResponse.getStatus());

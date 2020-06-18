@@ -14,6 +14,6 @@ roleRef:
   name: {{ template "elassandra.resourceName" . }}-node-reader
 subjects:
   - kind: ServiceAccount
-    name: nodeinfo
+    name: {{ template "elassandra.resourceName" . }}-nodeinfo
     namespace: {{ .Release.Namespace }}
 {{- end }}

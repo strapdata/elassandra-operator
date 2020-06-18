@@ -355,19 +355,17 @@ public class K8sResourceUtils {
     }
 
     public V1ServiceAccount readNamespacedServiceAccount(final String namespace, final String name) throws ApiException {
-            try {
-                coreApi.getApiClient().setDebugging(true);
-                V1ServiceAccount sa = coreApi.readNamespacedServiceAccount(name, namespace, null, null, null);
-                logger.debug("read namespaced serviceaccount={}", sa.getMetadata().getName());
-                coreApi.getApiClient().setDebugging(false);
-                return sa;
-            } catch(ApiException e) {
-                if (e.getCode() == 404) {
-                    logger.warn("serviceaccount namespace={} name={} not found", namespace, name);
-                    throw new NoSuchElementException("service="+name+"/"+namespace+" not found");
-                }
-                throw e;
+        try {
+            V1ServiceAccount sa = coreApi.readNamespacedServiceAccount(name, namespace, null, null, null);
+            logger.debug("read serviceaccount={}", sa);
+            return sa;
+        } catch(ApiException e) {
+            if (e.getCode() == 404) {
+                logger.warn("serviceaccount namespace={} name={} not found", namespace, name);
+                throw new NoSuchElementException("serviceaccount="+name+"/"+namespace+" not found");
             }
+            throw e;
+        }
     }
 
     public Single<V1Secret> createOrReplaceNamespacedDeployment(final V1Secret secret) throws ApiException {
