@@ -36,8 +36,8 @@ import javax.inject.Singleton;
         info = @Info(
                 title = "Elassandra Operator",
                 version = "0.1",
-                description = "Strapdata Elassandra Kubernetes Operator"
-                license = @License(name = "AGPL", url = "http://petstore.notreal")
+                description = "Strapdata Elassandra Kubernetes Operator",
+                license = @License(name = "AGPL", url = "https://www.gnu.org/licenses/agpl-3.0.fr.html")
         )
 )
 public class Application {
