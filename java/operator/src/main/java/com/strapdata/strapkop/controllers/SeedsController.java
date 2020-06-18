@@ -21,13 +21,11 @@ import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.cache.NodeCache;
 import com.strapdata.strapkop.cache.PodCache;
 import com.strapdata.strapkop.cache.StatefulsetCache;
-import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
 import io.kubernetes.client.openapi.ApiException;
-import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.openapi.models.V1Node;
 import io.kubernetes.client.openapi.models.V1NodeAddress;
 import io.kubernetes.client.openapi.models.V1Pod;
@@ -36,13 +34,16 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Error;
-import io.micronaut.http.annotation.*;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.QueryValue;
 import io.reactivex.Single;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.inject.Inject;
 import java.util.*;
 
 /**
@@ -54,26 +55,18 @@ public class SeedsController {
 
     private final Logger logger = LoggerFactory.getLogger(SeedsController.class);
 
-    private final K8sResourceUtils k8sResourceUtils;
-    private final CoreV1Api coreApi;
-    private final DataCenterCache dataCenterCache;
-    private final StatefulsetCache statefulsetCache;
-    private final NodeCache nodeCache;
-    private final PodCache podCache;
+    @Inject
+    DataCenterCache dataCenterCache;
 
-    public SeedsController(final CoreV1Api coreApi,
-                           final K8sResourceUtils k8sResourceUtils,
-                           final DataCenterCache dataCenterCache,
-                           final StatefulsetCache statefulsetCache,
-                           final PodCache podCache,
-                           final NodeCache nodeCache) {
-        this.coreApi= coreApi;
-        this.k8sResourceUtils = k8sResourceUtils;
-        this.dataCenterCache = dataCenterCache;
-        this.statefulsetCache = statefulsetCache;
-        this.podCache = podCache;
-        this.nodeCache = nodeCache;
-    }
+    @Inject
+    StatefulsetCache statefulsetCache;
+
+    @Inject
+    NodeCache nodeCache;
+
+    @Inject
+    PodCache podCache;
+
 
     /**
      * @return OK when preflight service are applied (CA and CRD installation)
@@ -88,14 +81,12 @@ public class SeedsController {
      * @param namespace
      * @param clusterName
      * @param datacenterName
-     * @param remoteSeeder
      * @return
      */
-    @Post(value = "/{namespace}/{clusterName}/{datacenterName}", consumes = MediaType.TEXT_PLAIN, produces = MediaType.APPLICATION_JSON)
+    @Get(value = "/{namespace}/{clusterName}/{datacenterName}", produces = MediaType.APPLICATION_JSON)
     public Single<List<String>> seeds(@QueryValue("namespace") String namespace,
                                       @QueryValue("clusterName") String clusterName,
-                                      @QueryValue("datacenterName") String datacenterName,
-                                      @Body String remoteSeeder) throws ApiException {
+                                      @QueryValue("datacenterName") String datacenterName) throws ApiException {
         Key dcKey = new Key(OperatorNames.dataCenterResource(clusterName, datacenterName), namespace);
         DataCenter dataCenter = dataCenterCache.get(dcKey);
         if (dataCenter == null)
@@ -144,7 +135,8 @@ public class SeedsController {
                 }
             }
         }
-        logger.info("remoteSeeder={} seeds={}", remoteSeeder, seeds);
+
+        logger.info("datacenter={} seeds={}", dataCenter.id(), seeds);
         return Single.just(seeds);
     }
 

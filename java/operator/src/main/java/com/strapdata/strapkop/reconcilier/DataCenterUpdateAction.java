@@ -22,7 +22,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.net.InetAddresses;
 import com.strapdata.cassandra.k8s.ElassandraOperatorSeedProvider;
-import com.strapdata.cassandra.k8s.ElassandraOperatorSeedProviderAndNotifier;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.backup.BackupScheduler;
 import com.strapdata.strapkop.cache.DataCenterStatusCache;
@@ -1239,9 +1238,7 @@ public class DataCenterUpdateAction {
             if (!remoteSeeders.isEmpty()) {
                 parameters.put("remote_seeders", String.join(", ", remoteSeeders));
             }
-            // Status callback URL allowing Cassandra nodes to notify the operator synchronously
-            //parameters.put(ElassandraOperatorSeedProviderAndNotifier.STATUS_NOTIFIER_URL,
-            //        "https://" + operatorConfig.getServiceName() + "." + operatorConfig.getOperatorNamespace()+ ".svc/node/" + dataCenterMetadata.getNamespace() + "/" + dataCenterSpec.getClusterName());
+
             logger.debug("seed parameters={}", parameters);
             final Map<String, Object> config = new HashMap<>(); // can't use ImmutableMap as some values are null
             config.put("seed_provider", ImmutableList.of(ImmutableMap.of(
@@ -1537,9 +1534,7 @@ public class DataCenterUpdateAction {
                     esConfig.put("cbs", ImmutableMap.of("enabled", enterprise.getCbs()));
                     configMapVolumeMountBuilder.addFile("elasticsearch.yml.d/002-enterprise.yaml", toYamlString(esConfig));
                     configMapVolumeMountBuilder.addFile("cassandra-env.sh.d/002-enterprise.sh",
-                            "JVM_OPTS=\"$JVM_OPTS -Dcassandra.custom_query_handler_class=org.elassandra.index.EnterpriseElasticQueryHandler" +
-                                    " -D" + ElassandraOperatorSeedProviderAndNotifier.STATUS_NOTIFIER_URL + "=https://elassandra-operator/node/" + dataCenterMetadata.getNamespace()
-                                    + "\"");
+                            "JVM_OPTS=\"$JVM_OPTS -Dcassandra.custom_query_handler_class=org.elassandra.index.EnterpriseElasticQueryHandler \"");
                     // TODO: override com exporter in cassandra-env.sh.d/001-cassandra-exporter.sh
                 }
 
@@ -1798,7 +1793,7 @@ public class DataCenterUpdateAction {
             // Add the nodeinfo init container to bind on the k8s node public IP if available.
             // If externalDns is enabled, this init-container also publish a DNSEndpoint to expose public DNS name of seed nodes.
             if (dataCenterSpec.getNetworking().getHostNetworkEnabled() || dataCenterSpec.getNetworking().getHostPortEnabled()) {
-                podSpec.addInitContainersItem(buildInitContainerNodeInfo("nodeinfo", rackStatus));
+                podSpec.addInitContainersItem(buildInitContainerNodeInfo(dataCenterResource(dataCenterSpec.getClusterName(), dataCenterSpec.getDatacenterName()) + "-nodeinfo", rackStatus));
             }
 
             {
