@@ -78,7 +78,7 @@ sleep 5
 # check index
 TOTAL_HIT=$(kubectl exec elassandra-cl1-dc2-0-0 -n $NS2 -- bash -l -c "get 'foo/bar/_search?pretty'" | tail -n +4 | jq ".hits.total")
 if [ "$TOTAL_HIT" != "$N" ]; then
-   finish
+   error
 fi
 
 # create a new elasticsearch index replicated on dc1 and dc2
@@ -89,12 +89,12 @@ sleep 5
 TOTAL_HIT=$(kubectl exec elassandra-cl1-dc1-0-0 -n $NS -- bash -l -c "get 'foo/bar/_search?pretty'" | tail -n +4 | jq ".hits.total")
 if [ "$TOTAL_HIT" != "$N" ]; then
    echo "Error, expecting $N docs in foo on dc1/$NS"
-   finish
+   error
 fi
 TOTAL_HIT=$(kubectl exec elassandra-cl1-dc2-0-0 -n $NS2 -- bash -l -c "get 'foo/bar/_search?pretty'" | tail -n +4 | jq ".hits.total")
 if [ "$TOTAL_HIT" != "$N" ]; then
    echo "Error, expecting $N docs in foo on dc2/$NS2"
-   finish
+   error
 fi
 
 # safely remove datacenter dc2

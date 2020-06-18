@@ -37,7 +37,7 @@ sleep 5
 TOTAL_HIT=$(kubectl exec elassandra-cl1-dc1-0-0 -n $NS -- bash -l -c "get 'foo/bar/_search?pretty'" | tail -n +4 | jq ".hits.total")
 if [ "$TOTAL_HIT" != "$N" ]; then
    echo "Error, expecting $N docs in foo on dc1"
-   finish
+   error
 fi
 
 uninstall_elassandra_datacenter $NS cl1 dc1

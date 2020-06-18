@@ -14,7 +14,9 @@ import org.slf4j.LoggerFactory;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocketFactory;
-import java.io.*;
+import java.io.DataInputStream;
+import java.io.FilterInputStream;
+import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.InetAddress;
 import java.net.URL;
@@ -34,25 +36,12 @@ public class ElassandraOperatorSeedProvider implements org.apache.cassandra.loca
      */
     private String[] seeds = null;
 
-
     private String[] remoteSeeds = null;
-
-    /**
-     * Internal elassandra operator URL accessible in the kubernetes cluster;
-     */
-    private String internalSeeder = null;
-
-    /**
-     * External elassandra operator URL accessible from remote kubernetes clusters;
-     */
-    private String externalSeeder = null;
 
     /**
      * List of URL to get current seeds (broadcast_address) from remote strapkop.
      */
     private final String[] remoteSeeders;
-
-    private Set<InetAddress> nodeInfoSeeds;
 
     private EncryptionOptions encryptionOptions;
 
@@ -60,9 +49,7 @@ public class ElassandraOperatorSeedProvider implements org.apache.cassandra.loca
         seeds = getParameter(args, "seeds", "SEEDS");
         remoteSeeds = getParameter(args, "remote_seeds", "REMOTE_SEEDS");
         remoteSeeders = getParameter(args, "remote_seeders", "REMOTE_SEEDERS");
-        internalSeeder = getSingleParameter(args, "internal_seeders", "INTERNAL_SEEDERS", null);
-        externalSeeder = getSingleParameter(args, "external_seeders", "EXTERNAL_SEEDERS", null);
-
+        
         this.encryptionOptions = new EncryptionOptions.ClientEncryptionOptions();
         EncryptionOptions.ClientEncryptionOptions cassandraEncryptionOptions = DatabaseDescriptor.getClientEncryptionOptions();
         this.encryptionOptions.keystore = getSingleParameter(args, "keystore", "SEEDER_KEYSTORE", cassandraEncryptionOptions.keystore);
@@ -111,6 +98,7 @@ public class ElassandraOperatorSeedProvider implements org.apache.cassandra.loca
 
         logger.info("seeds={} remote_seeds={} remote_seeders={}", Arrays.toString(seeds), Arrays.toString(remoteSeeds), Arrays.toString(remoteSeeders));
 
+        // remove seed nodes is replaced
         String replacePodName = System.getenv("REPLACE_POD_NAME");
         for (String s : seeds) {
             // filter out seed that are replaced (required with cassandra.replace_address_first_boot)
@@ -141,9 +129,8 @@ public class ElassandraOperatorSeedProvider implements org.apache.cassandra.loca
             if (!url.trim().isEmpty()) {
                 try {
                     String remoteSeeder = url.trim();
-                    String localSeeder = remoteSeeder.equals(internalSeeder) ? internalSeeder : remoteSeeder;
-                    logger.debug("remoteSeeder=[{}] localSeeder=[{}]", remoteSeeder, localSeeder);
-                    seedAddresses.addAll(seederCall(url.trim(), this.encryptionOptions, localSeeder));
+                    logger.debug("remoteSeeder=[{}]", remoteSeeder);
+                    seedAddresses.addAll(seederCall(url.trim(), this.encryptionOptions));
                 } catch (final UnknownHostException e) {
                     logger.warn("Unable to resolve k8s service=[" + url + "]", e);
                 } catch (final Exception e) {
@@ -156,11 +143,7 @@ public class ElassandraOperatorSeedProvider implements org.apache.cassandra.loca
         return seedAddresses;
     }
 
-    public static List<InetAddress> seederCall(String url, String localSeeder) throws IOException, ConfigurationException {
-        return seederCall(url, null);
-    }
-
-    public static List<InetAddress> seederCall(String url, EncryptionOptions encryptionOptions, String localSeeder) throws IOException, ConfigurationException
+    public static List<InetAddress> seederCall(String url, EncryptionOptions encryptionOptions) throws IOException, ConfigurationException
     {
         // Populate the region and zone by introspection, fail if 404 on metadata
         HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
@@ -176,14 +159,8 @@ public class ElassandraOperatorSeedProvider implements org.apache.cassandra.loca
         DataInputStream d = null;
         try
         {
-            conn.setRequestMethod("POST");
-            conn.addRequestProperty("Content-Type", "text/plain");
+            conn.setRequestMethod("GET");
             conn.addRequestProperty("Metadata-Flavor", "elassandra-operator-seed-provider");
-            conn.setDoOutput(true);
-            PrintWriter writer = new PrintWriter(conn.getOutputStream());
-            writer.println(localSeeder);
-            writer.flush();
-            writer.close();
 
             if (conn.getResponseCode() != 200)
                 throw new ConfigurationException("ElassandraOperatorSeedProvider was unable to execute the API call code="+conn.getResponseCode()+" reason="+conn.getResponseMessage());

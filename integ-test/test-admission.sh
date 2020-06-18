@@ -29,6 +29,13 @@ if [ $? -eq 0 ]; then
   finish
 fi
 
+ELASSANDRA_OPERATOR_POD=$(kubectl get pod -l app=elassandra-operator  -o custom-columns=NAME:.metadata.name --no-headers)
+SEED_IP=$(kubectl exec $ELASSANDRA_OPERATOR_POD -- curl -k "https://localhost/seeds/$NS/cl1/dc1" 2>/dev/null | jq -r ".[0]")
+if [ -z "$SEED_IP" ]; then
+  echo "Seed IP is empty"
+  finish
+fi
+
 # cleanup
 uninstall_elassandra_datacenter $NS cl1 dc1
 echo "Test SUCCESSFUL"
