@@ -163,7 +163,7 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
                         sts.getMetadata().getName(),
                         sts.getStatus().getReadyReplicas(), sts.getStatus().getReplicas());
                 Operation op = new Operation()
-                        .withSubmitDate(new Date())
+                        .withLastTransitionTime(new Date())
                         .withTriggeredBy("status update statefulset=" + sts.getMetadata().getName() + " replicas=" +
                                 sts.getStatus().getReadyReplicas() + "/" + sts.getStatus().getReplicas());
                 workQueues.submit(

@@ -121,7 +121,7 @@ public class DeploymentHandler extends TerminalHandler<K8sWatchEvent<V1Deploymen
                 logger.info("datacenter={}/{} deployment={}/{} is available, triggering a dc deploymentAvailable",
                         parent, namespace, deployment.getMetadata().getName(), deployment.getMetadata().getNamespace());
                 Operation op = new Operation()
-                        .withSubmitDate(new Date())
+                        .withLastTransitionTime(new Date())
                         .withTriggeredBy("status update deployment=" + deployment.getMetadata().getName());
                 workQueues.submit(
                         new ClusterKey(clusterName, deployment.getMetadata().getNamespace()),

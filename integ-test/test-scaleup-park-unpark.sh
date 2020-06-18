@@ -40,7 +40,10 @@ java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS -p RUNNING --
 # scale down
 scale_elassandra_datacenter $NS cl1 dc1 2
 java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --health GREEN -r 2
-kubectl get pvc data-volume-elassandra-cl1-dc1-0-0 -n $NS
+
+# delete PVC
+sleep 2
+kubectl delete pvc data-volume-elassandra-cl1-dc1-0-0 -n $NS
 
 # scale up
 scale_elassandra_datacenter $NS cl1 dc1 3

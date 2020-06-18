@@ -165,9 +165,9 @@ public abstract class TaskReconcilier extends Reconcilier<Task> {
                 .flatMapCompletable(p -> {
                     Operation operation = new Operation()
                             .withTriggeredBy("task " + task.getMetadata().getName())
-                            .withSubmitDate(new Date());
+                            .withLastTransitionTime(new Date());
                     operation.getActions().add("task " + task.getMetadata().getName());
-                    operation.setPendingInMs(startTime - operation.getSubmitDate().getTime());
+                    operation.setPendingInMs(startTime - operation.getLastTransitionTime().getTime());
                     operation.setDurationInMs(endTime - startTime);
 
                     List<Operation> history = dataCenterStatus.getOperationHistory();

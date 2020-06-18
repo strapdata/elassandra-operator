@@ -120,4 +120,4 @@ Here is such kubernetes secret for an Elassandra cluster named **cl1**:
       shared-secret.yaml: YWFhLnNoYXJlZF9zZWNyZXQ6IDE0MjY0YjI4LWQ0ZTAtNGFkMC05MDUzLWE0NjUwMzk2MDI3Mg==
 
 Like for certificates, in a multi-datacenter Elassandra cluster deployed in different namespaces or different Kubernetes clusters,
-you should copy this secret to all Elassandra datacenters.
+you must copy this secret to all Elassandra datacenters.

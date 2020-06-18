@@ -172,7 +172,7 @@ public class DataCenterController {
         DataCenter dc = dataCenterCache.get(key);
         if (dc != null) {
             Operation op = new Operation()
-                    .withSubmitDate(new Date())
+                    .withLastTransitionTime(new Date())
                     .withTriggeredBy("unschedulable pod=" + pod.getName());
             return reconcile(dc, statefulsetCache.loadIfAbsent(dc)
                     .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dc, op))
@@ -208,7 +208,7 @@ public class DataCenterController {
                 statefulsetCache.loadIfAbsent(dc)
                         .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dc,
                                 new Operation()
-                                        .withSubmitDate(new Date())
+                                        .withLastTransitionTime(new Date())
                                         .withTriggeredBy("dc-after-task-" + task.getMetadata().getName())))
                 .flatMapCompletable(dataCenterUpdateAction ->  dataCenterUpdateAction.taskDone(task))
                 .andThen(k8sResourceUtils.updateDataCenterStatus(dc, dc.getStatus()).ignoreElement()));

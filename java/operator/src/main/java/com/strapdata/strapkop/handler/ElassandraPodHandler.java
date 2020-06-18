@@ -18,7 +18,6 @@
 package com.strapdata.strapkop.handler;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.cache.PodCache;
 import com.strapdata.strapkop.event.K8sWatchEvent;
@@ -27,18 +26,14 @@ import com.strapdata.strapkop.k8s.Pod;
 import com.strapdata.strapkop.model.ClusterKey;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
-import com.strapdata.strapkop.model.k8s.datacenter.DecommissionPolicy;
 import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.reconcilier.DataCenterController;
 import com.strapdata.strapkop.reconcilier.Reconciliable;
-import io.kubernetes.client.openapi.models.V1PersistentVolumeClaim;
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.kubernetes.client.openapi.models.V1PodCondition;
 import io.micrometer.core.instrument.ImmutableTag;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tag;
-import io.reactivex.Completable;
-import io.vavr.collection.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,7 +42,6 @@ import javax.inject.Inject;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 /**
  * Track Elassandra POD status to update the ElassandraNodeStatusCache that trigger Cassandra status pooling.
@@ -158,17 +152,6 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
                 logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 V1Pod pod = event.getResource();
                 podCache.remove(new Key(pod.getMetadata()));
-                String clusterName = Pod.extractLabel(pod, OperatorLabels.CLUSTER);
-                String datacenterName = Pod.extractLabel(pod, OperatorLabels.DATACENTER);
-                ClusterKey clusterKey = new ClusterKey(clusterName, datacenterName);
-                DecommissionPolicy pvcPolicy = DecommissionPolicy.fromString(pod.getMetadata().getAnnotations().get(OperatorLabels.PVC_DECOMMISSION_POLICY));
-                if (pvcPolicy != null) {
-                    workQueues.submit(
-                            clusterKey,
-                            pod.getMetadata().getResourceVersion(),
-                            Reconciliable.Kind.ELASSANDRA_POD, K8sWatchEvent.Type.DELETED,
-                            freePodPvc(pvcPolicy, new Pod(pod, CONTAINER_NAME)));
-                }
                 meterRegistry.counter("k8s.event.deleted", tags).increment();
                 managed.decrementAndGet();
                 break;
@@ -178,39 +161,5 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
                 meterRegistry.counter("k8s.event.error", tags).increment();
                 break;
         }
-    }
-
-    public Completable freePodPvc(DecommissionPolicy decommissionPolicy, Pod deletedPod) throws Exception {
-        logger.debug("decommissionPolicy={} deletedPod={}", decommissionPolicy, deletedPod.getName());
-        // delete PVC only if the node was decommissioned to avoid deleting PVC in unexpectedly killed pod during a DC ScaleDown
-        switch (decommissionPolicy) {
-            case KEEP_PVC:
-                break;
-            case SNAPSHOT_AND_DELETE_PVC:
-                // TODO
-                break;
-            case DELETE_PVC:
-                List<V1PersistentVolumeClaim> pvcsToDelete = Stream.ofAll(k8sResourceUtils.listNamespacedPodsPersitentVolumeClaims(
-                        deletedPod.getNamespace(),
-                        null,
-                        OperatorLabels.toSelector(ImmutableMap.of(
-                                OperatorLabels.APP, "elassandra",
-                                OperatorLabels.PARENT, deletedPod.getParent(),
-                                OperatorLabels.RACK, deletedPod.getRack(),
-                                OperatorLabels.RACKINDEX, Integer.toString(deletedPod.getRackIndex())))
-                ))
-                        .filter(pvc -> {
-                            boolean match = pvc.getMetadata().getName().endsWith(deletedPod.getName());
-                            logger.info("PVC={} will be deleted due to pod={}/{} deletion", pvc.getMetadata().getName(), deletedPod.getName(), deletedPod.getNamespace());
-                            return match;
-                        }).collect(Collectors.toList());
-
-                if (pvcsToDelete.size() > 1) {
-                    logger.error("Too many PVC found for deletion, cancel it ! (List of PVC = {})", pvcsToDelete);
-                } else if (!pvcsToDelete.isEmpty()) {
-                    return k8sResourceUtils.deletePersistentVolumeClaim(pvcsToDelete.get(0));
-                }
-        }
-        return Completable.complete();
     }
 }

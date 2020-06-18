@@ -53,10 +53,10 @@ public class Operation {
     /**
      * Submit datetime
      */
-    @SerializedName("submitDate")
+    @SerializedName("lastTransitionTime")
     @Expose
     @JsonAdapter(GsonIsoDateAdapter.class)
-    private Date submitDate = null;
+    private Date lastTransitionTime = null;
 
     /**
      * Pending time in millisecond
