@@ -1,4 +1,4 @@
-{{- if or (.Values.networking.hostPortEnabled) (.Values.networking.hostNetworkEnabled) }}
+{{- if or (.Values.networking.hostPortEnabled) (.Values.networking.hostNetworkEnabled) (.Values.networking.externalDns.enabled) }}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -19,7 +19,7 @@ metadata:
   name: {{ template "elassandra.resourceName" . }}-nodeinfo
   namespace: {{ .Release.Namespace }}
   annotations:
-    kubernetes.io/service-account.name: nodeinfo
+    kubernetes.io/service-account.name: {{ template "elassandra.resourceName" . }}-nodeinfo
 #    helm.sh/hook: post-install
 type: kubernetes.io/service-account-token
 {{- end }}

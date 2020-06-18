@@ -15,7 +15,7 @@
  * along with the Elassandra-Operator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.strapdata.strapkop.backup;
+package com.strapdata.strapkop.utils;
 
 import com.google.common.base.Strings;
 import com.strapdata.strapkop.model.Key;

@@ -18,7 +18,7 @@
 package com.strapdata.strapkop.sidecar;
 
 import com.strapdata.strapkop.StrapkopException;
-import com.strapdata.strapkop.cache.SidecarConnectionCache;
+import com.strapdata.strapkop.cache.HttpConnectionCache;
 import com.strapdata.strapkop.cql.CqlRole;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.k8s.ElassandraPod;
@@ -49,16 +49,16 @@ import java.util.concurrent.ExecutionException;
  * the next nodeStatus check would invalidate the cache (calling invalidateClient()), and the next call to the factory would recreate the client.
  */
 @Singleton
-public class SidecarClientFactory {
+public class HttpClientFactory {
 
-    static final Logger logger = LoggerFactory.getLogger(SidecarClientFactory.class);
+    static final Logger logger = LoggerFactory.getLogger(HttpClientFactory.class);
 
-    private final SidecarConnectionCache sidecarConnectionCache;
+    private final HttpConnectionCache httpConnectionCache;
     private final AuthorityManager authorityManager;
     private final CqlRoleManager cqlRoleManager;
 
-    public SidecarClientFactory(SidecarConnectionCache sidecarConnectionCache, AuthorityManager authorityManager, CqlRoleManager cqlRoleManager) {
-        this.sidecarConnectionCache = sidecarConnectionCache;
+    public HttpClientFactory(HttpConnectionCache httpConnectionCache, AuthorityManager authorityManager, CqlRoleManager cqlRoleManager) {
+        this.httpConnectionCache = httpConnectionCache;
         this.authorityManager = authorityManager;
         this.cqlRoleManager = cqlRoleManager;
     }
@@ -66,8 +66,8 @@ public class SidecarClientFactory {
     /**
      * Get a sidecar client from cache or create it
      */
-    public synchronized SidecarClient clientForPod(final ElassandraPod pod, CqlRole cqlRole) throws MalformedURLException, InterruptedException, ExecutionException, ApiException, SSLException {
-        SidecarClient sidecarClient = sidecarConnectionCache.get(pod);
+    public synchronized HttpClient clientForPod(final ElassandraPod pod, CqlRole cqlRole) throws MalformedURLException, InterruptedException, ExecutionException, ApiException, SSLException {
+        HttpClient sidecarClient = httpConnectionCache.get(pod);
 
         if (sidecarClient != null && sidecarClient.isRunning()) {
             logger.debug("hitting sidecar client cache for pod={}", pod.getName());
@@ -78,8 +78,8 @@ public class SidecarClientFactory {
         logger.debug("creating sidecar for pod={} in {}/{} url={}", pod.getName(), pod.getDataCenter(), pod.getNamespace(), url.toString());
         DefaultHttpClientConfiguration httpClientConfiguration = new DefaultHttpClientConfiguration();
         httpClientConfiguration.setReadTimeout(Duration.ofSeconds(30));
-        sidecarClient = new SidecarClient(url, httpClientConfiguration, getSslContext(pod.getNamespace(), pod.getCluster()), cqlRole);
-        sidecarConnectionCache.put(pod, sidecarClient);
+        sidecarClient = new HttpClient(url, httpClientConfiguration, getSslContext(pod.getNamespace(), pod.getCluster()), cqlRole);
+        httpConnectionCache.put(pod, sidecarClient);
         return sidecarClient;
     }
 
@@ -98,7 +98,7 @@ public class SidecarClientFactory {
     public void invalidateClient(ElassandraPod pod, Throwable throwable) {
         logger.debug("invalidating cached sidecar client for pod="+pod.getName(), throwable);
 
-        final SidecarClient sidecarClient = sidecarConnectionCache.remove(pod);
+        final HttpClient sidecarClient = httpConnectionCache.remove(pod);
 
         if (sidecarClient != null) {
             sidecarClient.close();

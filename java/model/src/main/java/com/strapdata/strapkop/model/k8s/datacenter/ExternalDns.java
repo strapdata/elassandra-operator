@@ -18,6 +18,7 @@
 package com.strapdata.strapkop.model.k8s.datacenter;
 
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import com.google.common.base.Strings;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 import lombok.AllArgsConstructor;
@@ -70,5 +71,14 @@ public class ExternalDns {
     @SerializedName("ttl")
     @Expose
     private Integer ttl = 300;
+
+    public void validate() {
+        if (enabled) {
+            if (Strings.isNullOrEmpty(domain))
+                throw new IllegalArgumentException("externalDns is enabled but no DNS domain is configured, please fix your elassandra CRD");
+            if (ttl == null || ttl < 0)
+                throw new IllegalArgumentException("externalDns is enabled but no DNS TTL is configured, please fix your elassandra CRD");
+        }
+    }
 
 }

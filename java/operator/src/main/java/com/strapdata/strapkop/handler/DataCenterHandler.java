@@ -24,7 +24,6 @@ import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.model.ClusterKey;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
-import com.strapdata.strapkop.model.k8s.datacenter.DataCenterStatus;
 import com.strapdata.strapkop.model.k8s.datacenter.Operation;
 import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.reconcilier.DataCenterController;
@@ -65,13 +64,14 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
         this.managed = meterRegistry.gauge("k8s.managed", tags, new AtomicInteger(0));
     }
 
-    DataCenterStatus updateCaches(DataCenter dataCenter) {
+    void updateCaches(DataCenter dataCenter) {
         Key key = new Key(dataCenter.getMetadata());
         dataCenterCache.put(key, dataCenter);
-        dataCenterStatusCache.putIfAbsent(key, dataCenter.getStatus());
-        DataCenterStatus dataCenterStatus = dataCenterStatusCache.get(key);
-        dataCenter.setStatus(dataCenterStatus); // overwrite the watched dc status by the one we have updated more recently.
-        return dataCenterStatus;
+        dataCenter.setStatus(dataCenterStatusCache.compute(key, (k,v) -> {
+            if (v == null)
+                v = dataCenter.getStatus();
+            return v;
+        })); // overwrite the watched dc status by the one we have updated more recently.
     }
 
     @Override
@@ -117,8 +117,8 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
             case MODIFIED: {
                 dataCenter = event.getResource();
                 // read dc status from cache rather than from event because last write may be not yet available.
-                DataCenterStatus dataCenterStatus = updateCaches(dataCenter);
-                Long observedGeneration = dataCenterStatus.getObservedGeneration();
+                updateCaches(dataCenter);
+                Long observedGeneration = dataCenter.getStatus().getObservedGeneration();
                 if (observedGeneration == null || dataCenter.getMetadata().getGeneration() > observedGeneration) {
                     logger.debug("dataCenter={} spec new generation={}", dataCenter.id(), dataCenter.getMetadata().getGeneration());
                     workQueues.submit(new ClusterKey(event.getResource()),

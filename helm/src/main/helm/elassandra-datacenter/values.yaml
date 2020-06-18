@@ -42,15 +42,11 @@ decommissionPolicy: "DELETE_PVC"
 networking:
   hostPortEnabled: false
   hostNetworkEnabled: false
-  nodeLoadBalancerEnabled: false
-
-# When hostNetwork or hostPort is enabled, and k8s node have a public IP address,
-# externalDns publish a DNS name for seed nodes allowing to be joined by remote DCs.
-externalDns:
-  enabled: false
-  root: "xxx"
-  domain: "example.com"
-  ttl: 300
+  externalDns:
+    enabled: false
+    root: "xxx"
+    domain: "example.com"
+    ttl: 300
 
 managedKeyspaces: {}
 #  - keyspace: gravitee

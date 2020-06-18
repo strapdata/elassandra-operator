@@ -23,9 +23,10 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.net.InetAddresses;
 import com.strapdata.cassandra.k8s.ElassandraOperatorSeedProvider;
 import com.strapdata.strapkop.OperatorConfig;
-import com.strapdata.strapkop.backup.BackupScheduler;
+import com.strapdata.strapkop.utils.BackupScheduler;
 import com.strapdata.strapkop.cache.DataCenterStatusCache;
 import com.strapdata.strapkop.cache.NodeCache;
+import com.strapdata.strapkop.cache.ServiceAccountCache;
 import com.strapdata.strapkop.cache.StatefulsetCache;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRole;
@@ -141,6 +142,7 @@ public class DataCenterUpdateAction {
     private final NodeCache nodeCache;
     private final StatefulsetCache statefulsetCache;
     private final DataCenterStatusCache dataCenterStatusCache;
+    private final ServiceAccountCache serviceAccountCache;
 
     private final BackupScheduler backupScheduler;
 
@@ -157,6 +159,7 @@ public class DataCenterUpdateAction {
                                   final NodeCache nodeCache,
                                   final StatefulsetCache statefulsetCache,
                                   final DataCenterStatusCache dataCenterStatusCache,
+                                  final ServiceAccountCache serviceAccountCache,
                                   final JmxmpElassandraProxy jmxmpElassandraProxy,
                                   @Parameter("dataCenter") DataCenter dataCenter,
                                   @Parameter("operation") Operation operation,
@@ -182,6 +185,7 @@ public class DataCenterUpdateAction {
 
         this.statefulsetCache = statefulsetCache;
         this.dataCenterStatusCache = dataCenterStatusCache;
+        this.serviceAccountCache = serviceAccountCache;
 
         this.cqlRoleManager = cqlRoleManager;
         this.cqlKeyspaceManager = cqlKeyspaceManager;
@@ -194,8 +198,7 @@ public class DataCenterUpdateAction {
         this.pluginRegistry = pluginRegistry;
 
         this.key = new Key(dataCenterMetadata);
-        this.dataCenterStatus = dataCenterStatusCache.get(key).toBuilder().build(); // get a clone of the last update datacenter status
-        this.dataCenter.setStatus(this.dataCenterStatus); // reconciliation should update their own copy of dc status, then update the cache and etcd when reconciliation is done.
+        this.dataCenterStatus = dataCenter.getStatus();
         this.zones = new Zones(dataCenterStatus, nodeCache.values(), this.statefulsetCache.get(key));
     }
 
@@ -949,6 +952,7 @@ public class DataCenterUpdateAction {
                 meta.putLabelsItem(entry.getKey(), entry.getValue());
             meta.addOwnerReferencesItem(OperatorNames.ownerReference(dataCenter));
             meta.putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, dataCenter.getMetadata().getGeneration().toString());
+            meta.putAnnotationsItem(OperatorLabels.PVC_DECOMMISSION_POLICY, dataCenterSpec.getDecommissionPolicy().getValue());
             return meta;
         }
 
@@ -993,11 +997,12 @@ public class DataCenterUpdateAction {
                     v1ServiceSpec.setLoadBalancerIP(dataCenterSpec.getElasticsearch().getLoadBalancerIp());
 
                 // Add external-dns annotation to update public DNS
-                if (dataCenterSpec.getExternalDns() != null && dataCenterSpec.getExternalDns().getEnabled() == true) {
-                    String elasticsearchHostname = "elasticsearch-" + dataCenterSpec.getExternalDns().getRoot();
-                    v1ObjectMeta.putAnnotationsItem("external-dns.alpha.kubernetes.io/hostname", elasticsearchHostname + "." + dataCenterSpec.getExternalDns().getDomain());
-                    if (dataCenterSpec.getExternalDns().getTtl() != null && dataCenterSpec.getExternalDns().getTtl() > 0)
-                        v1ObjectMeta.putAnnotationsItem("external-dns.alpha.kubernetes.io/ttl", Integer.toString(dataCenterSpec.getExternalDns().getTtl()));
+                if (dataCenterSpec.getNetworking().getExternalDns() != null && dataCenterSpec.getNetworking().getExternalDns().getEnabled() == true) {
+                    ExternalDns externalDns = dataCenterSpec.getNetworking().getExternalDns();
+                    String elasticsearchHostname = "elasticsearch-" + externalDns.getRoot();
+                    v1ObjectMeta.putAnnotationsItem("external-dns.alpha.kubernetes.io/hostname", elasticsearchHostname + "." + externalDns.getDomain());
+                    if (externalDns.getTtl() != null && externalDns.getTtl() > 0)
+                        v1ObjectMeta.putAnnotationsItem("external-dns.alpha.kubernetes.io/ttl", Integer.toString(externalDns.getTtl()));
                 }
             }
 
@@ -1086,11 +1091,12 @@ public class DataCenterUpdateAction {
                     .putAnnotationsItem("service.alpha.kubernetes.io/tolerate-unready-endpoints", "true");
 
             // Add external-dns annotation to update public DNS allowing nodes to get there broadcast address
-            if (dataCenterSpec.getExternalDns() != null && dataCenterSpec.getExternalDns().getEnabled() == true) {
-                String nodeHostname = "cassandra-" + dataCenterSpec.getExternalDns().getRoot() + "-" +rackIndex + "-" +podIndex;
-                v1ObjectMeta.putAnnotationsItem("external-dns.alpha.kubernetes.io/hostname", nodeHostname + "." + dataCenterSpec.getExternalDns().getDomain());
-                if (dataCenterSpec.getExternalDns().getTtl() != null && dataCenterSpec.getExternalDns().getTtl() > 0)
-                    v1ObjectMeta.putAnnotationsItem("external-dns.alpha.kubernetes.io/ttl", Integer.toString(dataCenterSpec.getExternalDns().getTtl()));
+            if (dataCenterSpec.getNetworking().getExternalDns() != null && dataCenterSpec.getNetworking().getExternalDns().getEnabled() == true) {
+                ExternalDns externalDns = dataCenterSpec.getNetworking().getExternalDns();
+                String nodeHostname = "cassandra-" + externalDns.getRoot() + "-" +rackIndex + "-" +podIndex;
+                v1ObjectMeta.putAnnotationsItem("external-dns.alpha.kubernetes.io/hostname", nodeHostname + "." + externalDns.getDomain());
+                if (externalDns.getTtl() != null && externalDns.getTtl() > 0)
+                    v1ObjectMeta.putAnnotationsItem("external-dns.alpha.kubernetes.io/ttl", Integer.toString(externalDns.getTtl()));
             }
             final V1Service service = new V1Service()
                     .metadata(v1ObjectMeta)
@@ -1198,7 +1204,8 @@ public class DataCenterUpdateAction {
                     // first node in the first DC is seed
                     RackStatus rackStatus = dataCenterStatus.getRackStatuses().values().stream()
                             .filter(r -> r.getIndex() == 0).collect(Collectors.toList()).get(0);
-                    if (dataCenterSpec.getNetworking().getHostNetworkEnabled() || dataCenterSpec.getNetworking().getHostPortEnabled()) {
+                    if ((dataCenterSpec.getNetworking().getHostNetworkEnabled() || dataCenterSpec.getNetworking().getHostPortEnabled()) &&
+                            dataCenterSpec.getNetworking().getExternalDns().getEnabled()) {
                         seeds.add(OperatorNames.externalPodFqdn(dataCenter, rackStatus.getIndex(), 0));
                     } else {
                         seeds.add(OperatorNames.internalPodFqdn(dataCenter, rackStatus.getIndex(), 0));
@@ -1597,8 +1604,8 @@ public class DataCenterUpdateAction {
             final String wildcardStatefulsetName = "*." + OperatorNames.nodesService(dataCenter) + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local";
 
             List<String> dnsNames = new ArrayList<>();
-            if (dataCenterSpec.getExternalDns() != null && dataCenterSpec.getExternalDns().getEnabled() && dataCenterSpec.getExternalDns().getDomain() != null) {
-                dnsNames.add("*." + dataCenterSpec.getExternalDns().getDomain());
+            if (dataCenterSpec.getNetworking().getExternalDns() != null && dataCenterSpec.getNetworking().getExternalDns().getEnabled() && dataCenterSpec.getNetworking().getExternalDns().getDomain() != null) {
+                dnsNames.add("*." + dataCenterSpec.getNetworking().getExternalDns().getDomain());
                 dnsNames.add(OperatorNames.elasticsearchService(dataCenter) + "." + dataCenterMetadata.getNamespace()+ ".svc.cluster.local");
             } else {
                 final String headlessServiceName = OperatorNames.nodesService(dataCenter) + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local";
@@ -1792,8 +1799,15 @@ public class DataCenterUpdateAction {
 
             // Add the nodeinfo init container to bind on the k8s node public IP if available.
             // If externalDns is enabled, this init-container also publish a DNSEndpoint to expose public DNS name of seed nodes.
-            if (dataCenterSpec.getNetworking().getHostNetworkEnabled() || dataCenterSpec.getNetworking().getHostPortEnabled()) {
-                podSpec.addInitContainersItem(buildInitContainerNodeInfo(dataCenterResource(dataCenterSpec.getClusterName(), dataCenterSpec.getDatacenterName()) + "-nodeinfo", rackStatus));
+            if (dataCenterSpec.getNetworking().nodeInfoRequired()) {
+                Key key = new Key(OperatorNames.nodeInfoServiceAccount(dataCenter), dataCenterMetadata.getNamespace());
+                V1ServiceAccount serviceAccount = serviceAccountCache.get(key);
+                if (serviceAccount != null && !serviceAccount.getSecrets().isEmpty()) {
+                    String nodeInfoSecretName = serviceAccount.getSecrets().get(0).getName();
+                    podSpec.addInitContainersItem(buildInitContainerNodeInfo(nodeInfoSecretName, rackStatus));
+                } else {
+                    logger.warn("datacenter={} nodeinfo secret not found for serviceaccount={}", dataCenter, key);
+                }
             }
 
             {
@@ -1906,7 +1920,9 @@ public class DataCenterUpdateAction {
                     ? dataCenterSpec.getPodTemplate().getMetadata()
                     : new V1ObjectMeta())
                     .labels(rackLabels)
-                    .putAnnotationsItem(OperatorLabels.DATACENTER_FINGERPRINT, fingerprint);
+                    .putAnnotationsItem(OperatorLabels.DATACENTER_FINGERPRINT, fingerprint)
+                    .putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, dataCenter.getMetadata().getGeneration().toString())
+                    .putAnnotationsItem(OperatorLabels.PVC_DECOMMISSION_POLICY, dataCenterSpec.getDecommissionPolicy().getValue());
 
             // add prometheus annotations to scrap nodes
             if (dataCenterSpec.getPrometheus().getEnabled()) {
@@ -2138,24 +2154,14 @@ public class DataCenterUpdateAction {
          * @return
          */
         private V1Container buildInitContainerNodeInfo(String nodeInfoSecretName, RackStatus rackStatus) {
-            String dnsEndpointManifest = null;
+            ExternalDns externalDns = dataCenterSpec.getNetworking().getExternalDns();
+            externalDns.validate();
 
-            // check CRD
-            if (dataCenterSpec.getExternalDns() != null && dataCenterSpec.getExternalDns().getEnabled()) {
-                if (Strings.isNullOrEmpty(dataCenterSpec.getExternalDns().getDomain()))
-                    throw new IllegalArgumentException("externalDns is enabled but no DNS domain is configured, please fix your elassandra CRD");
-                if (dataCenterSpec.getExternalDns().getTtl() == null || dataCenterSpec.getExternalDns().getTtl() < 0)
-                    throw new IllegalArgumentException("externalDns is enabled but no DNS TTL is configured, please fix your elassandra CRD");
-            }
+            boolean updateDns = externalDns.getEnabled();
+            int rackIndex = dataCenterStatus.getZones().indexOf(rackStatus.getName());
+            String seedHostname = "cassandra-" + externalDns.getRoot() + "-" + rackIndex;
 
-            boolean updateDns = false;
-            if ((dataCenterSpec.getNetworking().getHostPortEnabled() || dataCenterSpec.getNetworking().getHostNetworkEnabled()) &&
-                    dataCenterSpec.getExternalDns() != null && dataCenterSpec.getExternalDns().getEnabled()) {
-                updateDns = true;
-                int rackIndex = dataCenterStatus.getZones().indexOf(rackStatus.getName());
-                String seedHostname = "cassandra-" + dataCenterSpec.getExternalDns().getRoot() + "-" + rackIndex;
-
-                dnsEndpointManifest = "apiVersion: externaldns.k8s.io/v1alpha1 \n" +
+            String dnsEndpointManifest = "apiVersion: externaldns.k8s.io/v1alpha1 \n" +
                         "kind: DNSEndpoint\n" +
                         "metadata:\n" +
                         "  name: " + seedHostname + "\n" +
@@ -2169,8 +2175,8 @@ public class DataCenterUpdateAction {
                         "    uid: " + dataCenterMetadata.getUid() + "\n" + // Datacenter UUID is mandatory to allow Cascading deletion
                         "spec:\n" +
                         "  endpoints:\n" +
-                        "  - dnsName: " + seedHostname + "-__POD_INDEX__." + dataCenterSpec.getExternalDns().getDomain() + "\n" +
-                        "    recordTTL: " + dataCenterSpec.getExternalDns().getTtl() + "\n" +
+                        "  - dnsName: " + seedHostname + "-__POD_INDEX__." + externalDns.getDomain() + "\n" +
+                        "    recordTTL: " + externalDns.getTtl() + "\n" +
                         "    recordType: A\n" +
                         "    targets:\n" +
                         "    - __NODE_IP__ ";
@@ -2178,9 +2184,8 @@ public class DataCenterUpdateAction {
                 if (logger.isTraceEnabled()) {
                     logger.trace("Template generated for DNSEndpoint CRD : {}", dnsEndpointManifest);
                 }
-            }
 
-            return new V1Container()
+                return new V1Container()
                     .securityContext(new V1SecurityContext().privileged(true))
                     .name("nodeinfo")
                     .image("bitnami/kubectl")
@@ -2190,17 +2195,11 @@ public class DataCenterUpdateAction {
                             " kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"failure-domain.beta.kubernetes.io/zone\"}}' | awk '!/<no value>/ { print $0 }' > /nodeinfo/zone " +
                                     " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"beta.kubernetes.io/instance-type\"}}'| awk '!/<no value>/ { print $0 }' > /nodeinfo/instance-type " +
                                     " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"storagetier\"}}' | awk '!/<no value>/ { print $0 }' > /nodeinfo/storagetier " +
-                                    " && kubectl get pod ${POD_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.annotations \"elassandra.strapdata.com/jvm.options\"}}' | awk '!/<no value>/ { print $0 }' > /etc/cassandra/jvm.options.d/099-jvm.annotations " +
-                                    " && kubectl get pod ${POD_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.annotations \"elassandra.strapdata.com/cassandra.yaml\"}}' | awk '!/<no value>/ { print $0 }' > /etc/cassandra/cassandra.yaml.d/099-cassandra.annotations " +
-                                    " && kubectl get pod ${POD_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.annotations \"elassandra.strapdata.com/elasticsearch.yml\"}}' | awk '!/<no value>/ { print $0 }' > /etc/cassandra/elasticsearch.yml.d/099-elasticsearch.annotations " +
                                     // try first to extract ExternalIP from node
-                                    ((dataCenterSpec.getNetworking().getHostPortEnabled() || dataCenterSpec.getNetworking().getHostNetworkEnabled()) ?
-                                            // if ExternalIP isn't set, try to extract public ip annotation
-                                            " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o jsonpath='{.status.addresses[?(@.type==\"ExternalIP\")].address}' > /nodeinfo/public-ip " +
-                                            " && ((PUB_IP=`cat /nodeinfo/public-ip` && test \"$PUB_IP\" = \"\" && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"kubernetes.strapdata.com/public-ip\"}}' | awk '!/<no value>/ { print $0 }' > /nodeinfo/public-ip) || true ) " +
-                                            " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}' > /nodeinfo/node-ip " :
-                                            ""
-                                    ) +
+                                    // if ExternalIP isn't set, try to extract public ip annotation
+                                    " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o jsonpath='{.status.addresses[?(@.type==\"ExternalIP\")].address}' > /nodeinfo/public-ip " +
+                                    " && ((PUB_IP=`cat /nodeinfo/public-ip` && test \"$PUB_IP\" = \"\" && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"kubernetes.strapdata.com/public-ip\"}}' | awk '!/<no value>/ { print $0 }' > /nodeinfo/public-ip) || true ) " +
+                                    " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}' > /nodeinfo/node-ip " +
                                     /*
                                     (dataCenterSpec.getNetworking().getNodeLoadBalancerEnabled() ?
                                             String.format(Locale.ROOT, " && echo \"${POD_NAME//%s/%s}.%s\" > /nodeinfo/public-name ",

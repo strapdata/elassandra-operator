@@ -52,6 +52,7 @@ public final class OperatorLabels {
 
     public static final String CREDENTIAL = labelPrefix + "credential";
     public static final String KEYSTORE = labelPrefix + "keystore";
+    public static final String PVC_DECOMMISSION_POLICY = labelPrefix + "pvc-decommission-policy";
 
     public static final String DATACENTER_GENERATION = labelPrefix + "datacenter-generation";
     public static final String DATACENTER_FINGERPRINT = labelPrefix + "datacenter-fingerprint";

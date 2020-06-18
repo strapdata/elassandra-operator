@@ -27,7 +27,7 @@ import com.strapdata.strapkop.k8s.Pod;
 import com.strapdata.strapkop.model.ClusterKey;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
-import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.DecommissionPolicy;
 import com.strapdata.strapkop.pipeline.WorkQueues;
 import com.strapdata.strapkop.reconcilier.DataCenterController;
 import com.strapdata.strapkop.reconcilier.Reconciliable;
@@ -158,17 +158,17 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
                 logger.debug("event type={} metadata={}", event.getType(), event.getResource().getMetadata().getName());
                 V1Pod pod = event.getResource();
                 podCache.remove(new Key(pod.getMetadata()));
-                String parent = Pod.extractLabel(pod, OperatorLabels.PARENT);
                 String clusterName = Pod.extractLabel(pod, OperatorLabels.CLUSTER);
                 String datacenterName = Pod.extractLabel(pod, OperatorLabels.DATACENTER);
-                String namespace = pod.getMetadata().getNamespace();
                 ClusterKey clusterKey = new ClusterKey(clusterName, datacenterName);
-                DataCenter dc = dataCenterCache.get(new Key(parent, namespace));
-                workQueues.submit(
-                        clusterKey,
-                        pod.getMetadata().getResourceVersion(),
-                        Reconciliable.Kind.ELASSANDRA_POD, K8sWatchEvent.Type.DELETED,
-                        freePodPvc(dc, new Pod(pod, CONTAINER_NAME)));
+                DecommissionPolicy pvcPolicy = DecommissionPolicy.fromString(pod.getMetadata().getAnnotations().get(OperatorLabels.PVC_DECOMMISSION_POLICY));
+                if (pvcPolicy != null) {
+                    workQueues.submit(
+                            clusterKey,
+                            pod.getMetadata().getResourceVersion(),
+                            Reconciliable.Kind.ELASSANDRA_POD, K8sWatchEvent.Type.DELETED,
+                            freePodPvc(pvcPolicy, new Pod(pod, CONTAINER_NAME)));
+                }
                 meterRegistry.counter("k8s.event.deleted", tags).increment();
                 managed.decrementAndGet();
                 break;
@@ -180,17 +180,18 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
         }
     }
 
-    public Completable freePodPvc(DataCenter dataCenter, Pod deletedPod) throws Exception {
+    public Completable freePodPvc(DecommissionPolicy decommissionPolicy, Pod deletedPod) throws Exception {
+        logger.debug("decommissionPolicy={} deletedPod={}", decommissionPolicy, deletedPod.getName());
         // delete PVC only if the node was decommissioned to avoid deleting PVC in unexpectedly killed pod during a DC ScaleDown
-        switch (dataCenter.getSpec().getDecommissionPolicy()) {
+        switch (decommissionPolicy) {
             case KEEP_PVC:
                 break;
-            case BACKUP_AND_DELETE_PVC:
+            case SNAPSHOT_AND_DELETE_PVC:
                 // TODO
                 break;
             case DELETE_PVC:
                 List<V1PersistentVolumeClaim> pvcsToDelete = Stream.ofAll(k8sResourceUtils.listNamespacedPodsPersitentVolumeClaims(
-                        dataCenter.getMetadata().getNamespace(),
+                        deletedPod.getNamespace(),
                         null,
                         OperatorLabels.toSelector(ImmutableMap.of(
                                 OperatorLabels.APP, "elassandra",

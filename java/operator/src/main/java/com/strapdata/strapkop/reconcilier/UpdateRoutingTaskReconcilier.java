@@ -32,7 +32,7 @@ import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
 import com.strapdata.strapkop.model.k8s.task.UpdateRoutingTaskSpec;
 import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
-import com.strapdata.strapkop.sidecar.SidecarClientFactory;
+import com.strapdata.strapkop.sidecar.HttpClientFactory;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -64,13 +64,13 @@ public class UpdateRoutingTaskReconcilier extends TaskReconcilier {
     private final ApplicationContext context;
     private final CqlRoleManager cqlRoleManager;
     private final CqlKeyspaceManager cqlKeyspaceManager;
-    private final SidecarClientFactory sidecarClientFactory;
+    private final HttpClientFactory httpClientFactory;
 
     public UpdateRoutingTaskReconcilier(ReconcilierObserver reconcilierObserver,
                                         final OperatorConfig operatorConfig,
                                         final K8sResourceUtils k8sResourceUtils,
                                         final JmxmpElassandraProxy jmxmpElassandraProxy,
-                                        final SidecarClientFactory sidecarClientFactory,
+                                        final HttpClientFactory httpClientFactory,
                                         final ApplicationContext context,
                                         final CqlRoleManager cqlRoleManager,
                                         final CqlKeyspaceManager cqlKeyspaceManager,
@@ -86,7 +86,7 @@ public class UpdateRoutingTaskReconcilier extends TaskReconcilier {
         this.context = context;
         this.cqlRoleManager = cqlRoleManager;
         this.cqlKeyspaceManager = cqlKeyspaceManager;
-        this.sidecarClientFactory = sidecarClientFactory;
+        this.httpClientFactory = httpClientFactory;
     }
 
     /**
@@ -124,7 +124,7 @@ public class UpdateRoutingTaskReconcilier extends TaskReconcilier {
                     .setEsPort(dc.getSpec().getElasticsearch().getHttpPort())
                     .setSsl(dc.getSpec().getCassandra().getSsl());
             if (reloadLicense == null) {
-                reloadLicense = sidecarClientFactory.clientForPod(pod, strapkopRole).reloadLicense()
+                reloadLicense = httpClientFactory.clientForPod(pod, strapkopRole).reloadLicense()
                         .onErrorResumeNext(throwable -> {
                             logger.error("datacenter={} updateRouting={} Error while executing destination DC on pod={}", dc.id(), task.id(), pod, throwable);
                             task.getStatus().setLastMessage(throwable.getMessage());
@@ -132,7 +132,7 @@ public class UpdateRoutingTaskReconcilier extends TaskReconcilier {
                             return Completable.complete();
                         });
             }
-            routingUpdates.add(sidecarClientFactory.clientForPod(pod, strapkopRole).updateRouting(updateRoutingTaskSpec.getIndices())
+            routingUpdates.add(httpClientFactory.clientForPod(pod, strapkopRole).updateRouting(updateRoutingTaskSpec.getIndices())
                     .toSingleDefault(task)
                     .map(t -> {
                         // update pod status in memory (no etcd update)

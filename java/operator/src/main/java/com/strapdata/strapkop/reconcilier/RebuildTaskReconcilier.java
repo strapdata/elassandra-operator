@@ -31,7 +31,7 @@ import com.strapdata.strapkop.model.k8s.task.RebuildTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
 import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
-import com.strapdata.strapkop.sidecar.SidecarClientFactory;
+import com.strapdata.strapkop.sidecar.HttpClientFactory;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -63,13 +63,13 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
     private final ApplicationContext context;
     private final CqlRoleManager cqlRoleManager;
     private final CqlKeyspaceManager cqlKeyspaceManager;
-    private final SidecarClientFactory sidecarClientFactory;
+    private final HttpClientFactory httpClientFactory;
 
     public RebuildTaskReconcilier(ReconcilierObserver reconcilierObserver,
                                   final OperatorConfig operatorConfig,
                                   final K8sResourceUtils k8sResourceUtils,
                                   final JmxmpElassandraProxy jmxmpElassandraProxy,
-                                  final SidecarClientFactory sidecarClientFactory,
+                                  final HttpClientFactory httpClientFactory,
                                   final ApplicationContext context,
                                   final CqlRoleManager cqlRoleManager,
                                   final CqlKeyspaceManager cqlKeyspaceManager,
@@ -85,7 +85,7 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
         this.context = context;
         this.cqlRoleManager = cqlRoleManager;
         this.cqlKeyspaceManager = cqlKeyspaceManager;
-        this.sidecarClientFactory = sidecarClientFactory;
+        this.httpClientFactory = httpClientFactory;
     }
 
     /**

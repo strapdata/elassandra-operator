@@ -23,6 +23,7 @@ import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.cql.CqlSessionHandler;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.K8sSupplier;
+import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.k8s.Pod;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
@@ -44,6 +45,7 @@ import io.reactivex.schedulers.Schedulers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.Date;
 import java.util.stream.Collectors;
@@ -57,41 +59,38 @@ public class DataCenterController {
 
     private final Logger logger = LoggerFactory.getLogger(DataCenterController.class);
 
-    private final ApplicationContext context;
-    private final PluginRegistry pluginRegistry;
-    private final CqlRoleManager cqlRoleManager;
-    private final DataCenterCache dataCenterCache;
-    private final DataCenterStatusCache dataCenterStatusCache;
-    private final StatefulsetCache statefulsetCache;
-    private final SidecarConnectionCache sidecarConnectionCache;
-    private final MeterRegistry meterRegistry;
-    private final K8sResourceUtils k8sResourceUtils;
-    private final ReconcilierObserver reconcilierObserver;
-    private final ReaperPlugin reaperPlugin;
+    @Inject
+    ApplicationContext context;
 
-    public DataCenterController(final ReconcilierObserver reconcilierObserver,
-                                final ApplicationContext context,
-                                final CqlRoleManager cqlRoleManager,
-                                final PluginRegistry pluginRegistry,
-                                final DataCenterCache dataCenterCache,
-                                final DataCenterStatusCache dataCenterStatusCache,
-                                final StatefulsetCache statefulsetCache,
-                                final K8sResourceUtils k8sResourceUtils,
-                                final SidecarConnectionCache sidecarConnectionCache,
-                                final MeterRegistry meterRegistry,
-                                final ReaperPlugin reaperPlugin) {
-        this.reconcilierObserver = reconcilierObserver;
-        this.context = context;
-        this.k8sResourceUtils = k8sResourceUtils;
-        this.pluginRegistry = pluginRegistry;
-        this.cqlRoleManager = cqlRoleManager;
-        this.dataCenterCache = dataCenterCache;
-        this.dataCenterStatusCache = dataCenterStatusCache;
-        this.statefulsetCache = statefulsetCache;
-        this.sidecarConnectionCache = sidecarConnectionCache;
-        this.meterRegistry = meterRegistry;
-        this.reaperPlugin = reaperPlugin;
-    }
+    @Inject
+    PluginRegistry pluginRegistry;
+
+    @Inject
+    CqlRoleManager cqlRoleManager;
+
+    @Inject
+    DataCenterCache dataCenterCache;
+
+    @Inject
+    DataCenterStatusCache dataCenterStatusCache;
+
+    @Inject
+    StatefulsetCache statefulsetCache;
+
+    @Inject
+    ServiceAccountCache serviceAccountCache;
+
+    @Inject
+    MeterRegistry meterRegistry;
+
+    @Inject
+    K8sResourceUtils k8sResourceUtils;
+
+    @Inject
+    ReconcilierObserver reconcilierObserver;
+
+    @Inject
+    ReaperPlugin reaperPlugin;
 
     public Completable reconcile(DataCenter dataCenter, Completable action) throws Exception {
         return reconcilierObserver.onReconciliationBegin().toSingleDefault(dataCenter)
@@ -117,12 +116,12 @@ public class DataCenterController {
                 .observeOn(Schedulers.io());
     }
 
-    /**
-     * Called when the DC CRD is updated, involving a rolling update of sts.
-     */
     public Completable initDatacenter(DataCenter dc, Operation op) throws Exception {
         return reconcile(dc,
                 statefulsetCache.loadIfAbsent(dc)
+                .flatMap(x -> (dc.getSpec().getNetworking().nodeInfoRequired())
+                        ? serviceAccountCache.load(OperatorNames.nodeInfoServiceAccount(dc), dc.getMetadata().getNamespace()).map(sa -> x)
+                        : Single.just(x))
                 .flatMap(t -> fetchDataCentersSameClusterAndNamespace(dc))
                 .flatMapCompletable(dcIterable -> context.createBean(DataCenterUpdateAction.class, dc, op)
                         .setSibilingDc(StreamSupport.stream(dcIterable.spliterator(), false)
@@ -216,7 +215,7 @@ public class DataCenterController {
     }
 
     /**
-     * Fetch datacenters of the same cluster in the same namespace to automatically add remoteSeeders
+     * Fetch datacenters of the same cluster in the same namespace to automatically add seeds
      * @param dc
      * @return
      */

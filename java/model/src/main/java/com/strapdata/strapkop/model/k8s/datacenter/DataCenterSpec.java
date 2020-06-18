@@ -167,14 +167,6 @@ public class DataCenterSpec {
     private Networking networking = new Networking();
 
     /**
-     * External DNS config for public nodes and elasticsearch service.
-     */
-    @JsonPropertyDescription("External DNS configuration")
-    @SerializedName("externalDns")
-    @Expose
-    private ExternalDns externalDns = null;
-
-    /**
      * Jvm configuration
      */
     @JsonPropertyDescription("JVM configuration")
@@ -255,7 +247,6 @@ public class DataCenterSpec {
         acc.add(webHookUrl);
         acc.add(resources);
         acc.add(podTemplate);
-        acc.add(externalDns);
         acc.add(networking);
         acc.add(cassandra);
         acc.add(elasticsearch);

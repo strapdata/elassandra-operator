@@ -54,17 +54,17 @@ import static io.micronaut.http.HttpRequest.POST;
  * Currently @Client annotation advice that generates the client code from an interface is totally static and cannot
  * be used to configure client with dynamic urls. See {@link io.micronaut.http.client.interceptor.HttpClientIntroductionAdvice}
  */
-public class SidecarClient {
+public class HttpClient {
 
-    static final Logger logger = LoggerFactory.getLogger(SidecarClient.class);
+    static final Logger logger = LoggerFactory.getLogger(HttpClient.class);
 
     private RxHttpClient httpClient;
     private CqlRole cqlRole;
 
-    public SidecarClient(URL url,
-                         HttpClientConfiguration httpClientConfiguration,
-                         SslContext sslContext,
-                         CqlRole cqlRole) {
+    public HttpClient(URL url,
+                      HttpClientConfiguration httpClientConfiguration,
+                      SslContext sslContext,
+                      CqlRole cqlRole) {
         this.httpClient = new DefaultHttpClient(LoadBalancer.fixed(url),
                 httpClientConfiguration,
                 null,

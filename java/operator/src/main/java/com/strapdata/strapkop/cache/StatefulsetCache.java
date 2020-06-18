@@ -29,6 +29,8 @@ import io.micrometer.core.instrument.ImmutableTag;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.reactivex.Single;
 
+import javax.annotation.PostConstruct;
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.Locale;
 import java.util.TreeMap;
@@ -37,10 +39,15 @@ import java.util.concurrent.Callable;
 @Singleton
 public class StatefulsetCache extends Cache<Key, TreeMap<String, V1StatefulSet>> {
 
-    final K8sResourceUtils k8sResourceUtils;
+    @Inject
+    K8sResourceUtils k8sResourceUtils;
 
-    StatefulsetCache(final K8sResourceUtils k8sResourceUtils, final MeterRegistry meterRegistry) {
-        this.k8sResourceUtils = k8sResourceUtils;
+    @Inject
+    MeterRegistry meterRegistry;
+
+
+    @PostConstruct
+    public void initGauge() {
         meterRegistry.gaugeMapSize("cache.size", ImmutableList.of(new ImmutableTag("type", "statefulset")), this);
     }
 

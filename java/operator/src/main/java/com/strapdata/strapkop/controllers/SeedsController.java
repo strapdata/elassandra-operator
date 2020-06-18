@@ -47,7 +47,7 @@ import javax.inject.Inject;
 import java.util.*;
 
 /**
- * Return nodes IP of pod 0 for active racks
+ * Return seed nodes IP (pod 0 for active racks)
  */
 @Tag(name = "seeds")
 @Controller("/seeds")
