@@ -8,7 +8,7 @@ function upgrade() {
   sleep 1
   for i in {1..40}; do
     sleep 5
-    java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --health GREEN -r 6 --min-replicas 5
+    java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --health GREEN -r 5 --min-replicas 4
     if [ $? != 0 ]; then
       echo "ERROR: min available replicas lower than 5"
       exit 1
@@ -34,8 +34,8 @@ source integ-test/test-lib.sh
 setup_flavor
 
 test_start $0
-install_elassandra_datacenter $NS cl1 dc1 6
-java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --health GREEN -r 6 --cql-status=ESTABLISHED --timeout 900
+install_elassandra_datacenter $NS cl1 dc1 5
+java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --health GREEN -r 5 --cql-status=ESTABLISHED --timeout 900
 
 upgrade "6.2.3.28"
 upgrade "6.8.4.5"
