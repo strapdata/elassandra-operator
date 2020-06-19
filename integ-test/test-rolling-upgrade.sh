@@ -8,9 +8,9 @@ function upgrade() {
   sleep 1
   for i in {1..40}; do
     sleep 5
-    java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --health GREEN -r 5 --min-replicas 4
+    java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --health GREEN -r 5 --min-replicas 4 --timeout 900
     if [ $? != 0 ]; then
-      echo "ERROR: min available replicas lower than 5"
+      echo "ERROR: min available replicas lower than 4"
       exit 1
     fi
     x=$(kubectl get pod -n $NS -l app=elassandra '-o=custom-columns=IMAGE:.spec.containers[*].image' --no-headers | grep -v "$1" | wc -l | sed -e 's/ //g')
