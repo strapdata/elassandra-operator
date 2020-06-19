@@ -42,6 +42,7 @@ before_install:
   # log to remote registry
   - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
   - echo "$NEXUS_PASSWORD"  | docker login -u "$NEXUS_USERNAME"  --password-stdin https://docker.repo.strapdata.com
+  - echo "$ACR_PASSWORD" | docker login -u "$ACR_USERNAME" --password-stdin https://strapdata.azurecr.io
   # Install kubectl
   - curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.15.0/bin/linux/amd64/kubectl
   - chmod +x ./kubectl
@@ -97,7 +98,7 @@ deploy:
 - provider: script
   skip_cleanup: true
   script: >-
-    ./gradlew dockerPushAllVersions -PregistryUsername=$DOCKER_USERNAME -PregistryPassword=$DOCKER_PASSWORD -PregistryUrl=dockerhub.io &&
+    ./gradlew dockerPushAllVersions -PregistryUsername=$DOCKER_USERNAME -PregistryPassword=$DOCKER_PASSWORD -PregistryUrl=docker.io &&
     ./gradlew java:model:publish -PrepoUsername=$NEXUS_USERNAME -PrepoPassword=$NEXUS_PASSWORD &&
     ./gradlew uploadEdctl &&
     ./gradlew uploadLicenseReport &&
