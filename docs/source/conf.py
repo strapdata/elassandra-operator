@@ -35,8 +35,7 @@ extensions = [
     'sphinx.ext.autosectionlabel',
     'sphinx.ext.autodoc',
     'sphinx-jsonschema',
-    'sphinx.ext.autosectionlabel',
-    'sphinxcontrib.openapi'
+    'sphinx.ext.autosectionlabel'
 ]
 
 autosectionlabel_prefix_document = True
