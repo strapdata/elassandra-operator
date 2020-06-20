@@ -212,9 +212,3 @@ cluster role ``elassandra-operator`` with the following authorizations in your K
       - namespaces
       verbs:
       - list
-
-
-HTTP endpoints
-==============
-
-The elassandra operator expose the following HTTP endpoint:
