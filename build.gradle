@@ -28,14 +28,13 @@ ext {
   connectionString = project.hasProperty("connectionString") ? project.getProperty("connectionString") : System.getenv("AZURE_CONNECTION_STRING")
 }
 
-configure(subprojects.findAll { it.name.contains("docker") }) {
+configure(subprojects.findAll { it.name.contains("docker") || it.name.contains("reaper") }) {
   apply plugin: 'com.bmuschko.docker-remote-api'
   docker {
-
     registryCredentials {
       url = registryUrl
-      //username = registryUsername
-      //password = registryPassword
+      username = registryUsername
+      password = registryPassword
     }
   }
 }

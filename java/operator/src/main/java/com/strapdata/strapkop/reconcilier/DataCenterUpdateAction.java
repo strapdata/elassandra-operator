@@ -1252,7 +1252,7 @@ public class DataCenterUpdateAction {
                     "class_name", ElassandraOperatorSeedProvider.class.getName(),
                     "parameters", ImmutableList.of(parameters))
             ));
-            // if datacenter is not boostrapped, add nodes with auto_bootstrap = false
+            // if datacenter is not bootstrapped, add nodes with auto_bootstrap = false
             if ((!remoteSeeds.isEmpty() || !remoteSeeders.isEmpty()) && dataCenterStatus.getBootstrapped() == false) {
                 // second DC will be rebuild from another one
                 config.put("auto_bootstrap", false);
@@ -2004,9 +2004,10 @@ public class DataCenterUpdateAction {
             if (dataCenterSpec.getElasticsearch().getEnabled() && dataCenterSpec.getElasticsearch().getEnterprise().getJmx()) {
                 cassandraContainer.lifecycle(new V1Lifecycle().preStop(new V1Handler().exec(new V1ExecAction()
                         .addCommandItem("curl")
+                        .addCommandItem("-k")
                         .addCommandItem("-X")
                         .addCommandItem("POST")
-                        .addCommandItem("http://localhost/enterprise/search/disable"))));
+                        .addCommandItem("https://localhost/enterprise/search/disable"))));
             }
             return cassandraContainer;
         }
@@ -2160,11 +2161,12 @@ public class DataCenterUpdateAction {
             boolean updateDns = externalDns.getEnabled();
             int rackIndex = dataCenterStatus.getZones().indexOf(rackStatus.getName());
             String seedHostname = "cassandra-" + externalDns.getRoot() + "-" + rackIndex;
+            String dnsEndpointName = OperatorNames.dataCenterResource(dataCenterSpec) + "-" + rackIndex;
 
             String dnsEndpointManifest = "apiVersion: externaldns.k8s.io/v1alpha1 \n" +
                         "kind: DNSEndpoint\n" +
                         "metadata:\n" +
-                        "  name: " + seedHostname + "\n" +
+                        "  name: " + dnsEndpointName + "\n" +
                         "  namespace: " + dataCenterMetadata.getNamespace() + "\n" +
                         "  ownerReferences:\n" +
                         "  - apiVersion: " + StrapdataCrdGroup.GROUP+"/" + DataCenter.VERSION + "\n" +
@@ -2219,10 +2221,7 @@ public class DataCenterUpdateAction {
                                             " && cat /tmp/dns-manifest.yaml && (kubectl create --token=\"$NODEINFO_TOKEN\" -f /tmp/dns-manifest.yaml || true)" :
                                             "")
                     ))
-                    .addVolumeMountsItem(new V1VolumeMount()
-                            .name("nodeinfo")
-                            .mountPath("/nodeinfo")
-                    )
+                    .addVolumeMountsItem(new V1VolumeMount().name("nodeinfo").mountPath("/nodeinfo"))
                     .addEnvItem(new V1EnvVar().name("NODE_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("spec.nodeName"))))
                     .addEnvItem(new V1EnvVar().name("NODEINFO_TOKEN").valueFrom(new V1EnvVarSource().secretKeyRef(new V1SecretKeySelector().name(nodeInfoSecretName).key("token"))))
                     .addEnvItem(new V1EnvVar().name("POD_NAME").valueFrom(new V1EnvVarSource().fieldRef(new V1ObjectFieldSelector().fieldPath("metadata.name"))));
@@ -2283,7 +2282,7 @@ public class DataCenterUpdateAction {
             return result;
         }
 
-        public Optional<Long> getDataCenterGeneation() {
+        public Optional<Long> getDataCenterGeneration() {
             Optional<Long> result = Optional.empty();
             if (sts.isPresent()) {
                 V1ObjectMeta metadata = sts.get().getMetadata();

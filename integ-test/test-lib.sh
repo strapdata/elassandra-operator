@@ -73,7 +73,15 @@ init_helm() {
 
   # K8s 1.16+ apiVersion issue
   # helm init --service-account tiller --override spec.selector.matchLabels.'name'='tiller',spec.selector.matchLabels.'app'='helm' --output yaml | sed 's@apiVersion: extensions/v1beta1@apiVersion: apps/v1@' | kubectl apply -f -
+  helm repo add bitnami https://charts.bitnami.com/bitnami
   echo "HELM installed"
+}
+
+# $1 secret name
+# $2 target context
+# $3 target namespace
+copy_secret_to_context() {
+  kubectl get secret $1 --export -o yaml | kubectl apply --context $2 -n $3 -f -
 }
 
 # deploy the elassandra operator
@@ -94,8 +102,7 @@ install_elassandra_operator() {
 
     helm install --namespace ${1:-default} --name strapkop \
     --set image.repository=$REGISTRY_URL/strapdata/elassandra-operator${registry} \
-    --set image.tag="$ELASSANDRA_OPERATOR_TAG" \
-    --set image.pullSecrets[0]="$REGISTRY_SECRET_NAME"$args \
+    --set image.tag="$ELASSANDRA_OPERATOR_TAG"$args \
     --wait \
     $HELM_REPO/elassandra-operator
     echo "Elassandra-operator installed"
@@ -133,11 +140,11 @@ install_elassandra_datacenter() {
     --set dataVolumeClaim.storageClassName=${STORAGE_CLASS_NAME:-"standard"} \
     --set kibana.enabled="false" \
     --set reaper.enabled="false",reaper.image="$REGISTRY_URL/strapdata/cassandra-reaper:2.1.0-SNAPSHOT-strapkop" \
-    --set cassandra.sslStoragePort="38001",jvm.jmxPort="35001",prometheus.port="34001" \
-    --set externalDns.enabled="false",externalDns.root="xxxx.yyyy",externalDns.domain="test.strapkube.com" \
+    --set cassandra.sslStoragePort="39000",cassandra.nativePort="39001" \
+    --set elasticsearch.httpPort="39002",elasticsearch.transportPort="39003" \
+    --set jvm.jmxPort="39004",jvm.jdb="39005",prometheus.port="39006" \
     --set replicas="$sz"$args \
-    --wait \
-    $HELM_REPO/elassandra-datacenter
+    --wait $HELM_REPO/elassandra-datacenter
     echo "Datacenter $cl-$dc size=$sz deployed in namespace $ns"
 }
 
@@ -249,4 +256,98 @@ generate_client_cert() {
 
 view_cert() {
     openssl x509 -text -in $1
+}
+
+#-----------------------------------------------------------
+export DNS_DOMAIN=${DNS_DOMAIN:-"test.strapkube.com"}
+export TRAEFIK_NAME=${TRAEFIK_NAME:-"traefik"}
+export TRAFIK_FQDN="${TRAEFIK_NAME}.${DNS_DOMAIN}"
+export AZURE_DNS_RESOURCE_GROUP="strapkube-int"
+
+create_sp_for_dns_update() {
+  az ad sp create-for-rbac --name http://strapkop-dns-updater
+  az role assignment create --assignee http://strapkop-dns-updater --role befefa01-2a29-4197-83a8-272ff33ce314  --resource-group $AZURE_DNS_RESOURCE_GROUP
+}
+
+delete_sp_for_dns_update() {
+  az role assignment delete --assignee http://strapkop-dns-updater --role befefa01-2a29-4197-83a8-272ff33ce314  --resource-group ${AZURE_DNS_RESOURCE_GROUP}
+  az ad sp delete --id http://strapkop-dns-updater
+}
+
+AZURE_DNS_APPI_ID="56cfe32c-9ac4-40d6-8e28-011109f413aa"
+AZURE_DNS_TENANT_ID="566af820-2f8c-45ac-b975-647d2647b277"
+AZURE_SUBSCRIPTION_ID="72738c1b-8ae6-4f23-8531-5796fe866f2e"
+AZURE_DNS_CLIENT_ID="http://strapkop-dns-updater"
+AZURE_DNS_CLIENT_SECRET="13420ffc-af87-4583-9389-acd378f006fb"
+
+#HELM_DEBUG="--debug --dry-run"
+#--set image.tag="0.7.2" \
+
+deploy_external_dns_azure() {
+  helm install $HELM_DEBUG --name my-externaldns --namespace default \
+    --set logLevel="debug" \
+    --set rbac.create=true \
+    --set policy="sync",txtPrefix=$(kubectl config current-context)\
+    --set sources[0]="service",sources[1]="ingress",sources[2]="crd" \
+    --set crd.create=true,crd.apiversion="externaldns.k8s.io/v1alpha1",crd.kind="DNSEndpoint" \
+    --set provider="azure" \
+    --set azure.secretName="$AZURE_DNS_SECRET_NAME",azure.resourceGroup="$AZURE_DNS_RESOURCE_GROUP" \
+    --set azure.tenantId="$AZURE_DNS_TENANT_ID",azure.subscriptionId="$AZURE_SUBSCRIPTION_ID" \
+    --set azure.aadClientId="$AZURE_DNS_CLIENT_ID",azure.aadClientSecret="$AZURE_DNS_CLIENT_SECRET" \
+    stable/external-dns
+}
+
+deploy_prometheus_operator() {
+  helm install $HELM_DEBUG --name my-promop \
+    --set prometheus.ingress.enabled=true,prometheus.ingress.hosts[0]="prometheus.${TRAFIK_FQDN}",prometheus.ingress.annotations."kubernetes\.io/ingress\.class"="traefik" \
+    --set alertmanager.ingress.enabled=true,alertmanager.ingress.hosts[0]="alertmanager.${TRAFIK_FQDN}",alertmanager.ingress.annotations."kubernetes\.io/ingress\.class"="traefik" \
+    --set grafana.ingress.enabled=true,grafana.ingress.hosts[0]="grafana.${TRAFIK_FQDN}",grafana.ingress.annotations."kubernetes\.io/ingress\.class"="traefik" \
+    -f integ-test/prometheus-operator-values.yaml \
+    stable/prometheus-operator
+}
+
+upgrade_prometheus_operator() {
+  helm upgrade $HELM_DEBUG \
+    --set prometheus.ingress.enabled=true,prometheus.ingress.hosts[0]="prometheus.${TRAFIK_FQDN}",prometheus.ingress.annotations."kubernetes\.io/ingress\.class"="traefik" \
+    --set alertmanager.ingress.enabled=true,alertmanager.ingress.hosts[0]="alertmanager.${TRAFIK_FQDN}",alertmanager.ingress.annotations."kubernetes\.io/ingress\.class"="traefik" \
+    --set grafana.ingress.enabled=true,grafana.ingress.hosts[0]="grafana.${TRAFIK_FQDN}",grafana.ingress.annotations."kubernetes\.io/ingress\.class"="traefik" \
+    -f integ-test/prometheus-operator-values.yaml \
+    my-promop stable/prometheus-operator
+}
+
+undeploy_prometheus_operator() {
+  kubectl delete crd prometheuses.monitoring.coreos.com
+  kubectl delete crd prometheusrules.monitoring.coreos.com
+  kubectl delete crd servicemonitors.monitoring.coreos.com
+  kubectl delete crd podmonitors.monitoring.coreos.com
+  kubectl delete crd alertmanagers.monitoring.coreos.com
+  kubectl delete crd thanosrulers.monitoring.coreos.com
+  helm delete --purge my-promop
+}
+
+deploy_traefik() {
+  echo "Deploying traefik proxy with DNS fqdn=${1:-$TRAFIK_FQDN}"
+  helm install $HELM_DEBUG --name traefik --namespace kube-system \
+    --set rbac.enabled=true,debug.enabled=true \
+    --set dashboard.enabled=true,dashboard.domain=dashboard.${1:-$TRAFIK_FQDN} \
+    --set service.annotations."external-dns\.alpha\.kubernetes\.io/hostname"="*.${1:-$TRAFIK_FQDN}" \
+    stable/traefik
+  echo "done."
+}
+
+# cluster1 --set nodes.hosts[0].name="aks-nodepool1-29186158-0",nodes.hosts[0].value="20.50.152.131" \
+# cluster2 --set nodes.hosts[0].name="aks-nodepool1-36354689-0",nodes.hosts[0].value="20.54.40.201" \
+# gke --set nodes.hosts[0].name="gke-test-default-pool-3834d5cb-8bcf",nodes.hosts[0].value="34.78.136.83" \
+
+deploy_coredns_forwarder() {
+  kubectl delete configmap --namespace kube-system coredns-custom
+  helm install $HELM_DEBUG --name coredns-forwarder --namespace kube-system \
+  --set forwarders.domain="${DNS_DOMAIN}" \
+  --set forwarders.hosts[0]="40.90.4.8" \
+  --set forwarders.hosts[1]="64.4.48.8" \
+  --set forwarders.hosts[2]="13.107.24.8" \
+  --set forwarders.hosts[3]="13.107.160.8" \
+  --set nodes.hosts[0].name="aks-nodepool1-36354689-0",nodes.hosts[0].value="20.54.40.201" \
+  strapdata/coredns-forwarder
+  kubectl delete pod --namespace kube-system -l k8s-app=kube-dns
 }

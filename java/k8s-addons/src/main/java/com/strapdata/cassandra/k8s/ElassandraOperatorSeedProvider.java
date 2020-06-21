@@ -49,7 +49,7 @@ public class ElassandraOperatorSeedProvider implements org.apache.cassandra.loca
         seeds = getParameter(args, "seeds", "SEEDS");
         remoteSeeds = getParameter(args, "remote_seeds", "REMOTE_SEEDS");
         remoteSeeders = getParameter(args, "remote_seeders", "REMOTE_SEEDERS");
-        
+
         this.encryptionOptions = new EncryptionOptions.ClientEncryptionOptions();
         EncryptionOptions.ClientEncryptionOptions cassandraEncryptionOptions = DatabaseDescriptor.getClientEncryptionOptions();
         this.encryptionOptions.keystore = getSingleParameter(args, "keystore", "SEEDER_KEYSTORE", cassandraEncryptionOptions.keystore);
@@ -111,12 +111,6 @@ public class ElassandraOperatorSeedProvider implements org.apache.cassandra.loca
             }
         }
 
-        String podName = System.getenv("POD_NAME");
-        if (seeds.length == 0 && podName != null && podName.endsWith("-0")) {
-            logger.debug("Add broadcast_address={}", DatabaseDescriptor.getBroadcastAddress());
-            seedAddresses.add(DatabaseDescriptor.getBroadcastAddress());
-        }
-
         for (String s : remoteSeeds) {
             try {
                 Collections.addAll(seedAddresses, InetAddress.getAllByName(s.trim()));
@@ -137,6 +131,13 @@ public class ElassandraOperatorSeedProvider implements org.apache.cassandra.loca
                     logger.warn("Unable to fetch seeds from url=[" + url + "]", e);
                 }
             }
+        }
+
+        // in last resort, add a self seed.
+        String podName = System.getenv("POD_NAME");
+        if (seedAddresses.isEmpty() && podName != null && podName.endsWith("-0")) {
+            logger.debug("Add broadcast_address={}", DatabaseDescriptor.getBroadcastAddress());
+            seedAddresses.add(DatabaseDescriptor.getBroadcastAddress());
         }
 
         logger.info("Discovered {} seed nodes: {}", seedAddresses.size(), seedAddresses);
