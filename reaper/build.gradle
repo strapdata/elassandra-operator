@@ -6,7 +6,7 @@ plugins {
     id 'com.bmuschko.docker-remote-api'
 }
 
-def reaperImageName = registryUrl + (registryUrl.length() > 0 ? "/" : "" )  + "strapdata/cassandra-reaper:${reaperVersion}-strapkop"
+def reaperImageName = registryUrl + (registryUrl.length() > 0 ? "/" : "" )  + "strapdata/cassandra-reaper"
 
 task buildReaper(type: DockerBuildImage) {
     inputDir = file('.')
@@ -19,5 +19,5 @@ task buildReaper(type: DockerBuildImage) {
 
 task pushReaper(type: DockerPushImage) {
     dependsOn "buildReaper"
-    images = [ reaperImageName ]
+    images = [ reaperImageName + ":" + reaperVersion + "-strapkop" ]
 }
