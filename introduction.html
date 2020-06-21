@@ -1,0 +1,352 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Introduction &mdash; Elassandra Operator Documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="https://media.readthedocs.org/css/sphinx_rtd_theme.css" type="text/css" />
+  <link rel="stylesheet" href="https://media.readthedocs.org/css/readthedocs-doc-embed.css" type="text/css" />
+  <link rel="stylesheet" href="_static/theme_overrides.css" type="text/css" />
+
+  
+  
+    <link rel="shortcut icon" href="_static/favicon.ico"/>
+  
+  
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
+        <script src="_static/custom.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Quick Start" href="quickstart.html" />
+    <link rel="prev" title="Elassandra Operator documentation" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home" alt="Documentation Home"> Elassandra-Operator
+          
+
+          
+            
+            <img src="_static/elassandra-operator.png" class="logo" alt="Logo"/>
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Introduction</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#how-it-works">How It works</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#multi-datacenter-cluster">Multi-datacenter cluster</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#using-dns-names-of-seed-nodes">Using DNS names of seed nodes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#using-the-elassandra-operator">Using the Elassandra operator</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="helm-setup.html">HELM setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="operator-setup.html">Operator setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="provisioning.html">Provision a Datacenter</a></li>
+<li class="toctree-l1"><a class="reference internal" href="advanced-services.html">Advanced services</a></li>
+<li class="toctree-l1"><a class="reference internal" href="security.html">Security</a></li>
+<li class="toctree-l1"><a class="reference internal" href="operations.html">Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="compute-resources.html">Compute resources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="full-setup.html">Full Setup Example</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Elassandra-Operator</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Introduction</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/introduction.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="introduction">
+<h1>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h1>
+<p>The Elassandra Operator automates the deployment and management of Elassandra datacenters in Kubernetes clusters.
+By reducing the complexity of running a Cassandra/Elassandra cluster, the Elassandra operator lets you focus on the desired configuration.</p>
+<p>Elassandra Operator features:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><a class="reference external" href="https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/">Kubernetes StatefulSet</a> per Cassandra rack to ensure data consistency across cloud-provider availability zones.</p></li>
+<li><p>Manage mutliple Cassandra datacenters in the same or different Kubernetes clusters.</p></li>
+<li><p>Manage rolling configuration changes, rolling upgrade/downgrade of Elassandra, scale up/down Elassandra datacenters.</p></li>
+<li><p>Deploy <a class="reference external" href="https://cassandra-reaper.io/">Cassandra Reaper</a> to run continuous Cassandra repairs.</p></li>
+<li><p>Deploy multiple <a class="reference external" href="https://www.elastic.co/fr/products/kibana">Kibana</a> instances with a dedicated Elasticserach index in Elassandra.</p></li>
+<li><p>Park/Unpark Elassandra datacenters (and associated Kibana and Cassandra Reaper instances).</p></li>
+<li><p>Expose Elassandra metrics for the <a class="reference external" href="https://prometheus.io/docs/prometheus/latest/querying/operators/">Prometheus Operator</a>.</p></li>
+<li><p>Publish public DNS names allowing Elassandra nodes to be reachable from the internet (Cassandra CQL and Elasticsearch REST API).</p></li>
+<li><p>Automatically generates SSL/TLS certificates and strong passwords stored as Kubernetes secrets.</p></li>
+<li><p>Create Cassandra roles and automatically grants the desired permissions on Cassandra keyspaces.</p></li>
+<li><p>Automatically adjust the Cassandra Replication Factor for managed keyspaces, repair and cleanup after scale up/down the datacenter.</p></li>
+</ul>
+</div></blockquote>
+<div class="section" id="requirements">
+<h2>Requirements<a class="headerlink" href="#requirements" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p>Kubernetes cluster 1.15 or newer.</p></li>
+<li><p>Kubernetes nodes must be properly synchronized with NTP.</p></li>
+<li><p>Kubernetes worker nodes must have labels matching <code class="docutils literal notranslate"><span class="pre">failure-domain.beta.kubernetes.io/zone</span></code>.</p></li>
+<li><p>HELM version 2 for operator and datacenter deployment.</p></li>
+<li><p><a class="reference external" href="https://github.com/coreos/prometheus-operator">Prometheus-Operator</a> to monitor your the Elassandra operator and Elassandra cluster.</p></li>
+<li><p>A Kubernetes <a class="reference external" href="https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/">Ingress Controller</a> to expose Kibana, Cassandra Reaper user interface, and the Elassandra operator for cross kubernetes cluster discovery.</p></li>
+<li><p><a class="reference external" href="https://github.com/kubernetes-sigs/external-dns">ExternalDNS</a> to expose Elassandra datacenters to the internet world.</p></li>
+</ul>
+</div>
+<div class="section" id="how-it-works">
+<h2>How It works<a class="headerlink" href="#how-it-works" title="Permalink to this headline">¶</a></h2>
+<p>The Elassandra Operator extends the Kubernetes API by creating a Custom Resource Definition (CRD) defining a Cassandra/Elassandra datacenter
+and creates a Kubernetes StatefulSet per Cassandra availability zone identified by the kubernetes label <code class="docutils literal notranslate"><span class="pre">failure-domain.beta.kubernetes.io/zone</span></code>.</p>
+<p>The Elassandra Operator can also deploy :
+* One Cassandra Reaper pod per datacenter to achieve continuous Cassandra repair.
+* Many Kibana deployment allowing to visualize data indexed in Elasticsearch and interact with Elasticsearch.</p>
+<img alt="_images/elassandra-operator-overview.png" src="_images/elassandra-operator-overview.png" />
+<p>Once Elassandra pods are deployed and running, the Elassandra operator interacts with the Elassandra nodes through JMX, CQLSH and HTTP
+to execute administrative tasks like Cassandra repair, cleanup or setup continuous repairs.
+It also interact directly with the Elassandra container to properly manage keyspace replication factor and deploy Cassandra roles and associated permissions.</p>
+</div>
+<div class="section" id="multi-datacenter-cluster">
+<h2>Multi-datacenter cluster<a class="headerlink" href="#multi-datacenter-cluster" title="Permalink to this headline">¶</a></h2>
+<p>The Elassandra operator can manage multiple Elassandra datacenters (or a Cassandra datacenter if Elasticsearch is disabled) in
+one or multiple Kubernetes clusters. In order to connect multiple Elassandra datacenters, you can use the DNS names of seed nodes, or
+use the operator to get IP addresses of seed nodes.</p>
+<div class="section" id="using-dns-names-of-seed-nodes">
+<h3>Using DNS names of seed nodes<a class="headerlink" href="#using-dns-names-of-seed-nodes" title="Permalink to this headline">¶</a></h3>
+<p>Basically, seeds nodes are Elassandra pods with index 0 in each StatefulSet, and DNS names for these seed nodes are:</p>
+<ul>
+<li><p>From inside the Kubernetes cluster, seeds DNS names are in the form:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">elassandra</span><span class="o">-</span><span class="p">[</span><span class="n">clusterName</span><span class="p">]</span><span class="o">-</span><span class="p">[</span><span class="n">dcName</span><span class="p">]</span><span class="o">-</span><span class="p">[</span><span class="n">rackIndex</span><span class="p">]</span><span class="o">-</span><span class="mf">0.</span><span class="n">elassandra</span><span class="o">-</span><span class="p">[</span><span class="n">clusterName</span><span class="p">]</span><span class="o">-</span><span class="p">[</span><span class="n">dcName</span><span class="p">]</span><span class="o">-</span><span class="p">[</span><span class="n">rackIndex</span><span class="p">]</span><span class="o">.</span><span class="p">[</span><span class="n">namespace</span><span class="p">]</span><span class="o">.</span><span class="n">svc</span>
+</pre></div>
+</div>
+</li>
+<li><p>From outside the Kubernetes cluster, when the externalDns publication is enabled in your datacenter spec, DNS names for
+pods are in the following form, where <strong>podIndex=0</strong> for seed nodes:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cassandra</span><span class="o">-</span><span class="p">[</span><span class="n">externalDns</span><span class="o">.</span><span class="n">root</span><span class="p">]</span><span class="o">-</span><span class="p">[</span><span class="n">rackIndex</span><span class="p">]</span><span class="o">-</span><span class="p">[</span><span class="n">podIndex</span><span class="p">]</span><span class="o">.</span><span class="p">[</span><span class="n">externalDns</span><span class="o">.</span><span class="n">domain</span><span class="p">]</span>
+</pre></div>
+</div>
+</li>
+</ul>
+<p>When an Elassandra node restarts with another IP address, the Kubernetes internal DNS is automatically updated, and the
+<a class="reference external" href="https://github.com/kubernetes-sigs/external-dns">ExternalDNS</a> operator also update your DNS zone.</p>
+<p>In order to connect a datacenter <strong>dc1</strong> to another datacenter <strong>dc2</strong> in the Cassandra cluster <strong>cl1</strong>, you need to specify the remote seeds names in your datacenter spec.
+For example, if dc1 and dc2 respectively running in namespaces <strong>ns1</strong> and <strong>ns2</strong> in the same kubernetes cluster, you would have the following spec on dc1:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">remoteSeeds</span><span class="p">:</span>
+  <span class="o">-</span> <span class="n">elassandra</span><span class="o">-</span><span class="n">cl1</span><span class="o">-</span><span class="n">dc2</span><span class="o">-</span><span class="mi">0</span><span class="o">-</span><span class="mf">0.</span><span class="n">elassandra</span><span class="o">-</span><span class="n">cl1</span><span class="o">-</span><span class="n">dc2</span><span class="o">-</span><span class="mf">0.</span><span class="n">ns2</span><span class="o">.</span><span class="n">svc</span>
+  <span class="o">-</span> <span class="n">elassandra</span><span class="o">-</span><span class="n">cl1</span><span class="o">-</span><span class="n">dc2</span><span class="o">-</span><span class="mi">1</span><span class="o">-</span><span class="mf">0.</span><span class="n">elassandra</span><span class="o">-</span><span class="n">cl1</span><span class="o">-</span><span class="n">dc2</span><span class="o">-</span><span class="mf">1.</span><span class="n">ns2</span><span class="o">.</span><span class="n">svc</span>
+  <span class="o">-</span> <span class="n">elassandra</span><span class="o">-</span><span class="n">cl1</span><span class="o">-</span><span class="n">dc2</span><span class="o">-</span><span class="mi">2</span><span class="o">-</span><span class="mf">0.</span><span class="n">elassandra</span><span class="o">-</span><span class="n">cl1</span><span class="o">-</span><span class="n">dc2</span><span class="o">-</span><span class="mf">2.</span><span class="n">ns2</span><span class="o">.</span><span class="n">svc</span>
+</pre></div>
+</div>
+<p>If <strong>dc1</strong> and <strong>dc2</strong> are deployed in two Kubernetes clusters, you would have the following spec on <strong>dc1</strong>.
+Of course, the <code class="docutils literal notranslate"><span class="pre">externalDns.root</span></code> must different in dc1 and dc2 to avoid DNS naming conflicts.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">externalDns</span><span class="p">:</span>
+  <span class="n">root</span><span class="p">:</span> <span class="n">dc1</span>
+  <span class="n">domain</span><span class="p">:</span> <span class="n">my</span><span class="o">-</span><span class="n">domain</span><span class="o">.</span><span class="n">com</span>
+<span class="n">remoteSeeds</span><span class="p">:</span>
+  <span class="o">-</span> <span class="n">cassandra</span><span class="o">-</span><span class="n">dc2</span><span class="o">-</span><span class="mi">0</span><span class="o">-</span><span class="mf">0.</span><span class="n">my</span><span class="o">-</span><span class="n">domain</span><span class="o">.</span><span class="n">com</span>
+  <span class="o">-</span> <span class="n">cassandra</span><span class="o">-</span><span class="n">dc2</span><span class="o">-</span><span class="mi">1</span><span class="o">-</span><span class="mf">0.</span><span class="n">my</span><span class="o">-</span><span class="n">domain</span><span class="o">.</span><span class="n">com</span>
+  <span class="o">-</span> <span class="n">cassandra</span><span class="o">-</span><span class="n">dc2</span><span class="o">-</span><span class="mi">2</span><span class="o">-</span><span class="mf">0.</span><span class="n">my</span><span class="o">-</span><span class="n">domain</span><span class="o">.</span><span class="n">com</span>
+</pre></div>
+</div>
+<p>And on <strong>dc2</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">externalDns</span><span class="p">:</span>
+  <span class="n">root</span><span class="p">:</span> <span class="n">dc2</span>
+  <span class="n">domain</span><span class="p">:</span> <span class="n">my</span><span class="o">-</span><span class="n">domain</span><span class="o">.</span><span class="n">com</span>
+<span class="n">remoteSeeds</span><span class="p">:</span>
+  <span class="o">-</span> <span class="n">cassandra</span><span class="o">-</span><span class="n">dc1</span><span class="o">-</span><span class="mi">0</span><span class="o">-</span><span class="mf">0.</span><span class="n">my</span><span class="o">-</span><span class="n">domain</span><span class="o">.</span><span class="n">com</span>
+  <span class="o">-</span> <span class="n">cassandra</span><span class="o">-</span><span class="n">dc1</span><span class="o">-</span><span class="mi">1</span><span class="o">-</span><span class="mf">0.</span><span class="n">my</span><span class="o">-</span><span class="n">domain</span><span class="o">.</span><span class="n">com</span>
+  <span class="o">-</span> <span class="n">cassandra</span><span class="o">-</span><span class="n">dc1</span><span class="o">-</span><span class="mi">2</span><span class="o">-</span><span class="mf">0.</span><span class="n">my</span><span class="o">-</span><span class="n">domain</span><span class="o">.</span><span class="n">com</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="using-the-elassandra-operator">
+<h3>Using the Elassandra operator<a class="headerlink" href="#using-the-elassandra-operator" title="Permalink to this headline">¶</a></h3>
+<p>Elassandra nodes run a SeedProvider that can request multiple Elassandra operators to get seed node IP addresses for each datacenters.</p>
+<img alt="_images/multi-dc-architecture.png" src="_images/multi-dc-architecture.png" />
+<p>The Elassandra operator HTTP endpoint <strong>/seeds/{namespace}/{clusterName}/{dcName}</strong> returns
+the Cassandra RPC broadcast IP addresses of Elassandra seed pods, which are pods IP addresses by default.
+If <code class="docutils literal notranslate"><span class="pre">networking.hostNetworkEnabled=true</span></code> or <code class="docutils literal notranslate"><span class="pre">networking.hostPortEnabled=true</span></code> in your Elassandra datacenter spec,
+the Cassandra RPC broadcast address of an Elassandra pod running on the Kubernetes node will be :</p>
+<ul class="simple">
+<li><p>The Kubernetes node external-IP if available,</p></li>
+<li><p>or the IP address defined by the node label <code class="docutils literal notranslate"><span class="pre">kubernetes.strapdata.com/public-ip</span></code> if available,</p></li>
+<li><p>or the Kubernetes node internal IP address in last resort.</p></li>
+</ul>
+<p>For example, if you run datacenter <strong>dc1</strong> in the cluster <strong>cl1</strong> in namespace <strong>ns1</strong>, you can connect to
+a remote datacenter <strong>dc2</strong> deployed in namespace <strong>ns2</strong> with the following datacenter spec. Of course,
+the elassandra-operator.my-domain.com must be properly resolved in your Kubernetes infrastructure.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">remoteSeeders</span><span class="p">:</span>
+<span class="o">-</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">elassandra</span><span class="o">-</span><span class="n">operator</span><span class="o">.</span><span class="n">my</span><span class="o">-</span><span class="n">domain</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">seeds</span><span class="o">/</span><span class="n">ns2</span><span class="o">/</span><span class="n">cl1</span><span class="o">/</span><span class="n">dc2</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="quickstart.html" class="btn btn-neutral float-right" title="Quick Start" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="index.html" class="btn btn-neutral float-left" title="Elassandra Operator documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2020, Strapdata
+
+    </p>
+  </div> 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
