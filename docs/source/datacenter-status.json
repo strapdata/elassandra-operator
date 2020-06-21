@@ -22,7 +22,7 @@
               "type" : "string"
             }
           },
-          "submitDate" : {
+          "lastTransitionTime" : {
             "type" : "integer",
             "format" : "utc-millisec"
           },

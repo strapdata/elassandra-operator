@@ -1,5 +1,5 @@
 Quick Start
------------
+===========
 
 Once HELM 2 is deployed in your kubernetes cluster and you have added the strapdata HELM repository (see :ref:`helm-setup`),
 deploy the Elassandra operator in the default namespace:
@@ -229,3 +229,4 @@ Watch the Elassandra Datacenter CRD status until it is green, meaning all pods a
 .. code::
 
     edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --health GREEN
+
