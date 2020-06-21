@@ -114,6 +114,9 @@
                 "dayOfMonth" : {
                   "type" : "integer"
                 },
+                "year" : {
+                  "type" : "integer"
+                },
                 "era" : {
                   "type" : "integer"
                 },
@@ -121,9 +124,6 @@
                   "type" : "integer"
                 },
                 "dayOfWeek" : {
-                  "type" : "integer"
-                },
-                "year" : {
                   "type" : "integer"
                 },
                 "chronology" : {

@@ -68,11 +68,12 @@ install:
 - kind get clusters
 - docker ps -a
 before_script:
-- (cd docs; make clean html SPHINXOPTS="-W"; touch build/html/.nojekyll )
 - ./gradlew java:edctl:buildExec dockerPush dockerPushAllVersions -PregistryUrl="localhost:5000" -PregistryInsecure
 - curl http://localhost:5000/v2/_catalog
 - integ-test/install_elassandra_operator.sh
 script:
+#- (cd docs; make clean html SPHINXOPTS="-W"; touch build/html/.nojekyll )
+- (cd docs; make clean html; touch build/html/.nojekyll )
 - integ-test/test-admission.sh
 - integ-test/test-hostnetwork.sh
 - integ-test/test-reaper-registration.sh

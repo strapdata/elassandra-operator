@@ -330,7 +330,7 @@ In this case, the **nodeinfo** init-container of Elassandra nodes
 publishes a `DNSEndpoint <https://github.com/kubernetes-sigs/external-dns/blob/a7ac4f9b1e26edea01068dbcedbdd55b1f56165b/docs/contributing/crd-source/dnsendpoint-example.yaml>`_
 CRD managed by the deployed `ExternalDNS operator <https://github.com/kubernetes-sigs/external-dns>`_.
 
-.. jsonschema:: datacenter-spec.json#/properties/externalDns
+.. jsonschema:: datacenter-spec.json#/properties/networking/properties/externalDns
 
 See the `External DNS <https://github.com/helm/charts/tree/master/stable/external-dns>`_ to install and configure the ExternalDNS in your Kubernetes cluster.
 

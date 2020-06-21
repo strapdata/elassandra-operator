@@ -25,6 +25,7 @@ Contents:
    operations
    monitoring
    compute-resources
+   full-setup
 
 
 Indices and tables

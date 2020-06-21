@@ -60,48 +60,53 @@ Basically, seeds nodes are Elassandra pods with index 0 in each StatefulSet, and
 * From inside the Kubernetes cluster, seeds DNS names are in the form:
 
   .. code::
-     elassandra-[clusterName]-[dcName]-[rackIndex]-0.elassandra-[clusterName]-[dcName]-[rackIndex].[namespace].svc
+
+      elassandra-[clusterName]-[dcName]-[rackIndex]-0.elassandra-[clusterName]-[dcName]-[rackIndex].[namespace].svc
 
 * From outside the Kubernetes cluster, when the externalDns publication is enabled in your datacenter spec, DNS names for
   pods are in the following form, where **podIndex=0** for seed nodes:
 
   .. code::
-     cassandra-[externalDns.root]-[rackIndex]-[podIndex].[externalDns.domain]
+
+      cassandra-[externalDns.root]-[rackIndex]-[podIndex].[externalDns.domain]
 
 When an Elassandra node restarts with another IP address, the Kubernetes internal DNS is automatically updated, and the
-``ExternalDNS <https://github.com/kubernetes-sigs/external-dns>`_ operator also update your DNS zone.
+`ExternalDNS <https://github.com/kubernetes-sigs/external-dns>`_ operator also update your DNS zone.
 
 In order to connect a datacenter **dc1** to another datacenter **dc2** in the Cassandra cluster **cl1**, you need to specify the remote seeds names in your datacenter spec.
 For example, if dc1 and dc2 respectively running in namespaces **ns1** and **ns2** in the same kubernetes cluster, you would have the following spec on dc1:
 
-    .. code::
-        remoteSeeds:
-          - elassandra-cl1-dc2-0-0.elassandra-cl1-dc2-0.ns2.svc
-          - elassandra-cl1-dc2-1-0.elassandra-cl1-dc2-1.ns2.svc
-          - elassandra-cl1-dc2-2-0.elassandra-cl1-dc2-2.ns2.svc
+.. code::
+
+    remoteSeeds:
+      - elassandra-cl1-dc2-0-0.elassandra-cl1-dc2-0.ns2.svc
+      - elassandra-cl1-dc2-1-0.elassandra-cl1-dc2-1.ns2.svc
+      - elassandra-cl1-dc2-2-0.elassandra-cl1-dc2-2.ns2.svc
 
 If **dc1** and **dc2** are deployed in two Kubernetes clusters, you would have the following spec on **dc1**.
 Of course, the ``externalDns.root`` must different in dc1 and dc2 to avoid DNS naming conflicts.
 
-    .. code::
-        externalDns:
-          root: dc1
-          domain: my-domain.com
-        remoteSeeds:
-          - cassandra-dc2-0-0.my-domain.com
-          - cassandra-dc2-1-0.my-domain.com
-          - cassandra-dc2-2-0.my-domain.com
+.. code::
+
+    externalDns:
+      root: dc1
+      domain: my-domain.com
+    remoteSeeds:
+      - cassandra-dc2-0-0.my-domain.com
+      - cassandra-dc2-1-0.my-domain.com
+      - cassandra-dc2-2-0.my-domain.com
 
 And on **dc2**:
 
-    .. code::
-        externalDns:
-          root: dc2
-          domain: my-domain.com
-        remoteSeeds:
-          - cassandra-dc1-0-0.my-domain.com
-          - cassandra-dc1-1-0.my-domain.com
-          - cassandra-dc1-2-0.my-domain.com
+.. code::
+
+    externalDns:
+      root: dc2
+      domain: my-domain.com
+    remoteSeeds:
+      - cassandra-dc1-0-0.my-domain.com
+      - cassandra-dc1-1-0.my-domain.com
+      - cassandra-dc1-2-0.my-domain.com
 
 Using the Elassandra operator
 _____________________________
