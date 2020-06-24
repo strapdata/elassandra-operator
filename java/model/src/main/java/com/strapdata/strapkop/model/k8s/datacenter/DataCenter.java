@@ -36,7 +36,7 @@ public class DataCenter {
 
     public static final String NAME = "elassandradatacenter";
     public static final String PLURAL = "elassandradatacenters";
-    public static final String VERSION = "v1";
+    public static final String VERSION = "v1beta1";
     public static final String SCOPE = "Namespaced";
     public static final String KIND = "ElassandraDatacenter";
 

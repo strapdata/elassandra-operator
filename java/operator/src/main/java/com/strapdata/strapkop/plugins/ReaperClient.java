@@ -92,6 +92,7 @@ public class ReaperClient implements Closeable {
                         }));
     }
 
+    // TODO: kibana keyspace may have not tables at the time of the registration, causing a reaper error
     public Completable registerScheduledRepair(String username, String password, ReaperScheduledRepair reaperScheduledRepair) throws UnsupportedEncodingException {
         String url = "/repair_schedule?clusterName="+ URLEncoder.encode(dataCenter.getSpec().getClusterName(), "UTF-8") +
                 ("&keyspace=" + URLEncoder.encode(reaperScheduledRepair.getKeyspace(), "UTF-8")) +

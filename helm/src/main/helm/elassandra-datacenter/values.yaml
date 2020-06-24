@@ -6,8 +6,8 @@ parked: false
 autoScaleMode: "MANUAL"
 
 image:
-  elassandraRepository: strapdata/elassandra-node-dev
-  tag: 6.8.4.5
+  elassandraRepository: strapdata/elassandra-node
+  tag: latest
   pullPolicy: Always
   pullSecrets: []
 
@@ -85,8 +85,9 @@ reaper:
   image: strapdata/cassandra-reaper:2.1.0-SNAPSHOT-strapkop
   enabled: true
   jwtSecret: "68d45d8f-419f-429e-8ba0-7b475cba795d"
-  ingressSuffix:
   ingressAnnotations: {}
+  ingressAdminHost:
+  ingressHost:
   loggingLevel: "INFO"
   podTemplate: {}
 

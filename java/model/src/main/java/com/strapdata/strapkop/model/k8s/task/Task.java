@@ -38,7 +38,7 @@ public class Task {
 
     public static final String NAME = "elassandratask";
     public static final String PLURAL = "elassandratasks";
-    public static final String VERSION = "v1";
+    public static final String VERSION = "v1beta1";
     public static final String SCOPE = "Namespaced";
     public static final String KIND = "ElassandraTask";
 

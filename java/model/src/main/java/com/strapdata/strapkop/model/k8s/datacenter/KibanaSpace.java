@@ -19,14 +19,14 @@ package com.strapdata.strapkop.model.k8s.datacenter;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 import io.kubernetes.client.openapi.models.V1PodTemplateSpec;
 import lombok.*;
 
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Kibana deployment context.
@@ -61,6 +61,11 @@ public class KibanaSpace {
     @Expose
     private Set<String> keyspaces = new HashSet<>();
 
+    @JsonPropertyDescription("Kibana authorization statements")
+    @SerializedName("statements")
+    @Expose
+    private List<String> statements = new ArrayList<>();
+
     /**
      * Number of kibana instance, default is 1
      */
@@ -71,9 +76,9 @@ public class KibanaSpace {
 
     /**
      * Kibana ingress suffix (concatened with kibana spaces).
-     * host: space-suffix
+     * host: {spaceName}-{ingressSuffix}
      */
-    @JsonPropertyDescription("Kibana space ingress suffix")
+    @JsonPropertyDescription("Kibana space ingress suffix so that ingress host = {spaceName}-{ingressSuffix}")
     @SerializedName("ingressSuffix")
     @Expose
     private String ingressSuffix = null;
@@ -91,10 +96,10 @@ public class KibanaSpace {
      * Should be 1 starting with elasticsearch 6.8
      * See https://www.elastic.co/guide/en/kibana/current/upgrade-migrations.html
      */
-    @JsonPropertyDescription("Kibana space upgrade version")
+    @JsonPropertyDescription("Kibana space Elasticsearch upgrade version")
     @SerializedName("version")
     @Expose
-    private Integer version = null;
+    private Integer version = 1;
 
     /**
      * PodTemplate provides pod customisation (labels, resource, annotations, affinity rules, resource, priorityClassName, serviceAccountName) for the kibana pods
@@ -104,7 +109,6 @@ public class KibanaSpace {
     @Expose
     private V1PodTemplateSpec podTemplate = new V1PodTemplateSpec();
 
-
     /**
      * Manage kibana index name depending on elasticsearch version
      * See https://www.elastic.co/guide/en/kibana/current/upgrade-migrations.html
@@ -113,22 +117,31 @@ public class KibanaSpace {
      */
     @JsonIgnore
     public String index(Integer version) {
-        return KIBANA_INDEX_PREFIX + (name.length() > 0 ? "-" : "") + name + (version == null ? "" : "_"+version);
+        return KIBANA_INDEX_PREFIX + (Strings.isNullOrEmpty(name) ? "" : "-" + name) + (version == null ? "" : "_"+version);
     }
 
     @JsonIgnore
     public String keyspace(Integer version) {
-        return KIBANA_KEYSPACE_PREFIX + (name.length() > 0 ? "-" : "") + name + (version == null ? "" : "_"+version);
+        return KIBANA_KEYSPACE_PREFIX + (Strings.isNullOrEmpty(name) ? "" : "-" + name) + (version == null ? "" : "_"+version);
     }
 
     @JsonIgnore
     public String role() {
-        return KIBANA_PREFIX + (name.length() > 0 ? "-" : "") + name;
+        return KIBANA_PREFIX + (Strings.isNullOrEmpty(name) ? "" : "-" + name);
     }
 
     @JsonIgnore
     public String name() {
-        return KIBANA_PREFIX + (name.length() > 0 ? "-" : "") + name;
+        return KIBANA_PREFIX + (Strings.isNullOrEmpty(name) ? "" : "-" + name);
     }
 
+    @JsonIgnore
+    public List<String> statements() {
+        return statements == null || statements.isEmpty()
+                ? ImmutableList.of(
+                    String.format(Locale.ROOT, "GRANT ALL PERMISSIONS ON KEYSPACE \"%s\" TO %s", keyspace(version), role()),
+                    String.format(Locale.ROOT, "INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','cluster:monitor/.*','.*')", role()),
+                    String.format(Locale.ROOT, "INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','indices:.*','.*')", role()))
+                : statements;
+    }
 }

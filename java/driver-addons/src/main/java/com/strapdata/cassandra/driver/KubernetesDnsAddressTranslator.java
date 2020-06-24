@@ -31,6 +31,7 @@ import javax.naming.directory.Attribute;
 import javax.naming.directory.Attributes;
 import javax.naming.directory.DirContext;
 import javax.naming.directory.InitialDirContext;
+import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.Enumeration;
@@ -57,6 +58,8 @@ public class KubernetesDnsAddressTranslator implements AddressTranslator {
     // TODO when we switch to Netty 4.1, we can replace this with the Netty built-in DNS client
     private final DirContext ctx;
 
+    private final String dnsDomain;
+
     public KubernetesDnsAddressTranslator() {
         Hashtable<Object, Object> env = new Hashtable<Object, Object>();
         env.put(Context.INITIAL_CONTEXT_FACTORY, "com.sun.jndi.dns.DnsContextFactory");
@@ -65,11 +68,13 @@ public class KubernetesDnsAddressTranslator implements AddressTranslator {
         } catch (NamingException e) {
             throw new DriverException("Could not create translator", e);
         }
+        this.dnsDomain = System.getenv("ADDRESS_TRANSLATOR_DNS_DOMAIN");
     }
 
     @VisibleForTesting
     KubernetesDnsAddressTranslator(DirContext ctx) {
         this.ctx = ctx;
+        this.dnsDomain = System.getenv("ADDRESS_TRANSLATOR_DNS_DOMAIN");
     }
 
     @Override
@@ -84,6 +89,20 @@ public class KubernetesDnsAddressTranslator implements AddressTranslator {
         // do not translate RFC1918 addresses
         if (address.isSiteLocalAddress())
             return socketAddress;
+
+        if (dnsDomain != null && address instanceof Inet4Address) {
+            // try to resolv internal IPv4 address by resolving the external address to X-X-X-X.$ADDRESS_TRANSLATOR_DNS_DOMAIN
+            String dnsName = address.getHostAddress().replace(".","-") + "." + dnsDomain;
+            try {
+                InetAddress translatedAddress = InetAddress.getByName(dnsName);
+                return new InetSocketAddress(translatedAddress, socketAddress.getPort());
+            } catch(java.net.UnknownHostException e) {
+                logger.warn("Cannot resolv " + dnsName + ", fallback to revers resolution");
+            } catch (Exception e) {
+                logger.warn("Error resolving " + address + ", returning it as-is", e);
+                return socketAddress;
+            }
+        }
 
         try {
             // InetAddress#getHostName() is supposed to perform a reverse DNS lookup, but for some reason

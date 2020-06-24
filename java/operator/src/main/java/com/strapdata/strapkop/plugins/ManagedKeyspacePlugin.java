@@ -70,7 +70,6 @@ public class ManagedKeyspacePlugin extends AbstractPlugin {
 
     @Override
     public Completable syncRoles(final CqlRoleManager cqlRoleManager, final DataCenter dataCenter) {
-
         for(ManagedKeyspace managedKeyspace : dataCenter.getSpec().getManagedKeyspaces()) {
             if (!Strings.isNullOrEmpty(managedKeyspace.getRole())) {
                 cqlRoleManager.addIfAbsent(dataCenter, managedKeyspace.getRole(), () -> new CqlRole()

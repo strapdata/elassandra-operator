@@ -1,4 +1,4 @@
-Advanced services
+Advanced Services
 *****************
 
 Managed Keyspaces
@@ -51,11 +51,25 @@ Continuous Cassandra repair
 ===========================
 
 In order to ensure data consistency, a continuous cassandra repair can be managed by a `Cassandra Reaper <https://http://cassandra-reaper.io/>`_
-instance running on each datacenter. The Elassandra-Operator automatically configure Cassandra Reaper, register the Cassandra cluster and schedule repairs for managed keyspaces.
+instance running on each datacenter. The Elassandra-Operator automatically configure Cassandra Reaper,
+register the Cassandra cluster and schedule repairs for managed keyspaces.
 
-Here is the datacenter spec to configure kibana deployment:
+.. image:: ./images/reaper-cluster.png
+
+Here is the datacenter spec to configure Cassandra reaper deployment:
 
 .. jsonschema:: datacenter-spec.json#/properties/reaper
+
+The Elassandra operator deploys one Cassandra Reaper instance per datacenter
+(see `Operating Multiple DCs using Multiple Reaper http://cassandra-reaper.io/docs/usage/multi_dc_distributed/>`_),
+with datacenterAvailability=EACH, JMX connections to local nodes only.
+
+You can enable/disable the Cassandra Reaper deployment by updating the Elassandra datacenter spec as show in
+the following example:
+
+.. code::
+
+    helm upgrade --reuse-values --set reaper.enabled=true default-cl1-dc1 strapdata/elassandra-datacenter
 
 Address translation
 -------------------
@@ -66,17 +80,30 @@ application deployed in the same Kubernetes cluster using the Cassandra driver s
 using their internal IP.
 
 This is the case of the deployed Cassandra Reaper instance which use Elassandra to store various data to manage continuous repairs,
-and the Cassandra Reaper is automatically deployed with a **KubernetesDnsAddressTranslator** issuing a revers resolution of the Cassandra broadcats RPC
-to retrieve the Kubernetes node's name, and then use the buildt-in Kubernetes DNS resolver to get the internal kubernetes node IP address.
+but also for any application you may deploy in the same Kubernetes cluster.
 
-To achieve this behavior, you may need to deploy CoreDNS in your Kubernetes cluster, with the following configuration.
+So we provide an `AddressTranslator <https://docs.datastax.com/en/developer/java-driver/3.7/manual/address_resolution/>`_
+implementation **KubernetesDnsAddressTranslator** using the DNS resolution to translate the public broadcast IP address to the internal IP address,
+installed for Cassandra Reaper.
 
+This **KubernetesDnsAddressTranslator** works in two ways:
+
+* If the env variable ``ADDRESS_TRANSLATOR_DNS_DOMAIN` is defined, the **KubernetesDnsAddressTranslator** convert the public address X.X.X.X
+  to the DNS name X-X-X-X.$ADDRESS_TRANSLATOR_DNS_DOMAIN and try to resolv that name to the internal node IP address.
+* If the ``ADDRESS_TRANSLATOR_DNS_DOMAIN`` is not defined or the resolution failed, the KubernetesDnsAddressTranslator try to
+  revers lookup the public IP to get the internal Kubernetes node name. Then it resolves the Kubernetes node name to its internal IP address.
+
+To achieve this behavior, you may need to deploy `CoreDNS <https://coredns.io/>`_ in your Kubernetes cluster,
+with the `hosts plugin <https://coredns.io/plugins/hosts/>`_
+properly configured to reverse lookup public IP addresses of Kubernetes nodes.
 
 Kibana visualisation
 ====================
 
 In order to visualize your Elassandra data, or interact with Elasticsearch, the Elassandra-Operator can deploy
 secured Kibana instances pointing to your Elassandra datacenter nodes.
+
+.. image:: ./images/kibana-cluster-state.png
 
 When Elasticsearch HTTPS is enabled in your Elassandra datacenter, Kibana is automatically configured to connect
 through HTTPS and trust the Elassandra datacenter root CA. Moreover, for each kibana space, the Elassandra-Operator
@@ -86,6 +113,13 @@ Thus, you can run separated kibana instances dedicated to specific usages or spe
 Here is the datacenter spec to configure kibana deployment:
 
 .. jsonschema:: datacenter-spec.json#/properties/elasticsearch
+
+You can enable/disable the Kibana deployment by updating the Elassandra datacenter spec as show in
+the following example:
+
+.. code::
+
+    helm upgrade --reuse-values --set kibana.enabled=true default-cl1-dc1 strapdata/elassandra-datacenter
 
 You can adjust Kibana memory by adding the following podTemplate to set environment variables:
 
@@ -101,4 +135,3 @@ You can adjust Kibana memory by adding the following podTemplate to set environm
               env:
               - name: NODE_OPTIONS
                 value: "--max-old-space-size=4096"
-

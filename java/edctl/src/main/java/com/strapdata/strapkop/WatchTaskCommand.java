@@ -15,23 +15,28 @@
  * along with the Elassandra-Operator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-    package com.strapdata.strapkop;
+package com.strapdata.strapkop;
 
-    import com.google.common.reflect.TypeToken;
-    import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
-    import com.strapdata.strapkop.model.k8s.task.Task;
-    import com.strapdata.strapkop.model.k8s.task.TaskPhase;
-    import io.kubernetes.client.openapi.ApiClient;
-    import io.kubernetes.client.openapi.Configuration;
-    import io.kubernetes.client.openapi.apis.CustomObjectsApi;
-    import io.kubernetes.client.util.Config;
-    import io.kubernetes.client.util.Watch;
-    import picocli.CommandLine;
+import com.google.common.reflect.TypeToken;
+import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
+import com.strapdata.strapkop.model.k8s.task.Task;
+import com.strapdata.strapkop.model.k8s.task.TaskPhase;
+import io.kubernetes.client.openapi.ApiClient;
+import io.kubernetes.client.openapi.Configuration;
+import io.kubernetes.client.openapi.apis.CustomObjectsApi;
+import io.kubernetes.client.util.Config;
+import io.kubernetes.client.util.KubeConfig;
+import io.kubernetes.client.util.Watch;
+import picocli.CommandLine;
 
-    import java.util.concurrent.Callable;
+import java.io.FileReader;
+import java.util.concurrent.Callable;
 
     @CommandLine.Command(name = "watch-task", description = "Watch elassandra task subcommand")
     public class WatchTaskCommand implements Callable<Integer> {
+
+        @CommandLine.Option(names = {"--context"}, description = "Kubernetes context")
+        String context;
 
         @CommandLine.Option(names = {"-n", "--name"}, description = "Elassandra task name")
         String name;
@@ -50,13 +55,22 @@
 
         @Override
         public Integer call() throws Exception {
-            System.out.println("Watching elassandra task " +
-                    (name == null ? "" : "name=" + name) +
-                    (namespace == null ? "" : "namespace=" + namespace) +
+            System.out.println("Watching elassandra task" +
+                    (context == null ? "" : " context=" + context) +
+                    (name == null ? "" : " name=" + name) +
+                    (namespace == null ? "" : " namespace=" + namespace) +
                     (phase == null ? "" : " phase=" + phase) +
                     (timeout == null ? "" : " timeout=" + timeout + "s"));
 
-            ApiClient client = Config.defaultClient().setReadTimeout(timeout * 1000);
+            String kubeConfigPath = "~/.kube/config";
+            if (System.getenv("KUBE_CONFIG") != null)
+                kubeConfigPath = System.getenv("KUBE_CONFIG");
+
+            KubeConfig kubeConfig = KubeConfig.loadKubeConfig(new FileReader(kubeConfigPath.replaceFirst("^~", System.getProperty("user.home"))));
+            if (context != null)
+                kubeConfig.setContext(context);
+
+            ApiClient client = Config.fromConfig(kubeConfig).setReadTimeout(timeout * 1000);
             Configuration.setDefaultApiClient(client);
             CustomObjectsApi customObjectsApi = new CustomObjectsApi(client);
 

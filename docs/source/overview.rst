@@ -1,5 +1,5 @@
-Introduction
-============
+Overview
+========
 
 The Elassandra Operator automates the deployment and management of Elassandra datacenters in Kubernetes clusters.
 By reducing the complexity of running a Cassandra/Elassandra cluster, the Elassandra operator lets you focus on the desired configuration.
@@ -52,8 +52,8 @@ The Elassandra operator can manage multiple Elassandra datacenters (or a Cassand
 one or multiple Kubernetes clusters. In order to connect multiple Elassandra datacenters, you can use the DNS names of seed nodes, or
 use the operator to get IP addresses of seed nodes.
 
-Using DNS names of seed nodes
-_____________________________
+Using DNS names
+_______________
 
 Basically, seeds nodes are Elassandra pods with index 0 in each StatefulSet, and DNS names for these seed nodes are:
 

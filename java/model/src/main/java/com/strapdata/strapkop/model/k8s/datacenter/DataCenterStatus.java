@@ -169,14 +169,6 @@ public class DataCenterStatus {
     @SerializedName("reaperPhase")
     private ReaperPhase reaperPhase = ReaperPhase.NONE;
 
-    @JsonPropertyDescription("Cassandra remote seeds")
-    @SerializedName("remoteSeeds")
-    private Set<String> remoteSeeds = new HashSet<>();
-
-    @JsonPropertyDescription("Cassandra remote seeders URLs")
-    @SerializedName("remoteSeeders")
-    private Set<String> remoteSeeders = new HashSet<>();
-
     public Health health() {
         if (DataCenterPhase.PARKED.equals(this.phase))
             return Health.RED;

@@ -166,4 +166,14 @@ public class OperatorNames {
                 .controller(true)
                 .blockOwnerDeletion(true);
     }
+
+    public static V1OwnerReference ownerReference(String name, String uid, String version) {
+        return new V1OwnerReference()
+                .kind(DataCenter.KIND)
+                .apiVersion(version)
+                .name(name)
+                .uid(uid)
+                .controller(true)
+                .blockOwnerDeletion(true);
+    }
 }

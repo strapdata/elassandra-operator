@@ -164,7 +164,7 @@ all keyspaces are repaired.
 .. code::
 
     cat <<EOF | kubectl apply -f -
-    apiVersion: elassandra.strapdata.com/v1
+    apiVersion: elassandra.strapdata.com/v1beta1
     kind: ElassandraTask
     metadata:
       name: cleanup-task-$$
@@ -189,7 +189,7 @@ on all nodes of a datacenter, with waiting by default 10s between each cleanup:
 .. code::
 
     cat <<EOF | kubectl apply -f -
-    apiVersion: elassandra.strapdata.com/v1
+    apiVersion: elassandra.strapdata.com/v1beta1
     kind: ElassandraTask
     metadata:
       name: cleanup-task-$$
@@ -211,7 +211,7 @@ The following replication task adds the datacenter dc2 in the replication maps o
 .. code::
 
     cat <<EOF | kubectl apply -f -
-    apiVersion: elassandra.strapdata.com/v1
+    apiVersion: elassandra.strapdata.com/v1beta1
     kind: ElassandraTask
     metadata:
       name: replication-add-$$
@@ -238,7 +238,7 @@ The following rebuild task rebuild the datacenter **dc2** by streaming data from
 .. code::
 
     cat <<EOF | kubectl apply -f -
-    apiVersion: elassandra.strapdata.com/v1
+    apiVersion: elassandra.strapdata.com/v1beta1
     kind: ElassandraTask
     metadata:
       name: rebuild-dc2-$$
@@ -259,7 +259,7 @@ This is usually done after a datacenter rebuild when data becomes available to p
 .. code::
 
     cat <<EOF | kubectl apply -f -
-    apiVersion: elassandra.strapdata.com/v1
+    apiVersion: elassandra.strapdata.com/v1beta1
     kind: ElassandraTask
     metadata:
       name: updaterouting-dc2-$$
@@ -282,7 +282,7 @@ The following task is executed on one node of the datacenter **dc1** to remove a
 .. code::
 
     cat <<EOF | kubectl apply -f -
-    apiVersion: elassandra.strapdata.com/v1
+    apiVersion: elassandra.strapdata.com/v1beta1
     kind: ElassandraTask
     metadata:
       name: removenodes-dc2-$$

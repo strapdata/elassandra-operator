@@ -22,10 +22,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
-import com.strapdata.strapkop.cql.CqlKeyspace;
-import com.strapdata.strapkop.cql.CqlKeyspaceManager;
-import com.strapdata.strapkop.cql.CqlRole;
-import com.strapdata.strapkop.cql.CqlRoleManager;
+import com.strapdata.strapkop.cql.*;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
@@ -173,15 +170,20 @@ public class ReaperPlugin extends AbstractPlugin {
 
                     switch (reaperPhase) {
                         case NONE:
+                            Completable todo = Completable.complete();
                             CqlRole reaperRole = cqlRoleManager.get(dataCenter, REAPER_ROLE.getUsername());
-                            if (reaperRole != null && reaperRole.isReconcilied()) {
-                                return createOrReplaceReaperObjects(dataCenter).map(b -> {
+                            if (reaperRole != null && !reaperRole.isReconcilied()) {
+                                // try to reconcile the reaper role before deploying
+                                todo = reaperRole.createOrUpdateRole(dataCenter, k8sResourceUtils, context.createBean(CqlSessionHandler.class, this.cqlRoleManager))
+                                        .ignoreElement();
+                            }
+                            return todo.andThen(createOrReplaceReaperObjects(dataCenter)
+                                        .map(b -> {
                                     dataCenterUpdateAction.operation.getActions().add("Deploying cassandra reaper");
                                     dataCenter.getStatus().setReaperPhase(ReaperPhase.DEPLOYED);
                                     return true;
-                                });
-                            }
-                            break;
+                                }));
+
                         case DEPLOYED:
                             break;
 
@@ -274,10 +276,10 @@ public class ReaperPlugin extends AbstractPlugin {
         } else {
             // default reaper resources
             container.resources(new V1ResourceRequirements()
-                    .putRequestsItem("cpu", Quantity.fromString("500m"))
-                    .putRequestsItem( "memory", Quantity.fromString("1Gi"))
+                    .putRequestsItem("cpu", Quantity.fromString("100m"))
+                    .putRequestsItem( "memory", Quantity.fromString("512Mi"))
                     .putLimitsItem("cpu", Quantity.fromString("1000m"))
-                    .putLimitsItem( "memory", Quantity.fromString("1Gi"))
+                    .putLimitsItem( "memory", Quantity.fromString("512Mi"))
             );
         }
 
@@ -364,7 +366,7 @@ public class ReaperPlugin extends AbstractPlugin {
                         .periodSeconds(10)
                         .timeoutSeconds(5)
                 )
-                .addEnvItem(new V1EnvVar().name("REAPER_DATACENTER_AVAILABILITY").value("LOCAL"))
+                .addEnvItem(new V1EnvVar().name("REAPER_DATACENTER_AVAILABILITY").value("EACH"))
                 .addEnvItem(new V1EnvVar()
                         .name("REAPER_JMX_AUTH_PASSWORD")
                         .valueFrom(new V1EnvVarSource()
@@ -414,7 +416,8 @@ public class ReaperPlugin extends AbstractPlugin {
             container
                     .addEnvItem(new V1EnvVar().name("REAPER_CASS_ADDRESS_TRANSLATOR_ENABLED").value("true"))
                     .addEnvItem(new V1EnvVar().name("REAPER_CASS_ADDRESS_TRANSLATOR_TYPE").value("kubernetesDnsTranslator"))
-                    .addEnvItem(new V1EnvVar().name("JMX_ADDRESS_TRANSLATOR_TYPE").value("kubernetesDnsTranslator"));
+                    .addEnvItem(new V1EnvVar().name("JMX_ADDRESS_TRANSLATOR_TYPE").value("kubernetesDnsTranslator"))
+                    .addEnvItem(new V1EnvVar().name("ADDRESS_TRANSLATOR_DNS_DOMAIN").value("internal.strapdata.com"));
         }
 
         // reaper with cassandra authentication
@@ -500,40 +503,44 @@ public class ReaperPlugin extends AbstractPlugin {
                     .map(e -> ingressMeta.putAnnotationsItem(e.getKey(), e.getValue()));
         }
         final ExtensionsV1beta1Ingress ingress;
-        if (!Strings.isNullOrEmpty(dataCenterSpec.getReaper().getIngressSuffix())) {
-            String baseHostname = dataCenterSpec.getReaper().getIngressSuffix();
-            String reaperAppHost = "reaper-" + baseHostname;
-            String reaperAdminHost = "admin-reaper-" + baseHostname;
+        if (!Strings.isNullOrEmpty(dataCenterSpec.getReaper().getIngressHost()) || !Strings.isNullOrEmpty(dataCenterSpec.getReaper().getIngressAdminHost())) {
+            String reaperAppHost = dataCenterSpec.getReaper().getIngressHost();
+            String reaperAdminHost = dataCenterSpec.getReaper().getIngressAdminHost();
             logger.info("Creating reaper ingress for reaperAppHost={} reaperAdminHost={}", reaperAppHost, reaperAdminHost);
+            ExtensionsV1beta1IngressSpec extensionsV1beta1IngressSpec = new ExtensionsV1beta1IngressSpec();
+            if (!Strings.isNullOrEmpty(dataCenterSpec.getReaper().getIngressHost())) {
+                extensionsV1beta1IngressSpec
+                        .addRulesItem(new ExtensionsV1beta1IngressRule()
+                                .host(reaperAppHost)
+                                .http(new ExtensionsV1beta1HTTPIngressRuleValue()
+                                        .addPathsItem(new ExtensionsV1beta1HTTPIngressPath()
+                                                .path("/")
+                                                .backend(new ExtensionsV1beta1IngressBackend()
+                                                        .serviceName(reaperName(dataCenter))
+                                                        .servicePort(new IntOrString(APP_SERVICE_PORT)))
+                                        )
+                                )
+                        )
+                        .addTlsItem(new ExtensionsV1beta1IngressTLS().addHostsItem(reaperAppHost));
+            }
+            if (!Strings.isNullOrEmpty(dataCenterSpec.getReaper().getIngressAdminHost())) {
+                extensionsV1beta1IngressSpec
+                        .addRulesItem(new ExtensionsV1beta1IngressRule()
+                                .host(reaperAdminHost)
+                                .http(new ExtensionsV1beta1HTTPIngressRuleValue()
+                                        .addPathsItem(new ExtensionsV1beta1HTTPIngressPath()
+                                                .path("/")
+                                                .backend(new ExtensionsV1beta1IngressBackend()
+                                                        .serviceName(reaperName(dataCenter))
+                                                        .servicePort(new IntOrString(ADMIN_SERVICE_PORT)))
+                                        )
+                                )
+                        )
+                        .addTlsItem(new ExtensionsV1beta1IngressTLS().addHostsItem(reaperAdminHost));
+            }
             ingress = new ExtensionsV1beta1Ingress()
                     .metadata(ingressMeta)
-                    .spec(new ExtensionsV1beta1IngressSpec()
-                            .addRulesItem(new ExtensionsV1beta1IngressRule()
-                                    .host(reaperAppHost)
-                                    .http(new ExtensionsV1beta1HTTPIngressRuleValue()
-                                            .addPathsItem(new ExtensionsV1beta1HTTPIngressPath()
-                                                    .path("/")
-                                                    .backend(new ExtensionsV1beta1IngressBackend()
-                                                            .serviceName(reaperName(dataCenter))
-                                                            .servicePort(new IntOrString(APP_SERVICE_PORT)))
-                                            )
-                                    )
-                            )
-                            .addTlsItem(new ExtensionsV1beta1IngressTLS().addHostsItem(reaperAppHost))
-                            .addRulesItem(new ExtensionsV1beta1IngressRule()
-                                    .host(reaperAdminHost)
-                                    .http(new ExtensionsV1beta1HTTPIngressRuleValue()
-                                            .addPathsItem(new ExtensionsV1beta1HTTPIngressPath()
-                                                    .path("/")
-                                                    .backend(new ExtensionsV1beta1IngressBackend()
-                                                            .serviceName(reaperName(dataCenter))
-                                                            .servicePort(new IntOrString(ADMIN_SERVICE_PORT)))
-                                            )
-                                    )
-                            )
-                            .addTlsItem(new ExtensionsV1beta1IngressTLS().addHostsItem(reaperAdminHost))
-
-                    );
+                    .spec(extensionsV1beta1IngressSpec);
         } else {
             ingress = null;
         }
@@ -628,9 +635,11 @@ public class ReaperPlugin extends AbstractPlugin {
                     Map<String, ReaperScheduledRepair> scheduledRepairMap = new HashMap<>();
                     // repair system + elastic_admin_xxx + managed keyspaces
                     for (CqlKeyspace cqlKeyspace : this.cqlKeyspaceManager.get(dc).values()) {
-                        scheduledRepairMap.put(cqlKeyspace.getName(), new ReaperScheduledRepair()
-                                .withKeyspace(cqlKeyspace.getName())
-                                .withOwner("elassandra-operator"));
+                        if (cqlKeyspace.isRepair()) {
+                            scheduledRepairMap.put(cqlKeyspace.getName(), new ReaperScheduledRepair()
+                                    .withKeyspace(cqlKeyspace.getName())
+                                    .withOwner("elassandra-operator"));
+                        }
                     }
                     // add explicit scheduled repair, can ovreride default settings
                     if (dc.getSpec().getReaper().getScheduledRepairs() != null) {

@@ -518,15 +518,9 @@ public class DataCenterUpdateAction {
                         doUpdate = doUpdate
                                 .flatMap(status -> this.cqlKeyspaceManager.reconcileKeyspaces(this, status, cqlSessionHandler, pluginRegistry))
                                 .flatMap(status -> this.cqlRoleManager.reconcileRole(this, status, cqlSessionHandler, pluginRegistry))
-                                // Disable License check because elastic_admin [_datacenregroup] is sometime created after creating the elassandra_operator role.
-                                // => elassandra_operator cannot read the keyspace (role is granted for existing keyspaces at the creation  time)
-                                // => cannot check license when running cassandra only
-                                // => elastic_admin.license should not be in elastic_admin_datacentergroup.license....
-                                //.andThen(this.cqlLicenseManager.verifyLicense(dataCenter, cqlSessionHandler))
-
                                 // manage plugins
-                                .flatMap(s -> pluginRegistry.reconcileAll(this).map(b -> b || s))
-                                .flatMap(s -> Completable.fromAction(() -> backupScheduler.scheduleBackups(dataCenter)).toSingleDefault(s)); // start
+                                .flatMap(s -> pluginRegistry.reconcileAll(this).map(b -> b || s));
+                                //.flatMap(s -> Completable.fromAction(() -> backupScheduler.scheduleBackups(dataCenter)).toSingleDefault(s));
                     }
 
                     // update datacenter status
@@ -915,14 +909,13 @@ public class DataCenterUpdateAction {
                     .labels(OperatorLabels.cluster(dataCenterSpec.getClusterName()));
         }
 
-        public V1ObjectMeta clusterObjectMeta(final String name, Map<String, String> additioonalLabels) {
+        public V1ObjectMeta clusterObjectMeta(final String name, Map<String, String> additionalLabels) {
             return new V1ObjectMeta()
                     .name(name)
                     .namespace(dataCenterMetadata.getNamespace())
-                    .addOwnerReferencesItem(OperatorNames.ownerReference(dataCenter))
                     .labels(Stream.concat(
                             OperatorLabels.cluster(dataCenterSpec.getClusterName()).entrySet().stream(),
-                            additioonalLabels.entrySet().stream())
+                            additionalLabels.entrySet().stream())
                             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
         }
 
@@ -1195,8 +1188,6 @@ public class DataCenterUpdateAction {
                             sibilingDc));
                 }
             }
-            // keep remote seeders dynamically added to the datacenter status
-            dataCenterStatus.getRemoteSeeders().addAll(remoteSeeders);
 
             Set<String> seeds = new HashSet<>();
             if (dataCenterStatus.getBootstrapped() == false) {
@@ -1802,7 +1793,7 @@ public class DataCenterUpdateAction {
             if (dataCenterSpec.getNetworking().nodeInfoRequired()) {
                 Key key = new Key(OperatorNames.nodeInfoServiceAccount(dataCenter), dataCenterMetadata.getNamespace());
                 V1ServiceAccount serviceAccount = serviceAccountCache.get(key);
-                if (serviceAccount != null && !serviceAccount.getSecrets().isEmpty()) {
+                if (serviceAccount != null && serviceAccount.getSecrets() != null && !serviceAccount.getSecrets().isEmpty()) {
                     String nodeInfoSecretName = serviceAccount.getSecrets().get(0).getName();
                     podSpec.addInitContainersItem(buildInitContainerNodeInfo(nodeInfoSecretName, rackStatus));
                 } else {

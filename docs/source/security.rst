@@ -101,7 +101,7 @@ Here is such kubernetes secret for an Elassandra cluster named **cl1**:
       name: elassandra-cl1
       namespace: ns4
       ownerReferences:
-      - apiVersion: elassandra.strapdata.com/v1
+      - apiVersion: elassandra.strapdata.com/v1beta1
         blockOwnerDeletion: true
         controller: true
         kind: ElassandraDatacenter

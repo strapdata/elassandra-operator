@@ -168,6 +168,7 @@ public class AuthorityManager {
      * @throws OperatorCreationException
      */
     public Single<X509CertificateAndPrivateKey> storeCaAsSecret(String namespace, String clusterName, X509CertificateAndPrivateKey ca) throws ApiException, GeneralSecurityException, IOException, OperatorCreationException {
+        // Warning: no ownerReference here because the secret maybe used by other DCs in the same namespace
         final V1Secret publicSecret = new V1Secret()
                 .metadata(new V1ObjectMeta()
                         .name(getPublicCaSecretName(clusterName))
