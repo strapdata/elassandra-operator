@@ -18,7 +18,7 @@ test "$(kubectl get edc elassandra-cl1-dc1 -n $NS -o jsonpath='{.status.needClea
 
 # cleanup all keyspaces
 cat <<EOF | kubectl apply -f -
-apiVersion: elassandra.strapdata.com/v1
+apiVersion: elassandra.strapdata.com/v1beta1
 kind: ElassandraTask
 metadata:
   name: cleanup-$$

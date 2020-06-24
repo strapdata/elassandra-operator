@@ -6,18 +6,24 @@ plugins {
     id 'com.bmuschko.docker-remote-api'
 }
 
-def reaperImageName = registryUrl + (registryUrl.length() > 0 ? "/" : "" )  + "strapdata/cassandra-reaper:" + reaperVersion + "-strapkop"
+def reaperImageName =  "strapdata/cassandra-reaper:" + reaperVersion + "-strapkop"
+println("reaperImageName=$reaperImageName")
 
-task buildReaper(type: DockerBuildImage) {
-    inputDir = file('.')
-    images.add(reaperImageName)
-    buildArgs = [
-            'baseImage': "${reaperParentImage}:${reaperVersion}",
-            'driverAddons': "../java/driver-addons/build/libs/driver-addons-${project.version}.jar"
-    ]
+task copyDriverAddons(type: Copy) {
+    dependsOn ":java:driver-addons:jar"
+    from file("../java/driver-addons/build/libs/driver-addons-${project.version}.jar")
+    into file("driver-addons-${project.version}.jar")
 }
 
-task pushReaper(type: DockerPushImage) {
-    dependsOn "buildReaper"
+task buildImage(type: DockerBuildImage) {
+    dependsOn "copyDriverAddons"
+    inputDir = file('.')
+    images.add(reaperImageName)
+    buildArgs.put("baseImage", "${reaperParentImage}:${reaperVersion}")
+    buildArgs.put("driverAddons", "driver-addons-${project.version}.jar")
+}
+
+task pushImage(type: DockerPushImage) {
+    dependsOn "buildImage"
     images = [ reaperImageName ]
 }

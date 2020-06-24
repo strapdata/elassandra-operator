@@ -28,7 +28,7 @@ java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc2 -ns $NS2 --health GRE
 
 # update replication map for keyspace foo on dc2 (and system keyspaces)
 cat <<EOF | kubectl apply -f -
-apiVersion: elassandra.strapdata.com/v1
+apiVersion: elassandra.strapdata.com/v1beta1
 kind: ElassandraTask
 metadata:
   name: replication-add-$$
@@ -47,7 +47,7 @@ java/edctl/build/libs/edctl watch-task -n replication-add-$$ -ns $NS --phase SUC
 
 # rebuild datacenter dc2 from dc1
 cat <<EOF | kubectl apply -f -
-apiVersion: elassandra.strapdata.com/v1
+apiVersion: elassandra.strapdata.com/v1beta1
 kind: ElassandraTask
 metadata:
   name: rebuild-dc2-$$
@@ -62,7 +62,7 @@ java/edctl/build/libs/edctl watch-task -n rebuild-dc2-$$ -ns $NS2 --phase SUCCEE
 
 # update routing table on dc2
 cat <<EOF | kubectl apply -f -
-apiVersion: elassandra.strapdata.com/v1
+apiVersion: elassandra.strapdata.com/v1beta1
 kind: ElassandraTask
 metadata:
   name: updaterouting-dc2-$$
@@ -100,7 +100,7 @@ fi
 # safely remove datacenter dc2
 # update replication map for keyspace foo on dc2 (and system keyspaces)
 cat <<EOF | kubectl apply -f -
-apiVersion: elassandra.strapdata.com/v1
+apiVersion: elassandra.strapdata.com/v1beta1
 kind: ElassandraTask
 metadata:
   name: replication-remove-dc2-$$
@@ -122,7 +122,7 @@ sleep 10
 
 # remove old nodes from dc1
 cat <<EOF | kubectl apply -f -
-apiVersion: elassandra.strapdata.com/v1
+apiVersion: elassandra.strapdata.com/v1beta1
 kind: ElassandraTask
 metadata:
   name: removenodes-dc2-$$

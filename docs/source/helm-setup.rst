@@ -22,7 +22,7 @@ and apply `Best practices for securing HELM and Tiller <https://v2.helm.sh/docs/
 Add the Strapdata HELM repository
 =================================
 
-Add the Strapdata `HELM 2 repository <https://github.com/strapdata>`_
+Add the Strapdata `HELM 2 repository <https://github.com/strapdata/helm-charts>`_
 
 .. code::
 

@@ -156,7 +156,7 @@ public class CqlRole implements CqlReconciliable, Cloneable {
      * @return this
      * @throws StrapkopException
      */
-    Single<CqlRole> createOrUpdateRole(DataCenter dataCenter, K8sResourceUtils k8sResourceUtils, final CqlSessionSupplier sessionSupplier) throws Exception {
+    public Single<CqlRole> createOrUpdateRole(DataCenter dataCenter, K8sResourceUtils k8sResourceUtils, final CqlSessionSupplier sessionSupplier) throws Exception {
         if (!reconcilied) {
             // create role if not exists, then alter... so this is completely idempotent and can even update password, although it might not be optimized
             return loadPassword(dataCenter, k8sResourceUtils)
@@ -195,6 +195,7 @@ public class CqlRole implements CqlReconciliable, Cloneable {
                             }
                         }
                         this.reconcilied = true;     // mark the role as up-to-date
+                        this.password = null; // forget the password
                         return this;
                     })
                     .onErrorReturn(t -> {

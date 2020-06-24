@@ -259,10 +259,10 @@ view_cert() {
 }
 
 #-----------------------------------------------------------
-export DNS_DOMAIN=${DNS_DOMAIN:-"test.strapkube.com"}
-export TRAEFIK_NAME=${TRAEFIK_NAME:-"traefik"}
+export DNS_DOMAIN="test.strapkube.com"
+export TRAEFIK_NAME="traefik-dc1"
 export TRAFIK_FQDN="${TRAEFIK_NAME}.${DNS_DOMAIN}"
-export AZURE_DNS_RESOURCE_GROUP="strapkube-int"
+
 
 create_sp_for_dns_update() {
   az ad sp create-for-rbac --name http://strapkop-dns-updater
@@ -274,11 +274,12 @@ delete_sp_for_dns_update() {
   az ad sp delete --id http://strapkop-dns-updater
 }
 
-AZURE_DNS_APPI_ID="56cfe32c-9ac4-40d6-8e28-011109f413aa"
-AZURE_DNS_TENANT_ID="566af820-2f8c-45ac-b975-647d2647b277"
-AZURE_SUBSCRIPTION_ID="72738c1b-8ae6-4f23-8531-5796fe866f2e"
-AZURE_DNS_CLIENT_ID="http://strapkop-dns-updater"
-AZURE_DNS_CLIENT_SECRET="13420ffc-af87-4583-9389-acd378f006fb"
+export AZURE_DNS_RESOURCE_GROUP="strapkube-int"
+export AZURE_DNS_APPI_ID="56cfe32c-9ac4-40d6-8e28-011109f413aa"
+export AZURE_DNS_TENANT_ID="566af820-2f8c-45ac-b975-647d2647b277"
+export AZURE_SUBSCRIPTION_ID="72738c1b-8ae6-4f23-8531-5796fe866f2e"
+export AZURE_DNS_CLIENT_ID="http://strapkop-dns-updater"
+export AZURE_DNS_CLIENT_SECRET="13420ffc-af87-4583-9389-acd378f006fb"
 
 #HELM_DEBUG="--debug --dry-run"
 #--set image.tag="0.7.2" \
@@ -335,11 +336,9 @@ deploy_traefik() {
   echo "done."
 }
 
-# cluster1 --set nodes.hosts[0].name="aks-nodepool1-29186158-0",nodes.hosts[0].value="20.50.152.131" \
-# cluster2 --set nodes.hosts[0].name="aks-nodepool1-36354689-0",nodes.hosts[0].value="20.54.40.201" \
-# gke --set nodes.hosts[0].name="gke-test-default-pool-3834d5cb-8bcf",nodes.hosts[0].value="34.78.136.83" \
-
 deploy_coredns_forwarder() {
+  HOST_ALIASES=$(kubectl get nodes -o custom-columns='INTERNAL-IP:.status.addresses[?(@.type=="InternalIP")].address,PUBLIC-IP:.metadata.labels.kubernetes\.strapdata\.com/public-ip' --no-headers |\
+  awk '{ gsub(/\./,"-",$2); printf("--set nodes.hosts[%d].name=%s,nodes.hosts[%d].value=%s ",NR-1, $2, NR-1, $1); }')
   kubectl delete configmap --namespace kube-system coredns-custom
   helm install $HELM_DEBUG --name coredns-forwarder --namespace kube-system \
   --set forwarders.domain="${DNS_DOMAIN}" \
@@ -347,7 +346,8 @@ deploy_coredns_forwarder() {
   --set forwarders.hosts[1]="64.4.48.8" \
   --set forwarders.hosts[2]="13.107.24.8" \
   --set forwarders.hosts[3]="13.107.160.8" \
-  --set nodes.hosts[0].name="aks-nodepool1-36354689-0",nodes.hosts[0].value="20.54.40.201" \
+  --set nodes.domain=internal.strapdata.com \
+  $HOST_ALIASES \
   strapdata/coredns-forwarder
   kubectl delete pod --namespace kube-system -l k8s-app=kube-dns
 }

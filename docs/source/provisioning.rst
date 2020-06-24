@@ -424,7 +424,7 @@ As an example, here is the deployed PodDisruptionBudget for a 3 nodes datacenter
         name: elassandra-cl1-dc1
         namespace: ns6
         ownerReferences:
-        - apiVersion: elassandra.strapdata.com/v1
+        - apiVersion: elassandra.strapdata.com/v1beta1
           blockOwnerDeletion: true
           controller: true
           kind: ElassandraDatacenter

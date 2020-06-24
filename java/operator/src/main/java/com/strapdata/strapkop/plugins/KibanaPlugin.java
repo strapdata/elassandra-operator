@@ -18,7 +18,6 @@
 package com.strapdata.strapkop.plugins;
 
 import com.google.common.base.Strings;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
@@ -84,11 +83,16 @@ public class KibanaPlugin extends AbstractPlugin {
     /**
      * Default space with empty name
      */
-    private static final KibanaSpace DEFAULT_KIBANA_SPACE = new KibanaSpace().withName("").withKeyspaces(ImmutableSet.of("_kibana"));
+    private static final KibanaSpace DEFAULT_KIBANA_SPACE = new KibanaSpace()
+            .withName("")
+            .withVersion(1)
+            .withKeyspaces(ImmutableSet.of("_kibana_1"));
 
     private Map<String, KibanaSpace> getKibanaSpaces(final DataCenter dataCenter) {
-        Map<String, KibanaSpace> spaces = dataCenter.getSpec().getKibana().getSpaces().stream().collect(Collectors.toMap(KibanaSpace::getName, Function.identity()));
-        return (spaces.size() == 0) ? ImmutableMap.of(DEFAULT_KIBANA_SPACE.getName(), DEFAULT_KIBANA_SPACE) : spaces;
+        List<KibanaSpace> spaces = dataCenter.getSpec().getKibana().getSpaces();
+        if (spaces.isEmpty())
+            spaces.add(DEFAULT_KIBANA_SPACE);
+        return spaces.stream().collect(Collectors.toMap(kibanaSpace -> kibanaSpace.name(), Function.identity()));
     }
 
     @Override
@@ -112,34 +116,32 @@ public class KibanaPlugin extends AbstractPlugin {
      */
     @Override
     public Completable syncRoles(final CqlRoleManager cqlRoleManager, final DataCenter dataCenter) throws ApiException {
+        logger.debug("datacenter={} sync kibana roles for spaces={}", getKibanaSpaces(dataCenter));
         List<CompletableSource> todoList = new ArrayList<>();
         for (KibanaSpace kibanaSpace : getKibanaSpaces(dataCenter).values()) {
             Integer version = kibanaSpace.getVersion();
+
+            // Warning: no ownerReference here because the secret maybe used by other DCs in the same namespace
             V1ObjectMeta v1SecretMeta = new V1ObjectMeta()
                     .name(OperatorNames.clusterChildObjectName("%s-" + kibanaSpace.role(), dataCenter))
                     .namespace(dataCenter.getMetadata().getNamespace())
-                    .addOwnerReferencesItem(OperatorNames.ownerReference(dataCenter))
                     .labels(OperatorLabels.cluster(dataCenter.getSpec().getClusterName()));
+
             todoList.add(k8sResourceUtils.readOrCreateNamespacedSecret(v1SecretMeta, () -> {
                 V1Secret secret = new V1Secret().metadata(v1SecretMeta).type("Opaque");
                 secret.putStringDataItem("kibana.kibana_password", UUID.randomUUID().toString());
                 logger.debug("Created new cluster secret={}/{}", v1SecretMeta.getName(), v1SecretMeta.getNamespace());
                 return secret;
             }).map(secret -> {
+                logger.debug("datacenter={} Adding kibana role={} for space={}", dataCenter.id(), kibanaSpace.role(), kibanaSpace.name());
                 cqlRoleManager.addIfAbsent(dataCenter, kibanaSpace.keyspace(version), () -> new CqlRole()
                         .withUsername(kibanaSpace.role())
                         .withSecretKey("kibana.kibana_password")
                         .withSecretNameProvider(dc -> OperatorNames.clusterChildObjectName("%s-" + kibanaSpace.role(), dc))
                         .withReconcilied(false)
-                        .withSuperUser(true)
+                        .withSuperUser(false)
                         .withLogin(true)
-                        .withGrantStatements(
-                                ImmutableList.of(
-                                        String.format(Locale.ROOT, "GRANT ALL PERMISSIONS ON KEYSPACE \"%s\" TO %s", kibanaSpace.keyspace(version), kibanaSpace.role()),
-                                        String.format(Locale.ROOT, "INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','cluster:monitor/.*','.*')", kibanaSpace.index(version)),
-                                        String.format(Locale.ROOT, "INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','indices:.*','.*')", kibanaSpace.index(version))
-                                )
-                        )
+                        .withGrantStatements(kibanaSpace.statements())
                 );
                 return secret;
             }).ignoreElement());
@@ -209,11 +211,14 @@ public class KibanaPlugin extends AbstractPlugin {
                     Set<String> newSpaces = Sets.difference(getKibanaSpaces(dataCenter).keySet(), deployedKibanaSpaces);
                     Completable createCompletable = newSpaces.isEmpty() ?
                             Completable.complete() :
-                            io.reactivex.Observable.fromIterable(getKibanaSpaces(dataCenter).values().stream().filter(k -> newSpaces.contains(k.getName())).collect(Collectors.toList()))
+                            io.reactivex.Observable.fromIterable(getKibanaSpaces(dataCenter).values()
+                                    .stream()
+                                    .filter(k -> newSpaces.contains(k.name()))
+                                    .collect(Collectors.toList()))
                                     .flatMapCompletable(kibanaSpace -> {
                                         logger.debug("Adding kibana space={}", kibanaSpace);
-                                        dataCenterUpdateAction.operation.getActions().add("Adding kibana space=["+kibanaSpace.getName()+"]");
-                                        dataCenter.getStatus().getKibanaSpaceNames().add(kibanaSpace.getName());
+                                        dataCenterUpdateAction.operation.getActions().add("Adding kibana space=["+kibanaSpace.name()+"]");
+                                        dataCenter.getStatus().getKibanaSpaceNames().add(kibanaSpace.name());
                                         return createOrReplaceKibanaObjects(dataCenter, kibanaSpace);
                                     });
 
@@ -227,7 +232,7 @@ public class KibanaPlugin extends AbstractPlugin {
                                 !newSpaces.contains(kibanaSpaceName) &&
                                 deployment.getSpec().getReplicas() != replicas) {
                             logger.debug("datacenter={} updating deployment={} replicas={}", dataCenter.id(), deployment.getMetadata().getName(), replicas);
-                            dataCenterUpdateAction.operation.getActions().add("Updating kibana space=["+kibanaSpace.getName()+"]");
+                            dataCenterUpdateAction.operation.getActions().add("Updating kibana space=["+kibanaSpace.name()+"]");
                             deployment.getSpec().setReplicas(replicas);
                             createCompletable = createCompletable.andThen(
                                     k8sResourceUtils.updateNamespacedDeployment(deployment).ignoreElement()
@@ -284,7 +289,7 @@ public class KibanaPlugin extends AbstractPlugin {
         final DataCenterSpec dataCenterSpec = dataCenter.getSpec();
         final Integer version = kibanaSpace.getVersion();
 
-        final Map<String, String> labels = kibanaSpaceLabels(dataCenter, kibanaSpace.getName());
+        final Map<String, String> labels = kibanaSpaceLabels(dataCenter, kibanaSpace.name());
 
         final V1ObjectMeta meta = (kibanaSpace.getPodTemplate() != null && kibanaSpace.getPodTemplate().getMetadata() != null
                 ? kibanaSpace.getPodTemplate().getMetadata()
@@ -312,7 +317,7 @@ public class KibanaPlugin extends AbstractPlugin {
         } else {
             // default kibana resources
             container.resources(new V1ResourceRequirements()
-                    .putRequestsItem("cpu", Quantity.fromString("500m"))
+                    .putRequestsItem("cpu", Quantity.fromString("250m"))
                     .putRequestsItem( "memory", Quantity.fromString("1Gi"))
                     .putLimitsItem("cpu", Quantity.fromString("1000m"))
                     .putLimitsItem( "memory", Quantity.fromString("1Gi"))
@@ -455,7 +460,7 @@ public class KibanaPlugin extends AbstractPlugin {
                 })
                 .flatMap(s -> {
                     if (!Strings.isNullOrEmpty(kibanaSpace.getIngressSuffix())) {
-                        String kibanaHost = kibanaSpace.name() + "-" + kibanaSpace.getIngressSuffix();
+                        String kibanaHost = kibanaSpace.name() + (kibanaSpace.name().length() > 0 ? "-" : "") + kibanaSpace.getIngressSuffix();
                         logger.info("Creating kibana ingress for host={}", kibanaHost);
                         final V1ObjectMeta ingressMeta = new V1ObjectMeta()
                                 .name(kibanaNameDc(dataCenter, kibanaSpace))

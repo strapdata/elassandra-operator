@@ -89,15 +89,15 @@ public class Reaper {
     @Expose
     private String loggingLevel = "INFO";
 
-    /**
-     * Reaper ingress suffix concatened with "repaer-" and "reaper-admin-"
-     * reaper-suffix
-     * reaper-admin-suffix
-     */
-    @JsonPropertyDescription("Reaper ingress suffix")
-    @SerializedName("ingressSuffix")
+    @JsonPropertyDescription("Reaper ingress host")
+    @SerializedName("ingressHost")
     @Expose
-    private String ingressSuffix = null;
+    private String ingressHost = null;
+
+    @JsonPropertyDescription("Reaper admin ingress host")
+    @SerializedName("ingressAdminHost")
+    @Expose
+    private String ingressAdminHost = null;
 
     /**
      * Ingress annotations

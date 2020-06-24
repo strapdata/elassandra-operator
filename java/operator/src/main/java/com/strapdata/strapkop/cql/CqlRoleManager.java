@@ -104,24 +104,25 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
     public Single<Boolean> reconcileRole(DataCenterUpdateAction dataCenterUpdateAction, Boolean status, CqlSessionSupplier sessionSupplier, PluginRegistry pluginRegistry) {
         DataCenter dataCenter = dataCenterUpdateAction.dataCenter;
         return Single.just(status)
-                .map(doUpdateStatus -> {
+                .flatMap(doUpdateStatus -> {
                     if (Authentication.NONE.equals(dataCenter.getSpec().getCassandra().getAuthentication()))
-                        return doUpdateStatus;
+                        return Single.just(doUpdateStatus);
 
                     addIfAbsent(dataCenter, CqlRole.CASSANDRA_ROLE.username, () -> CqlRole.CASSANDRA_ROLE.duplicate());
                     addIfAbsent(dataCenter, CqlRole.ADMIN_ROLE.username, () -> CqlRole.ADMIN_ROLE.duplicate());
                     addIfAbsent(dataCenter, CqlRole.STRAPKOP_ROLE.username, () -> CqlRole.STRAPKOP_ROLE.duplicate());
 
+                    List<CompletableSource> todoList = new ArrayList<>();
                     for(Plugin plugin : pluginRegistry.plugins()) {
                         if (plugin.isActive(dataCenter)) {
                             try {
-                                plugin.syncRoles(CqlRoleManager.this, dataCenter);
+                                todoList.add(plugin.syncRoles(CqlRoleManager.this, dataCenter));
                             } catch(Exception e) {
                                 logger.warn("datacenter={} Failed to syncRoles for plugin={}", dataCenter.id(), plugin.getClass().getName());
                             }
                         }
                     }
-                    return doUpdateStatus;
+                    return Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()])).toSingleDefault(doUpdateStatus);
                 })
                 .flatMap(doUpdateStatus -> {
                     // now we are sure authentication is required and cql connection has been set

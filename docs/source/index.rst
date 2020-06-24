@@ -15,17 +15,17 @@ Contents:
 .. toctree::
    :maxdepth: 3
 
-   introduction
+   overview
    quickstart
    helm-setup
    operator-setup
    provisioning
    advanced-services
-   security
    operations
+   security
    monitoring
    compute-resources
-   full-setup
+   multi-dc
 
 
 Indices and tables
