@@ -12,15 +12,19 @@ Elassandra Operator features:
 
 * Manage one [Kubernetes StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) per Cassandra rack to ensure data consistency across cloud-provider availability zones.
 * Manage mutliple Cassandra datacenters in the same or different Kubernetes clusters.
+* Implements Elassandra tasks to add/remove datacenters from an Elassandra cluster.
 * Manage rolling configuration changes, rolling upgrade/downgrade of Elassandra, scale up/down Elassandra datacenters.
-* Deploy [Cassandra Reaper](http://cassandra-reaper.io/) to run continuous Cassandra repairs.
-* Deploy multiple [Kibana](<https://www.elastic.co/fr/products/kibana>) instances with a dedicated Elasticserach index in Elassandra.
+* Deploy [Cassandra Reaper](http://cassandra-reaper.io/) and register keyspaces to run continuous Cassandra repairs.
+* Deploy multiple [Kibana](<https://www.elastic.co/fr/products/kibana>) instances with a dedicated Elasticsearch index in Elassandra.
 * Park/Unpark Elassandra datacenters (and associated Kibana and Cassandra Reaper instances).
 * Expose Elassandra metrics for the [Prometheus Operator](https://prometheus.io/docs/prometheus/latest/querying/operators/).
 * Publish public DNS names allowing Elassandra nodes to be reachable from the internet (Cassandra CQL and Elasticsearch REST API).
 * Automatically generates SSL/TLS certificates and strong passwords stored as Kubernetes secrets.
 * Create Cassandra roles and automatically grants the desired permissions on Cassandra keyspaces.
 * Automatically adjust the Cassandra Replication Factor for managed keyspaces, repair and cleanup after scale up/down.
+
+## Status
+
 
 ## Documentation
 

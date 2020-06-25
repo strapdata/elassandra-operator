@@ -43,12 +43,10 @@ public class ServiceAccountCache extends Cache<Key, V1ServiceAccount> {
     @Inject
     MeterRegistry meterRegistry;
 
-
     @PostConstruct
     public void initGauge() {
         meterRegistry.gaugeMapSize("cache.size", ImmutableList.of(new ImmutableTag("type", "serviceaccount")), this);
     }
-
 
     public void purgeServiceAccount(final DataCenter dc) {
         this.entrySet().removeIf(e ->
@@ -57,12 +55,12 @@ public class ServiceAccountCache extends Cache<Key, V1ServiceAccount> {
                         Objects.equals(e.getKey().getNamespace(), dc.getMetadata().getNamespace()));
     }
 
-    public Single<V1ServiceAccount> load(String serviceAccountName, String namespace) {
+    public Single<V1ServiceAccount> loadIfAbsent(String serviceAccountName, String namespace) {
         return Single.fromCallable(new Callable<V1ServiceAccount>() {
             @Override
             public V1ServiceAccount call() throws Exception {
                 Key key = new Key(serviceAccountName, namespace);
-                return compute(key, (k,v) -> {
+                return computeIfAbsent(key, k -> {
                     try {
                         return k8sResourceUtils.readNamespacedServiceAccount(k.getNamespace(), k.getName());
                     } catch (ApiException e) {

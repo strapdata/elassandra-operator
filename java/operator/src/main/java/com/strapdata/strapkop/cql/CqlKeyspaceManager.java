@@ -145,7 +145,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                             try {
                                 if (!keyspace.reconcilied() || keyspace.reconcileWithDcSize < keyspace.rf || dataCenter.getSpec().getReplicas() < keyspace.rf)
                                     todoList.add(updateKeyspaceReplicationMap(dataCenter, keyspace.name, effectiveRF(dataCenter, keyspace.rf), sessionSupplier)
-                                            .andThen(Completable.fromAction(() -> dataCenterUpdateAction.operation.getActions().add("update keyspace RF for ["+keyspace.getName()+"]")))
+                                            .andThen(Completable.fromAction(() -> dataCenterUpdateAction.operation.getActions().add("Update keyspace RF for ["+keyspace.getName()+"]")))
                                     );
                             } catch (Exception e) {
                                 logger.warn("datacenter=" + dataCenter.id() + " Failed to adjust RF for keyspace=" + keyspace, e);

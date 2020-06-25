@@ -119,7 +119,7 @@ public class DataCenterController {
         return reconcile(dc,
                 statefulsetCache.loadIfAbsent(dc)
                 .flatMap(x -> (dc.getSpec().getNetworking().nodeInfoRequired())
-                        ? serviceAccountCache.load(OperatorNames.nodeInfoServiceAccount(dc), dc.getMetadata().getNamespace()).map(sa -> x)
+                        ? serviceAccountCache.loadIfAbsent(OperatorNames.nodeInfoServiceAccount(dc), dc.getMetadata().getNamespace()).map(sa -> x)
                         : Single.just(x))
                 .flatMap(t -> fetchDataCentersSameClusterAndNamespace(dc))
                 .flatMapCompletable(dcIterable -> context.createBean(DataCenterUpdateAction.class, dc, op)

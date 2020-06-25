@@ -293,7 +293,8 @@ public class ReaperPlugin extends AbstractPlugin {
         }
         if (container == null) {
             // default reaper resources
-            container.resources(new V1ResourceRequirements()
+            container = new V1Container()
+                    .resources(new V1ResourceRequirements()
                     .putRequestsItem("cpu", Quantity.fromString("100m"))
                     .putRequestsItem("memory", Quantity.fromString("512Mi"))
                     .putLimitsItem("cpu", Quantity.fromString("1000m"))

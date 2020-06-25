@@ -69,7 +69,7 @@ public class K8sWatchEventSource<ResourceT, ResourceListT, Key> implements Event
     @Override
     public Observable<K8sWatchEvent<ResourceT>> createObservable() throws ApiException {
 
-        logger.debug("(re)creating k8s event observable for {}", this.adapter.getName());
+        logger.trace("(re)creating k8s event observable for {}", this.adapter.getName());
 
         // if last resource version is not null, restart watching where we stopped
         if (lastResourceVersion != null) {
@@ -87,7 +87,7 @@ public class K8sWatchEventSource<ResourceT, ResourceListT, Key> implements Event
      * @throws ApiException
      */
     private Observable<K8sWatchEvent<ResourceT>> createInitialObservable() throws ApiException {
-        logger.debug("Fetching existing k8s resources synchronously : {}", adapter.getName());
+        logger.trace("Fetching existing k8s resources synchronously : {}", adapter.getName());
         try {
             final ApiResponse<ResourceListT> apiResponse = watchClient.execute(adapter.createListApiCall(false, null), adapter.getResourceListType());
             // TODO: is it necessary to handle different response statuses here...

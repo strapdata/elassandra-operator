@@ -1,0 +1,29 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ template "storageclass.name" . }}
+  labels:
+    addonmanager.kubernetes.io/mode: EnsureExists
+    kubernetes.io/cluster-service: "true"
+
+provisioner: {{ .Values.provisioner }}
+parameters:
+{{ toYaml .Values.parameters | indent 2 }}
+
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+allowedTopologies:
+  - matchLabelExpressions:
+      {{- if .Values.region }}
+      - key: failure-domain.beta.kubernetes.io/region
+        operator: In
+        values:
+          - {{ .Values.region }}
+      {{- end }}
+      {{- if .Values.zone }}
+      - key: failure-domain.beta.kubernetes.io/zone
+        operator: In
+        values:
+          - {{ .Values.zone }}
+      {{- end }}
