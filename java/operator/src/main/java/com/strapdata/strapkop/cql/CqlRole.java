@@ -18,6 +18,7 @@
 package com.strapdata.strapkop.cql;
 
 import com.datastax.driver.core.Session;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
@@ -84,6 +85,7 @@ public class CqlRole implements CqlReconciliable, Cloneable {
      * Password loaded from a K8S secret.
      */
     @ToString.Exclude
+    @JsonIgnore
     String password;
 
     /**

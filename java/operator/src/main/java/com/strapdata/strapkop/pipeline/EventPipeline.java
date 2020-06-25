@@ -76,10 +76,10 @@ public class EventPipeline<DataT> {
                 .doOnComplete(() -> logger.debug("pipeline {} completed, recreating observable in 1 second", this.getClass().getSimpleName()))
                 .retryWhen(errors -> errors.delay(1, TimeUnit.SECONDS))
                 .repeatWhen(completed -> completed.delay(1, TimeUnit.SECONDS))
-                .doOnNext(event -> logger.debug("{} received event in thread {}", this.getClass().getSimpleName(), Thread.currentThread().getName()));
+                .doOnNext(event -> logger.trace("{} received event in thread {}", this.getClass().getSimpleName(), Thread.currentThread().getName()));
 
         observable = decorate(coldObservable)
-                .doOnNext(event -> logger.debug("{} dispatching event to subscribers in thread {}", this.getClass().getSimpleName(), Thread.currentThread().getName()))
+                .doOnNext(event -> logger.trace("{} dispatching event to subscribers in thread {}", this.getClass().getSimpleName(), Thread.currentThread().getName()))
                 .subscribeOn(Schedulers.io())
                 .publish();
 

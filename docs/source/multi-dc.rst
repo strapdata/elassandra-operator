@@ -51,14 +51,38 @@ kubernetes custom label ``kubernetes.strapdata.com/public-ip`` to each nodes, he
     }
 
     add_vmss_public_ip 0
+    add_vmss_public_ip 1
+    add_vmss_public_ip 2
 
 As the result, you should have kubernetes nodes properly labeled with zone and public-ip:
 
 .. code::
 
     kubectl get nodes -o wide -L failure-domain.beta.kubernetes.io/zone,kubernetes.strapdata.com/public-ip
-    NAME                                STATUS   ROLES   AGE   VERSION    INTERNAL-IP   EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION      CONTAINER-RUNTIME       ZONE            PUBLIC-IP
-    aks-nodepool1-33653023-vmss000000   Ready    agent   72m   v1.15.11   10.240.0.4    <none>        Ubuntu 16.04.6 LTS   4.15.0-1083-azure   docker://3.0.10+azure   northeurope-1   20.54.72.64
+    NAME                                STATUS   ROLES   AGE     VERSION    INTERNAL-IP   EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION      CONTAINER-RUNTIME       ZONE            PUBLIC-IP
+    aks-nodepool1-32762597-vmss000000   Ready    agent   2d20h   v1.15.11   10.240.0.4    <none>        Ubuntu 16.04.6 LTS   4.15.0-1083-azure   docker://3.0.10+azure   northeurope-1   20.54.72.64
+    aks-nodepool1-32762597-vmss000001   Ready    agent   2m32s   v1.15.11   10.240.0.35   <none>        Ubuntu 16.04.6 LTS   4.15.0-1083-azure   docker://3.0.10+azure   northeurope-2   40.113.33.9
+    aks-nodepool1-32762597-vmss000002   Ready    agent   2m29s   v1.15.11   10.240.0.66   <none>        Ubuntu 16.04.6 LTS   4.15.0-1083-azure   docker://3.0.10+azure   northeurope-3   20.54.80.104
+
+StorageClass definition
+.......................
+
+Azure persistent volumes are bound to an availability zone, so we need to defined one storageClass per zone in our Kubernetes cluster,
+and each Elassandra rack or statefulSet will be bound to the corresponding storageClass.
+This is done here using the HELM chart strapdata/storageclass.
+
+.. code::
+
+    for z in northeurope-1 northeurope-2 northeurope-3; do
+        helm install --name ssd-$z --namespace kube-system \
+            --set parameters.kind="Managed" \
+            --set parameters.cachingmode="ReadOnly" \
+            --set parameters.storageaccounttype="StandardSSD_LRS" \
+            --set provisioner="kubernetes.io/azure-disk" \
+            --set zone="${z}" \
+            --set nameOverride="ssd-$z" \
+            $HELM_REPO/storageclass
+    done
 
 Firewall rules
 ..............
@@ -116,8 +140,9 @@ Enable RBAC:
 CoreDNS installation
 ....................
 
-GKE is provided with KubeDns by default, which does not allows to configure host aliases required by the AddressTranslator.
-So we need to install coreDNS configured to import custom configuration, and configure kube-DNS stub domains to forward to CoreDNS.
+GKE is provided with KubeDns by default, which does not allows to configure host aliases required to run Cassandra Reaper with an AddressTranslator.
+So we need to install CoreDNS configured to import custom configuration (see `CoreDNS import plugin <https://coredns.io/plugins/import/>_),
+and configure kube-DNS stub domains to forward to CoreDNS.
 
 .. code::
 
@@ -356,7 +381,8 @@ Where coredns-values.yaml is:
         annotations: {}
 
 Once CoreDNS is installed, we need to add a KubeDNS a stub domain to forward request for domain **internal.strapdata.com**
-to the CoreDNS service, and restart KubeDNS pods:
+to the CoreDNS service, and restart KubeDNS pods.
+The **internal.strapdata.com** is just a dummy DNS domain used to resolv public IP addresses to Kubernetes nodes internal IP addresses.
 
 .. code::
 
@@ -365,8 +391,8 @@ to the CoreDNS service, and restart KubeDNS pods:
     kubectl patch configmap/kube-dns -n kube-system -p "{\"data\": {\"stubDomains\": \"KUBEDNS_STUB_DOMAINS\"}}"
     kubectl delete pod -l k8s-app=coredns -n kube-system
 
-StorageClass installation
-.........................
+StorageClass definition
+.......................
 
 Google cloud persistent volumes are bound to an availability zone, so we need to defined one storageClass per zone in our Kubernetes cluster,
 and each Elassandra rack or statefulSet will be bound to the corresponding storageClass.
@@ -487,7 +513,7 @@ If your Kubernetes nodes does not have the ExternalIP set (like AKS), public nod
       HOST_ALIASES=$(kubectl get nodes -o custom-columns='INTERNAL-IP:.status.addresses[?(@.type=="InternalIP")].address,PUBLIC-IP:.metadata.labels.kubernetes\.strapdata\.com/public-ip' --no-headers |\
       awk '{ gsub(/\./,"-",$2); printf("--set nodes.hosts[%d].name=%s,nodes.hosts[%d].value=%s ",NR-1, $2, NR-1, $1); }')
 
-The configure the CoreDNS custom config with your DNS name servers, this is azure name servers in the following example:
+The configure the CoreDNS custom config with your DNS name servers, this is Azure name servers in the following example:
 
 .. code::
 
@@ -568,12 +594,13 @@ Deploying a multi-dc Elassandra cluster
 Deploy dc1 on kube1
 ___________________
 
-Deploy the first datacenter **dc1** of the Elassandra cluster **cl1** in the Kubernetes cluster **kube1**, with the following settings:
+Deploy the first datacenter **dc1** of the Elassandra cluster **cl1** in the Kubernetes cluster **kube1**,
+with Kibana and Cassandra Reaper available through the Traefik ingress controller.
 
 .. code::
 
     helm install --namespace default --name "default-cl1-dc1" \
-        --set dataVolumeClaim.storageClassName=default \
+        --set dataVolumeClaim.storageClassName="ssd-{zone}" \
         --set cassandra.sslStoragePort="39000" \
         --set cassandra.nativePort="39001" \
         --set elasticsearch.httpPort="39002" \
@@ -581,7 +608,7 @@ Deploy the first datacenter **dc1** of the Elassandra cluster **cl1** in the Kub
         --set jvm.jmxPort="39004" \
         --set jvm.jdb="39005" \
         --set prometheus.port="39006" \
-        --set replicas="1" \
+        --set replicas="3" \
         --set networking.hostNetworkEnabled=true \
         --set networking.externalDns.enabled=true \
         --set networking.externalDns.domain=${DNS_DOMAIN} \
@@ -592,7 +619,7 @@ Deploy the first datacenter **dc1** of the Elassandra cluster **cl1** in the Kub
 
 Key points:
 
-* The storageClass must exist in your Kubernetes cluster.
+* The storageClass must exist in your Kubernetes cluster, default is the default storage class on Microsoft Azure.
 * Because ``hostNetwork`` is enabled, you need to properly choose TCP ports to avoid conflict on the Kubernetes nodes.
 * The env variable **TRAEFIK_FQDN** must be the public FQDN of your traefik deployment, traefik-kube1.$DNS_DOMAIN in our example.
 
@@ -686,32 +713,9 @@ the Elassandra datacenter namespace.
 
 .. code::
 
-    kubectl ksd get secret elassandra-cl1-kibana -o yaml
-    apiVersion: v1
-    kind: Secret
-    metadata:
-      creationTimestamp: "2020-06-23T15:45:29Z"
-      labels:
-        app: elassandra
-        app.kubernetes.io/managed-by: elassandra-operator
-        elassandra.strapdata.com/cluster: cl1
-      name: elassandra-cl1-kibana
-      namespace: default
-      ownerReferences:
-      - apiVersion: elassandra.strapdata.com/v1beta1
-        blockOwnerDeletion: true
-        controller: true
-        kind: ElassandraDatacenter
-        name: elassandra-cl1-dc1
-        uid: 22f312c6-8eda-49df-8ae5-1086f7e4cf93
-      resourceVersion: "106184"
-      selfLink: /api/v1/namespaces/default/secrets/elassandra-cl1-kibana
-      uid: 0b0319e6-4a78-4ff3-870b-e6e9534782ca
-    stringData:
-      kibana.kibana_password: 8c3fa492-0f53-4fdb-85ed-f87099ad8c51
-    type: Opaque
+    KIBANA_PASSWORD=$(kb get secret elassandra-cl1-kibana --context kube1 -o jsonpath='{.data.kibana\.kibana_password}' | base64 -D)
+    REAPER_ADMIN_PASSWORD=$(kb get secret elassandra-cl1-dc1-reaper --context kube1 -o jsonpath='{.data.password}' | base64 -D)
 
-.. code::
 
     kubectl ksd get secret elassandra-cl1-dc1-reaper -o yaml
     apiVersion: v1
@@ -755,8 +759,8 @@ namespace **default**, into the Kubernetes cluster **kube2** namespace **default
 
 .. tip::
 
-    These Elassandra cluster secrets does not include any ownerReference <https://kubernetes.io/docs/concepts/workloads/controllers/garbage-collection/>`_
-    and won't be deleted when deleting the Elassandra datacenter because these secrets could be used by another datacenter.
+    These Elassandra cluster-wide secrets does not include any ownerReference <https://kubernetes.io/docs/concepts/workloads/controllers/garbage-collection/>`_
+    and won't be deleted when deleting the Elassandra datacenter because they could be used by another datacenter.
     So, it's up to you to properly delete these secrets when deleting an Elassandra cluster.
 
 Deploy the datacenter **dc2** of the Elassandra cluster **cl1** in the Kubernetes cluster **cluster2**, with the following network settings:
@@ -899,11 +903,15 @@ helm install --namespace default --name "default-cl1-dc3" \
 Cleaning up
 -----------
 
-Delete Elassandra datacenters:
+Delete an Elassandra datacenter:
 
 .. code::
 
-    kubectx kube1 && helm delete --purge elassandra-cl1-dc1
-    kubectx kube2 && helm delete --purge elassandra-cl2-dc1
+    helm delete --purge elassandra-cl1-dc1
 
-Delete Kubernetes clusters.
+Undeploy the Elassandra operator and remove CRDs:
+
+.. code::
+
+    helm delete --purge elassandra-operator
+    kubectl delete crd elassandradatacenters.elassandra.strapdata.com elassandratasks.elassandra.strapdata.com

@@ -599,7 +599,8 @@ public class DataCenterUpdateAction {
                     .setHealth(Health.RED)
                     .withDesiredReplicas(1)
                     .withFingerprint(configMapVolumeMounts.fingerPrint()));
-            logger.debug("datacenter={} SCALE_UP started in rack={} size={}", dataCenter.id(), zone.name, zone.size);
+            logger.debug("datacenter={} SCALE_UP started in rack={} rackIndex={} size={}",
+                    dataCenter.id(), rackStatus.getName(), rackStatus.getIndex(), zone.size);
 
             configMapVolumeMounts.setRack(rackStatus);
             return todo
@@ -1791,8 +1792,7 @@ public class DataCenterUpdateAction {
             // Add the nodeinfo init container to bind on the k8s node public IP if available.
             // If externalDns is enabled, this init-container also publish a DNSEndpoint to expose public DNS name of seed nodes.
             if (dataCenterSpec.getNetworking().nodeInfoRequired()) {
-                Key key = new Key(OperatorNames.nodeInfoServiceAccount(dataCenter), dataCenterMetadata.getNamespace());
-                V1ServiceAccount serviceAccount = serviceAccountCache.get(key);
+                V1ServiceAccount serviceAccount = serviceAccountCache.loadIfAbsent(OperatorNames.nodeInfoServiceAccount(dataCenter), dataCenterMetadata.getNamespace()).blockingGet();
                 if (serviceAccount != null && serviceAccount.getSecrets() != null && !serviceAccount.getSecrets().isEmpty()) {
                     String nodeInfoSecretName = serviceAccount.getSecrets().get(0).getName();
                     podSpec.addInitContainersItem(buildInitContainerNodeInfo(nodeInfoSecretName, rackStatus));
@@ -1937,11 +1937,32 @@ public class DataCenterUpdateAction {
                             .spec(podSpec)
                     );
 
-            return getPersistentVolumeClaims(statefulSetMetadata, rackStatus)
-                    .flatMap(listVolumClaim -> {
-                        statefulSetSpec.setVolumeClaimTemplates(listVolumClaim);
-                        return k8sResourceUtils.createOrReplaceNamespacedStatefulSet(new V1StatefulSet().metadata(statefulSetMetadata).spec(statefulSetSpec));
-                    });
+            Zone zone = zones.get(rackStatus.getName());
+            if (zone != null && zone.getSts().isPresent()) {
+                // Avoid PVC replacement and data loss if spec modified...
+                statefulSetSpec.setVolumeClaimTemplates(zone.getSts().get().getSpec().
+                        getVolumeClaimTemplates());
+            } else {
+                if (dataCenterSpec.getDataVolumeClaim() != null && dataCenterSpec.getDataVolumeClaim().getStorageClassName() != null) {
+                    String storageClassName = dataCenterSpec.getDataVolumeClaim().getStorageClassName()
+                            .replace("{zone}", rackStatus.getName())
+                            .replace("{index}", Integer.toString(rackStatus.getIndex()));
+                    logger.info("sts={}/{} rack={} creating new PVC with storageClassName={}",
+                            statefulSetMetadata.getName(), rackStatus.getName(), dataCenterMetadata.getNamespace(), storageClassName);
+
+                    V1PersistentVolumeClaimSpec v1PersistentVolumeClaimSpec = new V1PersistentVolumeClaimSpec()
+                            .accessModes(dataCenterSpec.getDataVolumeClaim().getAccessModes())
+                            .dataSource(dataCenterSpec.getDataVolumeClaim().getDataSource())
+                            .resources(dataCenterSpec.getDataVolumeClaim().getResources())
+                            .selector(dataCenterSpec.getDataVolumeClaim().getSelector())
+                            .volumeMode(dataCenterSpec.getDataVolumeClaim().getVolumeMode())
+                            .storageClassName(storageClassName);
+                    statefulSetSpec.setVolumeClaimTemplates(ImmutableList.of(new V1PersistentVolumeClaim()
+                            .metadata(new V1ObjectMeta().name("data-volume")).spec(v1PersistentVolumeClaimSpec)));
+                }
+            }
+
+            return k8sResourceUtils.createOrReplaceNamespacedStatefulSet(new V1StatefulSet().metadata(statefulSetMetadata).spec(statefulSetSpec));
         }
 
         /**
@@ -1956,7 +1977,7 @@ public class DataCenterUpdateAction {
             // if the Statefulset already exists, do not override the VolumeClaims
             return k8sResourceUtils.readNamespacedStatefulSet(dataCenterMetadata.getNamespace(), statefulSetMetadata.getName())
                     .map(sts -> {
-                        logger.trace("sts={}/{} re-use PVC with templates={}",
+                        logger.debug("sts={}/{} re-use PVC with templates={}",
                                 statefulSetMetadata.getName(), dataCenterMetadata.getNamespace(), sts.getSpec().getVolumeClaimTemplates());
                         return sts.getSpec().getVolumeClaimTemplates();
                     })
@@ -1966,15 +1987,7 @@ public class DataCenterUpdateAction {
                             if (e.getCode() != 404)
                                 throw e;
                         }
-                        V1PersistentVolumeClaimSpec v1PersistentVolumeClaimSpec = dataCenterSpec.getDataVolumeClaim();
-                        if (v1PersistentVolumeClaimSpec.getStorageClassName() != null) {
-                            String storageClassName = v1PersistentVolumeClaimSpec.getStorageClassName()
-                                    .replace("{zone}", rackStatus.getName())
-                                    .replace("{index}", Integer.toString(rackStatus.getIndex()));
-                            v1PersistentVolumeClaimSpec.setStorageClassName(storageClassName);
-                            logger.info("sts={}/{} creating new PVC with storageClassName={}",
-                                    statefulSetMetadata.getName(), dataCenterMetadata.getNamespace(), storageClassName);
-                        }
+
                         return Single.just(Arrays.asList(new V1PersistentVolumeClaim()
                                 .metadata(new V1ObjectMeta().name("data-volume"))
                                 .spec(v1PersistentVolumeClaimSpec)));
@@ -2362,6 +2375,10 @@ public class DataCenterUpdateAction {
                     return z;
                 });
             }
+        }
+
+        public Zone get(String zoneName) {
+            return zoneMap.get(zoneName);
         }
 
         public int totalNodes() {

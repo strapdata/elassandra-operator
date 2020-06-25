@@ -1,0 +1,9 @@
+# storageClassName
+nameOverride: "ssd-b"
+
+# Cloud availibility zone
+zone: "europe-west1-b"
+
+# Storage parameters and provisioner
+parameters:
+provisioner:
