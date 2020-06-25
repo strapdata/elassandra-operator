@@ -262,17 +262,4 @@ public class DataCenterSpec {
         ///System.out.println(json+"="+digest);
         return digest;
     }
-
-    public String kibanaFingerprint() {
-        List<Object> acc = new ArrayList<>();
-
-        // we exclude :
-        // * Reaper config
-        // * Kibana config
-        acc.add(kibana);
-        String json = GsonUtils.toJson(acc);
-        String digest = DigestUtils.sha1Hex(json).substring(0,7);
-        return digest;
-    }
-
 }

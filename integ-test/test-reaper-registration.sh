@@ -14,7 +14,7 @@ kubectl get edc elassandra-cl1-dc1 -n $NS -o yaml
 test "$(kubectl get edc elassandra-cl1-dc1 -n $NS -o jsonpath='{.status.reaperPhase}')" == "NONE"
 
 reaper_enable $NS cl1 dc1
-java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --reaper REGISTERED || kubectl logs --tail=1000 -l app=reaper -n $NS
+java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --reaper- || kubectl logs --tail=1000 -l app=reaper -n $NS
 sleep 10
 reaper_disable $NS cl1 dc1
 java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --reaper NONE

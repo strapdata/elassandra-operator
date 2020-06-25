@@ -30,6 +30,8 @@ micronaut:
 #        netty:
 #            log-level: TRACE
     executors:
+        workqueue:
+            type: CACHED
         authority:
             type: FIXED
             number-of-threads: 2
@@ -39,8 +41,6 @@ micronaut:
         tasks:
             type: FIXED
             number-of-threads: 8
-        status:
-            type: WORK_STEALING
     metrics:
         enabled: true
         export:

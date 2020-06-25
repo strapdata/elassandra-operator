@@ -30,7 +30,6 @@ import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenterStatus;
 import com.strapdata.strapkop.model.k8s.datacenter.Operation;
-import com.strapdata.strapkop.model.k8s.datacenter.ReaperPhase;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.plugins.PluginRegistry;
 import com.strapdata.strapkop.plugins.ReaperPlugin;
@@ -138,7 +137,7 @@ public class DataCenterController {
      */
     public Completable updateDatacenter(DataCenter dc, Operation op) throws Exception {
         return reconcile(dc,
-                statefulsetCache.loadIfAbsent(dc)
+                statefulsetCache.load(dc)
                 .flatMap(t -> fetchDataCentersSameClusterAndNamespace(dc))
                 .flatMapCompletable(dcIterable -> context.createBean(DataCenterUpdateAction.class, dc, op)
                         .setSibilingDc(StreamSupport.stream(dcIterable.spliterator(), false)
@@ -159,7 +158,6 @@ public class DataCenterController {
     public Completable deploymentAvailable(DataCenter dc, Operation op, V1Deployment deployment) throws Exception {
         String app = deployment.getMetadata().getLabels().get(OperatorLabels.APP);
         if ("reaper".equals(app)) {
-            dc.getStatus().setReaperPhase(ReaperPhase.RUNNING);
             return reconcile(dc,
                     reaperPlugin.reconcile(context.createBean(DataCenterUpdateAction.class, dc, op))
                             .flatMapCompletable(b -> k8sResourceUtils.updateDataCenterStatus(dc, dc.getStatus()).ignoreElement()));
@@ -205,7 +203,7 @@ public class DataCenterController {
 
     public Completable taskDone(final DataCenter dc, final Task task) throws Exception {
         return reconcile(dc,
-                statefulsetCache.loadIfAbsent(dc)
+                statefulsetCache.load(dc)
                         .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dc,
                                 new Operation()
                                         .withLastTransitionTime(new Date())

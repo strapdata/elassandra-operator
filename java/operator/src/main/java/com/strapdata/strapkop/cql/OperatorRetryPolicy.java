@@ -25,10 +25,10 @@ import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.policies.DefaultRetryPolicy;
 import com.datastax.driver.core.policies.RetryPolicy;
 
-public class StrapkopRetryPolicy implements RetryPolicy {
+public class OperatorRetryPolicy implements RetryPolicy {
 
     private static final RetryPolicy DEFAULT_RETRY = DefaultRetryPolicy.INSTANCE;
-    public static final RetryPolicy INSTANCE = new StrapkopRetryPolicy();
+    public static final RetryPolicy INSTANCE = new OperatorRetryPolicy();
 
     @Override
     public RetryDecision onReadTimeout(Statement statement, ConsistencyLevel cl, int requiredResponses, int receivedResponses, boolean dataRetrieved, int nbRetry) {

@@ -61,7 +61,6 @@ import java.util.stream.Collectors;
 @Singleton
 public class KibanaPlugin extends AbstractPlugin {
 
-    public static final String KIBANA_SPACE_LABEL = "kibana-space";
 
     public KibanaPlugin(final ApplicationContext context,
                         K8sResourceUtils k8sResourceUtils,
@@ -167,7 +166,7 @@ public class KibanaPlugin extends AbstractPlugin {
     public static Map<String, String> kibanaSpaceLabels(DataCenter dataCenter, String kibanaSpaceName) {
         final Map<String, String> labels = new HashMap<>(OperatorLabels.datacenter(dataCenter));
         labels.put(OperatorLabels.APP, "kibana"); // overwrite label app
-        labels.put(KIBANA_SPACE_LABEL, kibanaSpaceName); // overwrite label app
+        labels.put(OperatorLabels.KIBANA_SPACE_LABEL, kibanaSpaceName); // overwrite label app
         return labels;
     }
 
@@ -176,76 +175,81 @@ public class KibanaPlugin extends AbstractPlugin {
         return dataCenter.getSpec().getElasticsearch().getEnabled() && dataCenter.getSpec().getKibana().getEnabled();
     }
 
-
     @Override
     public Single<Boolean> reconcile(DataCenterUpdateAction dataCenterUpdateAction) throws ApiException, StrapkopException {
+        return listDeployments(dataCenterUpdateAction.dataCenter)
+                .flatMap(deployments -> reconcile(dataCenterUpdateAction, deployments));
+    }
+
+
+    public Single<Boolean> reconcile(DataCenterUpdateAction dataCenterUpdateAction, List<V1Deployment> deployments) throws ApiException, StrapkopException {
         final DataCenter dataCenter = dataCenterUpdateAction.dataCenter;
         logger.trace("datacenter={} kibana.spec={}", dataCenter.id(), dataCenter.getSpec().getKibana());
         Set<String> deployedKibanaSpaces = dataCenter.getStatus().getKibanaSpaceNames();
         Map<String, KibanaSpace> desiredKibanaMap = getKibanaSpaces(dataCenter);
 
-        return this.listDeployments(dataCenter)
-                .flatMap(deployments -> {
-                    boolean kibanaEnabled = dataCenter.getSpec().getKibana() != null && dataCenter.getSpec().getKibana().getEnabled();
-                    logger.debug("datacenter={} enabled={} parked={} deployments.size={}",
-                            dataCenter.id(), kibanaEnabled, dataCenter.getSpec().isParked(), deployments.size());
-                    if ((kibanaEnabled == false || desiredKibanaMap.size() == 0 || dataCenter.getSpec().isParked())) {
-                        return delete(dataCenter)
-                                .map(s -> {
-                                    dataCenter.getStatus().setKibanaSpaceNames(new HashSet<>());
-                                    return true;
-                                });
-                    }
+        boolean kibanaEnabled = dataCenter.getSpec().getKibana() != null && dataCenter.getSpec().getKibana().getEnabled();
+        logger.debug("datacenter={} enabled={} parked={} deployments.size={}",
+                dataCenter.id(), kibanaEnabled, dataCenter.getSpec().isParked(), deployments.size());
 
-                    Set<String> deletedSpaces = Sets.difference(deployedKibanaSpaces, desiredKibanaMap.keySet());
-                    Completable deleteCompletable = deletedSpaces.isEmpty() ?
-                            Completable.complete() :
-                            io.reactivex.Observable.fromIterable(deletedSpaces)
-                                    .flatMapCompletable(spaceToDelete -> {
-                                        logger.debug("Deleting kibana space={}", spaceToDelete);
-                                        dataCenterUpdateAction.operation.getActions().add("Deleting kibana space=["+spaceToDelete+"]");
-                                        dataCenter.getStatus().getKibanaSpaceNames().remove(spaceToDelete);
-                                        return deleteSpace(dataCenter, spaceToDelete);
-                                    });
+        if ((kibanaEnabled == false || desiredKibanaMap.size() == 0 || dataCenter.getSpec().isParked())) {
+            return delete(dataCenter)
+                    .map(s -> {
+                        dataCenterUpdateAction.operation.getActions().add("Undeploying kibana");
+                        dataCenter.getStatus().setKibanaSpaceNames(new HashSet<>());
+                        return true;
+                    });
+        }
 
-                    Set<String> newSpaces = Sets.difference(getKibanaSpaces(dataCenter).keySet(), deployedKibanaSpaces);
-                    Completable createCompletable = newSpaces.isEmpty() ?
-                            Completable.complete() :
-                            io.reactivex.Observable.fromIterable(getKibanaSpaces(dataCenter).values()
-                                    .stream()
-                                    .filter(k -> newSpaces.contains(k.name()))
-                                    .collect(Collectors.toList()))
-                                    .flatMapCompletable(kibanaSpace -> {
-                                        logger.debug("Adding kibana space={}", kibanaSpace);
-                                        dataCenterUpdateAction.operation.getActions().add("Adding kibana space=["+kibanaSpace.name()+"]");
-                                        dataCenter.getStatus().getKibanaSpaceNames().add(kibanaSpace.name());
-                                        return createOrReplaceKibanaObjects(dataCenter, kibanaSpace);
-                                    });
+        Set<String> deletedSpaces = Sets.difference(deployedKibanaSpaces, desiredKibanaMap.keySet());
+        Completable deleteCompletable = deletedSpaces.isEmpty() ?
+                Completable.complete() :
+                io.reactivex.Observable.fromIterable(deletedSpaces)
+                        .flatMapCompletable(spaceToDelete -> {
+                            logger.debug("Deleting kibana space={}", spaceToDelete);
+                            dataCenterUpdateAction.operation.getActions().add("Deleting kibana space=["+spaceToDelete+"]");
+                            dataCenter.getStatus().getKibanaSpaceNames().remove(spaceToDelete);
+                            return deleteSpace(dataCenter, spaceToDelete);
+                        });
 
+        Set<String> newSpaces = Sets.difference(getKibanaSpaces(dataCenter).keySet(), deployedKibanaSpaces);
+        Completable createCompletable = newSpaces.isEmpty() ?
+                Completable.complete() :
+                io.reactivex.Observable.fromIterable(getKibanaSpaces(dataCenter).values()
+                        .stream()
+                        .filter(k -> newSpaces.contains(k.name()))
+                        .collect(Collectors.toList()))
+                        .flatMapCompletable(kibanaSpace -> {
+                            logger.debug("Adding kibana space={}", kibanaSpace);
+                            dataCenterUpdateAction.operation.getActions().add("Adding kibana space=["+kibanaSpace.name()+"]");
+                            dataCenter.getStatus().getKibanaSpaceNames().add(kibanaSpace.name());
+                            return createOrReplaceKibanaObjects(dataCenter, kibanaSpace);
+                        });
 
-                    // update kibana deployment spec replicas if needed
-                    for (V1Deployment deployment : deployments) {
-                        String kibanaSpaceName = deployment.getMetadata().getLabels().get(KIBANA_SPACE_LABEL);
-                        KibanaSpace kibanaSpace = desiredKibanaMap.get(kibanaSpaceName);
-                        int replicas = kibanaReplicas(dataCenter, kibanaSpace);
-                        if (kibanaSpaceName != null &&
-                                !newSpaces.contains(kibanaSpaceName) &&
-                                deployment.getSpec().getReplicas() != replicas) {
-                            logger.debug("datacenter={} updating deployment={} replicas={}", dataCenter.id(), deployment.getMetadata().getName(), replicas);
-                            dataCenterUpdateAction.operation.getActions().add("Updating kibana space=["+kibanaSpace.name()+"]");
-                            deployment.getSpec().setReplicas(replicas);
-                            createCompletable = createCompletable.andThen(
-                                    k8sResourceUtils.updateNamespacedDeployment(deployment).ignoreElement()
-                            );
-                        }
-                    }
+        for (V1Deployment deployment : deployments) {
+            String kibanaSpaceName = deployment.getMetadata().getLabels().get(OperatorLabels.KIBANA_SPACE_LABEL);
+            if (kibanaSpaceName == null) {
+                logger.warn("datacenter={} Kibana deployment has no label={}, ignoring", dataCenter.id(), OperatorLabels.KIBANA_SPACE_LABEL);
+                continue;
+            }
 
-                    return deleteCompletable.andThen(createCompletable)
-                            .toSingleDefault(!deletedSpaces.isEmpty() || !newSpaces.isEmpty())
-                            .map(s -> {
-                                dataCenter.getStatus().setKibanaSpaceNames(getKibanaSpaces(dataCenter).keySet());
-                                return s;
-                            });
+            KibanaSpace kibanaSpace = desiredKibanaMap.get(kibanaSpaceName);
+            String kibanaSpaceSpecFingerprint = kibanaSpace.fingerprint(dataCenter.getSpec().getKibana().getImage());
+            String kibanaSpaceFingerprint = deployment.getMetadata().getLabels().get(OperatorLabels.KIBANA_SPACE_FINGERPRINT);
+            int replicas = kibanaReplicas(dataCenter, kibanaSpace);
+            if (!kibanaSpaceSpecFingerprint.equals(kibanaSpaceFingerprint) || deployment.getSpec().getReplicas() != replicas) {
+                logger.debug("datacenter={} updating deployment={} replicas={}", dataCenter.id(), deployment.getMetadata().getName(), replicas);
+                dataCenterUpdateAction.operation.getActions().add("Updating kibana space=["+kibanaSpace.name()+"]");
+                deployment.getSpec().setReplicas(replicas);
+                createCompletable = createCompletable.andThen(createOrReplaceKibanaObjects(dataCenter, kibanaSpace));
+            }
+        }
+
+        return deleteCompletable.andThen(createCompletable)
+                .toSingleDefault(!deletedSpaces.isEmpty() || !newSpaces.isEmpty())
+                .map(s -> {
+                    dataCenter.getStatus().setKibanaSpaceNames(getKibanaSpaces(dataCenter).keySet());
+                    return s;
                 });
     }
 
@@ -267,7 +271,6 @@ public class KibanaPlugin extends AbstractPlugin {
                 k8sResourceUtils.deleteIngress(dataCenter.getMetadata().getNamespace(), null, kibanaSpaceLabelSelector)
         });
     }
-
 
     /**
      * @return The number of kibana pods depending on ReaperStatus
@@ -299,6 +302,7 @@ public class KibanaPlugin extends AbstractPlugin {
         for(Map.Entry<String, String> entry : labels.entrySet())
             meta.putLabelsItem(entry.getKey(), entry.getValue());
         meta.putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, dataCenter.getMetadata().getGeneration().toString());
+        meta.putAnnotationsItem(OperatorLabels.KIBANA_SPACE_FINGERPRINT, kibanaSpace.fingerprint(dataCenter.getSpec().getKibana().getImage()));
 
         final V1Container container = new V1Container();
         final V1PodSpec kibanaSpacePodSpec = (kibanaSpace.getPodTemplate() != null && kibanaSpace.getPodTemplate().getSpec() != null

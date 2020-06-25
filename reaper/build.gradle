@@ -25,5 +25,5 @@ task buildImage(type: DockerBuildImage) {
 
 task pushImage(type: DockerPushImage) {
     dependsOn "buildImage"
-    images = [ reaperImageName ]
+    images = [ registryUrl + (registryUrl.length() > 0 ? "/" : "" ) + reaperImageName ]
 }

@@ -322,7 +322,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                                 .withLocalDc(dc.getSpec().getDatacenterName())
                                 .withUsedHostsPerRemoteDc(0)
                                 .build()))
-                .withRetryPolicy(new LoggingRetryPolicy(StrapkopRetryPolicy.INSTANCE));
+                .withRetryPolicy(new LoggingRetryPolicy(OperatorRetryPolicy.INSTANCE));
 
         if (dc.getSpec().getNetworking().getHostNetworkEnabled() || dc.getSpec().getNetworking().getHostPortEnabled()) {
             // if cluster has public broadcast IPs, the translator retreive internal k8s IP addresses

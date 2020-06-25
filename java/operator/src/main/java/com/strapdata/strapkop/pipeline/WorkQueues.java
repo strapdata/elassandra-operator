@@ -24,7 +24,10 @@ import com.strapdata.strapkop.reconcilier.Reconciliable;
 import io.micrometer.core.instrument.ImmutableTag;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.annotation.Infrastructure;
+import io.micronaut.scheduling.executor.ExecutorFactory;
+import io.micronaut.scheduling.executor.UserExecutorConfiguration;
 import io.reactivex.Completable;
+import io.reactivex.Scheduler;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.schedulers.Schedulers;
 import io.reactivex.subjects.BehaviorSubject;
@@ -32,10 +35,9 @@ import io.reactivex.subjects.Subject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.PostConstruct;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.inject.Singleton;
-import java.math.BigInteger;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -50,13 +52,17 @@ public class WorkQueues {
     private static final Logger logger = LoggerFactory.getLogger(WorkQueues.class);
 
     private final Map<ClusterKey, Subject<Reconciliable>> queues = new ConcurrentHashMap<>();
-    private final Map<ClusterKey, BigInteger> ids = new ConcurrentHashMap<>();
 
     @Inject
     MeterRegistry meterRegistry;
 
-    @PostConstruct
-    public void initGauge() {
+    final Scheduler scheduler;
+
+    public WorkQueues(final MeterRegistry meterRegistry,
+                      final ExecutorFactory executorFactory,
+                      @Named("workqueue") UserExecutorConfiguration userExecutorConfiguration) {
+        this.scheduler = Schedulers.from(executorFactory.executorService(userExecutorConfiguration));
+        this.meterRegistry = meterRegistry;
         meterRegistry.gaugeMapSize("workqueues.size", ImmutableList.of(new ImmutableTag("type", "workqueues")), queues);
     }
 
@@ -67,7 +73,6 @@ public class WorkQueues {
      * @param completable
      */
     public synchronized void submit(final ClusterKey key, String resourceVersion, Reconciliable.Kind kind, K8sWatchEvent.Type type, final Completable completable) {
-
         Reconciliable reconciliable = new Reconciliable()
                 .withKind(kind)
                 .withType(type)
@@ -80,15 +85,13 @@ public class WorkQueues {
     }
 
     private Subject<Reconciliable> createQueue(final ClusterKey key) {
-
         logger.debug("creating workqueue for key {}", key);
-
         final Subject<Reconciliable> queue = BehaviorSubject.<Reconciliable>create()
                 .toSerialized(); // this make the subject thread safe (e.g can call onNext concurrently)
 
-        Disposable disposable = queue.observeOn(Schedulers.io()).subscribeOn(Schedulers.io())
-                // doOnError will be called if an error occurs within the subject (which is unlikely)
-                .doOnError(throwable -> logger.error("error in work queue for cluster " + key.getName(), throwable))
+        Disposable disposable = queue
+                .observeOn(scheduler)
+                .subscribeOn(scheduler)
                 .subscribe(reconciliable -> {
                             logger.debug("--- cluster={} resourceVersion={} kind={} type={}", key, reconciliable.getResourceVersion(), reconciliable.getKind(), reconciliable.getType());
                             reconciliable.setStartTime(System.currentTimeMillis());
@@ -102,7 +105,9 @@ public class WorkQueues {
                             } else {
                                 logger.warn("--- cluster=" + key + " reconciliable=" + reconciliable + " error:", e);
                             }
-                        });
+                        },
+                        throwable -> logger.error("error in work queue for cluster=" + key +":", throwable)
+                );
         return queue;
     }
 
@@ -112,7 +117,6 @@ public class WorkQueues {
      * @param key
      */
     public void dispose(final ClusterKey key) {
-        ids.remove(key);
         final Subject<Reconciliable> queue = queues.remove(key);
         if (queue != null) {
             queue.onComplete();

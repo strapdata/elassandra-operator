@@ -162,12 +162,9 @@ public class DataCenterStatus {
     @SerializedName("kibanaSpaceNames")
     private Set<String> kibanaSpaceNames = new HashSet<>();
 
-    /**
-     * Cassandra reaper status
-     */
-    @JsonPropertyDescription("Cassandra reaper phase")
-    @SerializedName("reaperPhase")
-    private ReaperPhase reaperPhase = ReaperPhase.NONE;
+    @JsonPropertyDescription("Cassandra reaper registred")
+    @SerializedName("reaperRegistred")
+    private Boolean reaperRegistred = false;
 
     public Health health() {
         if (DataCenterPhase.PARKED.equals(this.phase))

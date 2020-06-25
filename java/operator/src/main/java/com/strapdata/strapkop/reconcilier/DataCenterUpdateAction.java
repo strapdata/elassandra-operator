@@ -23,7 +23,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.net.InetAddresses;
 import com.strapdata.cassandra.k8s.ElassandraOperatorSeedProvider;
 import com.strapdata.strapkop.OperatorConfig;
-import com.strapdata.strapkop.utils.BackupScheduler;
 import com.strapdata.strapkop.cache.DataCenterStatusCache;
 import com.strapdata.strapkop.cache.NodeCache;
 import com.strapdata.strapkop.cache.ServiceAccountCache;
@@ -46,6 +45,7 @@ import com.strapdata.strapkop.plugins.PluginRegistry;
 import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import com.strapdata.strapkop.ssl.utils.X509CertificateAndPrivateKey;
+import com.strapdata.strapkop.utils.BackupScheduler;
 import com.strapdata.strapkop.utils.QuantityConverter;
 import io.kubernetes.client.custom.IntOrString;
 import io.kubernetes.client.custom.Quantity;
@@ -205,7 +205,6 @@ public class DataCenterUpdateAction {
     // sibiling DC are DC in the same cluster, same namespace
     public DataCenterUpdateAction setSibilingDc(List<String> sibilingDcs) {
         this.sibilingDcs = sibilingDcs;
-        logger.debug("sibilingDcs={}", sibilingDcs);
         return this;
     }
 
@@ -362,7 +361,7 @@ public class DataCenterUpdateAction {
                     .withDesiredReplicas(sts.getSpec().getReplicas());
         });
         rackStatus.setReadyReplicas(ObjectUtils.defaultIfNull(sts.getStatus().getReadyReplicas(), 0));
-        rackStatus.setProgressState(statefulSetUpToDate(sts) ? ProgressState.RUNNING : ProgressState.UPDATING);
+        rackStatus.setProgressState(statefulSetIsUpToDate(sts) ? ProgressState.RUNNING : ProgressState.UPDATING);
         rackStatus.setHealth(rackStatus.health());
 
         // update the DC total ready repliacs
@@ -376,7 +375,7 @@ public class DataCenterUpdateAction {
         return nextAction(true);
     }
 
-    public boolean statefulSetReady(V1StatefulSet sts) {
+    public boolean statefulSetIsReady(V1StatefulSet sts) {
         V1StatefulSetStatus stsStatus = sts.getStatus();
         int replicas = ObjectUtils.defaultIfNull(stsStatus.getReplicas(), 0);
         int readyReplicas = ObjectUtils.defaultIfNull(stsStatus.getReadyReplicas(), 0);
@@ -387,7 +386,7 @@ public class DataCenterUpdateAction {
         return false;
     }
 
-    public boolean statefulSetUpToDate(V1StatefulSet sts) {
+    public boolean statefulSetIsUpToDate(V1StatefulSet sts) {
         V1StatefulSetStatus stsStatus = sts.getStatus();
         int replicas = ObjectUtils.defaultIfNull(stsStatus.getReplicas(), 0);
         int updatedReplicas = ObjectUtils.defaultIfNull(stsStatus.getUpdatedReplicas(), replicas);
@@ -410,6 +409,7 @@ public class DataCenterUpdateAction {
         dataCenterStatus.setLastErrorTime(new Date());
         return nextAction(true);
     }
+
 
     public Completable nextAction(final boolean updateStatus) throws Exception {
         if (dataCenterSpec.isParked() && !(DataCenterPhase.PARKED.equals(dataCenterStatus.getPhase())))
@@ -436,7 +436,7 @@ public class DataCenterUpdateAction {
                     boolean allStsReady = true;
                     for(RackStatus rackStatus : dataCenterStatus.getRackStatuses().values()) {
                         V1StatefulSet v1StatefulSet = statefulSetTreeMap.get(rackStatus.getName());
-                        if (ProgressState.UPDATING.equals(rackStatus.getProgressState()) || !statefulSetReady(v1StatefulSet)) {
+                        if (ProgressState.UPDATING.equals(rackStatus.getProgressState()) || !statefulSetIsReady(v1StatefulSet)) {
                             allStsReady = false;
                             break;
                         }
@@ -501,7 +501,7 @@ public class DataCenterUpdateAction {
                     // check if all racks STS are ready, otherwise wait next reconciliation
                     for(RackStatus rackStatus : dataCenterStatus.getRackStatuses().values()) {
                         V1StatefulSet v1StatefulSet = statefulSetTreeMap.get(rackStatus.getName());
-                        if (!statefulSetReady(v1StatefulSet)) {
+                        if (!statefulSetIsReady(v1StatefulSet)) {
                             logger.debug("v1StatefulSet={}/{} not ready, waiting", v1StatefulSet.getMetadata().getName(), v1StatefulSet.getMetadata().getNamespace());
                             endOperation("noop, wait for pods ready in rack index=" + rackStatus.getIndex() + " name=" + rackStatus.getName());
                             return k8sResourceUtils.updateDataCenterStatus(dataCenter, dataCenterStatus).ignoreElement();

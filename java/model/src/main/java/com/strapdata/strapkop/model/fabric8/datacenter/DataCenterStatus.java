@@ -55,5 +55,5 @@ public class DataCenterStatus implements KubernetesResource {
     Map<String, RackStatus> rackStatuses;
     KeyspaceManagerStatus keyspaceManagerStatus;
     Set<String> kibanaSpaceNames;
-    ReaperPhase reaperPhase;
+    Boolean reaperRegistred;
 }

@@ -61,4 +61,5 @@ public class Kibana {
     @SerializedName("spaces")
     @Expose
     private List<KibanaSpace> spaces = new ArrayList<>();
+
 }
