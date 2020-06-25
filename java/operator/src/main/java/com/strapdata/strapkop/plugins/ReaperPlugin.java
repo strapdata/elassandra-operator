@@ -652,7 +652,7 @@ public class ReaperPlugin extends AbstractPlugin {
                 .observeOn(registrationScheduler)
                 .subscribeOn(registrationScheduler)
                 .flatMapCompletable(password -> {
-                    List<SingleSource> todoList = new ArrayList<>();
+                    List<CompletableSource> todoList = new ArrayList<>();
                     Map<String, ReaperScheduledRepair> scheduledRepairMap = new HashMap<>();
                     // repair system + elastic_admin_xxx + managed keyspaces
                     for (CqlKeyspace cqlKeyspace : this.cqlKeyspaceManager.get(dc).values()) {
@@ -668,7 +668,7 @@ public class ReaperPlugin extends AbstractPlugin {
                     }
                     logger.debug("Submit scheduledRepair={}", scheduledRepairMap.values());
                     for (ReaperScheduledRepair reaperScheduledRepair : scheduledRepairMap.values()) {
-                        todoList.add(reaperClient.registerScheduledRepair("admin", password, reaperScheduledRepair));
+                        todoList.add(reaperClient.registerScheduledRepair("admin", password, reaperScheduledRepair).ignoreElement());
                     }
                     return Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()]));
                 })

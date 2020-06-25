@@ -43,7 +43,7 @@ subprojects {
     implementation group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: "${jacksonVersion}"
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: "${jacksonVersion}"
 
-    implementation(group: 'com.datastax.cassandra', name: 'cassandra-driver-core', version: '3.7.1') {
+    implementation(group: 'com.datastax.cassandra', name: 'cassandra-driver-core', version: '3.7.2') {
       exclude group: 'com.google.guava', module: 'guava'
     }
 

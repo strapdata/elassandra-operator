@@ -265,18 +265,26 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
 
                         // reconnect with strapkop and close root session
                         CqlRole strakopRole = get(dc, CqlRole.STRAPKOP_ROLE.username);
-                        try {
-                            Tuple2<Cluster, Session> strapkopConnection = connect(dc, dcStatus, Optional.of(strakopRole)).blockingGet();
+                        if (strakopRole.isReconcilied()) {
                             try {
-                                logger.debug("Closing root session cluster={}", rootClusterSession._1.getClusterName());
+                                currentSession.close();
                                 rootClusterSession._1.close();
-                            } catch(Exception e) {
-                                logger.warn("datacenter="+dc.id()+" Failed to close root session:" + e.getMessage(), e);
+                            } catch (Exception e) {
+                                logger.error("datacenter=" + dc.id() + " Error closing root session", e);
                             }
-                            return strapkopConnection;
-                        } catch(AuthenticationException e) {
-                        } catch(Exception e) {
-                            logger.error("datacenter="+dc.id()+" Failed to reconnect with the operator role="+strakopRole+" :"+e.getMessage(), e);
+                            try {
+                                Tuple2<Cluster, Session> strapkopConnection = connect(dc, dcStatus, Optional.of(strakopRole)).blockingGet();
+                                try {
+                                    logger.debug("Closing root session cluster={}", rootClusterSession._1.getClusterName());
+                                    rootClusterSession._1.close();
+                                } catch (Exception e) {
+                                    logger.warn("datacenter=" + dc.id() + " Failed to close root session:" + e.getMessage(), e);
+                                }
+                                return strapkopConnection;
+                            } catch (AuthenticationException e) {
+                            } catch (Exception e) {
+                                logger.error("datacenter=" + dc.id() + " Failed to reconnect with the operator role=" + strakopRole + " :" + e.getMessage(), e);
+                            }
                         }
                     }
                     return rootClusterSession;

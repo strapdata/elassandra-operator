@@ -59,7 +59,7 @@ public class Pod {
     public Integer getRackIndex() { return Integer.parseInt(extractLabel(this.pod, OperatorLabels.RACKINDEX)); }
 
     public String id() {
-        return pod.getMetadata().getName() + pod.getMetadata().getNamespace();
+        return pod.getMetadata().getName() + "/" + pod.getMetadata().getNamespace();
     }
 
     public String getElassandraDatacenter() {
