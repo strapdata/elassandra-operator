@@ -403,11 +403,13 @@ public class DataCenterUpdateAction {
         return nextAction(false);
     }
 
+    // do nothing...
     public Completable unschedulablePod(Pod pod) throws Exception {
         logger.debug("########## datacenter={} unschedulable pod={}", dataCenter.id(), pod.id());
-        dataCenterStatus.setLastError("Unschedulable pod=" + pod.getName());
-        dataCenterStatus.setLastErrorTime(new Date());
-        return nextAction(true);
+        //dataCenterStatus.setLastError("Unschedulable pod=" + pod.getName());
+        //dataCenterStatus.setLastErrorTime(new Date());
+        return Completable.complete();
+        //return nextAction(true);
     }
 
 
@@ -483,12 +485,12 @@ public class DataCenterUpdateAction {
                     int totalReplicas = dataCenterStatus.getRackStatuses().values().stream()
                             .map(r -> r.getDesiredReplicas())
                             .reduce(0, (a, b) -> a + b);
-                    if (totalReplicas < dataCenter.getSpec().getReplicas())
+                    if (totalReplicas < dataCenter.getSpec().getReplicas() && Health.GREEN.equals(dataCenterStatus.health()))
                         return scaleUpDatacenter(configMapVolumeMounts);
 
                     // check if need to scale down (require a CQL connection to reduce some RF)
                     final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
-                    if (totalReplicas > dataCenter.getSpec().getReplicas())
+                    if (totalReplicas > dataCenter.getSpec().getReplicas() && Health.GREEN.equals(dataCenterStatus.health()))
                         return scaleDownDatacenter(configMapVolumeMounts, cqlSessionHandler)
                                 .doFinally(() -> cqlSessionHandler.close());
 
@@ -1963,35 +1965,6 @@ public class DataCenterUpdateAction {
             }
 
             return k8sResourceUtils.createOrReplaceNamespacedStatefulSet(new V1StatefulSet().metadata(statefulSetMetadata).spec(statefulSetSpec));
-        }
-
-        /**
-         * Create the list of PersistenceVolumeClaims according to the DataCenterSpec if the StatefulSet doesn't exists, otherwise
-         * the PersistenceVolumeClaims of the StatefulSet are preserved to avoid data lost.
-         *
-         * @param statefulSetMetadata
-         * @return
-         * @throws ApiException
-         */
-        private Single<List<V1PersistentVolumeClaim>> getPersistentVolumeClaims(V1ObjectMeta statefulSetMetadata, RackStatus rackStatus) throws Exception {
-            // if the Statefulset already exists, do not override the VolumeClaims
-            return k8sResourceUtils.readNamespacedStatefulSet(dataCenterMetadata.getNamespace(), statefulSetMetadata.getName())
-                    .map(sts -> {
-                        logger.debug("sts={}/{} re-use PVC with templates={}",
-                                statefulSetMetadata.getName(), dataCenterMetadata.getNamespace(), sts.getSpec().getVolumeClaimTemplates());
-                        return sts.getSpec().getVolumeClaimTemplates();
-                    })
-                    .onErrorResumeNext(t -> {
-                        if (t instanceof ApiException) {
-                            ApiException e = (ApiException)t;
-                            if (e.getCode() != 404)
-                                throw e;
-                        }
-
-                        return Single.just(Arrays.asList(new V1PersistentVolumeClaim()
-                                .metadata(new V1ObjectMeta().name("data-volume"))
-                                .spec(v1PersistentVolumeClaimSpec)));
-                    });
         }
 
         private V1Container buildElassandraContainer(RackStatus rack) {

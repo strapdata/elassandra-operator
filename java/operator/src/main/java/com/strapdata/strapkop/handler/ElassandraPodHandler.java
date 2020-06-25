@@ -18,10 +18,8 @@
 package com.strapdata.strapkop.handler;
 
 import com.google.common.collect.ImmutableList;
-import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.cache.PodCache;
 import com.strapdata.strapkop.event.K8sWatchEvent;
-import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.Pod;
 import com.strapdata.strapkop.model.ClusterKey;
 import com.strapdata.strapkop.model.Key;
@@ -70,13 +68,7 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
     DataCenterController dataCenterController;
 
     @Inject
-    DataCenterCache dataCenterCache;
-
-    @Inject
     PodCache podCache;
-
-    @Inject
-    K8sResourceUtils k8sResourceUtils;
 
     @Inject
     MeterRegistry meterRegistry;
@@ -128,13 +120,11 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
                                 .findFirst();
 
                         V1Pod pod = event.getResource();
-                        String parent = Pod.extractLabel(pod, OperatorLabels.PARENT);
                         String clusterName = Pod.extractLabel(pod, OperatorLabels.CLUSTER);
-                        String datacenterName = Pod.extractLabel(pod, OperatorLabels.DATACENTER);
                         String podName = pod.getMetadata().getName();
                         String namespace = pod.getMetadata().getNamespace();
 
-                        ClusterKey clusterKey = new ClusterKey(clusterName, datacenterName);
+                        ClusterKey clusterKey = new ClusterKey(clusterName, namespace);
                         logger.debug("Pending pod={}/{} conditions={}", podName, namespace, conditions);
                         if (scheduleFailed.isPresent()) {
                             meterRegistry.counter("k8s.pod.unschedulable", tags).increment();

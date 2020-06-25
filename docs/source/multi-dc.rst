@@ -64,6 +64,7 @@ As the result, you should have kubernetes nodes properly labeled with zone and p
     aks-nodepool1-32762597-vmss000001   Ready    agent   2m32s   v1.15.11   10.240.0.35   <none>        Ubuntu 16.04.6 LTS   4.15.0-1083-azure   docker://3.0.10+azure   northeurope-2   40.113.33.9
     aks-nodepool1-32762597-vmss000002   Ready    agent   2m29s   v1.15.11   10.240.0.66   <none>        Ubuntu 16.04.6 LTS   4.15.0-1083-azure   docker://3.0.10+azure   northeurope-3   20.54.80.104
 
+
 StorageClass definition
 .......................
 

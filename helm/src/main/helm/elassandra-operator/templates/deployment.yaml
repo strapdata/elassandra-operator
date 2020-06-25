@@ -88,6 +88,8 @@ spec:
             value: {{ default "true" .Values.prometheusEnabled | quote }}
           - name: OPERATOR_TASKS_RETENTION
             value: {{ default "7D" .Values.taskRetention | quote }}
+          - name: ADDRESS_TRANSLATOR_DNS_DOMAIN
+            value: {{ default "internal.strapdata.com" .Values.translatorDnsDomain | quote }}
           - name: OPERATOR_NAMESPACE
             valueFrom:
               fieldRef:
