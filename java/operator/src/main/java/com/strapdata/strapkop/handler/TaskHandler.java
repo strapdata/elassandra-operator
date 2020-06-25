@@ -157,7 +157,10 @@ public class TaskHandler extends TerminalHandler<K8sWatchEvent<Task>> {
             );
             Completable completable = taskReconcilierResolver.getTaskReconcilier(task).reconcile(task);
             // keep a task ref to cancel it on delete
-            completable.doFinally(() -> notTerminatedTasks.remove(key));
+            completable.doFinally(() -> {
+                notTerminatedTasks.remove(key);
+                managed.decrementAndGet();
+            });
             notTerminatedTasks.put(key, completable.subscribe());
             workQueues.submit(clusterKey, task.getMetadata().getResourceVersion(), Reconciliable.Kind.TASK, eventType, completable);
         } else {

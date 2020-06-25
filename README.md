@@ -3,8 +3,8 @@
 
 # Elassandra Operator [![Build Status](https://travis-ci.com/strapdata/strapkop.svg?token=PzEdBQpdXSgcm2zGdxUn&branch=master)](https://travis-ci.com/strapdata/strapkop) [![Twitter](https://img.shields.io/twitter/follow/strapdataio?style=social)](https://twitter.com/strapdataio)
 
-The Elassandra Kubernetes Operator automate the deployment and management of [Elassandra](https://github.com/strapdata/elassandra) datacenters 
-in one or multiple Kubernetes clusters. 
+The Elassandra Kubernetes Operator automate the deployment and management of [Elassandra](https://github.com/strapdata/elassandra) 
+datacenters in multiple Kubernetes clusters.
 
 ## Features
 
@@ -15,7 +15,7 @@ Elassandra Operator features:
 * Manage rolling configuration changes, rolling upgrade/downgrade of Elassandra, scale up/down Elassandra datacenters.
 * Deploy [Cassandra Reaper](http://cassandra-reaper.io/) to run continuous Cassandra repairs.
 * Deploy multiple [Kibana](<https://www.elastic.co/fr/products/kibana>) instances with a dedicated Elasticserach index in Elassandra.
-* Park/Unpark Elassandra datacenters (and associated Kibana and Cassandra reaper instances).
+* Park/Unpark Elassandra datacenters (and associated Kibana and Cassandra Reaper instances).
 * Expose Elassandra metrics for the [Prometheus Operator](https://prometheus.io/docs/prometheus/latest/querying/operators/).
 * Publish public DNS names allowing Elassandra nodes to be reachable from the internet (Cassandra CQL and Elasticsearch REST API).
 * Automatically generates SSL/TLS certificates and strong passwords stored as Kubernetes secrets.
@@ -43,9 +43,12 @@ Build parameters are located in `gradle.properties`.
 ## Support
 
  * Commercial support is available through [Strapdata](http://www.strapdata.com/).
- * Community support available via [elassandra google groups](https://groups.google.com/forum/#!forum/elassandra).
+ * Community support available via [Elassandra Google Groups](https://groups.google.com/forum/#!forum/elassandra).
  * Post feature requests and bugs on https://github.com/strapdata/elassandra-operator/issues
- 
+
+## Contribute
+
+
 ## License
 
 Copyright (C) 2020 Strapdata SAS (support@strapdata.com)

@@ -71,7 +71,7 @@ public class DataCenterHandler extends TerminalHandler<K8sWatchEvent<DataCenter>
             if (v == null)
                 v = dataCenter.getStatus();
             return v;
-        })); // overwrite the watched dc status by the one we have updated more recently.
+        })); // overwrite the watched dc status by the one we have updated the more recently.
     }
 
     @Override

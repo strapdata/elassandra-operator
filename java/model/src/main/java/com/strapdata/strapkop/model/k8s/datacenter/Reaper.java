@@ -22,7 +22,6 @@ import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 import com.strapdata.strapkop.model.GsonUtils;
 import io.kubernetes.client.openapi.models.V1PodTemplateSpec;
-import io.kubernetes.client.openapi.models.V1ResourceRequirements;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -48,16 +47,7 @@ public class Reaper {
     @JsonPropertyDescription("reaper docker image")
     @SerializedName("image")
     @Expose
-    private String image  = "strapdata/cassandra-reaper:2.1.0";
-
-    /**
-     * Resource requirements for the reaper container.
-     *
-     */
-    @JsonPropertyDescription("Resource requirements for reaper pod")
-    @SerializedName("resources")
-    @Expose
-    private V1ResourceRequirements resources = null;
+    private String image  = "strapdata/cassandra-reaper:2.1.0-SNAPSHOT-strapkop";
 
     /**
      * PodTemplate provides pod customisation (labels, resource, annotations, affinity rules, resource, priorityClassName, serviceAccountName) for the reaper pods
@@ -120,7 +110,13 @@ public class Reaper {
         // * Kibana config
         // * parked attribute
         // * scheduledBackups (DC reconciliation is useless in this case, we only want to update Scheduler)
-        acc.add(this);
+        acc.add(image);
+        acc.add(podTemplate);
+        acc.add(loggingLevel);
+        acc.add(ingressHost);
+        acc.add(ingressAdminHost);
+        acc.add(ingressAnnotations);
+
         String json = GsonUtils.toJson(acc);
         String digest = DigestUtils.sha1Hex(json).substring(0,7);
         return digest;

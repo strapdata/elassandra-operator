@@ -23,8 +23,10 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
+import com.strapdata.strapkop.model.GsonUtils;
 import io.kubernetes.client.openapi.models.V1PodTemplateSpec;
 import lombok.*;
+import org.apache.commons.codec.digest.DigestUtils;
 
 import java.util.*;
 
@@ -143,5 +145,19 @@ public class KibanaSpace {
                     String.format(Locale.ROOT, "INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','cluster:monitor/.*','.*')", role()),
                     String.format(Locale.ROOT, "INSERT INTO elastic_admin.privileges (role,actions,indices) VALUES ('%s','indices:.*','.*')", role()))
                 : statements;
+    }
+
+    @JsonIgnore
+    public String fingerprint(String image) {
+        List<Object> acc = new ArrayList<>();
+
+        acc.add(image);
+        acc.add(ingressAnnotations);
+        acc.add(ingressSuffix);
+        acc.add(podTemplate);
+
+        String json = GsonUtils.toJson(acc);
+        String digest = DigestUtils.sha1Hex(json).substring(0,7);
+        return digest;
     }
 }

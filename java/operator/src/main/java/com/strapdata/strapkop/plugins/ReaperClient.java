@@ -25,10 +25,10 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.client.RxHttpClient;
-import io.reactivex.Completable;
 import io.reactivex.Scheduler;
 import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
+import io.vavr.Tuple2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -93,7 +93,7 @@ public class ReaperClient implements Closeable {
     }
 
     // TODO: kibana keyspace may have not tables at the time of the registration, causing a reaper error
-    public Completable registerScheduledRepair(String username, String password, ReaperScheduledRepair reaperScheduledRepair) throws UnsupportedEncodingException {
+    public Single<Tuple2<ReaperScheduledRepair,Boolean>> registerScheduledRepair(String username, String password, ReaperScheduledRepair reaperScheduledRepair) throws UnsupportedEncodingException {
         String url = "/repair_schedule?clusterName="+ URLEncoder.encode(dataCenter.getSpec().getClusterName(), "UTF-8") +
                 ("&keyspace=" + URLEncoder.encode(reaperScheduledRepair.getKeyspace(), "UTF-8")) +
                 ("&owner=" + URLEncoder.encode(reaperScheduledRepair.getOwner() == null ? "elassandra-operator" : reaperScheduledRepair.getOwner(), "UTF-8")) +
@@ -115,9 +115,8 @@ public class ReaperClient implements Closeable {
                         .singleOrError()
                         .map(res -> {
                             logger.debug("datacenter={} reaperScheduledRepair={} rc={}", dataCenter.id(), reaperScheduledRepair, res.getStatus().getCode());
-                            return res.getStatus().getCode() == 200;
-                        }))
-                .ignoreElement();
+                            return new Tuple2<>(reaperScheduledRepair, res.getStatus().getCode() == 200);
+                        }));
     }
 
     /**

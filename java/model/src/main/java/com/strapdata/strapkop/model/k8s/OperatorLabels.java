@@ -57,6 +57,11 @@ public final class OperatorLabels {
     public static final String DATACENTER_GENERATION = labelPrefix + "datacenter-generation";
     public static final String DATACENTER_FINGERPRINT = labelPrefix + "datacenter-fingerprint";
 
+    public static final String REAPER_FINGERPRINT = labelPrefix + "reaper-fingerprint";
+
+    public static final String KIBANA_SPACE_FINGERPRINT = labelPrefix + "kibana-space-fingerprint";
+    public static final String KIBANA_SPACE_LABEL = labelPrefix + "kibana-space";
+
     public static final String MANAGED_BY = "app.kubernetes.io/managed-by";
     public static final String ELASSANDRA_APP = "elassandra";
     public static final String ELASSANDRA_OPERATOR = "elassandra-operator";
