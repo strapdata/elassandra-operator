@@ -60,8 +60,8 @@ Here is the datacenter spec to configure Cassandra reaper deployment:
 
 .. jsonschema:: datacenter-spec.json#/properties/reaper
 
-The Elassandra operator deploys one Cassandra Reaper instance per datacenter
-(see `Operating Multiple DCs using Multiple Reaper http://cassandra-reaper.io/docs/usage/multi_dc_distributed/>`_),
+The Elassandra Operator deploys one Cassandra Reaper instance per datacenter
+(see `Operating Multiple DCs using Multiple Reaper <http://cassandra-reaper.io/docs/usage/multi_dc_distributed/>`_),
 with datacenterAvailability=EACH, JMX connections to local nodes only.
 
 You can enable/disable the Cassandra Reaper deployment by updating the Elassandra datacenter spec as show in
@@ -88,14 +88,14 @@ installed for Cassandra Reaper.
 
 This **KubernetesDnsAddressTranslator** works in two ways:
 
-* If the env variable ``ADDRESS_TRANSLATOR_DNS_DOMAIN` is defined, the **KubernetesDnsAddressTranslator** convert the public address X.X.X.X
-  to the DNS name X-X-X-X.$ADDRESS_TRANSLATOR_DNS_DOMAIN and try to resolv that name to the internal node IP address.
+* If the env variable ``ADDRESS_TRANSLATOR_DNS_DOMAIN`` is defined, the **KubernetesDnsAddressTranslator** convert the public address X.X.X.X
+  to the DNS name X-X-X-X.$ADDRESS_TRANSLATOR_DNS_DOMAIN and try to resolve it to get the internal node IP address.
 * If the ``ADDRESS_TRANSLATOR_DNS_DOMAIN`` is not defined or the resolution failed, the KubernetesDnsAddressTranslator try to
   revers lookup the public IP to get the internal Kubernetes node name. Then it resolves the Kubernetes node name to its internal IP address.
 
 To achieve this behavior, you may need to deploy `CoreDNS <https://coredns.io/>`_ in your Kubernetes cluster,
 with the `hosts plugin <https://coredns.io/plugins/hosts/>`_
-properly configured to reverse lookup public IP addresses of Kubernetes nodes.
+properly configured to reverse lookup public IP addresses of Kubernetes nodes internal IP addresses.
 
 Kibana visualisation
 ====================
@@ -106,7 +106,7 @@ secured Kibana instances pointing to your Elassandra datacenter nodes.
 .. image:: ./images/kibana-cluster-state.png
 
 When Elasticsearch HTTPS is enabled in your Elassandra datacenter, Kibana is automatically configured to connect
-through HTTPS and trust the Elassandra datacenter root CA. Moreover, for each kibana space, the Elassandra-Operator
+through HTTPS and trust the Elassandra datacenter root CA. Moreover, for each Kibana space, the Elassandra-Operator
 creates a dedicated Cassandra role and a dedicated managed keyspace storing the kibana configuration.
 Thus, you can run separated kibana instances dedicated to specific usages or specific users.
 
@@ -121,13 +121,13 @@ the following example:
 
     helm upgrade --reuse-values --set kibana.enabled=true default-cl1-dc1 strapdata/elassandra-datacenter
 
-You can adjust Kibana memory by adding the following podTemplate to set environment variables:
+You can also adjust Kibana memory by adding the following podTemplate to set environment variables or customize resources:
 
 .. code::
 
     kibana:
       spaces:
-      - name: ""
+      - name: "default"
         podTemplate:
           spec:
             containers:

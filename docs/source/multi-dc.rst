@@ -23,7 +23,9 @@ In order to create your Azure Kubernetes cluster, see the `Azure Quickstart <htt
     az extension update --name aks-preview
     az feature register --name NodePublicIPPreview --namespace Microsoft.ContainerService
 
-Create an AKS cluster with the azure network plugin and a VirtualMachineScaleSets nodepool that assigns a public IP address to each virtual machine:
+Create a regional AKS cluster with the Azure network plugin and a default nodepool based
+on a `VirtualMachineScaleSets <https://docs.microsoft.com/en-us/rest/api/compute/virtualmachinescalesets>`_ that assigns
+a public IP address to each virtual machine:
 
 .. code::
 
@@ -65,8 +67,8 @@ As the result, you should have kubernetes nodes properly labeled with zone and p
     aks-nodepool1-32762597-vmss000002   Ready    agent   2m29s   v1.15.11   10.240.0.66   <none>        Ubuntu 16.04.6 LTS   4.15.0-1083-azure   docker://3.0.10+azure   northeurope-3   20.54.80.104
 
 
-StorageClass definition
-.......................
+AKS StorageClass
+................
 
 Azure persistent volumes are bound to an availability zone, so we need to defined one storageClass per zone in our Kubernetes cluster,
 and each Elassandra rack or statefulSet will be bound to the corresponding storageClass.
@@ -85,8 +87,8 @@ This is done here using the HELM chart strapdata/storageclass.
             $HELM_REPO/storageclass
     done
 
-Firewall rules
-..............
+AKS Firewall rules
+..................
 
 Finally, you may need to authorize inbound Elassandra connections on the following TCP ports:
 
@@ -118,7 +120,7 @@ Your Kubernetes cluster is now ready to deploy an Elassandra datacenter accessib
 GKE
 ___
 
-Create a `Regional Kubernetes cluster<https://cloud.google.com/kubernetes-engine/docs/how-to/creating-a-regional-cluster>_ on GCP:
+Create a `Regional Kubernetes cluster <https://cloud.google.com/kubernetes-engine/docs/how-to/creating-a-regional-cluster>`_ on GCP:
 
 .. code::
 
@@ -141,9 +143,9 @@ Enable RBAC:
 CoreDNS installation
 ....................
 
-GKE is provided with KubeDns by default, which does not allows to configure host aliases required to run Cassandra Reaper with an AddressTranslator.
-So we need to install CoreDNS configured to import custom configuration (see `CoreDNS import plugin <https://coredns.io/plugins/import/>_),
-and configure kube-DNS stub domains to forward to CoreDNS.
+GKE is provided with KubeDNS by default, which does not allows to configure host aliases required to run Cassandra Reaper with an AddressTranslator.
+So we need to install CoreDNS configured to import custom configuration (see `CoreDNS import plugin <https://coredns.io/plugins/import/>`_),
+and configure KubeDNS stub domains to forward to CoreDNS.
 
 .. code::
 
@@ -392,8 +394,8 @@ The **internal.strapdata.com** is just a dummy DNS domain used to resolv public 
     kubectl patch configmap/kube-dns -n kube-system -p "{\"data\": {\"stubDomains\": \"$KUBEDNS_STUB_DOMAINS\"}}"
     kubectl delete pod -l k8s-app=coredns -n kube-system
 
-StorageClass definition
-.......................
+GKE StorageClass
+................
 
 Google cloud persistent volumes are bound to an availability zone, so we need to defined one storageClass per zone in our Kubernetes cluster,
 and each Elassandra rack or statefulSet will be bound to the corresponding storageClass.
@@ -405,8 +407,8 @@ This is done here using the HELM chart strapdata/storageclass.
     helm install --name ssd-europe-west1-c --namespace kube-system --set zone=europe-west1-c,nameOverride=ssd-europe-west1-c strapdata/storageclass
     helm install --name ssd-europe-west1-d --namespace kube-system --set zone=europe-west1-d,nameOverride=ssd-europe-west1-d strapdata/storageclass
 
-Firewall rules
-..............
+GKE Firewall rules
+..................
 
 Finally, you may need to authorize inbound Elassandra connections on the following TCP ports:
 
@@ -429,7 +431,7 @@ and Kubernetes nodes are properly tagged:
       --direction INGRESS
 
 Webhook in GKE private cluster
-.............................
+..............................
 
 When Google configure the control plane for **private clusters**, they automatically configure VPC peering between your
 Kubernetes cluster’s network and a separate Google managed project. In order to restrict what Google are able to access within your cluster,
@@ -463,7 +465,7 @@ Deploy operators
 ----------------
 
 ExternalDNS
------------
+___________
 
 The `ExternalDNS <https://github.com/kubernetes-sigs/external-dns>`_ is used to automatically update your DNS zone and
 create an A record for the Cassandra broadcast IP addresses. You can use it with a public or a private DNS zone.
@@ -491,7 +493,7 @@ Key points:
   clusters using the same DNS zone.
 
 CoreDNS
--------
+_______
 
 The Kubernetes CoreDNS is used for two reasons:
 
@@ -547,9 +549,9 @@ On GKE:
 .. _traefik-setup:
 
 Traefik
--------
+_______
 
-Deploy a Traefik ingress controller in order to access to web user interface of the following components:
+Deploy a Traefik ingress controller in order to access to web user interfaces for the following components:
 
 * Cassandra Reaper
 * Kibana
@@ -567,21 +569,17 @@ Here is simple Traefik deployment where TRAEFIK_FQDN=traefik-kube1.$DNS_DOMAIN:
         --set service.annotations."external-dns\.alpha\.kubernetes\.io/hostname"="*.${TRAEFIK_FQDN}" \
         stable/traefik
 
-The externalDns annotation automatically publish the public IP of the traefik ingress controller in our DNS zone.
+The externalDns annotation automatically publish the public IP of the Traefik ingress controller in our DNS zone.
 To avoid conflict between Kubernetes cluster using the same DNS zone, the TRAEFIK_FQDN variable must
 be the unique traefik FQDN in our DNS zone (example: traefik-kube1.my.domain.com)
 
 .. warning::
 
-    Of course, this traefik setup is not secure, an it's up to you to setup encryption and restrict access to those resources.
-
-Prometheus operator
--------------------
+    Of course, this Traefik setup is not secure, an it's up to you to setup encryption and restrict access to those resources.
 
 
-
-Elassandra operator
--------------------
+Elassandra Operator
+___________________
 
 Finally, install the Elassandra operator in the default namespace:
 
@@ -589,8 +587,8 @@ Finally, install the Elassandra operator in the default namespace:
 
     helm install --namespace default --name elassop --wait $HELM_REPO/elassandra-operator
 
-Deploying a multi-dc Elassandra cluster
----------------------------------------
+Multi-datacenter setup
+----------------------
 
 Deploy dc1 on kube1
 ___________________

@@ -55,7 +55,7 @@ java/edctl/build/libs/edctl watch-task -n rebuild-dc2-$$ -ns $NS --phase SUCCEED
 
 # restart to update routing table
 kubectl delete -n $NS pod/elassandra-cl1-dc2-0-0
-sleep 5
+java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc2 -ns $NS --health RED
 java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc2 -ns $NS --health GREEN
 sleep 5
 

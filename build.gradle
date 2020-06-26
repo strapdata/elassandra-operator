@@ -88,22 +88,11 @@ task uploadLicenseNotices(type: com.strapdata.gradle.AzureStorageDeployTask) {
 task dockerBuild {
   dependsOn 'prepareDependenciesSources'
   dependsOn ':java:operator:jibDockerBuild'
-  dependsOn ':docker:dockerBuildImage'
+  dependsOn ':docker:dockerBuildAllVersions'
 }
 
 task dockerPush {
   dependsOn ':java:operator:jib'
-  dependsOn ':dockerBuild'
-  dependsOn ':docker:dockerPushImage'
-  dependsOn ':reaper:pushImage'
-}
-
-task dockerBuildAllVersions {
-  dependsOn ':java:operator:jibDockerBuild'
-  dependsOn ':docker:dockerBuildAllVersions'
-}
-
-task dockerPushAllVersions {
-  dependsOn ':java:operator:jib'
   dependsOn ':docker:dockerPushAllVersions'
+  dependsOn ':reaper:pushImage'
 }

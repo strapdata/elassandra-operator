@@ -95,7 +95,7 @@ deploy:
 - provider: script
   skip_cleanup: true
   script: >-
-    ./gradlew dockerPushAllVersions -PregistryUsername=$DOCKER_USERNAME -PregistryPassword=$DOCKER_PASSWORD -PregistryUrl=docker.io &&
+    ./gradlew dockerPush -PregistryUsername=$DOCKER_USERNAME -PregistryPassword=$DOCKER_PASSWORD -PregistryUrl=docker.io &&
     ./gradlew java:model:publish -PrepoUsername=$NEXUS_USERNAME -PrepoPassword=$NEXUS_PASSWORD &&
     ./gradlew uploadEdctl &&
     ./gradlew uploadLicenseReport &&
