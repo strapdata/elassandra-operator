@@ -2,9 +2,9 @@ Overview
 ========
 
 The Elassandra Kubernetes Operator automates the deployment and management of `Elassandra <https://github.com/strapdata/elassandra>`_
-datacenters in **multiple Kubernetes clusters**. By reducing the complexity of running a Cassandra or Elassandra cluster under Kubernetes,
-it gives you the flexibility to migrate your data to any Kubernetes cluster with no downtime and the freedom to choose
-your cloud provider or run on-premise.
+clusters in **multiple** `Kubernetes <https://kubernetes.io/>`_ clusters**. By reducing the complexity of running a Cassandra or
+Elassandra cluster under Kubernetes, it gives you the flexibility to migrate your data to any Kubernetes cluster with
+no downtime and the freedom to choose your cloud provider or run on-premise.
 
 Elassandra Operator features:
 
@@ -18,7 +18,7 @@ Elassandra Operator features:
 * Deploy `Cassandra Reaper <https://cassandra-reaper.io/>`_ and register keyspaces to run continuous Cassandra repairs.
 * Deploy multiple `Kibana <https://www.elastic.co/fr/products/kibana>`_ instances with a dedicated Elasticsearch index in Elassandra (Kibana spaces).
 * Expose Elassandra metrics for the `Prometheus Operator <https://github.com/helm/charts/tree/master/stable/prometheus-operator>`_.
-* Publish DNS names allowing Elassandra nodes to be reachable from the internet or using dynamic private IP addresses.
+* Publish DNS names of Elassandra broadcast IP addresses using `ExternalDNS <https://github.com/kubernetes-sigs/external-dns>`_.
 * Automatically generates SSL/TLS certificates and strong passwords stored as Kubernetes secrets (if not provided).
 * Create Cassandra roles and automatically grants the desired permissions on Cassandra keyspaces.
 * Depending on the number of running Elassandra nodes, automatically adjusts the Cassandra Replication Factor for managed keyspaces, repair and cleanup after scale up/down.

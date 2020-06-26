@@ -1,1 +1,0 @@
-# Elassandra operator integration tests
