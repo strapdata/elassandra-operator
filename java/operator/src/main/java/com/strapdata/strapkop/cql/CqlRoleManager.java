@@ -174,7 +174,6 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                     if (dc.getSpec().getCassandra().getAuthentication().equals(Authentication.NONE))
                         return connect(dc, dcStatus, Optional.empty()).blockingGet();
 
-                    // WARNING: get the role copy for the current dc
                     List<CqlRole> roles = ImmutableList.of(
                             get(dc, CqlRole.ADMIN_ROLE.username),
                             get(dc, CqlRole.CASSANDRA_ROLE.username),

@@ -29,16 +29,3 @@ prometheus:
             action: replace
             target_label: instance
 
-grafana:
-  dashboardProviders:
-    dashboardproviders.yaml:
-      apiVersion: 1
-      providers:
-      - name: 'strapdata'
-        orgId: 816
-  #     folder: ''
-        type: file
-        disableDeletion: false
-        editable: true
-  #      options:
-  #        path: /var/lib/grafana/dashboards/default

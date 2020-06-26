@@ -41,8 +41,8 @@ add_firwall_rule() {
   NODE_POOLS_TARGET_TAGS=$(gcloud container clusters describe $K8S_CLUSTER_NAME --region $GCLOUD_REGION --format='value[terminator=","](nodePools.config.tags)' --flatten='nodePools[].config.tags[]' | sed 's/,\{2,\}//g')
 
 
-  gcloud compute firewall-rules create "allow-apiserver-to-admission-webhook-443" \
-      --allow tcp:8443 \
+  gcloud compute firewall-rules create "allow-admission-webhook-443" \
+      --allow tcp:443 \
       --network="$VPC_NETWORK" \
       --source-ranges="$MASTER_IPV4_CIDR_BLOCK" \
       --target-tags="$NODE_POOLS_TARGET_TAGS" \

@@ -4,8 +4,8 @@ Mutli-datacenter deployment
 With the Elassandra operator, you can connect Elassandra datacenter running in the same or distinct Kubernetes clusters.
 The following chapter explains how to setup an Elassandra multi-datacenter deployment over the internet.
 
-Kubernetes Installation
------------------------
+Kubernetes cluster setup
+------------------------
 
 Here is instruction to prepare your Kubernetes cluster before deploying the Elassandra stack.
 
@@ -389,7 +389,7 @@ The **internal.strapdata.com** is just a dummy DNS domain used to resolv public 
 
     COREDNS_SERVICE_IP=$(kubectl get  service -l k8s-app=coredns  -n kube-system -o jsonpath='{.items[0].spec.clusterIP}')
     KUBEDNS_STUB_DOMAINS="{\\\"internal.strapdata.com\\\": [\\\"$COREDNS_SERVICE_IP\\\"]}"
-    kubectl patch configmap/kube-dns -n kube-system -p "{\"data\": {\"stubDomains\": \"KUBEDNS_STUB_DOMAINS\"}}"
+    kubectl patch configmap/kube-dns -n kube-system -p "{\"data\": {\"stubDomains\": \"$KUBEDNS_STUB_DOMAINS\"}}"
     kubectl delete pod -l k8s-app=coredns -n kube-system
 
 StorageClass definition
@@ -455,7 +455,7 @@ Alternatively, you can disable the hooks by setting webhookEnabled=false in your
 
 
 AWS
----
+___
 
 Coming soon...
 
@@ -465,7 +465,8 @@ Deploy operators
 ExternalDNS
 -----------
 
-The ExternalDNS is used to automatically update your DNS zone and create an A record for the Cassandra broadcast IP addresses.
+The `ExternalDNS <https://github.com/kubernetes-sigs/external-dns>`_ is used to automatically update your DNS zone and
+create an A record for the Cassandra broadcast IP addresses. You can use it with a public or a private DNS zone.
 
 In the following setup, we will use a DNS zone hosted on Azure, but you can use any other DNS provider supported by External DNS.
 
@@ -494,11 +495,11 @@ CoreDNS
 
 The Kubernetes CoreDNS is used for two reasons:
 
-* Resolve DNS name of you DNZ zone from inside the Kubernetes cluster using DNS forwarders.
+* Resolve DNS name of you DNS zone from inside the Kubernetes cluster using DNS forwarders.
 * Reverse resolution of the broadcast Elassandra public IP addresses to Kubernetes nodes private IP required by the AddressTranslator of the Cassandra driver.
 
-You can deploy the CodeDNS custom configuration with the strapdata coredns-forwarder HELM chart to basically install (or replace) the coredns-custom configmap,
-and restart coreDNS pods.
+You can deploy the CodeDNS custom configuration with the strapdata coredns-forwarder HELM chart to basically install (or replace)
+the coredns-custom configmap, and restart coreDNS pods.
 
 If your Kubernetes nodes have the ExternalIP set (like GKE), prepare the coreDNS with this command:
 
@@ -514,7 +515,7 @@ If your Kubernetes nodes does not have the ExternalIP set (like AKS), public nod
       HOST_ALIASES=$(kubectl get nodes -o custom-columns='INTERNAL-IP:.status.addresses[?(@.type=="InternalIP")].address,PUBLIC-IP:.metadata.labels.kubernetes\.strapdata\.com/public-ip' --no-headers |\
       awk '{ gsub(/\./,"-",$2); printf("--set nodes.hosts[%d].name=%s,nodes.hosts[%d].value=%s ",NR-1, $2, NR-1, $1); }')
 
-The configure the CoreDNS custom config with your DNS name servers, this is Azure name servers in the following example:
+Then configure the CoreDNS custom config with your DNS name servers, this is Azure name servers in the following example:
 
 .. code::
 
@@ -542,7 +543,6 @@ On GKE:
 .. code::
 
     kubectl delete pod --namespace kube-system -l k8s-app=coredns
-
 
 .. _traefik-setup:
 
@@ -705,6 +705,8 @@ Once started, Kibana and Cassandra Reaper, Prometheus server, Prometheur alert m
 
 * http://kibana-kibana.traefik-kube1.$DNS_DOMAIN/
 * http://reaper.traefik-kube1.$DNS_DOMAIN/webui
+
+If the prometheus operator is deployed, you should get these user interfaces:
 * http://prometheus.traefik-kube1.$DNS_DOMAIN/
 * http://alertmanager.traefik-kube1.$DNS_DOMAIN/
 * http://grafana.traefik-kube1.$DNS_DOMAIN/login
@@ -717,28 +719,13 @@ the Elassandra datacenter namespace.
     KIBANA_PASSWORD=$(kb get secret elassandra-cl1-kibana --context kube1 -o jsonpath='{.data.kibana\.kibana_password}' | base64 -D)
     REAPER_ADMIN_PASSWORD=$(kb get secret elassandra-cl1-dc1-reaper --context kube1 -o jsonpath='{.data.password}' | base64 -D)
 
+Here is the Elasticsearch cluster state from the Kibana devtool:
 
-    kubectl ksd get secret elassandra-cl1-dc1-reaper -o yaml
-    apiVersion: v1
-    kind: Secret
-    metadata:
-      creationTimestamp: "2020-06-23T15:45:29Z"
-      labels:
-        app: elassandra
-        app.kubernetes.io/managed-by: elassandra-operator
-        elassandra.strapdata.com/cluster: cl1
-        elassandra.strapdata.com/datacenter: dc1
-        elassandra.strapdata.com/parent: elassandra-cl1-dc1
-      name: elassandra-cl1-dc1-reaper
-      namespace: default
-      resourceVersion: "106187"
-      selfLink: /api/v1/namespaces/default/secrets/elassandra-cl1-dc1-reaper
-      uid: 8d049bd8-d07d-4ab4-b60a-ca531eb3cedb
-    stringData:
-      password: 9fe4045e-ae5c-48db-9811-91316875f8b1
-      username: admin
-    type: kubernetes.io/basic-auth
+.. image:: ./images/kibana-cluster-state.png
 
+Here the Cassandra Reaper UI with our registered Cassandra cluster:
+
+.. image:: ./images/reaper-cluster.png
 
 Deploy dc2 on kube2
 ___________________
@@ -755,7 +742,7 @@ namespace **default**, into the Kubernetes cluster **kube2** namespace **default
 .. code::
 
     for s in elassandra-cl1 elassandra-cl1-ca-pub elassandra-cl1-ca-key; do
-        kubectl get secret $s --context kube1 --export -n default -o yaml | kubectl apply --context kube2 -n default -f -
+        kubectl get secret $s --context kube1 --export -n default -o yaml | kubectl apply --context gke_strapkube1_europe-west1_kube2 -n default -f -
     done
 
 .. tip::
@@ -789,7 +776,7 @@ Deploy the datacenter **dc2** of the Elassandra cluster **cl1** in the Kubernete
 
 Key points :
 
-* Datacenter **dc2** is deployed on GKE, where storageClassName is bound to an availability zone, so the storageClassName is **ssd-{zone}**.
+* Storage class must be defined in the Kubernetes cluster to match **ssd-{zone}**.
 * The ``cassandra.remoteSeeds`` array must include the DNS name of a seed nodes in **dc1**.
 * The ``networking.externalDns.root`` must be different from the **dc1** to avoid DNS name conflict, and you can include namespace or whatever in your naming plan.
 * The **TRAEFIK_FQDN** env variable must point to the traefik public FQDN in the Kubernetes cluster **kube2**.
@@ -808,7 +795,7 @@ Before streaming the Cassandra data, you now need to adjust the replication fact
 * elastic_admin (if elasticsearch is enabled).
 * any user keyspace that you want to replicate in **dc2**, *foo* in the provided example.
 
-This is done with the following task deployed on **dc1** (Kubernetes cluster **cluster1**):
+This is done with the following Elassandra task deployed on **dc1** (Kubernetes cluster **cluster1**):
 
 .. code::
 
@@ -871,35 +858,6 @@ Finally, check the datacenter **dc2** is properly running on the Kubernetes clus
 .. code::
 
     curl -k --user admin:$CASSANDRA_ADMIN_PASSWORD "https://cassandra-cl1-dc2-0-0.test.strapkube.com:39002/_cluster/state?pretty"
-
-
-
-Deploy dc3 on kube3
-___________________
-
-    for s in elassandra-cl1 elassandra-cl1-ca-pub elassandra-cl1-ca-key; do
-        kubectl get secret $s --context kube1 --export -n default -o yaml | kubectl apply --context gke_strapkube1_europe-west1_kube3 -n default -f -
-    done
-
-helm install --namespace default --name "default-cl1-dc3" \
-        --set dataVolumeClaim.storageClassName="ssd-{zone}" \
-        --set cassandra.sslStoragePort="39000" \
-        --set cassandra.nativePort="39001" \
-        --set elasticsearch.httpPort="39002" \
-        --set elasticsearch.transportPort="39003" \
-        --set jvm.jmxPort="39004" \
-        --set jvm.jdb="39005" \
-        --set prometheus.port="39006" \
-        --set replicas="1" \
-        --set cassandra.remoteSeeds[0]=cassandra-cl1-dc1-0-0.${DNS_DOMAIN} \
-        --set networking.hostNetworkEnabled=true \
-        --set networking.externalDns.enabled=true \
-        --set networking.externalDns.domain=${DNS_DOMAIN} \
-        --set networking.externalDns.root=cl1-dc3 \
-        --set kibana.enabled="true",kibana.spaces[0].ingressAnnotations."kubernetes\.io/ingress\.class"="traefik",kibana.spaces[0].ingressSuffix=kibana.${TRAEFIK_FQDN} \
-        --set reaper.enabled="true",reaper.ingressAnnotations."kubernetes\.io/ingress\.class"="traefik",reaper.ingressHost=reaper.${TRAEFIK_FQDN} \
-        --wait $HELM_REPO/elassandra-datacenter
-
 
 Cleaning up
 -----------

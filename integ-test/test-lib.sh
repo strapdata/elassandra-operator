@@ -225,14 +225,6 @@ downgrade_elassandra_datacenter() {
     echo "Datacenter $cl-$dc downgrade to 6.2.3.26"
 }
 
-add_memory_elassandra_datacenter() {
-    local ns=${1:-"default"}
-    local cl=${2:-"cl1"}
-    local dc=${3:-"dc1"}
-    helm upgrade --reuse-values --set resources.limits.memory="3Gi" "$ns-$cl-$dc" $HELM_REPO/elassandra-datacenter
-    echo "Datacenter $cl-$dc update memory to 3Gi"
-}
-
 create_namespace() {
     echo "Creating namespace $1"
     kubectl create namespace $1
@@ -259,6 +251,7 @@ view_cert() {
 }
 
 #-----------------------------------------------------------
+#
 export DNS_DOMAIN="test.strapkube.com"
 export TRAEFIK_NAME="traefik-dc1"
 export TRAFIK_FQDN="${TRAEFIK_NAME}.${DNS_DOMAIN}"
@@ -274,15 +267,6 @@ delete_sp_for_dns_update() {
   az ad sp delete --id http://strapkop-dns-updater
 }
 
-export AZURE_DNS_RESOURCE_GROUP="strapkube-int"
-export AZURE_DNS_APPI_ID="56cfe32c-9ac4-40d6-8e28-011109f413aa"
-export AZURE_DNS_TENANT_ID="566af820-2f8c-45ac-b975-647d2647b277"
-export AZURE_SUBSCRIPTION_ID="72738c1b-8ae6-4f23-8531-5796fe866f2e"
-export AZURE_DNS_CLIENT_ID="http://strapkop-dns-updater"
-export AZURE_DNS_CLIENT_SECRET="13420ffc-af87-4583-9389-acd378f006fb"
-
-#HELM_DEBUG="--debug --dry-run"
-#--set image.tag="0.7.2" \
 
 deploy_external_dns_azure() {
   helm install $HELM_DEBUG --name my-externaldns --namespace default \

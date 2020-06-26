@@ -30,6 +30,7 @@ import io.kubernetes.client.util.Watch;
 import picocli.CommandLine;
 
 import java.io.FileReader;
+import java.util.Date;
 import java.util.concurrent.Callable;
 
     @CommandLine.Command(name = "watch-task", description = "Watch elassandra task subcommand")
@@ -84,7 +85,10 @@ import java.util.concurrent.Callable;
 
             long start = System.currentTimeMillis();
             for (Watch.Response<Task> item : watch) {
-                System.out.printf("%s : %s phase=%s %n", item.type, item.object.getMetadata().getName(),
+                System.out.printf("\"%tT %s: %s phase=%s %n",
+                        new Date(),
+                        item.type,
+                        item.object.getMetadata().getName(),
                         item.object.getStatus().getPhase().name());
                 boolean conditionMet = true;
 
