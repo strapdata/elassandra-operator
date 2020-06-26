@@ -1,5 +1,5 @@
 profile: service
-defaultPackage: com.strapdata.strapkop.sidecar
+defaultPackage: com.strapdata.strapkop
 ---
 testFramework: junit
 sourceLanguage: java

@@ -111,12 +111,6 @@
                 "minuteOfDay" : {
                   "type" : "integer"
                 },
-                "dayOfMonth" : {
-                  "type" : "integer"
-                },
-                "year" : {
-                  "type" : "integer"
-                },
                 "era" : {
                   "type" : "integer"
                 },
@@ -124,6 +118,12 @@
                   "type" : "integer"
                 },
                 "dayOfWeek" : {
+                  "type" : "integer"
+                },
+                "dayOfMonth" : {
+                  "type" : "integer"
+                },
+                "year" : {
                   "type" : "integer"
                 },
                 "chronology" : {
@@ -2088,11 +2088,6 @@
           "type" : "string",
           "description" : "reaper docker image"
         },
-        "resources" : {
-          "type" : "object",
-          "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ResourceRequirements",
-          "description" : "Resource requirements for reaper pod"
-        },
         "podTemplate" : {
           "type" : "object",
           "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1PodTemplateSpec",
@@ -2110,9 +2105,13 @@
           "type" : "string",
           "description" : "Reaper logging level"
         },
-        "ingressSuffix" : {
+        "ingressHost" : {
           "type" : "string",
-          "description" : "Reaper ingress suffix"
+          "description" : "Reaper ingress host"
+        },
+        "ingressAdminHost" : {
+          "type" : "string",
+          "description" : "Reaper admin ingress host"
         },
         "ingressAnnotations" : {
           "type" : "object",
@@ -2342,13 +2341,20 @@
                   "type" : "string"
                 }
               },
+              "statements" : {
+                "type" : "array",
+                "description" : "Kibana authorization statements",
+                "items" : {
+                  "type" : "string"
+                }
+              },
               "replicas" : {
                 "type" : "integer",
                 "description" : "Number of kibana instance, default is 1"
               },
               "ingressSuffix" : {
                 "type" : "string",
-                "description" : "Kibana space ingress suffix"
+                "description" : "Kibana space ingress suffix so that ingress host = {spaceName}-{ingressSuffix}"
               },
               "ingressAnnotations" : {
                 "type" : "object",
@@ -2359,7 +2365,7 @@
               },
               "version" : {
                 "type" : "integer",
-                "description" : "Kibana space upgrade version"
+                "description" : "Kibana space Elasticsearch upgrade version"
               },
               "podTemplate" : {
                 "type" : "object",
