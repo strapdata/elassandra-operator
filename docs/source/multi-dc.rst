@@ -19,9 +19,11 @@ In order to create your Azure Kubernetes cluster, see the `Azure Quickstart <htt
     To setup an AKS cluster with having a public IP address on each Kubernetes nodes, you need to install the following `Azure preview features
     <https://docs.microsoft.com/en-us/azure/aks/use-multiple-node-pools#assign-a-public-ip-per-node-for-your-node-pools-preview>`_:
 
-    az extension add --name aks-preview
-    az extension update --name aks-preview
-    az feature register --name NodePublicIPPreview --namespace Microsoft.ContainerService
+    .. code::
+
+        az extension add --name aks-preview
+        az extension update --name aks-preview
+        az feature register --name NodePublicIPPreview --namespace Microsoft.ContainerService
 
 Create a regional AKS cluster with the Azure network plugin and a default nodepool based
 on a `VirtualMachineScaleSets <https://docs.microsoft.com/en-us/rest/api/compute/virtualmachinescalesets>`_ that assigns
@@ -143,7 +145,7 @@ Enable RBAC:
 CoreDNS installation
 ....................
 
-GKE is provided with KubeDNS by default, which does not allows to configure host aliases required to run Cassandra Reaper with an AddressTranslator.
+GKE is provided with KubeDNS by default, which does not allows to configure host aliases required by our Kubernetes AddressTranslator.
 So we need to install CoreDNS configured to import custom configuration (see `CoreDNS import plugin <https://coredns.io/plugins/import/>`_),
 and configure KubeDNS stub domains to forward to CoreDNS.
 
@@ -403,9 +405,9 @@ This is done here using the HELM chart strapdata/storageclass.
 
 .. code::
 
-    helm install --name ssd-europe-west1-b --namespace kube-system --set zone=europe-west1-b,nameOverride=ssd-europe-west1-b strapdata/storageclass
-    helm install --name ssd-europe-west1-c --namespace kube-system --set zone=europe-west1-c,nameOverride=ssd-europe-west1-c strapdata/storageclass
-    helm install --name ssd-europe-west1-d --namespace kube-system --set zone=europe-west1-d,nameOverride=ssd-europe-west1-d strapdata/storageclass
+    for z in europe-west1-b europe-west1-c europe-west1-d; do
+        helm install --name ssd-$z --namespace kube-system --set zone=$z,nameOverride=ssd-$z strapdata/storageclass
+    done
 
 GKE Firewall rules
 ..................
@@ -464,7 +466,6 @@ Coming soon...
 Operators
 ---------
 
-
 Elassandra Operator
 ___________________
 
@@ -508,7 +509,7 @@ _______
 The Kubernetes CoreDNS is used for two reasons:
 
 * Resolve DNS name of you DNS zone from inside the Kubernetes cluster using DNS forwarders.
-* Reverse resolution of the broadcast Elassandra public IP addresses to Kubernetes nodes private IP required by the AddressTranslator of the Cassandra driver.
+* Reverse resolution of the broadcast Elassandra public IP addresses to Kubernetes nodes private IP.
 
 You can deploy the CodeDNS custom configuration with the strapdata coredns-forwarder HELM chart to basically install (or replace)
 the coredns-custom configmap, and restart coreDNS pods.
@@ -700,12 +701,13 @@ Check the Elasticsearch cluster status:
       }
     }
 
-Once started, Kibana and Cassandra Reaper, Prometheus server, Prometheur alert manager and Grafana should be available in **kube1** at :
+Once started, Kibana and Cassandra Reaper should be available in **kube1** at :
 
 * http://kibana-kibana.traefik-kube1.$DNS_DOMAIN/
 * http://reaper.traefik-kube1.$DNS_DOMAIN/webui
 
-If the prometheus operator is deployed, you should get these user interfaces:
+If the Prometheus Operator is deployed, you should get web user interfaces at:
+
 * http://prometheus.traefik-kube1.$DNS_DOMAIN/
 * http://alertmanager.traefik-kube1.$DNS_DOMAIN/
 * http://grafana.traefik-kube1.$DNS_DOMAIN/login
