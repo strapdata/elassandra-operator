@@ -438,7 +438,7 @@ public class DataCenterUpdateAction {
                     boolean allStsReady = true;
                     for(RackStatus rackStatus : dataCenterStatus.getRackStatuses().values()) {
                         V1StatefulSet v1StatefulSet = statefulSetTreeMap.get(rackStatus.getName());
-                        if (ProgressState.UPDATING.equals(rackStatus.getProgressState()) || !statefulSetIsReady(v1StatefulSet)) {
+                        if (ProgressState.UPDATING.equals(rackStatus.getProgressState()) || v1StatefulSet == null || !statefulSetIsReady(v1StatefulSet)) {
                             allStsReady = false;
                             break;
                         }

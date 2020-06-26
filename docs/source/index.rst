@@ -24,7 +24,6 @@ Contents:
    operations
    security
    monitoring
-   compute-resources
    multi-dc
 
 

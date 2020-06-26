@@ -63,8 +63,6 @@ public class ValidationController {
         }
     }
 
-
-
     /**
      * Use the fabric8 datacenter for webhook admission.
      * @param admissionReview

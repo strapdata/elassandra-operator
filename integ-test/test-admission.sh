@@ -13,27 +13,27 @@ java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --health GREE
 kubectl patch elassandradatacenter elassandra-cl1-dc1 -n $NS --type="merge" --patch '{"spec": {"clusterName": "cl2" }}'
 if [ $? -eq 0 ]; then
   echo "Webhook admission should refuse cluster name change"
-  finish
+  error
 fi
 
 # cannot change the datacenter name
 kubectl patch elassandradatacenter elassandra-cl1-dc1 -n $NS --type="merge" --patch '{"spec": {"datacenterName": "dc2" }}'
 if [ $? -eq 0 ]; then
   echo "Webhook admission should refuse datacenter name change"
-  finish
+  error
 fi
 
 kubectl patch elassandradatacenter elassandra-cl1-dc1 -n $NS --type="merge" --patch '{"spec": {"dataVolumeClaim": { "storageClassName":"dummy" }}}'
 if [ $? -eq 0 ]; then
   echo "Webhook admission should refuse storageClassName change"
-  finish
+  error
 fi
 
 ELASSANDRA_OPERATOR_POD=$(kubectl get pod -l app=elassandra-operator  -o custom-columns=NAME:.metadata.name --no-headers)
 SEED_IP=$(kubectl exec $ELASSANDRA_OPERATOR_POD -- curl -k "https://localhost/seeds/$NS/cl1/dc1" 2>/dev/null | jq -r ".[0]")
 if [ -z "$SEED_IP" ]; then
   echo "Seed IP is empty"
-  finish
+  error
 fi
 
 # cleanup
