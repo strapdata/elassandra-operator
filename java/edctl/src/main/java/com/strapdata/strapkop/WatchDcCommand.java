@@ -62,8 +62,11 @@ public class WatchDcCommand implements Callable<Integer> {
     @CommandLine.Option(names = {"--min-replicas"}, description = "Minimum number of ready replicas")
     Integer minReadyReplicas = -1;
 
-    @CommandLine.Option(names = {"--reaper-registred"}, description = "Cassandra reaper registration status")
-    Boolean reaperRegistred;
+    @CommandLine.Option(names = {"--reaper-registered"}, description = "Cassandra reaper registered")
+    Boolean reaperRegistered;
+
+    @CommandLine.Option(names = {"--reaper-unregistered"}, description = "Cassandra reaper unregistered")
+    Boolean reaperUnregistered;
 
     @CommandLine.Option(names = {"-t", "--timeout"}, description = "Wait timeout", defaultValue = "600")
     Integer timeout;
@@ -82,7 +85,8 @@ public class WatchDcCommand implements Callable<Integer> {
                 (cqlStatus == null ? "" : " cqlStatus=" + cqlStatus) +
                 (managedKeyspace == null ? "" : " managedKeyspace=" + managedKeyspace) +
                 (readyReplicas == null ? "" : " replicas=" + readyReplicas) +
-                (reaperRegistred == null ? "" : " reaperRegistred=" + reaperRegistred) +
+                (reaperRegistered == null ? "" : " reaperRegistered=" + reaperRegistered) +
+                (reaperUnregistered == null ? "" : " reaperUnregistered=" + reaperUnregistered) +
                 (timeout == null ? "" : " timeout=" + timeout + "s"));
 
         String kubeConfigPath = "~/.kube/config";
@@ -136,7 +140,10 @@ public class WatchDcCommand implements Callable<Integer> {
             if (readyReplicas != null && !readyReplicas.equals(item.object.getStatus().getReadyReplicas()))
                 conditionMet = false;
 
-            if (reaperRegistred != null && !reaperRegistred.equals(item.object.getStatus().getReaperRegistred()))
+            if (reaperRegistered != null && !reaperRegistered.equals(item.object.getStatus().getReaperRegistred()))
+                conditionMet = false;
+
+            if (reaperUnregistered != null && reaperUnregistered.equals(item.object.getStatus().getReaperRegistred()))
                 conditionMet = false;
 
             // error if minAvailableReplicas condition not met while watching a rolling restart

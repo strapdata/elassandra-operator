@@ -197,7 +197,6 @@ public class CqlRole implements CqlReconciliable, Cloneable {
                             }
                         }
                         this.reconcilied = true;     // mark the role as up-to-date
-                        this.password = null; // forget the password
                         return this;
                     })
                     .onErrorReturn(t -> {

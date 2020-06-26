@@ -61,18 +61,23 @@ EOF
 java/edctl/build/libs/edctl watch-task -n rebuild-dc2-$$ -ns $NS2 --phase SUCCEED
 
 # update routing table on dc2
-cat <<EOF | kubectl apply -f -
-apiVersion: elassandra.strapdata.com/v1beta1
-kind: ElassandraTask
-metadata:
-  name: updaterouting-dc2-$$
-  namespace: $NS2
-spec:
-  cluster: "cl1"
-  datacenter: "dc2"
-  updateRouting: {}
-EOF
-java/edctl/build/libs/edctl watch-task -n updaterouting-dc2-$$ -ns $NS2 --phase SUCCEED
+#cat <<EOF | kubectl apply -f -
+#apiVersion: elassandra.strapdata.com/v1beta1
+#kind: ElassandraTask
+#metadata:
+#  name: updaterouting-dc2-$$
+#  namespace: $NS2
+#spec:
+#  cluster: "cl1"
+#  datacenter: "dc2"
+#  updateRouting: {}
+#EOF
+#java/edctl/build/libs/edctl watch-task -n updaterouting-dc2-$$ -ns $NS2 --phase SUCCEED
+
+# restart to update routing table
+kubectl delete -n $NS2 pod/elassandra-cl1-dc2-0-0
+sleep 5
+java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc2 -ns $NS2 --health GREEN
 sleep 5
 
 # check index

@@ -173,7 +173,7 @@ public class ReaperPlugin extends AbstractPlugin {
         }
 
         CqlRole reaperRole = cqlRoleManager.get(dataCenter, REAPER_ROLE.getUsername());
-        if (reaperRole == null && !reaperRole.isReconcilied()) {
+        if (reaperRole == null || !reaperRole.isReconcilied()) {
             return Single.just(false);
         }
 
