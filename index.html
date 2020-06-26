@@ -42,7 +42,7 @@
     
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Introduction" href="introduction.html" /> 
+    <link rel="next" title="Overview" href="overview.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -95,16 +95,15 @@
             
             
               <ul>
-<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="overview.html">Overview</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a></li>
 <li class="toctree-l1"><a class="reference internal" href="helm-setup.html">HELM setup</a></li>
 <li class="toctree-l1"><a class="reference internal" href="operator-setup.html">Operator setup</a></li>
 <li class="toctree-l1"><a class="reference internal" href="provisioning.html">Provision a Datacenter</a></li>
-<li class="toctree-l1"><a class="reference internal" href="advanced-services.html">Advanced services</a></li>
-<li class="toctree-l1"><a class="reference internal" href="security.html">Security</a></li>
+<li class="toctree-l1"><a class="reference internal" href="advanced-services.html">Advanced Services</a></li>
 <li class="toctree-l1"><a class="reference internal" href="operations.html">Operations</a></li>
-<li class="toctree-l1"><a class="reference internal" href="compute-resources.html">Compute resources</a></li>
-<li class="toctree-l1"><a class="reference internal" href="full-setup.html">Full Setup Example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="security.html">Security</a></li>
+<li class="toctree-l1"><a class="reference internal" href="multi-dc.html">Mutli-datacenter deployment</a></li>
 </ul>
 
             
@@ -180,22 +179,18 @@
 <p>Contents:</p>
 <div class="toctree-wrapper compound">
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="introduction.html#requirements">Requirements</a></li>
-<li class="toctree-l2"><a class="reference internal" href="introduction.html#how-it-works">How It works</a></li>
-<li class="toctree-l2"><a class="reference internal" href="introduction.html#multi-datacenter-cluster">Multi-datacenter cluster</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="introduction.html#using-dns-names-of-seed-nodes">Using DNS names of seed nodes</a></li>
-<li class="toctree-l3"><a class="reference internal" href="introduction.html#using-the-elassandra-operator">Using the Elassandra operator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="overview.html">Overview</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="overview.html#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="overview.html#how-it-works">How It works</a></li>
+<li class="toctree-l2"><a class="reference internal" href="overview.html#multi-datacenter-cluster">Multi-datacenter cluster</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="overview.html#using-dns-names">Using DNS names</a></li>
+<li class="toctree-l3"><a class="reference internal" href="overview.html#using-the-elassandra-operator">Using the Elassandra operator</a></li>
 </ul>
 </li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a></li>
-<li class="toctree-l1"><a class="reference internal" href="helm-setup.html">HELM setup</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="helm-setup.html#helm-2-install">HELM 2 install</a></li>
-<li class="toctree-l2"><a class="reference internal" href="helm-setup.html#add-the-strapdata-helm-repository">Add the Strapdata HELM repository</a></li>
-</ul>
-</li>
+<li class="toctree-l1"><a class="reference internal" href="helm-setup.html">HELM setup</a></li>
 <li class="toctree-l1"><a class="reference internal" href="operator-setup.html">Operator setup</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="operator-setup.html#helm-chart-configuration">HELM chart configuration</a></li>
 <li class="toctree-l2"><a class="reference internal" href="operator-setup.html#tls-configuration">TLS Configuration</a></li>
@@ -230,23 +225,13 @@
 </li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="advanced-services.html">Advanced services</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="advanced-services.html">Advanced Services</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="advanced-services.html#managed-keyspaces">Managed Keyspaces</a></li>
 <li class="toctree-l2"><a class="reference internal" href="advanced-services.html#continuous-cassandra-repair">Continuous Cassandra repair</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="advanced-services.html#address-translation">Address translation</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="advanced-services.html#kibana-visualisation">Kibana visualisation</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="security.html">Security</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="security.html#kubernetes-rbac">Kubernetes RBAC</a></li>
-<li class="toctree-l2"><a class="reference internal" href="security.html#certificate-management">Certificate management</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="security.html#datacenter-ca">Datacenter CA</a></li>
-<li class="toctree-l3"><a class="reference internal" href="security.html#generated-certificates">Generated Certificates</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="security.html#elassandra-credentials">Elassandra Credentials</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="operations.html">Operations</a><ul>
@@ -270,19 +255,36 @@
 </li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="compute-resources.html">Compute resources</a></li>
-<li class="toctree-l1"><a class="reference internal" href="full-setup.html">Full Setup Example</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="full-setup.html#externaldns">ExternalDNS</a></li>
-<li class="toctree-l2"><a class="reference internal" href="full-setup.html#coredns">CoreDNS</a></li>
-<li class="toctree-l2"><a class="reference internal" href="full-setup.html#traefik">Traefik</a></li>
-<li class="toctree-l2"><a class="reference internal" href="full-setup.html#prometheus-operator">Prometheus operator</a></li>
-<li class="toctree-l2"><a class="reference internal" href="full-setup.html#aks-setup">AKS Setup</a></li>
-<li class="toctree-l2"><a class="reference internal" href="full-setup.html#gke-setup">GKE Setup</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="full-setup.html#coredns-installation">CoreDNS installation</a></li>
-<li class="toctree-l3"><a class="reference internal" href="full-setup.html#webhook">Webhook</a></li>
+<li class="toctree-l1"><a class="reference internal" href="security.html">Security</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="security.html#kubernetes-rbac">Kubernetes RBAC</a></li>
+<li class="toctree-l2"><a class="reference internal" href="security.html#certificate-management">Certificate management</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="security.html#datacenter-ca">Datacenter CA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="security.html#generated-certificates">Generated Certificates</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="full-setup.html#elassandra-datacenter">Elassandra datacenter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="security.html#elassandra-credentials">Elassandra Credentials</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="multi-dc.html">Mutli-datacenter deployment</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="multi-dc.html#kubernetes-cluster-setup">Kubernetes cluster setup</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="multi-dc.html#aks">AKS</a></li>
+<li class="toctree-l3"><a class="reference internal" href="multi-dc.html#gke">GKE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="multi-dc.html#aws">AWS</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="multi-dc.html#deploy-operators">Deploy operators</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="multi-dc.html#externaldns">ExternalDNS</a></li>
+<li class="toctree-l3"><a class="reference internal" href="multi-dc.html#coredns">CoreDNS</a></li>
+<li class="toctree-l3"><a class="reference internal" href="multi-dc.html#traefik">Traefik</a></li>
+<li class="toctree-l3"><a class="reference internal" href="multi-dc.html#elassandra-operator">Elassandra Operator</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="multi-dc.html#multi-datacenter-setup">Multi-datacenter setup</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="multi-dc.html#deploy-dc1-on-kube1">Deploy dc1 on kube1</a></li>
+<li class="toctree-l3"><a class="reference internal" href="multi-dc.html#deploy-dc2-on-kube2">Deploy dc2 on kube2</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="multi-dc.html#cleaning-up">Cleaning up</a></li>
 </ul>
 </li>
 </ul>
@@ -305,7 +307,7 @@
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="introduction.html" class="btn btn-neutral float-right" title="Introduction" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="overview.html" class="btn btn-neutral float-right" title="Overview" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
     </div>

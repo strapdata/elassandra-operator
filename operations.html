@@ -42,8 +42,8 @@
     
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Compute resources" href="compute-resources.html" />
-    <link rel="prev" title="Security" href="security.html" /> 
+    <link rel="next" title="Security" href="security.html" />
+    <link rel="prev" title="Advanced Services" href="advanced-services.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -96,13 +96,12 @@
             
             
               <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="overview.html">Overview</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a></li>
 <li class="toctree-l1"><a class="reference internal" href="helm-setup.html">HELM setup</a></li>
 <li class="toctree-l1"><a class="reference internal" href="operator-setup.html">Operator setup</a></li>
 <li class="toctree-l1"><a class="reference internal" href="provisioning.html">Provision a Datacenter</a></li>
-<li class="toctree-l1"><a class="reference internal" href="advanced-services.html">Advanced services</a></li>
-<li class="toctree-l1"><a class="reference internal" href="security.html">Security</a></li>
+<li class="toctree-l1"><a class="reference internal" href="advanced-services.html">Advanced Services</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Operations</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#edctl-utility">Edctl utility</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#datacenter-operations">Datacenter operations</a><ul>
@@ -127,8 +126,8 @@
 </li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="compute-resources.html">Compute resources</a></li>
-<li class="toctree-l1"><a class="reference internal" href="full-setup.html">Full Setup Example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="security.html">Security</a></li>
+<li class="toctree-l1"><a class="reference internal" href="multi-dc.html">Mutli-datacenter deployment</a></li>
 </ul>
 
             
@@ -326,7 +325,7 @@ Kubenetes clusters, and watch task status with <strong>edctl</strong>.</p>
 on all nodes of a datacenter, with waiting by default 10s between each repair. If the keyspace is not specified,
 all keyspaces are repaired.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>cat &lt;&lt;EOF | kubectl apply -f -
-apiVersion: elassandra.strapdata.com/v1
+apiVersion: elassandra.strapdata.com/v1beta1
 kind: ElassandraTask
 metadata:
   name: cleanup-task-$$
@@ -350,7 +349,7 @@ on all nodes of a datacenter, with waiting by default 10s between each cleanup:<
 and <code class="docutils literal notranslate"><span class="pre">status.needCleanupKeyspaces</span></code> is emptied.</p></li>
 </ul>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>cat &lt;&lt;EOF | kubectl apply -f -
-apiVersion: elassandra.strapdata.com/v1
+apiVersion: elassandra.strapdata.com/v1beta1
 kind: ElassandraTask
 metadata:
   name: cleanup-task-$$
@@ -369,7 +368,7 @@ EOF
 <p>The <strong>replication</strong> task adds or removes a datacenter in the Cassandra schema by updating the keyspace replication map.</p>
 <p>The following replication task adds the datacenter dc2 in the replication maps of system keyspaces and the <strong>foo</strong> user keyspace.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>cat &lt;&lt;EOF | kubectl apply -f -
-apiVersion: elassandra.strapdata.com/v1
+apiVersion: elassandra.strapdata.com/v1beta1
 kind: ElassandraTask
 metadata:
   name: replication-add-$$
@@ -393,7 +392,7 @@ EOF
 on all nodes of a datacenter in order to stream the data from another existing datacenter.</p>
 <p>The following rebuild task rebuild the datacenter <strong>dc2</strong> by streaming data from the datacenter <strong>dc1</strong>.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>cat &lt;&lt;EOF | kubectl apply -f -
-apiVersion: elassandra.strapdata.com/v1
+apiVersion: elassandra.strapdata.com/v1beta1
 kind: ElassandraTask
 metadata:
   name: rebuild-dc2-$$
@@ -412,7 +411,7 @@ EOF
 <p>The <strong>updateRouting</strong> task updates the Elasticsearch routing table for all nodes of an Elassandra datacenter.
 This is usually done after a datacenter rebuild when data becomes available to properly open elasticsearch indices.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>cat &lt;&lt;EOF | kubectl apply -f -
-apiVersion: elassandra.strapdata.com/v1
+apiVersion: elassandra.strapdata.com/v1beta1
 kind: ElassandraTask
 metadata:
   name: updaterouting-dc2-$$
@@ -432,7 +431,7 @@ for all nodes of a deleted datacenter. This is usually done after a datacenter i
 that datacenter has been remove with a <code class="docutils literal notranslate"><span class="pre">replication</span></code> task.</p>
 <p>The following task is executed on one node of the datacenter <strong>dc1</strong> to remove all nodes from the datacenter <strong>dc2</strong>.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>cat &lt;&lt;EOF | kubectl apply -f -
-apiVersion: elassandra.strapdata.com/v1
+apiVersion: elassandra.strapdata.com/v1beta1
 kind: ElassandraTask
 metadata:
   name: removenodes-dc2-$$
@@ -457,10 +456,10 @@ EOF
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="compute-resources.html" class="btn btn-neutral float-right" title="Compute resources" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="security.html" class="btn btn-neutral float-right" title="Security" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="security.html" class="btn btn-neutral float-left" title="Security" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="advanced-services.html" class="btn btn-neutral float-left" title="Advanced Services" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   

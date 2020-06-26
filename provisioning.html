@@ -42,7 +42,7 @@
     
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Advanced services" href="advanced-services.html" />
+    <link rel="next" title="Advanced Services" href="advanced-services.html" />
     <link rel="prev" title="Operator setup" href="operator-setup.html" /> 
 </head>
 
@@ -96,7 +96,7 @@
             
             
               <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="overview.html">Overview</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a></li>
 <li class="toctree-l1"><a class="reference internal" href="helm-setup.html">HELM setup</a></li>
 <li class="toctree-l1"><a class="reference internal" href="operator-setup.html">Operator setup</a></li>
@@ -128,11 +128,10 @@
 </li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="advanced-services.html">Advanced services</a></li>
-<li class="toctree-l1"><a class="reference internal" href="security.html">Security</a></li>
+<li class="toctree-l1"><a class="reference internal" href="advanced-services.html">Advanced Services</a></li>
 <li class="toctree-l1"><a class="reference internal" href="operations.html">Operations</a></li>
-<li class="toctree-l1"><a class="reference internal" href="compute-resources.html">Compute resources</a></li>
-<li class="toctree-l1"><a class="reference internal" href="full-setup.html">Full Setup Example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="security.html">Security</a></li>
+<li class="toctree-l1"><a class="reference internal" href="multi-dc.html">Mutli-datacenter deployment</a></li>
 </ul>
 
             
@@ -413,7 +412,7 @@ configs:
     &lt;/configuration&gt;
 </pre></div>
 </div>
-<p>Once HELM is installed (see <a class="reference internal" href="helm-setup.html#id1"><span class="std std-ref">HELM 2 install</span></a>), deploy an Elassandra Datacenter in a dedicated namespace <strong>ns1</strong> with 1 replica:</p>
+<p>Once HELM is installed (see <span class="xref std std-ref">helm-setup</span>), deploy an Elassandra Datacenter in a dedicated namespace <strong>ns1</strong> with 1 replica:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">helm</span> <span class="n">install</span> <span class="o">--</span><span class="n">namespace</span> <span class="s2">&quot;ns1&quot;</span> <span class="o">--</span><span class="n">name</span> <span class="s2">&quot;ns1-cl1-dc1&quot;</span> <span class="o">-</span><span class="n">f</span> <span class="n">values</span><span class="o">.</span><span class="n">yaml</span> <span class="o">--</span><span class="n">wait</span> <span class="n">strapdata</span><span class="o">/</span><span class="n">elassandra</span><span class="o">-</span><span class="n">datacenter</span>
 </pre></div>
 </div>
@@ -641,7 +640,7 @@ datacenter spec.</p>
     <span class="n">name</span><span class="p">:</span> <span class="n">elassandra</span><span class="o">-</span><span class="n">cl1</span><span class="o">-</span><span class="n">dc1</span>
     <span class="n">namespace</span><span class="p">:</span> <span class="n">ns6</span>
     <span class="n">ownerReferences</span><span class="p">:</span>
-    <span class="o">-</span> <span class="n">apiVersion</span><span class="p">:</span> <span class="n">elassandra</span><span class="o">.</span><span class="n">strapdata</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">v1</span>
+    <span class="o">-</span> <span class="n">apiVersion</span><span class="p">:</span> <span class="n">elassandra</span><span class="o">.</span><span class="n">strapdata</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">v1beta1</span>
       <span class="n">blockOwnerDeletion</span><span class="p">:</span> <span class="n">true</span>
       <span class="n">controller</span><span class="p">:</span> <span class="n">true</span>
       <span class="n">kind</span><span class="p">:</span> <span class="n">ElassandraDatacenter</span>
@@ -1124,7 +1123,7 @@ Here is an example to customize Cassandra settings from the cassandra.yaml file:
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="advanced-services.html" class="btn btn-neutral float-right" title="Advanced services" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="advanced-services.html" class="btn btn-neutral float-right" title="Advanced Services" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
         <a href="operator-setup.html" class="btn btn-neutral float-left" title="Operator setup" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>

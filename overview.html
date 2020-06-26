@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Introduction &mdash; Elassandra Operator Documentation</title>
+  <title>Overview &mdash; Elassandra Operator Documentation</title>
   
 
   
@@ -96,11 +96,11 @@
             
             
               <ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Introduction</a><ul>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Overview</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#requirements">Requirements</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#how-it-works">How It works</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#multi-datacenter-cluster">Multi-datacenter cluster</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#using-dns-names-of-seed-nodes">Using DNS names of seed nodes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#using-dns-names">Using DNS names</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#using-the-elassandra-operator">Using the Elassandra operator</a></li>
 </ul>
 </li>
@@ -110,11 +110,10 @@
 <li class="toctree-l1"><a class="reference internal" href="helm-setup.html">HELM setup</a></li>
 <li class="toctree-l1"><a class="reference internal" href="operator-setup.html">Operator setup</a></li>
 <li class="toctree-l1"><a class="reference internal" href="provisioning.html">Provision a Datacenter</a></li>
-<li class="toctree-l1"><a class="reference internal" href="advanced-services.html">Advanced services</a></li>
-<li class="toctree-l1"><a class="reference internal" href="security.html">Security</a></li>
+<li class="toctree-l1"><a class="reference internal" href="advanced-services.html">Advanced Services</a></li>
 <li class="toctree-l1"><a class="reference internal" href="operations.html">Operations</a></li>
-<li class="toctree-l1"><a class="reference internal" href="compute-resources.html">Compute resources</a></li>
-<li class="toctree-l1"><a class="reference internal" href="full-setup.html">Full Setup Example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="security.html">Security</a></li>
+<li class="toctree-l1"><a class="reference internal" href="multi-dc.html">Mutli-datacenter deployment</a></li>
 </ul>
 
             
@@ -161,13 +160,13 @@
     
       <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
         
-      <li>Introduction</li>
+      <li>Overview</li>
     
     
       <li class="wy-breadcrumbs-aside">
         
             
-            <a href="_sources/introduction.rst.txt" rel="nofollow"> View page source</a>
+            <a href="_sources/overview.rst.txt" rel="nofollow"> View page source</a>
           
         
       </li>
@@ -180,8 +179,8 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="introduction">
-<h1>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h1>
+  <div class="section" id="overview">
+<h1>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h1>
 <p>The Elassandra Operator automates the deployment and management of Elassandra datacenters in Kubernetes clusters.
 By reducing the complexity of running a Cassandra/Elassandra cluster, the Elassandra operator lets you focus on the desired configuration.</p>
 <p>Elassandra Operator features:</p>
@@ -229,8 +228,8 @@ It also interact directly with the Elassandra container to properly manage keysp
 <p>The Elassandra operator can manage multiple Elassandra datacenters (or a Cassandra datacenter if Elasticsearch is disabled) in
 one or multiple Kubernetes clusters. In order to connect multiple Elassandra datacenters, you can use the DNS names of seed nodes, or
 use the operator to get IP addresses of seed nodes.</p>
-<div class="section" id="using-dns-names-of-seed-nodes">
-<h3>Using DNS names of seed nodes<a class="headerlink" href="#using-dns-names-of-seed-nodes" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="using-dns-names">
+<h3>Using DNS names<a class="headerlink" href="#using-dns-names" title="Permalink to this headline">¶</a></h3>
 <p>Basically, seeds nodes are Elassandra pods with index 0 in each StatefulSet, and DNS names for these seed nodes are:</p>
 <ul>
 <li><p>From inside the Kubernetes cluster, seeds DNS names are in the form:</p>

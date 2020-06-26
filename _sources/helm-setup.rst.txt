@@ -1,12 +1,9 @@
 HELM setup
 **********
 
-Elassandra operator and datacenter can be easily installed using HELM 2 (HELM 3 is not currently supported).
+The Elassandra Operator and Elassandra datacenters can be easily installed using HELM 2 (HELM 3 is not currently supported).
 
 .. _helm-setup:
-
-HELM 2 install
-==============
 
 Install HELM 2 in your kubernetes cluster:
 
@@ -19,10 +16,7 @@ Install HELM 2 in your kubernetes cluster:
 For more information, see the `HELM 2 website <https://v2.helm.sh/docs/install/>`_,
 and apply `Best practices for securing HELM and Tiller <https://v2.helm.sh/docs/securing_installation/#best-practices-for-securing-helm-and-tiller>`_.
 
-Add the Strapdata HELM repository
-=================================
-
-Add the Strapdata `HELM 2 repository <https://github.com/strapdata>`_
+Add the Strapdata `HELM 2 repository <https://github.com/strapdata/helm-charts>`_
 
 .. code::
 
