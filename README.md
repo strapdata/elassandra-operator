@@ -1,30 +1,40 @@
 
 ![Elassandra Logo](docs/source/images/elassandra-operator.png)
 
-# Elassandra Operator [![Build Status](https://travis-ci.com/strapdata/strapkop.svg?token=PzEdBQpdXSgcm2zGdxUn&branch=master)](https://travis-ci.com/strapdata/strapkop) [![Twitter](https://img.shields.io/twitter/follow/strapdataio?style=social)](https://twitter.com/strapdataio)
+# Elassandra Operator [![Build Status](https://travis-ci.com/strapdata/elassandra-operator.svg?token=PzEdBQpdXSgcm2zGdxUn&branch=master)](https://travis-ci.com/strapdata/elassandra-operator) [![Twitter](https://img.shields.io/twitter/follow/strapdataio?style=social)](https://twitter.com/strapdataio)
 
-The Elassandra Kubernetes Operator automate the deployment and management of [Elassandra](https://github.com/strapdata/elassandra) 
-datacenters in multiple Kubernetes clusters.
+The Elassandra Kubernetes Operator automates the deployment and management of [Elassandra](https://github.com/strapdata/elassandra) 
+datacenters in multiple Kubernetes clusters. By reducing the complexity of running a Cassandra or Elassandra cluster under Kubernetes,
+it gives you the flexibility to migrate your data to any Kubernetes cluster with no downtime and the freedom to choose 
+your cloud provider or run on-premise.
 
 ## Features
 
 Elassandra Operator features:
 
 * Manage one [Kubernetes StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) per Cassandra rack to ensure data consistency across cloud-provider availability zones.
-* Manage mutliple Cassandra datacenters in the same or different Kubernetes clusters.
+* Manage multiple Elassandra/Cassandra datacenters in the same or different Kubernetes clusters, in one or multiple namespaces.
+* Manage rolling configuration changes, rolling upgrade/downgrade of Elassandra.
+* Scale up/down Elassandra datacenters.
+* Park/Unpark Elassandra datacenters (and associated Kibana and Cassandra Reaper instances).
 * Implements Elassandra tasks to add/remove datacenters from an Elassandra cluster.
-* Manage rolling configuration changes, rolling upgrade/downgrade of Elassandra, scale up/down Elassandra datacenters.
 * Deploy [Cassandra Reaper](http://cassandra-reaper.io/) and register keyspaces to run continuous Cassandra repairs.
 * Deploy multiple [Kibana](<https://www.elastic.co/fr/products/kibana>) instances with a dedicated Elasticsearch index in Elassandra.
-* Park/Unpark Elassandra datacenters (and associated Kibana and Cassandra Reaper instances).
 * Expose Elassandra metrics for the [Prometheus Operator](https://prometheus.io/docs/prometheus/latest/querying/operators/).
-* Publish public DNS names allowing Elassandra nodes to be reachable from the internet (Cassandra CQL and Elasticsearch REST API).
+* Publish DNS names allowing Elassandra nodes to be reachable from the internet or using dynamic private IP addresses.
 * Automatically generates SSL/TLS certificates and strong passwords stored as Kubernetes secrets.
 * Create Cassandra roles and automatically grants the desired permissions on Cassandra keyspaces.
 * Automatically adjust the Cassandra Replication Factor for managed keyspaces, repair and cleanup after scale up/down.
+* Provide a java [AddressTranslator](https://docs.datastax.com/en/developer/java-driver/3.6/manual/address_resolution/) for the Cassandra driver allowing to run applications in the same Kubernetes cluster as the Elassandra datacenter (similar to the [EC2MultiRegionAddressTranslator](https://docs.datastax.com/en/drivers/java/3.7/index.html?com/datastax/driver/core/policies/EC2MultiRegionAddressTranslator.html) but for any Kubernetes cluster).
 
 ## Status
 
+Elassandra Operator version 0.1 is currently Alpha.
+
+## Minimum Requirements
+
+- Kubernetes cluster, 1.15 or newer.
+- HELM 2
 
 ## Documentation
 
@@ -50,8 +60,50 @@ Build parameters are located in `gradle.properties`.
  * Community support available via [Elassandra Google Groups](https://groups.google.com/forum/#!forum/elassandra).
  * Post feature requests and bugs on https://github.com/strapdata/elassandra-operator/issues
 
-## Contribute
+## Contributing
 
+The Elassandra-Operator is licensed under AGPL and you can contribute to bug reports,
+documentation updates, tests, and features by submitting github issues or/and pull requests as usual.
+
+### General design
+
+The Elassandra Operator rely on the [Micronaut framework](https://micronaut.io/) and the 
+(Kubernetes java client)[https://github.com/kubernetes-client/java] in a reactive programming style.
+It does not require any Cassandra/Elassandra sidecar container, but requires a dedicated Elassandra docker image 
+that warps the docker entrypoint for customization purposes.
+
+### Developer setup
+
+Requirements:
+* Java 8
+* Docker
+* HELM 2
+* Kind (for test)
+
+Build:
+
+```
+./gradlew dockerPush dockerPushAllVersions -PregistryUrl="localhost:5000" -PregistryInsecure
+./gradlew java:edctl:buildExec
+```
+
+Setup test cluster using kind:
+
+```
+integ-test/setup-cluster.sh
+```
+
+Run integration tests (see .travis.yml):
+
+```
+integ-test/test-admission.sh
+integ-test/test-hostnetwork.sh
+integ-test/test-reaper-registration.sh
+integ-test/test-scaleup-park-unpark.sh
+integ-test/test-multiple-dc-1ns.sh
+integ-test/test-multiple-dc-2ns.sh
+integ-test/test-rolling-upgrade.sh
+```
 
 ## License
 

@@ -28,11 +28,11 @@ Datacenter operations
 Check the datacenter status
 ___________________________
 
-You can check the Elassandra datacenter status as follow:
+You can check the Elassandra datacenter status as follow (**edc** is the short name for elassandradatacenters):
 
 .. code::
 
-    kubectl get elassandradatacenters elassandra-cl1-dc1 -o yaml
+    kubectl get edc elassandra-cl1-dc1 -o yaml
 
 Scale Up/Down a datacenter
 __________________________
@@ -63,9 +63,9 @@ When scaling down:
     If you scale-up and re-use these old PVCs, Elassandra nodes won't start until you delete old PVCs because Cassandra
     hosts IDs stored on these disks were previously used in the cluster, and you will get the following error message:
 
-..code::
+    ..code::
 
-    org.apache.cassandra.exceptions.ConfigurationException: This node was decommissioned and will not rejoin the ring unless cassandra.override_decommission=true has been set, or all existing data is removed and the node is bootstrapped again
+        org.apache.cassandra.exceptions.ConfigurationException: This node was decommissioned and will not rejoin the ring unless cassandra.override_decommission=true has been set, or all existing data is removed and the node is bootstrapped again
 
 Rolling update
 --------------

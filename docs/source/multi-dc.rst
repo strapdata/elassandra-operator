@@ -4,8 +4,8 @@ Mutli-datacenter deployment
 With the Elassandra operator, you can connect Elassandra datacenter running in the same or distinct Kubernetes clusters.
 The following chapter explains how to setup an Elassandra multi-datacenter deployment over the internet.
 
-Kubernetes cluster setup
-------------------------
+Kubernetes
+----------
 
 Here is instruction to prepare your Kubernetes cluster before deploying the Elassandra stack.
 
@@ -461,8 +461,18 @@ ___
 
 Coming soon...
 
-Deploy operators
-----------------
+Operators
+---------
+
+
+Elassandra Operator
+___________________
+
+Finally, install the Elassandra operator in the default namespace:
+
+.. code::
+
+    helm install --namespace default --name elassop --wait $HELM_REPO/elassandra-operator
 
 ExternalDNS
 ___________
@@ -577,15 +587,6 @@ be the unique traefik FQDN in our DNS zone (example: traefik-kube1.my.domain.com
 
     Of course, this Traefik setup is not secure, an it's up to you to setup encryption and restrict access to those resources.
 
-
-Elassandra Operator
-___________________
-
-Finally, install the Elassandra operator in the default namespace:
-
-.. code::
-
-    helm install --namespace default --name elassop --wait $HELM_REPO/elassandra-operator
 
 Multi-datacenter setup
 ----------------------
@@ -860,13 +861,13 @@ Finally, check the datacenter **dc2** is properly running on the Kubernetes clus
 Cleaning up
 -----------
 
-Delete an Elassandra datacenter:
+Uninstall an Elassandra datacenter:
 
 .. code::
 
     helm delete --purge elassandra-cl1-dc1
 
-Undeploy the Elassandra operator and remove CRDs:
+Uninstall the Elassandra operator and remove CRDs:
 
 .. code::
 

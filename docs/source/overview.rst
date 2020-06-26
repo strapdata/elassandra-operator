@@ -1,22 +1,28 @@
 Overview
 ========
 
-The Elassandra Operator automates the deployment and management of Elassandra datacenters in Kubernetes clusters.
-By reducing the complexity of running a Cassandra/Elassandra cluster, the Elassandra operator lets you focus on the desired configuration.
+The Elassandra Kubernetes Operator automates the deployment and management of `Elassandra <https://github.com/strapdata/elassandra>`_
+datacenters in **multiple Kubernetes clusters**. By reducing the complexity of running a Cassandra or Elassandra cluster under Kubernetes,
+it gives you the flexibility to migrate your data to any Kubernetes cluster with no downtime and the freedom to choose
+your cloud provider or run on-premise.
 
 Elassandra Operator features:
 
-  * `Kubernetes StatefulSet <https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/>`_ per Cassandra rack to ensure data consistency across cloud-provider availability zones.
-  * Manage mutliple Cassandra datacenters in the same or different Kubernetes clusters.
-  * Manage rolling configuration changes, rolling upgrade/downgrade of Elassandra, scale up/down Elassandra datacenters.
-  * Deploy `Cassandra Reaper <https://cassandra-reaper.io/>`_ to run continuous Cassandra repairs.
-  * Deploy multiple `Kibana <https://www.elastic.co/fr/products/kibana>`_ instances with a dedicated Elasticserach index in Elassandra.
-  * Park/Unpark Elassandra datacenters (and associated Kibana and Cassandra Reaper instances).
-  * Expose Elassandra metrics for the `Prometheus Operator <https://prometheus.io/docs/prometheus/latest/querying/operators/>`_.
-  * Publish public DNS names allowing Elassandra nodes to be reachable from the internet (Cassandra CQL and Elasticsearch REST API).
-  * Automatically generates SSL/TLS certificates and strong passwords stored as Kubernetes secrets.
-  * Create Cassandra roles and automatically grants the desired permissions on Cassandra keyspaces.
-  * Automatically adjust the Cassandra Replication Factor for managed keyspaces, repair and cleanup after scale up/down the datacenter.
+
+* Manage one `Kubernetes StatefulSet <https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/>`_ per Cassandra rack to ensure data consistency across cloud-provider availability zones.
+* Manage multiple Elassandra/Cassandra datacenters in the same or different Kubernetes clusters, in one or multiple namespaces.
+* Manage rolling configuration changes, rolling upgrade/downgrade of Elassandra.
+* Scale up/down Elassandra datacenters.
+* Park/Unpark Elassandra datacenters (and associated Kibana and Cassandra Reaper instances).
+* Implements Elassandra tasks to add/remove datacenters from an Elassandra cluster.
+* Deploy `Cassandra Reaper <https://cassandra-reaper.io/>`_ and register keyspaces to run continuous Cassandra repairs.
+* Deploy multiple `Kibana <https://www.elastic.co/fr/products/kibana>`_ instances with a dedicated Elasticsearch index in Elassandra (Kibana spaces).
+* Expose Elassandra metrics for the `Prometheus Operator <https://github.com/helm/charts/tree/master/stable/prometheus-operator>`_.
+* Publish DNS names allowing Elassandra nodes to be reachable from the internet or using dynamic private IP addresses.
+* Automatically generates SSL/TLS certificates and strong passwords stored as Kubernetes secrets (if not provided).
+* Create Cassandra roles and automatically grants the desired permissions on Cassandra keyspaces.
+* Depending on the number of running Elassandra nodes, automatically adjusts the Cassandra Replication Factor for managed keyspaces, repair and cleanup after scale up/down.
+* Provide a java `AddressTranslator <https://docs.datastax.com/en/developer/java-driver/3.6/manual/address_resolution/>`_ for the Cassandra driver allowing to run applications in the same Kubernetes cluster as the Elassandra datacenter (similar to the [EC2MultiRegionAddressTranslator](https://docs.datastax.com/en/drivers/java/3.7/index.html?com/datastax/driver/core/policies/EC2MultiRegionAddressTranslator.html) but for any Kubernetes cluster).
 
 Requirements
 ------------
@@ -25,7 +31,7 @@ Requirements
 * Kubernetes nodes must be properly synchronized with NTP.
 * Kubernetes worker nodes must have labels matching ``failure-domain.beta.kubernetes.io/zone``.
 * HELM version 2 for operator and datacenter deployment.
-* `Prometheus-Operator <https://github.com/coreos/prometheus-operator>`_ to monitor your the Elassandra operator and Elassandra cluster.
+* `Prometheus-Operator <https://github.com/helm/charts/tree/master/stable/prometheus-operator>`_ to monitor your the Elassandra operator and Elassandra cluster.
 * A Kubernetes `Ingress Controller <https://kubernetes.io/docs/concepts/services-networking/ingress-controllers/>`_ to expose Kibana, Cassandra Reaper user interface, and the Elassandra operator for cross kubernetes cluster discovery.
 * `ExternalDNS <https://github.com/kubernetes-sigs/external-dns>`_ to expose Elassandra datacenters to the internet world.
 
