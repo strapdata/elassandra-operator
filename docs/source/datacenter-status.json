@@ -159,24 +159,9 @@
         "type" : "string"
       }
     },
-    "reaperPhase" : {
-      "type" : "string",
-      "description" : "Cassandra reaper phase",
-      "enum" : [ "NONE", "DEPLOYED", "RUNNING", "REGISTERED" ]
-    },
-    "remoteSeeds" : {
-      "type" : "array",
-      "description" : "Cassandra remote seeds",
-      "items" : {
-        "type" : "string"
-      }
-    },
-    "remoteSeeders" : {
-      "type" : "array",
-      "description" : "Cassandra remote seeders URLs",
-      "items" : {
-        "type" : "string"
-      }
+    "reaperRegistred" : {
+      "type" : "boolean",
+      "description" : "Cassandra reaper registred"
     }
   }
 }
