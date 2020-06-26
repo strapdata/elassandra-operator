@@ -1,12 +1,11 @@
+# Elassandra Operator [![Build Status](https://travis-ci.com/strapdata/elassandra-operator.svg?token=m7zqfSQPuiZqq2siqFNt&branch=master)](https://travis-ci.com/strapdata/elassandra-operator) [![Twitter](https://img.shields.io/twitter/follow/strapdataio?style=social)](https://twitter.com/strapdataio)
 
 ![Elassandra Logo](docs/source/images/elassandra-operator.png)
 
-# Elassandra Operator [![Build Status](https://travis-ci.com/strapdata/elassandra-operator.svg?token=PzEdBQpdXSgcm2zGdxUn&branch=master)](https://travis-ci.com/strapdata/elassandra-operator) [![Twitter](https://img.shields.io/twitter/follow/strapdataio?style=social)](https://twitter.com/strapdataio)
-
 The Elassandra Kubernetes Operator automates the deployment and management of [Elassandra](https://github.com/strapdata/elassandra) 
-datacenters in multiple Kubernetes clusters. By reducing the complexity of running a Cassandra or Elassandra cluster under Kubernetes,
-it gives you the flexibility to migrate your data to any Kubernetes cluster with no downtime and the freedom to choose 
-your cloud provider or run on-premise.
+clusters deployed in multiple [Kubernetes](https://kubernetes.io/) clusters. By reducing the complexity of running a Cassandra or 
+Elassandra clusters under Kubernetes, it gives you the flexibility to migrate your data to any Kubernetes cluster with 
+no downtime and the freedom to choose your cloud provider or run on-premise.
 
 ## Features
 
@@ -21,7 +20,7 @@ Elassandra Operator features:
 * Deploy [Cassandra Reaper](http://cassandra-reaper.io/) and register keyspaces to run continuous Cassandra repairs.
 * Deploy multiple [Kibana](<https://www.elastic.co/fr/products/kibana>) instances with a dedicated Elasticsearch index in Elassandra.
 * Expose Elassandra metrics for the [Prometheus Operator](https://prometheus.io/docs/prometheus/latest/querying/operators/).
-* Publish DNS names allowing Elassandra nodes to be reachable from the internet or using dynamic private IP addresses.
+* Publish DNS names of Elassandra broadcast IP addresses using [ExternalDNS](https://github.com/kubernetes-sigs/external-dns).
 * Automatically generates SSL/TLS certificates and strong passwords stored as Kubernetes secrets.
 * Create Cassandra roles and automatically grants the desired permissions on Cassandra keyspaces.
 * Automatically adjust the Cassandra Replication Factor for managed keyspaces, repair and cleanup after scale up/down.
@@ -68,7 +67,7 @@ documentation updates, tests, and features by submitting github issues or/and pu
 ### General design
 
 The Elassandra Operator rely on the [Micronaut framework](https://micronaut.io/) and the 
-(Kubernetes java client)[https://github.com/kubernetes-client/java] in a reactive programming style.
+[Kubernetes java client](https://github.com/kubernetes-client/java) in a reactive programming style.
 It does not require any Cassandra/Elassandra sidecar container, but requires a dedicated Elassandra docker image 
 that warps the docker entrypoint for customization purposes.
 
@@ -87,13 +86,13 @@ Build:
 ./gradlew java:edctl:buildExec
 ```
 
-Setup test cluster using kind:
+Setup test cluster using [Kind](https://kind.sigs.k8s.io/docs/user/quick-start/):
 
 ```
 integ-test/setup-cluster.sh
 ```
 
-Run integration tests (see .travis.yml):
+Run integration tests (Run by travis):
 
 ```
 integ-test/test-admission.sh
