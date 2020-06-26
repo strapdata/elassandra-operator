@@ -100,7 +100,7 @@ install_elassandra_operator() {
        args=",$2"
     fi
 
-    helm install --namespace ${1:-default} --name strapkop \
+    helm install --namespace ${1:-default} --name elassop \
     --set image.repository=$REGISTRY_URL/strapdata/elassandra-operator${registry} \
     --set image.tag="$ELASSANDRA_OPERATOR_TAG"$args \
     --wait \
@@ -109,7 +109,7 @@ install_elassandra_operator() {
 }
 
 uninstall_elassandra_operator() {
-    helm delete --purge strapkop
+    helm delete --purge elassop
 }
 
 # Deploy single node cluster in namespace=cluster_name
@@ -258,13 +258,13 @@ export TRAFIK_FQDN="${TRAEFIK_NAME}.${DNS_DOMAIN}"
 
 
 create_sp_for_dns_update() {
-  az ad sp create-for-rbac --name http://strapkop-dns-updater
-  az role assignment create --assignee http://strapkop-dns-updater --role befefa01-2a29-4197-83a8-272ff33ce314  --resource-group $AZURE_DNS_RESOURCE_GROUP
+  az ad sp create-for-rbac --name http://elassop-dns-updater
+  az role assignment create --assignee http://elassop-dns-updater --role befefa01-2a29-4197-83a8-272ff33ce314  --resource-group $AZURE_DNS_RESOURCE_GROUP
 }
 
 delete_sp_for_dns_update() {
-  az role assignment delete --assignee http://strapkop-dns-updater --role befefa01-2a29-4197-83a8-272ff33ce314  --resource-group ${AZURE_DNS_RESOURCE_GROUP}
-  az ad sp delete --id http://strapkop-dns-updater
+  az role assignment delete --assignee http://elassop-dns-updater --role befefa01-2a29-4197-83a8-272ff33ce314  --resource-group ${AZURE_DNS_RESOURCE_GROUP}
+  az ad sp delete --id http://elassop-dns-updater
 }
 
 

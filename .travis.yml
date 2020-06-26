@@ -68,7 +68,7 @@ install:
 - kind get clusters
 - docker ps -a
 before_script:
-- ./gradlew java:edctl:buildExec dockerPush dockerPushAllVersions -PregistryUrl="localhost:5000" -PregistryInsecure
+- ./gradlew java:edctl:buildExec :java:operator:jib dockerPushAllVersions :reaper:pushImage -PregistryUrl="localhost:5000" -PregistryInsecure
 - curl http://localhost:5000/v2/_catalog
 - integ-test/install_elassandra_operator.sh
 script:
@@ -95,7 +95,7 @@ deploy:
 - provider: script
   skip_cleanup: true
   script: >-
-    ./gradlew dockerPush -PregistryUsername=$DOCKER_USERNAME -PregistryPassword=$DOCKER_PASSWORD -PregistryUrl=docker.io &&
+    ./gradlew :java:operator:jib dockerPushAllVersions :reaper:pushImage -PregistryUsername=$DOCKER_USERNAME -PregistryPassword=$DOCKER_PASSWORD -PregistryUrl=docker.io &&
     ./gradlew java:model:publish -PrepoUsername=$NEXUS_USERNAME -PrepoPassword=$NEXUS_PASSWORD &&
     ./gradlew uploadEdctl &&
     ./gradlew uploadLicenseReport &&

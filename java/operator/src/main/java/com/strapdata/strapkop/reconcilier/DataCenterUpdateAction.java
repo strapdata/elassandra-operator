@@ -1984,14 +1984,19 @@ public class DataCenterUpdateAction {
                         .addCommandItem("-k")
                         .addCommandItem("-X")
                         .addCommandItem("POST")
-                        .addCommandItem("https://localhost/enterprise/search/disable"))));
+                        .addCommandItem(
+                                (dataCenterSpec.getElasticsearch().getEnterprise().getHttps() ? "https" : "http") +
+                                        "://localhost:$ES_PORT/enterprise/search/disable; " +
+                                        "nodetool -u cassandra -pwf /etc/cassandra/jmxremote.password " +
+                                        (dataCenterSpec.getJvm().getJmxmpEnabled() ? " --jmxmp " : "") +
+                                        (dataCenterSpec.getCassandra().getSsl() ? " --ssl " : "") + " drain"))));
             }
             return cassandraContainer;
         }
 
         private V1Container buildInitContainerCommitlogReplayer(RackStatus rack) {
             return buildElassandraBaseContainer("commitlog-replayer", rack)
-                    .addEnvItem(new V1EnvVar().name("STOP_AFTER_COMMILOG_REPLAY").value("true"));
+                    .addEnvItem(new V1EnvVar().name("STOP_AFTER_COMMITLOG_REPLAY").value("true"));
         }
 
         private V1Container buildElassandraBaseContainer(String containerName, RackStatus rack) {
