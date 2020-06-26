@@ -77,7 +77,7 @@ Requirements:
 * Java 8
 * Docker
 * HELM 2
-* Kind (for test)
+* Kind (for tests)
 
 Build:
 
