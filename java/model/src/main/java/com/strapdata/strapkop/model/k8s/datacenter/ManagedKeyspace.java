@@ -48,7 +48,7 @@ public class ManagedKeyspace {
     /**
      * Target replication factor
      */
-    @JsonPropertyDescription("Managed keyspace replication factor")
+    @JsonPropertyDescription("Managed keyspace target replication factor")
     @SerializedName("rf")
     @Expose
     private Integer rf = 1;
@@ -59,7 +59,7 @@ public class ManagedKeyspace {
     @JsonPropertyDescription("Managed keyspace automatic repair")
     @SerializedName("repair")
     @Expose
-    private Boolean repair = Boolean.FALSE;
+    private Boolean repair = Boolean.TRUE;
 
     /**
      * CQL Role name, may be null

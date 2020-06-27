@@ -111,8 +111,8 @@ public class OperatorNames {
         return OperatorNames.dataCenterChildObjectName("%s-seeds", dataCenter);
     }
 
-    public static String specConfig(final DataCenter dataCenter) {
-        return OperatorNames.dataCenterChildObjectName("%s-spec", dataCenter);
+    public static String operatorConfig(final DataCenter dataCenter) {
+        return OperatorNames.dataCenterChildObjectName("%s-operator", dataCenter);
     }
 
     public static String rackConfig(final DataCenter dataCenter, final String rack) {

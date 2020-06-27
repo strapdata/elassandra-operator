@@ -7,16 +7,17 @@
 # az account set --subscription 72738c1b-8ae6-4f23-8531-5796fe866f2e
 set -x
 
-export AZURE_REGION=${AZURE_REGION:-"westeurope"}
-export RESOURCE_GROUP_NAME=${RESOURCE_GROUP_NAME:-"aks1"}
-export K8S_CLUSTER_NAME=${K8S_CLUSTER_NAME:-"cluster1"}
+AZURE_REGION=${AZURE_REGION:-"westeurope"}
+RESOURCE_GROUP_NAME=${RESOURCE_GROUP_NAME:-"aks1"}
+K8S_CLUSTER_NAME=${K8S_CLUSTER_NAME:-"cluster1"}
 
-export REGISTRY_URL="docker.io"
-export STORAGE_CLASS_NAME="default"
+REGISTRY_URL="docker.io"
+STORAGE_CLASS_NAME="default"
 
 create_cluster() {
   create_resource_group $RESOURCE_GROUP_NAME
   create_aks_cluster_vmss
+  add_nsg_rule
 }
 
 delete_cluster() {
@@ -57,20 +58,6 @@ create-acr-rbac() {
     --name $SERVICE_PRINCIPAL_NAME | jq -r '"export SPN_PW=\(.password) && export SPN_CLIENT_ID=\(.appId)"')
 }
 
-create_aks_cluster() {
-     az aks create --name "${K8S_CLUSTER_NAME}" \
-                  --resource-group $RESOURCE_GROUP_NAME \
-                  --network-plugin azure \
-                  --node-count 1 \
-                  --node-vm-size Standard_D2_v3 \
-                  --vm-set-type AvailabilitySet \
-                  --output table \
-                  --zone 1 2 3
-
-    kubectl create clusterrolebinding kubernetes-dashboard -n kube-system --clusterrole=cluster-admin --serviceaccount=kube-system:kubernetes-dashboard
-    use_aks_cluster $RESOURCE_GROUP_NAME "${K8S_CLUSTER_NAME}"
-}
-
 create_aks_cluster_vmss() {
    az aks create --name "${K8S_CLUSTER_NAME}" \
                   --resource-group $RESOURCE_GROUP_NAME \
@@ -85,34 +72,6 @@ create_aks_cluster_vmss() {
     kubectl create clusterrolebinding kubernetes-dashboard -n kube-system --clusterrole=cluster-admin --serviceaccount=kube-system:kubernetes-dashboard
     use_aks_cluster $RESOURCE_GROUP_NAME "${K8S_CLUSTER_NAME}"
 }
-
-
-# AKS zone availability (require VM Scale Set) does not allow to add public IPs on nodes because of the standard LB.
-# So, keep AvailabilitySet deployment with no LB unless you deploy one.
-# $1 = k8s cluster IDX
-create_aks_cluster_advanced() {
-     az network vnet subnet create -g $RESOURCE_GROUP_NAME --vnet-name vnet0 -n "subnet$1" --address-prefixes 10.0.$1.0/24
-     local B3=$((64+($1 -1)*16))
-
-     az aks create --name "${K8S_CLUSTER_NAME}${1}" \
-                  --resource-group $RESOURCE_GROUP_NAME \
-                  --network-plugin azure \
-                  --docker-bridge-address "192.168.0.1/24" \
-                  --service-cidr "10.0.$B3.0/22" \
-                  --dns-service-ip "10.0.$B3.10" \
-                  --vnet-subnet-id $(az network vnet subnet show -g $RESOURCE_GROUP_NAME --vnet-name vnet0 -n "subnet$1" | jq -r '.id') \
-                  --node-count 1 \
-                  --node-vm-size Standard_D2_v3 \
-                  --vm-set-type AvailabilitySet \
-                  --output table
-#                  --attach-acr "$ACR_ID"
-#                   --load-balancer-sku basic
-#                  --load-balancer-managed-outbound-ip-count 0 \
-
-    kubectl create clusterrolebinding kubernetes-dashboard -n kube-system --clusterrole=cluster-admin --serviceaccount=kube-system:kubernetes-dashboard
-    use_aks_cluster $RESOURCE_GROUP_NAME "${K8S_CLUSTER_NAME}${1}"
-}
-
 
 # $1 =  VM instance index starting from 0
 add_public_vmss_ip() {
@@ -154,19 +113,6 @@ delete_aks_cluster() {
 use_aks_cluster() {
    az aks get-credentials --name "${2}" --resource-group $1 --output table
    kubectl config set-context $1 --cluster=${2}
-}
-
-# $1 k8s cluster name
-delete_aks_lb() {
-   AKS_RG_NAME=$(az resource show --namespace Microsoft.ContainerService --resource-type managedClusters -g $RESOURCE_GROUP_NAME -n "${1}" | jq -r .properties.nodeResourceGroup)
-   az network lb delete --name kubernetes -g $AKS_RG_NAME
-}
-
-# $1 k8s cluster name
-replace_standard_lb() {
-   AKS_RG_NAME=$(az resource show --namespace Microsoft.ContainerService --resource-type managedClusters -g $RESOURCE_GROUP_NAME -n "${1:-$K8S_CLUSTER_NAME}" | jq -r .properties.nodeResourceGroup)
-   az network lb delete --name kubernetes -g $AKS_RG_NAME
-   az network lb create --name kubernetes -g $AKS_RG_NAME --sku Standard
 }
 
 

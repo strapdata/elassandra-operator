@@ -64,9 +64,9 @@ public class RackStatus {
     private Health health = Health.UNKNOWN;
 
     /**
-     * Datacenter spec and user configmap fingerprint
+     * Datacenter spec fingerprint - operator configmap fingerprint - user configmap fingerprint
      */
-    @JsonPropertyDescription("Datacenter spec and user configmap fingerprint")
+    @JsonPropertyDescription("Rack fingerprint")
     @SerializedName("fingerprint")
     @Expose
     private String fingerprint = null;

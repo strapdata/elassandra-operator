@@ -76,6 +76,7 @@ import java.util.concurrent.Callable;
             CustomObjectsApi customObjectsApi = new CustomObjectsApi(client);
 
             String fieldSelector = name == null ? null : "metadata.name=" + name;
+            long start = System.currentTimeMillis();
             Watch<Task> watch = Watch.createWatch(client,
                     customObjectsApi.listNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, Task.VERSION,
                             namespace, Task.PLURAL, null, null, fieldSelector,
@@ -83,7 +84,6 @@ import java.util.concurrent.Callable;
                     new TypeToken<Watch.Response<Task>>() {
                     }.getType());
 
-            long start = System.currentTimeMillis();
             for (Watch.Response<Task> item : watch) {
                 System.out.printf("\"%tT %s: %s phase=%s %n",
                         new Date(),

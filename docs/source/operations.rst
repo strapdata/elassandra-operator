@@ -78,7 +78,17 @@ In the following example, we upgrade the elassandra image.
 
 .. code-block:: bash
 
-    kubectl patch elassandradatacenter elassandra-cl1-dc1 -n $NS --type="merge" --patch '{"spec": { "elassandraImage": "strapdata/elassandra-node:6.8.4.5" }}'
+    kubectl patch elassandradatacenter elassandra-cl1-dc1 --type="merge" --patch '{"spec": { "elassandraImage": "strapdata/elassandra-node:6.8.4.5" }}'
+
+Rolling restart
+---------------
+
+In order to rolling restart all Elassandra nodes, just add a dummy annotation to the spec.podTemplate, and this triggers a rolling restart of rack statefulsets one by one.
+
+.. code-block:: bash
+
+    kubectl patch elassandradatacenter elassandra-cl1-dc1 --type="merge" --patch '{"spec": { "podTemplate": { "metadata": { "annotations":{"restart":"1"}}}}}'
+
 
 Park/Unpark a datacenter
 ________________________

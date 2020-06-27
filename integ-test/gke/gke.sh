@@ -2,11 +2,16 @@
 
 set -x
 
+# define your own settings in an env file.
 GCLOUD_PROJECT=${GCLOUD_PROJECT:-strapkube1}
-K8S_CLUSTER_NAME=${K8S_CLUSTER_NAME:-kube3}
-GCLOUD_REGION="europe-west1"
+K8S_CLUSTER_NAME=${K8S_CLUSTER_NAME:-kube2}
+GCLOUD_REGION=${GCLOUD_REGION:-"europe-west1"}
 
-export REGISTRY_URL=docker.io
+REGISTRY_URL=docker.io
+
+create_cluster() {
+  create_regional_cluster
+}
 
 create_regional_cluster() {
   echo "gke: creating cluster"
@@ -24,6 +29,12 @@ create_regional_cluster() {
 
   echo "gke: bootstrap RBAC"
   kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-admin --user $(gcloud config get-value account)
+
+  add_firewall_rule
+}
+
+delete_cluster() {
+  delete_regional_cluster
 }
 
 delete_regional_cluster() {
@@ -31,23 +42,12 @@ delete_regional_cluster() {
 }
 
 create_registry() {
+  echo "Using docker registry"
 }
 
-
-
-add_firwall_rule() {
+add_firewall_rule() {
   VPC_NETWORK=$(gcloud container clusters describe $K8S_CLUSTER_NAME --region $GCLOUD_REGION --format='value(network)')
-  MASTER_IPV4_CIDR_BLOCK=$(gcloud container clusters describe $K8S_CLUSTER_NAME --region $GCLOUD_REGION --format='value(clusterIpv4Cidr)')
   NODE_POOLS_TARGET_TAGS=$(gcloud container clusters describe $K8S_CLUSTER_NAME --region $GCLOUD_REGION --format='value[terminator=","](nodePools.config.tags)' --flatten='nodePools[].config.tags[]' | sed 's/,\{2,\}//g')
-
-
-  gcloud compute firewall-rules create "allow-admission-webhook-443" \
-      --allow tcp:443 \
-      --network="$VPC_NETWORK" \
-      --source-ranges="$MASTER_IPV4_CIDR_BLOCK" \
-      --target-tags="$NODE_POOLS_TARGET_TAGS" \
-      --description="Allow apiserver access to admission webhook pod on port 443" \
-      --direction INGRESS
 
   gcloud compute firewall-rules create "allow-elassandra-inbound" \
       --allow tcp:39000-39002 \
@@ -56,3 +56,18 @@ add_firwall_rule() {
       --description="Allow elassandra inbound" \
       --direction INGRESS
 }
+
+add_firewall_rule_admission() {
+  VPC_NETWORK=$(gcloud container clusters describe $K8S_CLUSTER_NAME --region $GCLOUD_REGION --format='value(network)')
+  MASTER_IPV4_CIDR_BLOCK=$(gcloud container clusters describe $K8S_CLUSTER_NAME --region $GCLOUD_REGION --format='value(clusterIpv4Cidr)')
+  NODE_POOLS_TARGET_TAGS=$(gcloud container clusters describe $K8S_CLUSTER_NAME --region $GCLOUD_REGION --format='value[terminator=","](nodePools.config.tags)' --flatten='nodePools[].config.tags[]' | sed 's/,\{2,\}//g')
+
+  gcloud compute firewall-rules create "allow-admission-webhook-443" \
+      --allow tcp:443 \
+      --network="$VPC_NETWORK" \
+      --source-ranges="$MASTER_IPV4_CIDR_BLOCK" \
+      --target-tags="$NODE_POOLS_TARGET_TAGS" \
+      --description="Allow apiserver access to admission webhook pod on port 443" \
+      --direction INGRESS
+}
+

@@ -33,14 +33,11 @@ micronaut:
         workqueue:
             type: CACHED
         authority:
-            type: FIXED
-            number-of-threads: 2
+            type: CACHED
         reaper:
-            type: FIXED
-            number-of-threads: 2
+            type: CACHED
         tasks:
-            type: FIXED
-            number-of-threads: 8
+            type: CACHED
     metrics:
         enabled: true
         export:

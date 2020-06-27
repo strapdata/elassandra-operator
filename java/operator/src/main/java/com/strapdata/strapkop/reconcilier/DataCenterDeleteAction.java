@@ -179,7 +179,7 @@ public class DataCenterDeleteAction {
                         });
                         break;
                 }
-                logger.info("Deleted DataCenter namespace={} name={}", dataCenter.getMetadata().getNamespace(), dataCenter.getMetadata().getName());
+                logger.info("Deleted dataCenter={}", dataCenter.id());
             }
         });
     }

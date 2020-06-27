@@ -102,6 +102,7 @@ public class WatchDcCommand implements Callable<Integer> {
         CustomObjectsApi customObjectsApi = new CustomObjectsApi(client);
 
         String fieldSelector = name == null ? null : "metadata.name=" + name;
+        long start = System.currentTimeMillis();
         Watch<DataCenter> watch = Watch.createWatch(client,
                 customObjectsApi.listNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, DataCenter.VERSION,
                         namespace, DataCenter.PLURAL, null, null, fieldSelector,
@@ -109,7 +110,6 @@ public class WatchDcCommand implements Callable<Integer> {
                 new TypeToken<Watch.Response<DataCenter>>() {
                 }.getType());
 
-        long start = System.currentTimeMillis();
         for (Watch.Response<DataCenter> item : watch) {
             System.out.printf("%tT %s: %s phase=%s heath=%s replicas=%d reaper=%s cqlStatus=%s managedKeyspaces=%s\n",
                     new Date(),

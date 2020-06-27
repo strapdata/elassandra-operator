@@ -153,7 +153,7 @@ and configure KubeDNS stub domains to forward to CoreDNS.
 
     helm install --name coredns --namespace=kube-system -f integ-test/gke/coredns-values.yaml stable/coredns
 
-Where coredns-values.yaml is:
+Where integ-test/gke/coredns-values.yaml is:
 
 .. code::
 
@@ -406,7 +406,11 @@ This is done here using the HELM chart strapdata/storageclass.
 .. code::
 
     for z in europe-west1-b europe-west1-c europe-west1-d; do
-        helm install --name ssd-$z --namespace kube-system --set zone=$z,nameOverride=ssd-$z strapdata/storageclass
+        helm install --name ssd-$z --namespace kube-system \
+            --set parameters.type="pd-ssd" \
+            --set provisioner="kubernetes.io/gce-pd" \
+            --set zone=$z,nameOverride=ssd-$z \
+            strapdata/storageclass
     done
 
 GKE Firewall rules
@@ -557,6 +561,63 @@ On GKE:
 
     kubectl delete pod --namespace kube-system -l k8s-app=coredns
 
+Check DNS resolution:
+
+.. code::
+
+    kubectl get configmap -n kube-system coredns-custom -o yaml
+    apiVersion: v1
+    data:
+      dns.server: |
+        test.strapkube.com:53 {
+            errors
+            cache 30
+            forward test.strapkube.com 40.90.4.8 64.4.48.8 13.107.24.8 13.107.160.8
+        }
+      hosts.override: |
+        hosts nodes.hosts internal.strapdata.com {
+            10.132.0.57 146-148-117-125.internal.strapdata.com 146-148-117-125
+            10.132.0.58 35-240-56-87.internal.strapdata.com 35-240-56-87
+            10.132.0.56 34-76-40-251.internal.strapdata.com 34-76-40-251
+            fallthrough
+        }
+    kind: ConfigMap
+    metadata:
+      creationTimestamp: "2020-06-26T16:45:52Z"
+      name: coredns-custom
+      namespace: kube-system
+      resourceVersion: "6632"
+      selfLink: /api/v1/namespaces/kube-system/configmaps/coredns-custom
+      uid: dca59c7d-6503-48c1-864f-28ae46319725
+
+.. code::
+
+    cat <<EOF | kubectl apply -f -
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      name: dnsutils
+      namespace: default
+    spec:
+      containers:
+      - name: dnsutils
+        image: gcr.io/kubernetes-e2e-test-images/dnsutils:1.3
+        command:
+          - sleep
+          - "3600"
+        imagePullPolicy: IfNotPresent
+      restartPolicy: Always
+    EOF
+
+.. code::
+
+    kubectl exec -ti dnsutils -- nslookup 146-148-117-125.internal.strapdata.com
+    Server:		10.19.240.10
+    Address:	10.19.240.10#53
+
+    Name:	146-148-117-125.internal.strapdata.com
+    Address: 10.132.0.57
+
 .. _traefik-setup:
 
 Traefik
@@ -655,26 +716,46 @@ Check the Elasticsearch cluster status:
     curl -k --user admin:$CASSANDRA_ADMIN_PASSWORD "https://cassandra-cl1-dc1-0-0.test.strapkube.com:39002/_cluster/state?pretty"
     {
       "cluster_name" : "cl1",
-      "cluster_uuid" : "9754758d-bac6-4b92-0000-000000000000",
-      "version" : 5,
-      "state_uuid" : "lXB_pTXvRnuLwE3jNOcaeQ",
-      "master_node" : "9754758d-bac6-4b92-0000-000000000000",
+      "cluster_uuid" : "8bbfeef1-6112-4509-0000-000000000000",
+      "version" : 2925,
+      "state_uuid" : "Pp36o9m9QU-AtYm8FepEHA",
+      "master_node" : "8bbfeef1-6112-4509-0000-000000000000",
       "blocks" : { },
       "nodes" : {
-        "9754758d-bac6-4b92-0000-000000000000" : {
-          "name" : "51.138.48.150",
+        "8bbfeef1-6112-4509-0000-000000000000" : {
+          "name" : "20.54.72.64",
           "status" : "ALIVE",
-          "ephemeral_id" : "9754758d-bac6-4b92-0000-000000000000",
+          "ephemeral_id" : "8bbfeef1-6112-4509-0000-000000000000",
           "transport_address" : "10.240.0.4:9300",
           "attributes" : {
-            "rack" : "0",
+            "rack" : "northeurope-1",
+            "dc" : "dc1"
+          }
+        },
+        "3a246ac2-1a0a-4f6e-0001-000000000000" : {
+          "name" : "40.113.33.9",
+          "status" : "ALIVE",
+          "ephemeral_id" : "3a246ac2-1a0a-4f6e-0001-000000000000",
+          "transport_address" : "10.240.0.35:9300",
+          "attributes" : {
+            "rack" : "northeurope-2",
+            "dc" : "dc1"
+          }
+        },
+        "ff8f0776-97cd-47a3-0002-000000000000" : {
+          "name" : "20.54.80.104",
+          "status" : "ALIVE",
+          "ephemeral_id" : "ff8f0776-97cd-47a3-0002-000000000000",
+          "transport_address" : "10.240.0.66:9300",
+          "attributes" : {
+            "rack" : "northeurope-3",
             "dc" : "dc1"
           }
         }
       },
       "metadata" : {
         "version" : 0,
-        "cluster_uuid" : "9754758d-bac6-4b92-0000-000000000000",
+        "cluster_uuid" : "8bbfeef1-6112-4509-0000-000000000000",
         "templates" : { },
         "indices" : { },
         "index-graveyard" : {
@@ -687,7 +768,7 @@ Check the Elasticsearch cluster status:
       "routing_nodes" : {
         "unassigned" : [ ],
         "nodes" : {
-          "9754758d-bac6-4b92-0000-000000000000" : [ ]
+          "8bbfeef1-6112-4509-0000-000000000000" : [ ]
         }
       },
       "snapshots" : {
@@ -739,10 +820,11 @@ namespace **default**, into the Kubernetes cluster **kube2** namespace **default
 * elassandra-cl1-dc1 (cluster passwords)
 * elassandra-cl1-dc1-ca-pub (cluster root CA)
 * elassandra-cl1-dc2-ca-key (cluster root CA key)
+* elassandra-cl1-kibana (cluster kibana passwords)
 
 .. code::
 
-    for s in elassandra-cl1 elassandra-cl1-ca-pub elassandra-cl1-ca-key; do
+    for s in elassandra-cl1 elassandra-cl1-ca-pub elassandra-cl1-ca-key elassandra-cl1-kibana; do
         kubectl get secret $s --context kube1 --export -n default -o yaml | kubectl apply --context gke_strapkube1_europe-west1_kube2 -n default -f -
     done
 
@@ -765,7 +847,7 @@ Deploy the datacenter **dc2** of the Elassandra cluster **cl1** in the Kubernete
         --set jvm.jmxPort="39004" \
         --set jvm.jdb="39005" \
         --set prometheus.port="39006" \
-        --set replicas="1" \
+        --set replicas="3" \
         --set cassandra.remoteSeeds[0]=cassandra-cl1-dc1-0-0.${DNS_DOMAIN} \
         --set networking.hostNetworkEnabled=true \
         --set networking.externalDns.enabled=true \
@@ -786,8 +868,13 @@ Wait for the datacenter **dc2** to be ready:
 
 .. code::
 
-    edctl watch-dc --context kube2 -n elassandra-cl1-dc2 -ns default --health GREEN
+    edctl watch-dc --context gke_strapkube1_europe-west1_kube2 -n elassandra-cl1-dc2 -ns default --replicas 3 --health GREEN
+    19:29:20.254 [main] INFO  i.m.context.env.DefaultEnvironment.<init>:210 Established active environments: [cli]
+    Waiting elassandra datacenter context=gke_strapkube1_europe-west1_kube2 name=elassandra-cl1-dc2 namespace=default health=GREEN timeout=600s
+    19:29:21 ADDED: elassandra-cl1-dc2 phase=RUNNING heath=GREEN replicas=3 reaper=false cqlStatus=NOT_STARTED managedKeyspaces=[]
+    done 143ms
 
+The second datacenter has never bootstrapped, so nodes are started with auto_bootstrap=false.
 Before streaming the Cassandra data, you now need to adjust the replication factor for the following keyspaces:
 
 * system_distributed
@@ -812,20 +899,23 @@ This is done with the following Elassandra task deployed on **dc1** (Kubernetes 
       replication:
         action: ADD
         dcName: "dc2"
-        dcSize: 1
+        dcSize: 3
         replicationMap:
-          elastic_admin: 1
-          reaper_db: 1
-          _kibana_1: 1
+          reaper_db: 3
           foo: 1
     EOF
-    edctl watch-task --context kube1 -n replication-add-$$ -ns default --phase SUCCEED
+    edctl watch-task --context kube1 -n replication-add-573 -ns default --phase SUCCEED
+    19:54:04.505 [main] INFO  i.m.context.env.DefaultEnvironment.<init>:210 Established active environments: [cli]
+    Watching elassandra task context=kube1 name=replication-add-573 namespace=default phase=SUCCEED timeout=600s
+    "19:54:06 ADDED: replication-add-573 phase=WAITING
+    "19:55:02 MODIFIED: replication-add-573 phase=SUCCEED
+    done 56772ms
 
 Then on **dc2**, run a rebuild task to stream data from **dc1** and wait for termination:
 
 .. code::
 
-    cat <<EOF | kubectl apply --context kube2 -f -
+    cat <<EOF | kubectl apply --context gke_strapkube1_europe-west1_kube2 -f -
     apiVersion: elassandra.strapdata.com/v1beta1
     kind: ElassandraTask
     metadata:
@@ -837,14 +927,39 @@ Then on **dc2**, run a rebuild task to stream data from **dc1** and wait for ter
       rebuild:
         srcDcName: "dc1"
     EOF
-    edctl watch-task --context kube2 -n rebuild-dc2-$$ -ns default --phase SUCCEED
+    edctl watch-task --context gke_strapkube1_europe-west1_kube2 -n rebuild-dc2-573 -ns default --phase SUCCEED
+    19:59:29.458 [main] INFO  i.m.context.env.DefaultEnvironment.<init>:210 Established active environments: [cli]
+    Watching elassandra task context=gke_strapkube1_europe-west1_kube2 name=rebuild-dc2-573 namespace=default phase=SUCCEED timeout=600s
+    "19:59:30 ADDED: rebuild-dc2-573 phase=SUCCEED
+    done 49ms
 
 If elasticsearch is enabled in **dc2**, you need to run restart Elassandra pods to update the Elasticsearch
 cluster state since data have been populated by streaming data from **dc1**.
 
 .. code::
 
-    kubectl delete pod --namespace default -l app=elassandra
+    kubectl delete pod --namespace default -l app=elassandra,elassandra.strapdata.com/datacenter=dc2
+
+Check the status of the Elassandra cluster running on AKS and GKE:
+
+.. code::
+
+    Datacenter: dc1
+    ===============
+    Status=Up/Down
+    |/ State=Normal/Leaving/Joining/Moving
+    --  Address          Load       Tokens       Owns    Host ID                               Rack
+    UN  20.54.72.64      4.77 MiB   16           ?       8bbfeef1-6112-4509-0000-000000000000  northeurope-1
+    UN  40.113.33.9      4.77 MiB   16           ?       3a246ac2-1a0a-4f6e-0001-000000000000  northeurope-2
+    UN  20.54.80.104     4.75 MiB   16           ?       ff8f0776-97cd-47a3-0002-000000000000  northeurope-3
+    Datacenter: dc2
+    ===============
+    Status=Up/Down
+    |/ State=Normal/Leaving/Joining/Moving
+    --  Address          Load       Tokens       Owns    Host ID                               Rack
+    UN  34.76.40.251     3.65 MiB   16           ?       66d0eada-908a-407d-0000-000000000000  europe-west1-c
+    UN  35.240.56.87     3.51 MiB   16           ?       6c578060-fc2b-4737-0002-000000000000  europe-west1-b
+    UN  146.148.117.125  3.51 MiB   16           ?       84846161-944e-49e2-0001-000000000000  europe-west1-d
 
 Finally, check the datacenter **dc2** is properly running on the Kubernetes cluster **kube2**:
 
@@ -859,6 +974,53 @@ Finally, check the datacenter **dc2** is properly running on the Kubernetes clus
 .. code::
 
     curl -k --user admin:$CASSANDRA_ADMIN_PASSWORD "https://cassandra-cl1-dc2-0-0.test.strapkube.com:39002/_cluster/state?pretty"
+    {
+      "cluster_name" : "cl1",
+      "cluster_uuid" : "8bbfeef1-6112-4509-0000-000000000000",
+      "version" : 33,
+      "state_uuid" : "0K-HIaLaR6qcQJNEbEF1lw",
+      "master_node" : "66d0eada-908a-407d-0000-000000000000",
+      "blocks" : { },
+      "nodes" : {
+        "84846161-944e-49e2-0001-000000000000" : {
+          "name" : "146.148.117.125",
+          "status" : "ALIVE",
+          "ephemeral_id" : "84846161-944e-49e2-0001-000000000000",
+          "transport_address" : "10.132.0.57:9300",
+          "attributes" : {
+            "rack" : "europe-west1-d",
+            "dc" : "dc2"
+          }
+        },
+        "66d0eada-908a-407d-0000-000000000000" : {
+          "name" : "34.76.40.251",
+          "status" : "ALIVE",
+          "ephemeral_id" : "66d0eada-908a-407d-0000-000000000000",
+          "transport_address" : "10.132.0.56:9300",
+          "attributes" : {
+            "rack" : "europe-west1-c",
+            "dc" : "dc2"
+          }
+        },
+        "6c578060-fc2b-4737-0002-000000000000" : {
+          "name" : "35.240.56.87",
+          "status" : "ALIVE",
+          "ephemeral_id" : "6c578060-fc2b-4737-0002-000000000000",
+          "transport_address" : "10.132.0.58:9300",
+          "attributes" : {
+            "rack" : "europe-west1-b",
+            "dc" : "dc2"
+          }
+        }
+      },
+      "metadata" : {
+        "version" : 5,
+        "cluster_uuid" : "8bbfeef1-6112-4509-0000-000000000000",
+        ...
+
+Cassandra reaper now see the two datacenters:
+
+.. image:: ./images/reaper-cluster-2dc.png
 
 Cleaning up
 -----------
