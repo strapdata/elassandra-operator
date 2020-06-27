@@ -10,8 +10,9 @@ set -x
 BASE_DIR=integ-test
 HELM_REPO=helm/src/main/helm
 
-export ELASSANDRA_OPERATOR_TAG=$(awk -F "=" '/version/ { print $2 }' gradle.properties)
-export ELASSANDRA_NODE_TAG=$(head -n 1 docker/supportedElassandraVersions.txt)
+ELASSANDRA_OPERATOR_TAG=$(awk -F "=" '/version/ { print $2 }' gradle.properties)
+ELASSANDRA_NODE_TAG=$(head -n 1 docker/supportedElassandraVersions.txt)
+
 
 test_start() {
   echo "### Starting $1"
@@ -63,6 +64,11 @@ setup_cluster() {
   create_cluster ${1:-cluster1} ${2:-6}
   create_registry
   init_helm
+}
+
+destroy_cluster() {
+  setup_flavor
+  delete_cluster
 }
 
 init_helm() {

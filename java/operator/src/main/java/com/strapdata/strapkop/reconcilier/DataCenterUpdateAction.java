@@ -687,67 +687,6 @@ public class DataCenterUpdateAction {
                 });
     }
 
-
-
-    public Completable rollbackDataCenter(Key key) throws Exception {
-        return Completable.complete();
-        /*
-        return fetchExistingStatefulSetsByZone()
-                .flatMapCompletable(existingStsMap -> {
-                    Zones zones = new Zones(dataCenterStatus, this.coreApi, existingStsMap);
-
-                    // 1.lookup for unscheduled rack
-                    final Map<String, RackStatus> rackStatusByName = new HashMap<>();
-                    boolean foundUnscheduledRack = false;
-                    for (RackStatus rackStatus : dataCenterStatus.getRackStatuses().values()) {
-                        rackStatusByName.put(rackStatus.getName(), rackStatus);
-                        if (rackStatus.getPhase().equals(RackPhase.SCHEDULING_PENDING)) {
-                            foundUnscheduledRack = true;
-                        }
-                    }
-
-                    if (!foundUnscheduledRack) {
-                        logger.warn("datacenter={} Rollback requested but there are no rack in phase={}. Rollback is cancelled !",
-                                dataCenter.id(), RackPhase.SCHEDULING_PENDING);
-                        return Completable.complete();
-                    }
-
-                    Completable todo = Completable.complete();
-                    if (checkPointCache.getCheckPoint(key).isPresent()) {
-                        final CheckPoint checkPoint = checkPointCache.rollbackCheckPoint(key);
-                        logger.info("datacenter={} Try to restore DataCenter configuration with fingerprint={} and userConfigMap={}'",
-                                dataCenter.id(), checkPoint.getCommittedSpec().fingerprint(), checkPoint.getCommittedUserConfigMap());
-
-                        if (checkPoint.getCommittedUserConfigMap() != null) {
-                            logger.trace("ROLLBACK user ConfigMap : {}", dataCenterSpec.getUserConfigMapVolumeSource().getName());
-                            V1ConfigMap previousUserConfig = k8sResourceUtils.readNamespacedConfigMap(dataCenterMetadata.getNamespace(), checkPoint.getCommittedUserConfigMap()).blockingGet();
-                            // override the current ConfigMap with the Previous one
-                            // force the ConfigMap name with the previous one without fingerprint
-                            logger.trace("RESTORE user ConfigMap : {}", checkPoint.getCommittedSpec().getUserConfigMapVolumeSource().getName());
-                            previousUserConfig.getMetadata().setName(checkPoint.getCommittedSpec().getUserConfigMapVolumeSource().getName());
-                            todo = todo.andThen(k8sResourceUtils.createOrReplaceNamespacedConfigMap(previousUserConfig).ignoreElement());
-                        } else {
-                            logger.info("datacenter={} No user ConfigMap to restore", dataCenter.id());
-                        }
-
-                        // restore previous configuration
-                        logger.trace("ROLLBACK DataCenter Spec : {}", dataCenterSpec);
-                        logger.trace("RESTORE DataCenter Spec : {}", checkPoint.getCommittedSpec());
-                        dataCenter.setSpec(checkPoint.getCommittedSpec());
-                        todo = todo.andThen(k8sResourceUtils.updateDataCenter(dataCenter)
-                                .flatMapCompletable((updatedDatacenter) -> {
-                                    // update dc status
-                                    updateDatacenterStatus(updatedDatacenter.getStatus(), DataCenterPhase.ROLLING_BACK, zones, rackStatusByName, Optional.of(""));
-                                    return k8sResourceUtils.updateDataCenterStatus(updatedDatacenter).ignoreElement();
-                                }));
-                    }
-                    // update dc status
-                    updateDatacenterStatus(dataCenterStatus, DataCenterPhase.ROLLING_BACK, zones, rackStatusByName, Optional.of(""));
-                    return todo.andThen(k8sResourceUtils.updateDataCenterStatus(dataCenter).ignoreElement());
-                });
-         */
-    }
-
     public class ConfigMapVolumeMountBuilder {
         public final V1ConfigMap configMap;
         public final V1ConfigMapVolumeSource volumeSource;
@@ -827,28 +766,31 @@ public class DataCenterUpdateAction {
         public ConfigMapVolumeMountBuilder seedConfig;  // per DC configmap, can be changed without triggering a rolling restart
         public ConfigMapVolumeMountBuilder rackConfig;  // per rack configmap
 
-        public final ConfigMapVolumeMountBuilder specConfig;  // configmap generated from CRD
+        public final ConfigMapVolumeMountBuilder operatorConfig;  // configmap generated from CRD
         public final Optional<ConfigMapVolumeMountBuilder> userConfig;  // user provided configmap
 
         public ConfigMapVolumeMounts(Optional<V1ConfigMap> userConfig) throws IOException, ApiException {
-            this.specConfig = builder.buildConfigMapSpec();
+            this.operatorConfig = builder.buildConfigMapOperator();
             this.userConfig = builder.buildConfigMapUser(userConfig);
         }
 
         public void setRack(RackStatus rackStatus) throws IOException, ApiException {
-            this.rackConfig = builder.buildConfigMapRack(rackStatus.getName(), rackStatus.getIndex());
+            this.rackConfig = builder.buildConfigMapRack(rackStatus);
             this.seedConfig = builder.buildConfigMapSeed(zones);
         }
 
         public String fingerPrint() {
-            String fingerprint = configMapFingerPrint(this.specConfig.configMap);
-            if (userConfig.isPresent())
+            String fingerprint = configMapFingerPrint(this.operatorConfig.configMap);
+            if (userConfig.isPresent()) {
                 fingerprint += "-" + configMapFingerPrint(userConfig.get().configMap);
+            } else {
+                fingerprint += "-0000000";
+            }
             return fingerprint;
         }
 
         public Completable createOrReplaceNamespacedConfigMaps() throws ApiException {
-            return specConfig.createOrReplaceNamespacedConfigMap().ignoreElement()
+            return operatorConfig.createOrReplaceNamespacedConfigMap().ignoreElement()
                     .andThen(rackConfig.createOrReplaceNamespacedConfigMap().ignoreElement())
                     .andThen(seedConfig.createOrReplaceNamespacedConfigMap().ignoreElement())
                     // use user configmap
@@ -866,7 +808,7 @@ public class DataCenterUpdateAction {
         @Override
         public Iterator<ConfigMapVolumeMountBuilder> iterator() {
             List<ConfigMapVolumeMountBuilder> builders = new ArrayList<>(4);
-            builders.add(specConfig);
+            builders.add(operatorConfig);
             builders.add(rackConfig);
             builders.add(seedConfig);
             if (userConfig.isPresent())
@@ -924,9 +866,7 @@ public class DataCenterUpdateAction {
 
         private V1ObjectMeta dataCenterObjectMeta(final String name, String... labels) {
             assert labels.length % 2 == 0 : "labels arguments should be even";
-            V1ObjectMeta meta = (dataCenterSpec.getPodTemplate() != null && dataCenterSpec.getPodTemplate().getMetadata() != null
-                    ? dataCenterSpec.getPodTemplate().getMetadata()
-                    : new V1ObjectMeta())
+            V1ObjectMeta meta = new V1ObjectMeta()
                     .name(name)
                     .namespace(dataCenterMetadata.getNamespace());
             for(Map.Entry<String, String> entry : OperatorLabels.datacenter(dataCenter).entrySet())
@@ -938,15 +878,14 @@ public class DataCenterUpdateAction {
             return meta;
         }
 
-        private V1ObjectMeta rackObjectMeta(final String rack, final int rackIndex, final String name) {
-            V1ObjectMeta meta = (dataCenterSpec.getPodTemplate() != null && dataCenterSpec.getPodTemplate().getMetadata() != null
-                    ? dataCenterSpec.getPodTemplate().getMetadata()
-                    : new V1ObjectMeta())
-                    .name(name)
+        private V1ObjectMeta rackObjectMeta(RackStatus rackStatus) {
+            V1ObjectMeta meta = new V1ObjectMeta()
+                    .name(OperatorNames.rackConfig(dataCenter, Integer.toString(rackStatus.getIndex())))
                     .namespace(dataCenterMetadata.getNamespace());
-            for(Map.Entry<String, String> entry : OperatorLabels.rack(dataCenter, rack, rackIndex).entrySet())
+            for(Map.Entry<String, String> entry : OperatorLabels.rack(dataCenter, rackStatus.getName(), rackStatus.getIndex()).entrySet())
                 meta.putLabelsItem(entry.getKey(), entry.getValue());
             meta.addOwnerReferencesItem(OperatorNames.ownerReference(dataCenter));
+            meta.putAnnotationsItem(OperatorLabels.DATACENTER_FINGERPRINT, rackStatus.getFingerprint());
             meta.putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, dataCenter.getMetadata().getGeneration().toString());
             meta.putAnnotationsItem(OperatorLabels.PVC_DECOMMISSION_POLICY, dataCenterSpec.getDecommissionPolicy().getValue());
             return meta;
@@ -1264,19 +1203,17 @@ public class DataCenterUpdateAction {
          * @return
          * @throws IOException
          */
-        public ConfigMapVolumeMountBuilder buildConfigMapSpec() throws IOException {
-            final V1ConfigMap configMap = new V1ConfigMap().metadata(dataCenterObjectMeta(OperatorNames.specConfig(dataCenter)));
+        public ConfigMapVolumeMountBuilder buildConfigMapOperator() throws IOException {
+            final V1ConfigMap configMap = new V1ConfigMap().metadata(dataCenterObjectMeta(OperatorNames.operatorConfig(dataCenter)));
             final V1ConfigMapVolumeSource volumeSource = new V1ConfigMapVolumeSource().name(configMap.getMetadata().getName());
             final ConfigMapVolumeMountBuilder configMapVolumeMountBuilder =
-                    new ConfigMapVolumeMountBuilder(configMap, volumeSource, "operator-config-volume-spec", "/tmp/operator-config-spec");
+                    new ConfigMapVolumeMountBuilder(configMap, volumeSource, "operator-config-volume", "/tmp/operator-config");
 
             // cassandra.yaml overrides
             {
                 final Map<String, Object> config = new HashMap<>(); // can't use ImmutableMap as some values are null
 
                 config.put("cluster_name", dataCenterSpec.getClusterName());
-                config.put("num_tokens", "16");
-
                 config.put("listen_address", null); // let C* discover the listen address
                 // broadcast_rpc is set dynamically from entry-point.sh according to env $POD_IP
                 config.put("rpc_address", "0.0.0.0"); // bind rpc to all addresses (allow localhost access)
@@ -1336,7 +1273,7 @@ public class DataCenterUpdateAction {
                     }
                 }
 
-                configMapVolumeMountBuilder.addFile("cassandra.yaml.d/001-spec.yaml", toYamlString(config));
+                configMapVolumeMountBuilder.addFile("cassandra.yaml.d/001-operator.yaml", toYamlString(config));
             }
 
             // prometheus support (see prometheus annotations)
@@ -1481,7 +1418,7 @@ public class DataCenterUpdateAction {
                         //.put("cipher_suites", ImmutableList.of("TLS_RSA_WITH_AES_128_CBC_SHA", "TLS_RSA_WITH_AES_256_CBC_SHA"))
                         .build()
                 );
-                configMapVolumeMountBuilder.addFile("cassandra.yaml.d/002-ssl.yaml", toYamlString(cassandraConfig));
+                configMapVolumeMountBuilder.addFile("cassandra.yaml.d/001-ssl.yaml", toYamlString(cassandraConfig));
             }
 
             // add authentication config
@@ -1489,19 +1426,19 @@ public class DataCenterUpdateAction {
                 case NONE:
                     // create configMapFile also in NONE case because the ElassandraEnterprise image
                     // defines the PasswordAuthorizer as default.
-                    configMapVolumeMountBuilder.addFile("cassandra.yaml.d/002-authentication.yaml",
+                    configMapVolumeMountBuilder.addFile("cassandra.yaml.d/001-authentication.yaml",
                             toYamlString(ImmutableMap.of(
                                     "authenticator", "AllowAllAuthenticator",
                                     "authorizer", "AllowAllAuthorizer")));
                     break;
                 case CASSANDRA:
-                    configMapVolumeMountBuilder.addFile("cassandra.yaml.d/002-authentication.yaml",
+                    configMapVolumeMountBuilder.addFile("cassandra.yaml.d/001-authentication.yaml",
                             toYamlString(ImmutableMap.of(
                                     "authenticator", "PasswordAuthenticator",
                                     "authorizer", "CassandraAuthorizer")));
                     break;
                 case LDAP:
-                    configMapVolumeMountBuilder.addFile("cassandra.yaml.d/002-authentication.yaml",
+                    configMapVolumeMountBuilder.addFile("cassandra.yaml.d/001-authentication.yaml",
                             toYamlString(ImmutableMap.of(
                                     "authenticator", "com.strapdata.cassandra.ldap.LDAPAuthenticator",
                                     "authorizer", "CassandraAuthorizer",
@@ -1533,8 +1470,8 @@ public class DataCenterUpdateAction {
                     }
 
                     esConfig.put("cbs", ImmutableMap.of("enabled", enterprise.getCbs()));
-                    configMapVolumeMountBuilder.addFile("elasticsearch.yml.d/002-enterprise.yaml", toYamlString(esConfig));
-                    configMapVolumeMountBuilder.addFile("cassandra-env.sh.d/002-enterprise.sh",
+                    configMapVolumeMountBuilder.addFile("elasticsearch.yml.d/001-enterprise.yaml", toYamlString(esConfig));
+                    configMapVolumeMountBuilder.addFile("cassandra-env.sh.d/001-enterprise.sh",
                             "JVM_OPTS=\"$JVM_OPTS -Dcassandra.custom_query_handler_class=org.elassandra.index.EnterpriseElasticQueryHandler \"");
                     // TODO: override com exporter in cassandra-env.sh.d/001-cassandra-exporter.sh
                 }
@@ -1543,7 +1480,7 @@ public class DataCenterUpdateAction {
                 if (dataCenterSpec.getElasticsearch().getDatacenterGroup() != null) {
                     final Map<String, Object> esConfig = new HashMap<>();
                     esConfig.put("datacenter", ImmutableMap.of("group", dataCenterSpec.getElasticsearch().getDatacenterGroup()));
-                    configMapVolumeMountBuilder.addFile("elasticsearch.yml.d/003-datacentergroup.yaml", toYamlString(esConfig));
+                    configMapVolumeMountBuilder.addFile("elasticsearch.yml.d/001-datacentergroup.yaml", toYamlString(esConfig));
                 }
             }
 
@@ -1554,14 +1491,14 @@ public class DataCenterUpdateAction {
          * configuration that is specific to rack. For the moment, an update of it does not trigger a restart
          * One immutable configmap per rack
          */
-        private ConfigMapVolumeMountBuilder buildConfigMapRack(final String rack, final int rackIndex) throws IOException {
-            final V1ConfigMap configMap = new V1ConfigMap().metadata(rackObjectMeta(rack, rackIndex, OperatorNames.rackConfig(dataCenter, rack)));
+        private ConfigMapVolumeMountBuilder buildConfigMapRack(final RackStatus rackStatus) throws IOException {
+            final V1ConfigMap configMap = new V1ConfigMap().metadata(rackObjectMeta(rackStatus));
             final V1ConfigMapVolumeSource volumeSource = new V1ConfigMapVolumeSource().name(configMap.getMetadata().getName());
 
             // GossipingPropertyFileSnitch config
             final Properties rackDcProperties = new Properties();
             rackDcProperties.setProperty("dc", dataCenterSpec.getDatacenterName());
-            rackDcProperties.setProperty("rack", rack);
+            rackDcProperties.setProperty("rack", rackStatus.getName());
             rackDcProperties.setProperty("prefer_local", Boolean.toString(dataCenterSpec.getCassandra().getSnitchPreferLocal()));
 
             final StringWriter writer = new StringWriter();
@@ -1570,7 +1507,7 @@ public class DataCenterUpdateAction {
             // This is because GossipingPropertyFileSnitch inherits from PropertyFileSnitch
             return new ConfigMapVolumeMountBuilder(configMap, volumeSource, "operator-config-volume-rack", "/tmp/operator-config-rack")
                     .addFile("cassandra-rackdc.properties", writer.toString())
-                    .addFile("cassandra-topology.properties", String.format(Locale.ROOT, "default=%s:%s", dataCenterSpec.getDatacenterName(), rack));
+                    .addFile("cassandra-topology.properties", String.format(Locale.ROOT, "default=%s:%s", dataCenterSpec.getDatacenterName(), rackStatus.getName()));
         }
 
         public Optional<ConfigMapVolumeMountBuilder> buildConfigMapUser(Optional<V1ConfigMap> userConfigMap) {
@@ -1698,7 +1635,7 @@ public class DataCenterUpdateAction {
         }
 
         public Single<V1StatefulSet> buildStatefulSetRack(RackStatus rackStatus, ConfigMapVolumeMounts configMapVolumeMounts) throws Exception {
-            final V1ObjectMeta statefulSetMetadata = rackObjectMeta(rackStatus.getName(), rackStatus.getIndex(), OperatorNames.stsName(dataCenter, rackStatus.getIndex()));
+            final V1ObjectMeta statefulSetMetadata = rackObjectMeta(rackStatus);
 
             // create Elassandra container and the associated initContainer to replay commitlogs
             final V1Container cassandraContainer = buildElassandraContainer(rackStatus);
@@ -1906,16 +1843,18 @@ public class DataCenterUpdateAction {
                 commitlogInitContainer.addArgsItem(opClusterSecretPath);
             }
 
-            final Map<String, String> rackLabels = OperatorLabels.rack(dataCenter, rackStatus.getName(), rackStatus.getIndex());
-
+            // CRD spec + configMap fingerprint
             String fingerprint = dataCenterSpec.elassandraFingerprint() + "-" + configMapVolumeMounts.fingerPrint();
             final V1ObjectMeta templateMetadata = (dataCenterSpec.getPodTemplate() != null && dataCenterSpec.getPodTemplate().getMetadata() != null
                     ? dataCenterSpec.getPodTemplate().getMetadata()
                     : new V1ObjectMeta())
-                    .labels(rackLabels)
                     .putAnnotationsItem(OperatorLabels.DATACENTER_FINGERPRINT, fingerprint)
                     .putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, dataCenter.getMetadata().getGeneration().toString())
                     .putAnnotationsItem(OperatorLabels.PVC_DECOMMISSION_POLICY, dataCenterSpec.getDecommissionPolicy().getValue());
+
+            final Map<String, String> rackLabels = OperatorLabels.rack(dataCenter, rackStatus.getName(), rackStatus.getIndex());
+            for(Map.Entry<String,String> entry : rackLabels.entrySet())
+                templateMetadata.putLabelsItem(entry.getKey(), entry.getValue());
 
             // add prometheus annotations to scrap nodes
             if (dataCenterSpec.getPrometheus().getEnabled()) {
@@ -1942,8 +1881,7 @@ public class DataCenterUpdateAction {
             Zone zone = zones.get(rackStatus.getName());
             if (zone != null && zone.getSts().isPresent()) {
                 // Avoid PVC replacement and data loss if spec modified...
-                statefulSetSpec.setVolumeClaimTemplates(zone.getSts().get().getSpec().
-                        getVolumeClaimTemplates());
+                statefulSetSpec.setVolumeClaimTemplates(zone.getSts().get().getSpec().getVolumeClaimTemplates());
             } else {
                 if (dataCenterSpec.getDataVolumeClaim() != null && dataCenterSpec.getDataVolumeClaim().getStorageClassName() != null) {
                     String storageClassName = dataCenterSpec.getDataVolumeClaim().getStorageClassName()

@@ -20,6 +20,7 @@ package com.strapdata.strapkop.pipeline;
 import com.google.common.collect.ImmutableList;
 import com.strapdata.strapkop.event.K8sWatchEvent;
 import com.strapdata.strapkop.model.ClusterKey;
+import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.reconcilier.Reconciliable;
 import io.micrometer.core.instrument.ImmutableTag;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -51,7 +52,7 @@ public class WorkQueues {
 
     private static final Logger logger = LoggerFactory.getLogger(WorkQueues.class);
 
-    private final Map<ClusterKey, Subject<Reconciliable>> queues = new ConcurrentHashMap<>();
+    private final Map<Key, Subject<Reconciliable>> queues = new ConcurrentHashMap<>();
 
     @Inject
     MeterRegistry meterRegistry;
@@ -72,7 +73,7 @@ public class WorkQueues {
      * @param key
      * @param completable
      */
-    public synchronized void submit(final ClusterKey key, String resourceVersion, Reconciliable.Kind kind, K8sWatchEvent.Type type, final Completable completable) {
+    public synchronized void submit(final Key key, String resourceVersion, Reconciliable.Kind kind, K8sWatchEvent.Type type, final Completable completable) {
         Reconciliable reconciliable = new Reconciliable()
                 .withKind(kind)
                 .withType(type)
@@ -84,29 +85,29 @@ public class WorkQueues {
         queue.onNext(reconciliable);
     }
 
-    private Subject<Reconciliable> createQueue(final ClusterKey key) {
-        logger.debug("creating workqueue for key {}", key);
+    private Subject<Reconciliable> createQueue(final Key key) {
+        logger.debug("datacenter={} Creating workqueue", key.id());
         final Subject<Reconciliable> queue = BehaviorSubject.<Reconciliable>create()
                 .toSerialized(); // this make the subject thread safe (e.g can call onNext concurrently)
 
         Disposable disposable = queue
                 .observeOn(scheduler)
-                .subscribeOn(scheduler)
                 .subscribe(reconciliable -> {
-                            logger.debug("--- cluster={} resourceVersion={} kind={} type={}", key, reconciliable.getResourceVersion(), reconciliable.getKind(), reconciliable.getType());
+                            logger.debug("--- datacenter={} resourceVersion={} kind={} type={}",
+                                    key.id(), reconciliable.getResourceVersion(), reconciliable.getKind(), reconciliable.getType());
                             reconciliable.setStartTime(System.currentTimeMillis());
                             Throwable e = reconciliable.getCompletable().blockingGet();
                             if (e == null) {
-                                logger.debug("--- cluster={} resourceVersion={} kind={} type={} pending={}ms execution={}ms",
-                                        key, reconciliable.getResourceVersion(),
+                                logger.debug("--- datacenter={} resourceVersion={} kind={} type={} pending={}ms execution={}ms",
+                                        key.id(), reconciliable.getResourceVersion(),
                                         reconciliable.getKind(), reconciliable.getType(),
                                         reconciliable.getStartTime() - reconciliable.getSubmitTime(),
                                         System.currentTimeMillis() - reconciliable.getStartTime());
                             } else {
-                                logger.warn("--- cluster=" + key + " reconciliable=" + reconciliable + " error:", e);
+                                logger.warn("--- datacenter=" + key.id() + " reconciliable=" + reconciliable + " error:", e);
                             }
                         },
-                        throwable -> logger.error("error in work queue for cluster=" + key +":", throwable)
+                        throwable -> logger.error("Error in work queue for datacenter=" + key.id() +":", throwable)
                 );
         return queue;
     }

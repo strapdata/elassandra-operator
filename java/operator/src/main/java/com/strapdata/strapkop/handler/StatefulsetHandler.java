@@ -91,7 +91,10 @@ public class StatefulsetHandler extends TerminalHandler<K8sWatchEvent<V1Stateful
             if (zone == null) {
                 logger.warn("sts={}/{} has no {} label", sts.getMetadata().getName(), sts.getMetadata().getNamespace(), OperatorLabels.RACK);
             } else {
-                logger.debug("sts={}/{} {}={}", sts.getMetadata().getName(), sts.getMetadata().getNamespace(), OperatorLabels.RACK, zone);
+                logger.debug("sts={}/{} {}={} resourceVersion={} readyReplica={}",
+                        sts.getMetadata().getName(), sts.getMetadata().getNamespace(), OperatorLabels.RACK, zone,
+                        sts.getMetadata().getResourceVersion(),
+                        sts.getStatus().getReadyReplicas());
                 v.put(zone, sts);
             }
             return v;

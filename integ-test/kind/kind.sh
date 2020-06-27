@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -x
 
-export STORAGE_CLASS_NAME="server-storage"
-export REGISTRY_NAME='kind-registry'
-export REGISTRY_PORT='5000'
-export REGISTRY_URL="localhost:5000"
+STORAGE_CLASS_NAME="server-storage"
+REGISTRY_NAME='kind-registry'
+REGISTRY_PORT='5000'
+
 
 create_cluster() {
   case "${2:-6}" in

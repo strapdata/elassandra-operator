@@ -120,16 +120,15 @@ public class ElassandraPodHandler extends TerminalHandler<K8sWatchEvent<V1Pod>> 
                                 .findFirst();
 
                         V1Pod pod = event.getResource();
-                        String clusterName = Pod.extractLabel(pod, OperatorLabels.CLUSTER);
+                        String datacenterName = Pod.extractLabel(pod, OperatorLabels.PARENT);
                         String podName = pod.getMetadata().getName();
                         String namespace = pod.getMetadata().getNamespace();
 
-                        ClusterKey clusterKey = new ClusterKey(clusterName, namespace);
                         logger.debug("Pending pod={}/{} conditions={}", podName, namespace, conditions);
                         if (scheduleFailed.isPresent()) {
                             meterRegistry.counter("k8s.pod.unschedulable", tags).increment();
                             workQueues.submit(
-                                    clusterKey,
+                                    new Key(datacenterName, namespace),
                                     pod.getMetadata().getResourceVersion(),
                                     Reconciliable.Kind.ELASSANDRA_POD, K8sWatchEvent.Type.MODIFIED,
                                     dataCenterController.unschedulablePod(new Pod(pod, CONTAINER_NAME)));

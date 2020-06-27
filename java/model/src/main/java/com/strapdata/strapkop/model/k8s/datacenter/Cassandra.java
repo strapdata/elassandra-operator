@@ -25,9 +25,7 @@ import lombok.NoArgsConstructor;
 import lombok.With;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Cassandra settings
@@ -44,13 +42,6 @@ public class Cassandra {
     @SerializedName("workload")
     @Expose
     private Workload workload = Workload.READ_WRITE;
-
-    /**
-     * Cassandra YAML configuration
-     */
-    @SerializedName("config")
-    @Expose
-    private Map<String, Object> config = new HashMap<>();
 
     /**
      * Enable cassandra/ldap authentication and authorization

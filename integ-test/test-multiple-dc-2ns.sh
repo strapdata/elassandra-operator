@@ -14,7 +14,7 @@ install_elassandra_datacenter $NS cl1 dc1 1
 java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --health GREEN --cql-status=ESTABLISHED
 
 # create an index
-kubectl exec elassandra-cl1-dc1-0-0 -n $NS -- bash -l -c "for i in {1..$N}; do post foo/bar '{\"foo\":\"bar\"}'; done"
+kubectl exec elassandra-cl1-dc1-0-0 -n $NS -- bash -l -c "for i in {1..$N}; do post foo/bar '{\"foo\":\"bar\"}' 2>/dev/null; done"
 
 # create namespace NS2 and copy cluster secrets
 kubectl create namespace $NS2 || true
@@ -88,7 +88,7 @@ fi
 
 # create a new elasticsearch index replicated on dc1 and dc2
 kubectl exec elassandra-cl1-dc2-0-0 -n $NS2 -- bash -l -c "put _template/replicated '{ \"index_patterns\": [\"foo*\"],\"settings\": { \"index.replication\":\"dc1:1,dc2:1\" }}'"
-kubectl exec elassandra-cl1-dc2-0-0 -n $NS2 -- bash -l -c "for i in {1..$N}; do post foo2/bar '{\"foo\":\"bar\"}'; done"
+kubectl exec elassandra-cl1-dc2-0-0 -n $NS2 -- bash -l -c "for i in {1..$N}; do post foo2/bar '{\"foo\":\"bar\"}' 2>/dev/null; done"
 # wait for async replication en ES refresh
 sleep 5
 TOTAL_HIT=$(kubectl exec elassandra-cl1-dc1-0-0 -n $NS -- bash -l -c "get 'foo/bar/_search?pretty'" | tail -n +4 | jq ".hits.total")
