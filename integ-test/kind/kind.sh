@@ -26,7 +26,7 @@ create_kind_cluster3() {
   kubectl label nodes cluster1-worker failure-domain.beta.kubernetes.io/zone=a
   kubectl label nodes cluster1-worker2 failure-domain.beta.kubernetes.io/zone=b
   kubectl label nodes cluster1-worker3 failure-domain.beta.kubernetes.io/zone=c
-  kubectl get nodes -o wide -L failure-domain.beta.kubernetes.io/zone,kubernetes.strapdata.com/public-ip,beta.kubernetes.io/instance-type
+  kubectl get nodes -o wide -L failure-domain.beta.kubernetes.io/zone,elassandra.strapdata.com/public-ip,beta.kubernetes.io/instance-type
 }
 
 # $1 = cluster name

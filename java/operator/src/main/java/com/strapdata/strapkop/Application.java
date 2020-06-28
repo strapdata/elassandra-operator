@@ -47,7 +47,6 @@ public class Application {
 
     @Singleton
     static class ObjectMapperBeanEventListener implements BeanCreatedEventListener<ObjectMapper> {
-
         /**
          * Register the fabric8 datacenter+task deserializer for webhook admission.
          * @param event

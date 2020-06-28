@@ -20,6 +20,7 @@ package com.strapdata.strapkop.cql;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.Session;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenterStatus;
 import io.micronaut.context.annotation.Prototype;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
@@ -45,10 +46,10 @@ public class CqlSessionHandler implements CqlSessionSupplier {
     }
 
     @Override
-    public Single<Session> getSession(DataCenter dataCenter) throws Exception {
+    public Single<Session> getSession(DataCenter dataCenter, DataCenterStatus dataCenterStatus) throws Exception {
         return (session != null) ?
             Single.just(session) :
-            cqlRoleManager.connect(dataCenter, dataCenter.getStatus())
+            cqlRoleManager.connect(dataCenter, dataCenterStatus)
                 .map(tuple -> {
                     this.cluster = tuple._1;
                     this.session = tuple._2;
@@ -67,8 +68,8 @@ public class CqlSessionHandler implements CqlSessionSupplier {
 
 
     @Override
-    public Single<Session> getSessionWithSchemaAgreed(DataCenter dataCenter) throws Exception {
-        return getSession(dataCenter)
+    public Single<Session> getSessionWithSchemaAgreed(DataCenter dataCenter, DataCenterStatus dataCenterStatus) throws Exception {
+        return getSession(dataCenter, dataCenterStatus)
                 .flatMap(s -> {
                     if (!s.getCluster().getMetadata().checkSchemaAgreement())
                         throw new IllegalStateException("No schema agreement");

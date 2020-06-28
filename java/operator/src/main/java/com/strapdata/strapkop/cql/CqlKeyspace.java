@@ -18,6 +18,7 @@
 package com.strapdata.strapkop.cql;
 
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenterStatus;
 import io.reactivex.Single;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -73,10 +74,10 @@ public class CqlKeyspace implements CqlReconciliable {
      * @param sessionSupplier
      * @return
      */
-    public Single<CqlKeyspace> createIfNotExistsKeyspace(final DataCenter dataCenter, final CqlSessionSupplier sessionSupplier) throws Exception {
+    public Single<CqlKeyspace> createIfNotExistsKeyspace(final DataCenter dataCenter, final DataCenterStatus dataCenterStatus, final CqlSessionSupplier sessionSupplier) throws Exception {
         return (rf <= 0) ?
                 Single.just(this) :
-                sessionSupplier.getSessionWithSchemaAgreed(dataCenter)
+                sessionSupplier.getSessionWithSchemaAgreed(dataCenter, dataCenterStatus)
                         .flatMap(session -> {
                         int targetRf = Math.max(1, Math.min(rf, dataCenter.getSpec().getReplicas()));
                         String query = String.format(Locale.ROOT, "CREATE KEYSPACE IF NOT EXISTS \"%s\" WITH replication = {'class': 'NetworkTopologyStrategy', '%s':'%d'}; ",

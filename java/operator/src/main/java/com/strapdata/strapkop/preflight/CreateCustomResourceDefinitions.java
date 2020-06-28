@@ -17,6 +17,7 @@
 
 package com.strapdata.strapkop.preflight;
 
+import com.strapdata.strapkop.k8s.K8sController;
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.apis.ApiextensionsV1beta1Api;
@@ -37,17 +38,17 @@ public class CreateCustomResourceDefinitions implements Preflight<Void> {
 
     static final Logger logger = LoggerFactory.getLogger(CreateCustomResourceDefinitions.class);
 
-    private final ApiextensionsV1beta1Api apiExtensionsApi;
+    @Inject
+    ApiextensionsV1beta1Api apiExtensionsApi;
 
     @Inject
-    public CreateCustomResourceDefinitions(final ApiextensionsV1beta1Api apiExtensionsApi) {
-        this.apiExtensionsApi = apiExtensionsApi;
-    }
+    K8sController kubernetesController;
 
     @Override
     public Void call() throws Exception {
         createCrdFromResource("/datacenter-crd.yaml");
         createCrdFromResource("/task-crd.yaml");
+        kubernetesController.start();   // start when CRD are deployed
         return null;
     }
 

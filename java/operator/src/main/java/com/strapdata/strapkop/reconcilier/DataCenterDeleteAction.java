@@ -27,6 +27,8 @@ import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
+import io.kubernetes.client.informer.SharedIndexInformer;
+import io.kubernetes.client.informer.SharedInformerFactory;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.apis.AppsV1Api;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
@@ -48,13 +50,11 @@ public class DataCenterDeleteAction {
     private final K8sResourceUtils k8sResourceUtils;
     private final CoreV1Api coreV1Api;
     private final DataCenter dataCenter;
-    private final DataCenterCache dataCenterCache;
+    private final SharedIndexInformer<DataCenter> dataCenterSharedIndexInformer;
     private final DataCenterStatusCache dataCenterStatusCache;
     private final HttpConnectionCache sidecarConnectionCache;
     private final JMXConnectorCache jmxConnectorCache;
     private final StatefulsetCache statefulsetCache;
-    private final ServiceAccountCache serviceAccountCache;
-    private final PodCache podCache;
 
     private final CqlKeyspaceManager cqlKeyspaceManager;
     private final CqlRoleManager cqlRoleManager;
@@ -64,13 +64,11 @@ public class DataCenterDeleteAction {
     public DataCenterDeleteAction(K8sResourceUtils k8sResourceUtils,
                                   CoreV1Api coreV1Api,
                                   AppsV1Api appsV1Api,
-                                  final DataCenterCache dataCenterCache,
+                                  final SharedInformerFactory sharedInformerFactory,
                                   final DataCenterStatusCache dataCenterStatusCache,
                                   final HttpConnectionCache sidecarConnectionCache,
                                   final JMXConnectorCache jmxConnectorCache,
                                   final StatefulsetCache statefulsetCache,
-                                  final ServiceAccountCache serviceAccountCache,
-                                  final PodCache podCache,
                                   CqlKeyspaceManager cqlKeyspaceManager,
                                   CqlRoleManager cqlRoleManager,
                                   @Parameter("dataCenter") DataCenter dataCenter,
@@ -79,20 +77,18 @@ public class DataCenterDeleteAction {
         this.k8sResourceUtils = k8sResourceUtils;
         this.coreV1Api = coreV1Api;
         this.dataCenter = dataCenter;
-        this.dataCenterCache = dataCenterCache;
+        this.dataCenterSharedIndexInformer = sharedInformerFactory.getExistingSharedIndexInformer(DataCenter.class);
         this.dataCenterStatusCache = dataCenterStatusCache;
         this.sidecarConnectionCache = sidecarConnectionCache;
-        this.serviceAccountCache = serviceAccountCache;
         this.statefulsetCache = statefulsetCache;
         this.jmxConnectorCache = jmxConnectorCache;
-        this.podCache = podCache;
         this.cqlKeyspaceManager = cqlKeyspaceManager;
         this.cqlRoleManager = cqlRoleManager;
         this.backupScheduler = backupScheduler;
         this.meterRegistry = meterRegistry;
     }
 
-    Completable deleteDataCenter(final CqlSessionSupplier cqlSessionSupplier) throws Exception {
+    Completable deleteDataCenter(final CqlSessionSupplier cqlSessionSupplier)  {
         // remove the datacenter from replication maps of managed keyspaces
         return Completable.fromAction(new Action() {
             @Override
@@ -101,15 +97,12 @@ public class DataCenterDeleteAction {
                 backupScheduler.cancelBackups(new Key(dataCenter.getMetadata()));
 
                 // cleanup local caches
-                Key key = new Key(dataCenter.getMetadata().getName(), dataCenter.getMetadata().getNamespace());
-                dataCenterCache.remove(key);
+                Key key = new Key(dataCenter.getMetadata());
                 dataCenterStatusCache.remove(key);
                 statefulsetCache.remove(key);
 
                 sidecarConnectionCache.purgeDataCenter(dataCenter);
                 jmxConnectorCache.purgeDataCenter(dataCenter);
-                podCache.purgeDataCenter(dataCenter);
-                serviceAccountCache.purgeServiceAccount(dataCenter);
 
                 cqlRoleManager.remove(dataCenter);
                 cqlKeyspaceManager.remove(dataCenter);

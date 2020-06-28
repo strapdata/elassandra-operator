@@ -28,6 +28,7 @@ import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.datacenter.CqlStatus;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenterPhase;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenterStatus;
 import com.strapdata.strapkop.plugins.Plugin;
 import com.strapdata.strapkop.plugins.PluginRegistry;
 import com.strapdata.strapkop.reconcilier.DataCenterUpdateAction;
@@ -125,7 +126,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                                 needDcStatusUpdate = true;
                                 if (ks.createIfNotExists) {
                                     try {
-                                        todoList.add(ks.createIfNotExistsKeyspace(dataCenter, sessionSupplier).ignoreElement());
+                                        todoList.add(ks.createIfNotExistsKeyspace(dataCenter, dataCenterUpdateAction.dataCenterStatus, sessionSupplier).ignoreElement());
                                     } catch (Exception e) {
                                         logger.warn("datacenter=" + dataCenter.id() + " Failed to create keyspace=" + ks.name, e);
                                     }
@@ -144,7 +145,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                         for (CqlKeyspace keyspace : get(dataCenter).values()) {
                             try {
                                 if (!keyspace.reconcilied() || keyspace.reconcileWithDcSize < keyspace.rf || dataCenter.getSpec().getReplicas() < keyspace.rf)
-                                    todoList.add(updateKeyspaceReplicationMap(dataCenter, keyspace.name, effectiveRF(dataCenter, keyspace.rf), sessionSupplier)
+                                    todoList.add(updateKeyspaceReplicationMap(dataCenter, dataCenterUpdateAction.dataCenterStatus, keyspace.name, effectiveRF(dataCenter, keyspace.rf), sessionSupplier)
                                             .andThen(Completable.fromAction(() -> dataCenterUpdateAction.operation.getActions().add("Update keyspace RF for ["+keyspace.getName()+"]")))
                                     );
                             } catch (Exception e) {
@@ -153,7 +154,9 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                         }
                         // we set the current replicas in observed replicas to know if we need to update rf map
                         return Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()]))
-                                .andThen(Completable.fromAction(() -> dataCenterUpdateAction.dataCenterStatus.getKeyspaceManagerStatus().setReplicas(dataCenter.getSpec().getReplicas())))
+                                .andThen(Completable.fromAction(() -> {
+                                    dataCenterUpdateAction.dataCenterStatus.getKeyspaceManagerStatus().setReplicas(dataCenter.getSpec().getReplicas());
+                                }))
                                 .toSingleDefault(true);
                     } else {
                         return Single.just(needDcStatusUpdate);
@@ -173,27 +176,26 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
         return Math.max(1, Math.min(targetRf, Math.min(dataCenter.getStatus().getReadyReplicas(), dataCenter.getSpec().getReplicas())));
     }
 
-    public void removeDatacenter(final DataCenter dataCenter, CqlSessionSupplier sessionSupplier) throws Exception {
+    public void removeDatacenter(final DataCenter dataCenter, DataCenterStatus dataCenterStatus, CqlSessionSupplier sessionSupplier) throws Exception {
         // abort if dc is not running normally or not connected
         if (dataCenter.getStatus().getPhase().equals(DataCenterPhase.RUNNING) &&
                 dataCenter.getStatus().getCqlStatus().equals(CqlStatus.ESTABLISHED)) {
             try {
                 // adjust RF for system keyspaces
                 for (CqlKeyspace keyspace : SYSTEM_KEYSPACES) {
-                    updateKeyspaceReplicationMap(dataCenter, keyspace.name, 0, sessionSupplier).blockingGet();
+                    updateKeyspaceReplicationMap(dataCenter, dataCenterStatus, keyspace.name, 0, sessionSupplier).blockingGet();
                 }
 
                 // monitor elastic_admin keyspace to reduce RF when scaling down the DC.
-                updateKeyspaceReplicationMap(dataCenter, elasticAdminKeyspaceName(dataCenter), 0, sessionSupplier).blockingGet();
+                updateKeyspaceReplicationMap(dataCenter, dataCenterStatus, elasticAdminKeyspaceName(dataCenter), 0, sessionSupplier).blockingGet();
 
                 // adjust user keyspace RF
                 if (get(dataCenter) != null) {
                     for (CqlKeyspace keyspace : get(dataCenter).values()) {
-                        updateKeyspaceReplicationMap(dataCenter, keyspace.name, 0, sessionSupplier).blockingGet();
+                        updateKeyspaceReplicationMap(dataCenter, dataCenterStatus, keyspace.name, 0, sessionSupplier).blockingGet();
                     }
                 }
             } catch (Exception e) {
-                // TODO [ELE] should be ignored in single DC deployment but maybe retry in multiDC configuration...
                 logger.warn("datacenter=" + dataCenter.id() + " Unable to update Keyspace Replication Map due to '{}'", e.getMessage(), e);
             }
         }
@@ -201,22 +203,22 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
     }
 
 
-    public Completable decreaseRfBeforeScalingDownDc(final DataCenter dataCenter, int targetDcSize, final CqlSessionSupplier sessionSupplier) throws Exception {
+    public Completable decreaseRfBeforeScalingDownDc(final DataCenter dataCenter, final DataCenterStatus dataCenterStatus, int targetDcSize, final CqlSessionSupplier sessionSupplier) throws Exception {
         if (get(dataCenter) != null &&
                 dataCenter.getStatus().getPhase().equals(DataCenterPhase.RUNNING) &&
                 dataCenter.getStatus().getCqlStatus().equals(CqlStatus.ESTABLISHED)) {
             Collection<CqlKeyspace> keyspaces = get(dataCenter).values();
             List<Completable> completables = new ArrayList<>(keyspaces.size());
             for (CqlKeyspace keyspace : keyspaces) {
-                completables.add(updateKeyspaceReplicationMap(dataCenter, keyspace.name, Math.min(keyspace.rf, targetDcSize), sessionSupplier));
+                completables.add(updateKeyspaceReplicationMap(dataCenter, dataCenterStatus, keyspace.name, Math.min(keyspace.rf, targetDcSize), sessionSupplier));
             }
             return Completable.mergeArray(completables.toArray(new Completable[completables.size()])).onErrorComplete();
         }
         return Completable.complete();
     }
 
-    private Completable updateKeyspaceReplicationMap(final DataCenter dc, final String keyspace, int targetRf, final CqlSessionSupplier sessionSupplier) throws Exception {
-        return updateKeyspaceReplicationMap(dc, dc.getSpec().getDatacenterName(), keyspace, targetRf, sessionSupplier, true);
+    private Completable updateKeyspaceReplicationMap(final DataCenter dc, final DataCenterStatus dataCenterStatus, final String keyspace, int targetRf, final CqlSessionSupplier sessionSupplier) throws Exception {
+        return updateKeyspaceReplicationMap(dc, dataCenterStatus, dc.getSpec().getDatacenterName(), keyspace, targetRf, sessionSupplier, true);
     }
 
     /**
@@ -227,8 +229,9 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
      * @return
      * @throws Exception
      */
-    public Completable removeDcFromReplicationMap(final DataCenter dc, final String dcName, final CqlSessionSupplier sessionSupplier) throws Exception {
-        return sessionSupplier.getSession(dc)
+    public Completable removeDcFromReplicationMap(final DataCenter dc, final DataCenterStatus dataCenterStatus,
+                                                  final String dcName, final CqlSessionSupplier sessionSupplier) throws Exception {
+        return sessionSupplier.getSession(dc, dataCenterStatus)
                 .flatMap(session -> Single.fromFuture(session.executeAsync("SELECT keyspace_name, replication FROM system_schema.keyspaces")))
                 .flatMapCompletable(rs -> {
                     final Map<String, Integer> currentRfMap = new HashMap<>();
@@ -240,7 +243,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                                 .collect(Collectors.toMap(Map.Entry::getKey, e -> Integer.parseInt(e.getValue())));
                         if (keyspaceReplicationMap.containsKey(dcName)) {
                             keyspaceReplicationMap.remove(dcName);
-                            todoList.add(alterKeyspace(dc, sessionSupplier, row.getString("keyspace_name"), keyspaceReplicationMap).ignoreElement());
+                            todoList.add(alterKeyspace(dc, dataCenterStatus, sessionSupplier, row.getString("keyspace_name"), keyspaceReplicationMap).ignoreElement());
                         }
                     }
                     return Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()]));
@@ -256,8 +259,8 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
      *
      * @throws StrapkopException
      */
-    public Completable updateKeyspaceReplicationMap(final DataCenter dc, String dcName, final String keyspace, int targetRf, final CqlSessionSupplier sessionSupplier, boolean triggerRepairOrCleanup) throws Exception {
-        return sessionSupplier.getSessionWithSchemaAgreed(dc)
+    public Completable updateKeyspaceReplicationMap(final DataCenter dc, DataCenterStatus dataCenterStatus, String dcName, final String keyspace, int targetRf, final CqlSessionSupplier sessionSupplier, boolean triggerRepairOrCleanup) throws Exception {
+        return sessionSupplier.getSessionWithSchemaAgreed(dc, dataCenterStatus)
                 .flatMap(session ->
                         Single.fromFuture(session.executeAsync("SELECT keyspace_name, replication FROM system_schema.keyspaces WHERE keyspace_name = ?", keyspace))
                 )
@@ -286,7 +289,7 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                         currentRfMap.put(dcName, rf);
                         final int rf2 = rf;
                         if (currentRfMap.entrySet().stream().filter(e -> e.getValue() > 0).count() > 0) {
-                            todo = todo.andThen(alterKeyspace(dc, sessionSupplier, keyspace, currentRfMap)
+                            todo = todo.andThen(alterKeyspace(dc, dataCenterStatus, sessionSupplier, keyspace, currentRfMap)
                                     .map(s -> {
                                         logger.debug("datacenter={} ALTER executed keyspace={} replicationMap={}", dc.id(), keyspace, currentRfMap);
                                         return s;
@@ -354,8 +357,8 @@ public class CqlKeyspaceManager extends AbstractManager<CqlKeyspace> {
                 });
     }
 
-    private Single<Session> alterKeyspace(final DataCenter dc, final CqlSessionSupplier sessionSupplier, final String name, Map<String, Integer> rfMap) throws Exception {
-        return sessionSupplier.getSessionWithSchemaAgreed(dc)
+    private Single<Session> alterKeyspace(final DataCenter dc, DataCenterStatus dataCenterStatus, final CqlSessionSupplier sessionSupplier, final String name, Map<String, Integer> rfMap) throws Exception {
+        return sessionSupplier.getSessionWithSchemaAgreed(dc, dataCenterStatus)
                 .flatMap(session -> {
                     final String query = String.format(Locale.ROOT,
                             "ALTER KEYSPACE %s WITH replication = {'class': 'NetworkTopologyStrategy', %s};",

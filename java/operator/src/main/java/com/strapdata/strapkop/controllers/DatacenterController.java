@@ -17,11 +17,17 @@
 
 package com.strapdata.strapkop.controllers;
 
+import com.strapdata.strapkop.cache.DataCenterStatusCache;
+import com.strapdata.strapkop.cache.StatefulsetCache;
 import com.strapdata.strapkop.cql.CqlKeyspace;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRole;
 import com.strapdata.strapkop.cql.CqlRoleManager;
+import com.strapdata.strapkop.k8s.OperatorNames;
+import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenterStatus;
 import io.kubernetes.client.openapi.ApiException;
+import io.kubernetes.client.openapi.models.V1StatefulSet;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
@@ -38,6 +44,12 @@ public class DatacenterController {
     @Inject
     CqlRoleManager cqlRoleManager;
 
+    @Inject
+    StatefulsetCache statefulsetCache;
+
+    @Inject
+    DataCenterStatusCache dataCenterStatusCache;
+
     @Get(value = "/{namespace}/{cluster}/{datacenter}/_keyspace", produces = MediaType.APPLICATION_JSON)
     public Map<String, CqlKeyspace> managedKeyspaces(String namespace, String cluster, String datacenter) throws ApiException {
         return cqlKeyspaceManager.get(namespace, cluster, datacenter);
@@ -47,4 +59,15 @@ public class DatacenterController {
     public Map<String, CqlRole> managedRoles(String namespace, String cluster, String datacenter) throws ApiException {
         return cqlRoleManager.get(namespace, cluster, datacenter);
     }
+
+    @Get(value = "/{namespace}/{cluster}/{datacenter}/_status", produces = MediaType.APPLICATION_JSON)
+    public DataCenterStatus dataCenterStatus(String namespace, String cluster, String datacenter) throws ApiException {
+        return dataCenterStatusCache.get(new Key(namespace, OperatorNames.dataCenterResource(cluster, datacenter)));
+    }
+
+    @Get(value = "/{namespace}/{cluster}/{datacenter}/_statefulset", produces = MediaType.APPLICATION_JSON)
+    public Map<String, V1StatefulSet> managedSts(String namespace, String cluster, String datacenter) throws ApiException {
+        return statefulsetCache.get(new Key(namespace, OperatorNames.dataCenterResource(cluster, datacenter)));
+    }
+
 }

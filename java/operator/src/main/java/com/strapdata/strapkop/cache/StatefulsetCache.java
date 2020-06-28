@@ -18,23 +18,17 @@
 package com.strapdata.strapkop.cache;
 
 import com.google.common.collect.ImmutableList;
-import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
-import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
-import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.models.V1StatefulSet;
 import io.micrometer.core.instrument.ImmutableTag;
 import io.micrometer.core.instrument.MeterRegistry;
-import io.reactivex.Single;
 
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.util.Locale;
 import java.util.TreeMap;
-import java.util.concurrent.Callable;
 
 @Singleton
 public class StatefulsetCache extends Cache<Key, TreeMap<String, V1StatefulSet>> {
@@ -51,11 +45,42 @@ public class StatefulsetCache extends Cache<Key, TreeMap<String, V1StatefulSet>>
         meterRegistry.gaugeMapSize("cache.size", ImmutableList.of(new ImmutableTag("type", "statefulset")), this);
     }
 
+    public TreeMap<String, V1StatefulSet> update(V1StatefulSet sts) {
+        final Key key = new Key(sts.getMetadata().getNamespace(), sts.getMetadata().getLabels().get(OperatorLabels.PARENT));
+        final String zone = sts.getMetadata().getLabels().get(OperatorLabels.RACK);
+        if (zone != null) {
+            return compute(key, (k, v) -> {
+                if (v == null) {
+                    v = new TreeMap<>();
+                }
+                v.put(zone, sts);
+                return v;
+            });
+        }
+        return getOrDefault(key, new TreeMap<>());
+    }
+
+    public TreeMap<String, V1StatefulSet> updateIfAbsent(V1StatefulSet sts) {
+        final Key key = new Key(sts.getMetadata().getNamespace(), sts.getMetadata().getLabels().get(OperatorLabels.PARENT));
+        final String zone = sts.getMetadata().getLabels().get(OperatorLabels.RACK);
+        if (zone != null) {
+            return compute(key, (k, v) -> {
+                if (v == null) {
+                    v = new TreeMap<>();
+                }
+                v.putIfAbsent(zone, sts);
+                return v;
+            });
+        }
+        return getOrDefault(key, new TreeMap<>());
+    }
+
     /**
      * Populate the cache if empty
      * @param dataCenter
      * @return
      */
+    /*
     public Single<TreeMap<String, V1StatefulSet>> loadIfAbsent(final DataCenter dataCenter) {
         return Single.fromCallable(new Callable<TreeMap<String, V1StatefulSet>>() {
             @Override
@@ -86,12 +111,14 @@ public class StatefulsetCache extends Cache<Key, TreeMap<String, V1StatefulSet>>
             }
         });
     }
+    */
 
     /**
      * Force a cache update
      * @param dataCenter
      * @return
      */
+    /*
     public Single<TreeMap<String, V1StatefulSet>> load(final DataCenter dataCenter) {
         return Single.fromCallable(new Callable<TreeMap<String, V1StatefulSet>>() {
             @Override
@@ -122,4 +149,5 @@ public class StatefulsetCache extends Cache<Key, TreeMap<String, V1StatefulSet>>
             }
         });
     }
+    */
 }

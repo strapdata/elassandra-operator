@@ -134,7 +134,7 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                                 try {
                                     doUpdateStatus = true;
                                     todoList.add(
-                                            role.createOrUpdateRole(dataCenter, k8sResourceUtils, sessionSupplier)
+                                            role.createOrUpdateRole(dataCenter, dataCenterUpdateAction.dataCenterStatus, k8sResourceUtils, sessionSupplier)
                                             .map(r -> {
                                                 // update registry because role seems to be managed by value
                                                 put(dataCenter, r.getUsername(), r);
@@ -241,14 +241,14 @@ public class CqlRoleManager extends AbstractManager<CqlRole> {
                                 get(dc, CqlRole.STRAPKOP_ROLE.username)
                         )) {
                             try {
-                                role.createOrUpdateRole(dc, k8sResourceUtils, new CqlSessionSupplier() {
+                                role.createOrUpdateRole(dc, dcStatus, k8sResourceUtils, new CqlSessionSupplier() {
                                     @Override
-                                    public Single<Session> getSession(DataCenter dc) throws Exception {
+                                    public Single<Session> getSession(DataCenter dc, DataCenterStatus dataCenterStatus) throws Exception {
                                         return Single.just(currentSession);
                                     }
 
                                     @Override
-                                    public Single<Session> getSessionWithSchemaAgreed(DataCenter dataCenter) throws Exception {
+                                    public Single<Session> getSessionWithSchemaAgreed(DataCenter dataCenter, DataCenterStatus dataCenterStatus) throws Exception {
                                         return Single.just(currentSession);
                                     }
 

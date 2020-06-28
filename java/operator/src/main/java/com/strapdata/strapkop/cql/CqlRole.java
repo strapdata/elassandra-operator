@@ -23,6 +23,7 @@ import com.strapdata.strapkop.StrapkopException;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenterStatus;
 import io.reactivex.Completable;
 import io.reactivex.Single;
 import lombok.*;
@@ -158,13 +159,13 @@ public class CqlRole implements CqlReconciliable, Cloneable {
      * @return this
      * @throws StrapkopException
      */
-    public Single<CqlRole> createOrUpdateRole(DataCenter dataCenter, K8sResourceUtils k8sResourceUtils, final CqlSessionSupplier sessionSupplier) throws Exception {
+    public Single<CqlRole> createOrUpdateRole(DataCenter dataCenter, DataCenterStatus dataCenterStatus, K8sResourceUtils k8sResourceUtils, final CqlSessionSupplier sessionSupplier) throws Exception {
         if (!reconcilied) {
             // create role if not exists, then alter... so this is completely idempotent and can even update password, although it might not be optimized
             return loadPassword(dataCenter, k8sResourceUtils)
                     .flatMap(cqlRole -> {
                         logger.debug("datacenter={} Creating role={}", dataCenter.id(), this);
-                        return sessionSupplier.getSession(dataCenter);
+                        return sessionSupplier.getSession(dataCenter, dataCenterStatus);
                     })
                     .flatMap(session -> {
                         if (!"cassandra".equals(username)) {

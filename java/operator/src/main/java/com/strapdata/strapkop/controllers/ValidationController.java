@@ -86,7 +86,7 @@ public class ValidationController {
                     .build());
         }
 
-        Key dcKey = new Key(admissionReview.getRequest().getName(), admissionReview.getRequest().getNamespace());
+        Key dcKey = new Key(admissionReview.getRequest().getNamespace(), admissionReview.getRequest().getName());
         return k8sResourceUtils.readDatacenter(dcKey)
                 .map(deployedDc -> {
                     // Attempt to change the clusterName

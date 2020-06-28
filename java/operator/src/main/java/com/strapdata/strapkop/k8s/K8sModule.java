@@ -17,16 +17,20 @@
 
 package com.strapdata.strapkop.k8s;
 
+import io.kubernetes.client.informer.SharedInformerFactory;
 import io.kubernetes.client.openapi.ApiClient;
+import io.kubernetes.client.openapi.Configuration;
 import io.kubernetes.client.openapi.apis.*;
 import io.kubernetes.client.util.ClientBuilder;
 import io.kubernetes.client.util.Config;
+import io.kubernetes.client.util.KubeConfig;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
+import java.io.FileReader;
 import java.io.IOException;
 
 @Factory
@@ -37,6 +41,23 @@ public class K8sModule {
     private final ApiClient debuggableApiClient;
 
     public K8sModule(ApplicationContext applicationContext) throws IOException {
+
+        if (applicationContext.getEnvironment().getActiveNames().contains("k8s")) {
+            ApiClient apiClient = ClientBuilder.cluster().build();
+
+            // set the global default api-client to the in-cluster one from above
+            Configuration.setDefaultApiClient(apiClient);
+        } else {
+            // file path to your KubeConfig
+            String kubeConfigPath = "~/.kube/config";
+
+            // loading the out-of-cluster config, a kubeconfig from file-system
+            ApiClient apiClient = ClientBuilder.kubeconfig(KubeConfig.loadKubeConfig(new FileReader(kubeConfigPath))).build();
+
+            // set the global default api-client to the in-cluster one from above
+            Configuration.setDefaultApiClient(apiClient);
+        }
+
         this.apiClient = ClientBuilder.standard().build();
         this.watchClient =  Config.defaultClient();
 
@@ -47,6 +68,12 @@ public class K8sModule {
         } else {
             debuggableApiClient = apiClient;
         }
+    }
+
+    @Bean
+    @Singleton
+    public SharedInformerFactory provideSharedInformerFactory() {
+        return new SharedInformerFactory();
     }
 
     @Bean

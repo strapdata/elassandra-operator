@@ -19,7 +19,6 @@ package com.strapdata.strapkop.reconcilier;
 
 import com.google.common.collect.Lists;
 import com.strapdata.strapkop.OperatorConfig;
-import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.cache.DataCenterStatusCache;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRoleManager;
@@ -30,8 +29,9 @@ import com.strapdata.strapkop.model.k8s.datacenter.DataCenterStatus;
 import com.strapdata.strapkop.model.k8s.task.RebuildTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
-import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
 import com.strapdata.strapkop.sidecar.HttpClientFactory;
+import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
+import io.kubernetes.client.informer.SharedInformerFactory;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -74,13 +74,13 @@ public class RebuildTaskReconcilier extends TaskReconcilier {
                                   final CqlRoleManager cqlRoleManager,
                                   final CqlKeyspaceManager cqlKeyspaceManager,
                                   final MeterRegistry meterRegistry,
-                                  final DataCenterController dataCenterController,
-                                  final DataCenterCache dataCenterCache,
+                                  final DataCenterReconcilier dataCenterController,
+                                  final SharedInformerFactory sharedInformerFactory,
                                   final DataCenterStatusCache dataCenterStatusCache,
                                   ExecutorFactory executorFactory,
                                   @Named("tasks") UserExecutorConfiguration userExecutorConfiguration) {
         super(reconcilierObserver, operatorConfig, k8sResourceUtils, meterRegistry,
-                dataCenterController, dataCenterCache, dataCenterStatusCache, executorFactory, userExecutorConfiguration);
+                dataCenterController, sharedInformerFactory, dataCenterStatusCache, executorFactory, userExecutorConfiguration);
         this.jmxmpElassandraProxy = jmxmpElassandraProxy;
         this.context = context;
         this.cqlRoleManager = cqlRoleManager;

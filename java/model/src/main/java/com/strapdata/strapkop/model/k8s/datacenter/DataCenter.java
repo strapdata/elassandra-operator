@@ -61,6 +61,6 @@ public class DataCenter {
     private DataCenterStatus status = new DataCenterStatus();
 
     public String id() {
-        return metadata.getName()+"/"+metadata.getNamespace();
+        return metadata.getNamespace() + "/" + metadata.getName();
     }
 }

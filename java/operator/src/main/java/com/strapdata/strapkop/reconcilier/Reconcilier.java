@@ -19,21 +19,31 @@ package com.strapdata.strapkop.reconcilier;
 
 import io.reactivex.Completable;
 
+import javax.inject.Inject;
+
 /**
  * Base class for the reconcilier objects
  * @param <T>
  */
 public abstract class Reconcilier<T> {
 
-    ReconcilierObserver reconcilierObserver;
+    @Inject
+    protected ReconcilierObserver reconcilierObserver;
 
-    public Reconcilier(ReconcilierObserver reconcilierObserver) {
-        this.reconcilierObserver = reconcilierObserver;
+    public Reconcilier() {}
+
+    /**
+     * Reconcilier must implement the reconciliation logic in this method
+     */
+    public Completable reconcile(T value) {
+        return Completable.complete();
     }
 
     /**
      * Reconcilier must implement the reconciliation logic in this method
      */
-    public abstract Completable reconcile(T value) throws Exception;
+    public Completable reconcile(T value, Completable action) {
+        return Completable.complete();
+    }
 
 }
