@@ -17,14 +17,12 @@
 
 package com.strapdata.strapkop.controllers;
 
-import com.strapdata.strapkop.cache.DataCenterCache;
-import com.strapdata.strapkop.cache.NodeCache;
-import com.strapdata.strapkop.cache.PodCache;
 import com.strapdata.strapkop.cache.StatefulsetCache;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
+import io.kubernetes.client.informer.SharedInformerFactory;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.models.V1Node;
 import io.kubernetes.client.openapi.models.V1NodeAddress;
@@ -56,16 +54,10 @@ public class SeedsController {
     private final Logger logger = LoggerFactory.getLogger(SeedsController.class);
 
     @Inject
-    DataCenterCache dataCenterCache;
+    SharedInformerFactory sharedInformerFactory;
 
     @Inject
     StatefulsetCache statefulsetCache;
-
-    @Inject
-    NodeCache nodeCache;
-
-    @Inject
-    PodCache podCache;
 
 
     /**
@@ -87,18 +79,19 @@ public class SeedsController {
     public Single<List<String>> seeds(@QueryValue("namespace") String namespace,
                                       @QueryValue("clusterName") String clusterName,
                                       @QueryValue("datacenterName") String datacenterName) throws ApiException {
-        Key dcKey = new Key(OperatorNames.dataCenterResource(clusterName, datacenterName), namespace);
-        DataCenter dataCenter = dataCenterCache.get(dcKey);
+        DataCenter dataCenter = sharedInformerFactory.getExistingSharedIndexInformer(DataCenter.class).getIndexer().getByKey(
+                namespace + "/" + OperatorNames.dataCenterResource(clusterName, datacenterName));
         if (dataCenter == null)
             throw new IllegalArgumentException("Datacenter not found");
 
+        Key dcKey = new Key(namespace, OperatorNames.dataCenterResource(clusterName, datacenterName));
         TreeMap<String, V1StatefulSet> stsMap = statefulsetCache.get(dcKey);
         if (stsMap == null)
-            throw new IllegalArgumentException("no StatefulSet not found");
+            throw new IllegalArgumentException("No StatefulSet found");
 
         List<String> seeds = new ArrayList<>();
         Map<String, String> hostIpToExternalIp = new HashMap<>();
-        for(V1Node node : nodeCache.values()) {
+        for(V1Node node : sharedInformerFactory.getExistingSharedIndexInformer(V1Node.class).getIndexer().list()) {
             String internalIp = null;
             String externalIp = null;
             if (node.getStatus() != null && node.getStatus().getAddresses() != null) {
@@ -111,7 +104,7 @@ public class SeedsController {
                     }
                 }
             }
-            String publicIp = node.getMetadata().getAnnotations().get("kubernetes.strapdata.com/public-ip");
+            String publicIp = node.getMetadata().getAnnotations().get("elassandra.strapdata.com/public-ip");
             if (publicIp != null)
                 externalIp = publicIp;
 
@@ -122,8 +115,7 @@ public class SeedsController {
         for(V1StatefulSet statefulSet : stsMap.values()) {
             if (statefulSet.getStatus() != null && statefulSet.getStatus().getCurrentReplicas() != null && statefulSet.getStatus().getCurrentReplicas() > 0) {
                 String podName = OperatorNames.podName(dataCenter, Integer.parseInt(statefulSet.getMetadata().getLabels().get(OperatorLabels.RACKINDEX)), 0);
-                Key podKey = new Key(podName, namespace);
-                V1Pod pod = podCache.get(podKey);
+                V1Pod pod = sharedInformerFactory.getExistingSharedIndexInformer(V1Pod.class).getIndexer().getByKey(namespace + "/" + podName);
                 if (pod != null && pod.getStatus() != null && pod.getStatus().getHostIP() != null) {
                     String hostIp = pod.getStatus().getHostIP();
                     String externalIp = hostIpToExternalIp.get(hostIp);

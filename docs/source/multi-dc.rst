@@ -43,7 +43,7 @@ a public IP address to each virtual machine:
     az aks get-credentials --name "${K8S_CLUSTER_NAME}" --resource-group $RESOURCE_GROUP_NAME --output table
 
 Unfortunately, AKS does not map VM's public IP address to the Kubernetes node external IP address, so the trick is to add these public IP addresses as a
-kubernetes custom label ``kubernetes.strapdata.com/public-ip`` to each nodes, here for the first Kubernetes node in our AKS cluster:
+kubernetes custom label ``elassandra.strapdata.com/public-ip`` to each nodes, here for the first Kubernetes node in our AKS cluster:
 
 .. code::
 
@@ -51,7 +51,7 @@ kubernetes custom label ``kubernetes.strapdata.com/public-ip`` to each nodes, he
        AKS_RG_NAME=$(az resource show --namespace Microsoft.ContainerService --resource-type managedClusters -g $RESOURCE_GROUP_NAME -n $K8S_CLUSTER_NAME | jq -r .properties.nodeResourceGroup)
        AKS_VMSS_INSTANCE=$(kubectl get nodes -o json | jq -r ".items[${1:-0}].metadata.name")
        PUBLIC_IP=$(az vmss list-instance-public-ips -g $AKS_RG_NAME -n ${AKS_VMSS_INSTANCE::-6} | jq -r ".[${1:-0}].ipAddress")
-       kubectl label nodes --overwrite $AKS_VMSS_INSTANCE kubernetes.strapdata.com/public-ip=$PUBLIC_IP
+       kubectl label nodes --overwrite $AKS_VMSS_INSTANCE elassandra.strapdata.com/public-ip=$PUBLIC_IP
     }
 
     add_vmss_public_ip 0
@@ -62,7 +62,7 @@ As the result, you should have kubernetes nodes properly labeled with zone and p
 
 .. code::
 
-    kubectl get nodes -o wide -L failure-domain.beta.kubernetes.io/zone,kubernetes.strapdata.com/public-ip
+    kubectl get nodes -o wide -L failure-domain.beta.kubernetes.io/zone,elassandra.strapdata.com/public-ip
     NAME                                STATUS   ROLES   AGE     VERSION    INTERNAL-IP   EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION      CONTAINER-RUNTIME       ZONE            PUBLIC-IP
     aks-nodepool1-32762597-vmss000000   Ready    agent   2d20h   v1.15.11   10.240.0.4    <none>        Ubuntu 16.04.6 LTS   4.15.0-1083-azure   docker://3.0.10+azure   northeurope-1   20.54.72.64
     aks-nodepool1-32762597-vmss000001   Ready    agent   2m32s   v1.15.11   10.240.0.35   <none>        Ubuntu 16.04.6 LTS   4.15.0-1083-azure   docker://3.0.10+azure   northeurope-2   40.113.33.9
@@ -525,7 +525,7 @@ If your Kubernetes nodes have the ExternalIP set (like GKE), prepare the coreDNS
       HOST_ALIASES=$(kubectl get nodes -o custom-columns='INTERNAL-IP:.status.addresses[?(@.type=="InternalIP")].address,EXTERNAL-IP:.status.addresses[?(@.type=="ExternalIP")].address' --no-headers |\
       awk '{ gsub(/\./,"-",$2); printf("--set nodes.hosts[%d].name=%s,nodes.hosts[%d].value=%s ",NR-1, $2, NR-1, $1); }')
 
-If your Kubernetes nodes does not have the ExternalIP set (like AKS), public node IP address should be available through the custom label ``kubernetes.strapdata.com/public-ip``.
+If your Kubernetes nodes does not have the ExternalIP set (like AKS), public node IP address should be available through the custom label ``elassandra.strapdata.com/public-ip``.
 
 .. code::
 

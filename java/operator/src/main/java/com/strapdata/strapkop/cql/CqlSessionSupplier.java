@@ -19,6 +19,7 @@ package com.strapdata.strapkop.cql;
 
 import com.datastax.driver.core.Session;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenterStatus;
 import io.reactivex.Single;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,7 +34,7 @@ public interface CqlSessionSupplier  {
      * @return
      * @throws Exception
      */
-    Single<Session> getSession(DataCenter dataCenter) throws Exception;
+    Single<Session> getSession(DataCenter dataCenter, DataCenterStatus status) throws Exception;
 
     /**
      * Return a session with agreed schema, meaning that we can safly update it
@@ -41,7 +42,7 @@ public interface CqlSessionSupplier  {
      * @return
      * @throws Exception
      */
-    Single<Session> getSessionWithSchemaAgreed(DataCenter dataCenter) throws Exception;
+    Single<Session> getSessionWithSchemaAgreed(DataCenter dataCenter, DataCenterStatus status) throws Exception;
 
     /**
      * Close cassandra session

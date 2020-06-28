@@ -28,25 +28,20 @@
 
     <turboFilter class="ch.qos.logback.classic.turbo.DuplicateMessageFilter"/>
 
-    <logger name="com.strapdata.cassandra.driver" level="${LOGBACK_com_strapdata_cassandra_driver:-TRACE}" />
+    <logger name="com.strapdata.cassandra.driver" level="${LOGBACK_com_strapdata_cassandra_driver:-DEBUG}" />
 
     <logger name="com.strapdata.strapkop.controllers" level="${LOGBACK_com_strapdata_strapkop_controllers:-DEBUG}" />
-    <logger name="com.strapdata.strapkop.k8s" level="${LOGBACK_com_strapdata_strapkop_k8s:-WARN}" />
-    <logger name="com.strapdata.strapkop.event" level="${LOGBACK_com_strapdata_strapkop_event:-DEBUG}" />
-    <logger name="com.strapdata.strapkop.handler" level="${LOGBACK_com_strapdata_strapkop_handler:-DEBUG}" />
-    <logger name="com.strapdata.strapkop.handler.NodeHandler" level="${LOGBACK_com_strapdata_strapkop_handler:-WARN}" />
-
-    <logger name="com.strapdata.strapkop.pipeline" level="${LOGBACK_com_strapdata_strapkop_pipeline:-DEBUG}" />
+    <logger name="com.strapdata.strapkop.k8s" level="${LOGBACK_com_strapdata_strapkop_k8s:-DEBUG}" />
     <logger name="com.strapdata.strapkop.sidecar" level="${LOGBACK_com_strapdata_strapkop_sidecar:-DEBUG}" />
     <logger name="com.strapdata.strapkop.plugins" level="${LOGBACK_com_strapdata_strapkop_plugins:-TRACE}" />
     <logger name="com.strapdata.strapkop.cql" level="${LOGBACK_com_strapdata_strapkop_cql:-DEBUG}" />
-
     <logger name="com.strapdata.strapkop.reconcilier" level="${LOGBACK_com_strapdata_strapkop_reconcilier:-DEBUG}" />
 
     <!--
     <logger name="io.micronaut.http.client" level="TRACE"/>
     <logger name="io.micronaut.http.server" level="TRACE"/>
     <logger name="io.netty" level="TRACE"/>
+    <logger name="io.kubernetes.client" level="TRACE"/>
     -->
 
     <root level="INFO">

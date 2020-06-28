@@ -20,7 +20,6 @@ package com.strapdata.strapkop.reconcilier;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.strapdata.strapkop.OperatorConfig;
-import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.cache.DataCenterStatusCache;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
@@ -32,6 +31,7 @@ import com.strapdata.strapkop.model.k8s.datacenter.Operation;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
 import com.strapdata.strapkop.model.k8s.task.TaskStatus;
+import io.kubernetes.client.informer.SharedInformerFactory;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -57,8 +57,8 @@ public abstract class TaskReconcilier extends Reconcilier<Task> {
     private static final Logger logger = LoggerFactory.getLogger(TaskReconcilier.class);
     final K8sResourceUtils k8sResourceUtils;
     final MeterRegistry meterRegistry;
-    final DataCenterController dataCenterController;
-    final DataCenterCache dataCenterCache;
+    final DataCenterReconcilier dataCenterController;
+    final SharedInformerFactory sharedInformerFactory;
     final DataCenterStatusCache dataCenterStatusCache;
     final OperatorConfig operatorConfig;
     private volatile int runningTaskCount = 0;
@@ -68,16 +68,16 @@ public abstract class TaskReconcilier extends Reconcilier<Task> {
                     final OperatorConfig operatorConfig,
                     final K8sResourceUtils k8sResourceUtils,
                     final MeterRegistry meterRegistry,
-                    final DataCenterController dataCenterController,
-                    final DataCenterCache dataCenterCache,
+                    final DataCenterReconcilier dataCenterController,
+                    final SharedInformerFactory sharedInformerFactory,
                     final DataCenterStatusCache dataCenterStatusCache,
                     ExecutorFactory executorFactory,
                     @Named("tasks") UserExecutorConfiguration userExecutorConfiguration) {
-        super(reconcilierObserver);
+        this.reconcilierObserver = reconcilierObserver;
         this.k8sResourceUtils = k8sResourceUtils;
         this.meterRegistry = meterRegistry;
         this.dataCenterController = dataCenterController;
-        this.dataCenterCache = dataCenterCache;
+        this.sharedInformerFactory = sharedInformerFactory;
         this.dataCenterStatusCache = dataCenterStatusCache;
         this.operatorConfig = operatorConfig;
         this.tasksScheduler = Schedulers.from(executorFactory.executorService(userExecutorConfiguration));
@@ -85,23 +85,25 @@ public abstract class TaskReconcilier extends Reconcilier<Task> {
 
     protected abstract Completable doTask(final DataCenter dc, final DataCenterStatus dataCenterStatus, final Task task, Iterable<V1Pod> pods) throws Exception;
 
-    protected Completable validTask(final DataCenter dc, final Task task) throws Exception {
+    protected Completable validTask(final DataCenter dc, final Task task) {
         return Completable.complete();
     }
 
     @Override
-    public Completable reconcile(final Task task) throws Exception {
+    public Completable reconcile(final Task task) {
         String dcName = OperatorNames.dataCenterResource(task.getSpec().getCluster(), task.getSpec().getDatacenter());
-        Key key = new Key(dcName, task.getMetadata().getNamespace());
-        DataCenter dc = dataCenterCache.get(key);
-        final DataCenterStatus dataCenterStatus = dataCenterStatusCache.get(key);
+        Key key = new Key(task.getMetadata().getNamespace(), dcName);
 
-        logger.debug("datacenter={} task={} processing generation={}", dc.id(), task.id(), task.getMetadata().getGeneration());
+        final DataCenter dc = sharedInformerFactory.getExistingSharedIndexInformer(DataCenter.class).getIndexer().getByKey(task.getMetadata().getNamespace() + "/" + dcName);
+        final DataCenterStatus dcStatus = dataCenterStatusCache.get(key);
+
+        logger.debug("datacenter={} task={} processing generation/resourceVersion={}/{}",
+                dc.id(), task.id(), task.getMetadata().getGeneration(), task.getMetadata().getResourceVersion());
         task.getStatus().setObservedGeneration(task.getMetadata().getGeneration());
 
         // failed when datacenter not found => task failed
         return validTask(dc, task)
-                .andThen(init(task, dc).flatMapCompletable(pods -> doTask(dc, dataCenterStatus, task, pods)))     // update DC and task status
+                .andThen(init(task, dc).flatMapCompletable(pods -> doTask(dc, dcStatus, task, pods)))     // update DC and task status
                 .andThen(reconcileDcWhenDone(dc, task))
                 .onErrorResumeNext(t -> {
                     logger.error("task={} FAILED due to error:", task.id(), t);
@@ -114,7 +116,7 @@ public abstract class TaskReconcilier extends Reconcilier<Task> {
                 });
     }
 
-    Completable reconcileDcWhenDone(DataCenter dataCenter, Task task) throws Exception {
+    Completable reconcileDcWhenDone(DataCenter dataCenter, Task task)  {
         return reconcileDataCenterWhenDone() ?
                 this.dataCenterController.taskDone(dataCenter, task) :
                 Completable.complete();

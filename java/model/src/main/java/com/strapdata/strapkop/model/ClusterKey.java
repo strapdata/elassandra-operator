@@ -27,10 +27,10 @@ import lombok.ToString;
 @ToString(callSuper = true)
 public class ClusterKey extends Key {
     public ClusterKey(final DataCenter dc) {
-        super(dc.getSpec().getClusterName(), dc.getMetadata().getNamespace());
+        super(dc.getMetadata().getNamespace(), dc.getSpec().getClusterName());
     }
 
-    public ClusterKey(String name, String namespace) {
-        super(name, namespace);
+    public ClusterKey(String namespace, String name) {
+        super(namespace, name);
     }
 }

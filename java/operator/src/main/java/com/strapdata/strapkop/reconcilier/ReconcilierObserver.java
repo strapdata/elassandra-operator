@@ -37,7 +37,7 @@ public class ReconcilierObserver {
     private final Logger logger = LoggerFactory.getLogger(ReconcilierObserver.class);
 
     @Inject
-    private MeterRegistry meterRegistry;
+    MeterRegistry meterRegistry;
 
     Integer count;
     volatile boolean gracefullStop = false;

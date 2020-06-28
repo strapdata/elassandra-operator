@@ -127,7 +127,7 @@ If ``networking.hostNetworkEnabled=true`` or ``networking.hostPortEnabled=true``
 the Cassandra RPC broadcast address of an Elassandra pod running on the Kubernetes node will be :
 
 * The Kubernetes node external-IP if available,
-* or the IP address defined by the node label ``kubernetes.strapdata.com/public-ip`` if available,
+* or the IP address defined by the node label ``elassandra.strapdata.com/public-ip`` if available,
 * or the Kubernetes node internal IP address in last resort.
 
 For example, if you run datacenter **dc1** in the cluster **cl1** in namespace **ns1**, you can connect to

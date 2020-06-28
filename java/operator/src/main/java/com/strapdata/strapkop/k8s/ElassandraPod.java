@@ -108,6 +108,6 @@ public class ElassandraPod {
     }
 
     public String id() {
-        return this.name + "/" + this.namespace;
+        return this.namespace + "/" + this.name;
     }
 }

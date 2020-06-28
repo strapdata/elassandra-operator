@@ -82,7 +82,7 @@ public class K8sResourceUtils {
     }
 
 
-    public static <T> Single<Iterable<T>> listNamespacedResources(String namespace, K8sSupplier<Iterable<T>> lister) throws ApiException {
+    public static <T> Single<Iterable<T>> listNamespacedResources(String namespace, K8sSupplier<Iterable<T>> lister) {
         return Single.fromCallable(new Callable<Iterable<T>>() {
             @Override
             public Iterable<T> call() throws Exception {
@@ -101,7 +101,9 @@ public class K8sResourceUtils {
             @Override
             public T call() throws Exception {
                 try {
-                    return create.get();
+                    T t = create.get();
+                    Objects.requireNonNull(t);
+                    return t;
                 } catch (final ApiException e) {
                     logger.error("create error code={} namespace={} object={}", e.getCode(), namespace, t);
                     throw e;
@@ -115,7 +117,9 @@ public class K8sResourceUtils {
             @Override
             public T call() throws Exception {
                 try {
-                    return create.get();
+                    T t = create.get();
+                    Objects.requireNonNull(t);
+                    return t;
                 } catch (final ApiException e) {
                     if (e.getCode() != 409) {
                         logger.error("create error code={} namespace={} object={}", e.getCode(), namespace, t);
@@ -137,14 +141,18 @@ public class K8sResourceUtils {
             @Override
             public T call() throws Exception {
                 try {
-                    return read.get();
+                    T t = create.get();
+                    Objects.requireNonNull(t);
+                    return t;
                 } catch (final ApiException e) {
                     if (e.getCode() != 404) {
                         logger.error("read error code={} namespace={} object={}", e.getCode(), namespace, t);
                         throw e;
                     }
                     try {
-                        return create.get();
+                        T t = create.get();
+                        Objects.requireNonNull(t);
+                        return t;
                     } catch (final ApiException e2) {
                         logger.error("create error code={} namespace={} object={}", e2.getCode(), namespace, t);
                         throw e2;
@@ -159,7 +167,9 @@ public class K8sResourceUtils {
             @Override
             public T call() throws Exception {
                 try {
-                    return delete.get();
+                    T t = delete.get();
+                    Objects.requireNonNull(t);
+                    return t;
                 } catch (final ApiException e) {
                     logger.error("delete error code={} namespace={} object={}", e.getCode(), namespace, t);
                     throw e;
@@ -174,7 +184,9 @@ public class K8sResourceUtils {
             public T call() throws Exception {
                 try {
                     logger.trace("Attempting to get resource.");
-                    return getResourceCallable.call();
+                    T t = getResourceCallable.call();
+                    Objects.requireNonNull(t);
+                    return t;
                 } catch (final ApiException e) {
                     if (e.getCode() != 404)
                         throw e;
@@ -312,7 +324,7 @@ public class K8sResourceUtils {
                 () -> coreApi.replaceNamespacedSecret(secret.getMetadata().getName(), namespace, secret, null, null, null));
     }
 
-    public Single<V1StatefulSet> replaceNamespacedStatefulSet(final V1StatefulSet statefulset) throws ApiException {
+    public Single<V1StatefulSet> replaceNamespacedStatefulSet(final V1StatefulSet statefulset) {
         final String namespace = statefulset.getMetadata().getNamespace();
         return Single.fromCallable(() -> {
                     try {
@@ -442,7 +454,7 @@ public class K8sResourceUtils {
                         deleteService(service);
                         logger.debug("Deleted Service namespace={} name={}", service.getMetadata().getNamespace(), service.getMetadata().getName());
                     } catch (final JsonSyntaxException e) {
-                        logger.debug("Caught JSON exception while deleting Service. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
+                        logger.trace("Caught JSON exception while deleting Service. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
                     }
                 }
             }
@@ -504,7 +516,7 @@ public class K8sResourceUtils {
                 final V1ObjectMeta statefulSetMetadata = statefulSet.getMetadata();
                 v1Status = appsApi.deleteNamespacedStatefulSet(statefulSetMetadata.getName(), statefulSetMetadata.getNamespace(), null, null, null, null, null, deleteOptions);
             } catch (final JsonSyntaxException e) {
-                logger.debug("Caught JSON exception while deleting Service. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
+                logger.trace("Caught JSON exception while deleting Service. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
             }
             return v1Status;
         });
@@ -576,7 +588,7 @@ public class K8sResourceUtils {
                 logger.debug("Deleting PVC name={}", pvcName);
                 v1Status = coreApi.deleteNamespacedPersistentVolumeClaim(pvcName, persistentVolumeClaim.getMetadata().getNamespace(), null, null, null, null, null, deleteOptions);
             } catch (final JsonSyntaxException e) {
-                logger.debug("Caught JSON exception while deleting Service. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
+                logger.trace("Caught JSON exception while deleting Service. Ignoring due to https://github.com/kubernetes-client/java/issues/86.", e);
             }
             return v1Status;
         });
@@ -930,7 +942,7 @@ public class K8sResourceUtils {
         return new ResourceListIterable<>(firstPage);
     }
 
-    public Single<DataCenter> readDatacenter(final Key key) throws ApiException {
+    public Single<DataCenter> readDatacenter(final Key key) {
         return Single.fromCallable(new Callable<DataCenter>() {
             @Override
             public DataCenter call() throws Exception {
@@ -988,19 +1000,23 @@ public class K8sResourceUtils {
     }
      */
 
-    public Single<Object> updateDataCenterStatus(final DataCenter dc, final DataCenterStatus dcStatus) throws ApiException {
+    public Single<DataCenterStatus> updateDataCenterStatus(final DataCenter dc, final DataCenterStatus dcStatus) {
         // read before write to avoid 409 conflict
-        Key key = new Key(dc.getMetadata());
+        final Key key = new Key(dc.getMetadata());
         return readDatacenter(key)
                 .map(currentDc -> {
                     currentDc.setStatus(dcStatus);
                     return currentDc;
                 })
                 .flatMap(currentDc ->
-                        Single.fromCallable(() -> {
+                        Single.fromCallable(new Callable<DataCenterStatus>() {
+                            @Override
+                            public DataCenterStatus call() throws Exception {
                                 customObjectsApi.replaceNamespacedCustomObjectStatus(StrapdataCrdGroup.GROUP, DataCenter.VERSION,
                                         dc.getMetadata().getNamespace(), DataCenter.PLURAL, dc.getMetadata().getName(), currentDc);
-                            return dataCenterStatusCache.put(key, currentDc.getStatus());
+                                dataCenterStatusCache.put(key, currentDc.getStatus());
+                                return currentDc.getStatus();
+                            }
                         })
                 );
     }
@@ -1082,7 +1098,7 @@ public class K8sResourceUtils {
         });
     }
 
-    public Single<Task> deleteTask(final V1ObjectMeta metadata) throws ApiException {
+    public Single<Task> deleteTask(final V1ObjectMeta metadata) {
         return Single.fromCallable(new Callable<Task>() {
             @Override
             public Task call() throws Exception {

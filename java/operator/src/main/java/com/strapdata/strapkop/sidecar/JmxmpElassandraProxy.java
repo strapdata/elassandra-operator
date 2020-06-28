@@ -20,17 +20,16 @@ package com.strapdata.strapkop.sidecar;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.strapdata.strapkop.StrapkopException;
-import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.cache.JMXConnectorCache;
 import com.strapdata.strapkop.k8s.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
-import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
 import com.strapdata.strapkop.model.sidecar.ElassandraNodeStatus;
 import com.strapdata.strapkop.reconcilier.DataCenterUpdateAction;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import com.strapdata.strapkop.ssl.utils.X509CertificateAndPrivateKey;
+import io.kubernetes.client.informer.SharedInformerFactory;
 import io.kubernetes.client.openapi.ApiException;
 import io.micronaut.context.annotation.Infrastructure;
 import io.micronaut.http.uri.UriTemplate;
@@ -81,7 +80,7 @@ public class JmxmpElassandraProxy {
     JMXConnectorCache jmxConnectorCache;
 
     @Inject
-    DataCenterCache dataCenterCache;
+    SharedInformerFactory sharedInformerFactory;
 
     @Inject
     K8sResourceUtils k8sResourceUtils;
@@ -173,7 +172,7 @@ public class JmxmpElassandraProxy {
     }
 
     DataCenter getDataCenter(ElassandraPod pod) {
-        return this.dataCenterCache.get(new Key(pod.dataCenterName(), pod.getNamespace()));
+        return sharedInformerFactory.getExistingSharedIndexInformer(DataCenter.class).getIndexer().getByKey(pod.getNamespace() + "/" + pod.dataCenterName());
     }
 
     Single<String> loadPassword(DataCenter dataCenter, K8sResourceUtils k8sResourceUtils, String secretName, String secretKey) {

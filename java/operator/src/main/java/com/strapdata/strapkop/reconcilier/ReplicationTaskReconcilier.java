@@ -19,7 +19,6 @@ package com.strapdata.strapkop.reconcilier;
 
 import com.google.common.base.Strings;
 import com.strapdata.strapkop.OperatorConfig;
-import com.strapdata.strapkop.cache.DataCenterCache;
 import com.strapdata.strapkop.cache.DataCenterStatusCache;
 import com.strapdata.strapkop.cql.CqlKeyspace;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
@@ -33,6 +32,7 @@ import com.strapdata.strapkop.model.k8s.task.ReplicationTaskSpec;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskPhase;
 import com.strapdata.strapkop.sidecar.JmxmpElassandraProxy;
+import io.kubernetes.client.informer.SharedInformerFactory;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.apis.CustomObjectsApi;
 import io.kubernetes.client.openapi.models.V1Pod;
@@ -76,13 +76,13 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
                                       final CqlRoleManager cqlRoleManager,
                                       final CqlKeyspaceManager cqlKeyspaceManager,
                                       final MeterRegistry meterRegistry,
-                                      final DataCenterController dataCenterController,
-                                      final DataCenterCache dataCenterCache,
+                                      final DataCenterReconcilier dataCenterController,
+                                      final SharedInformerFactory sharedInformerFactory,
                                       final DataCenterStatusCache dataCenterStatusCache,
                                       ExecutorFactory executorFactory,
                                       @Named("tasks") UserExecutorConfiguration userExecutorConfiguration) {
         super(reconcilierObserver, operatorConfig, k8sResourceUtils, meterRegistry,
-                dataCenterController, dataCenterCache, dataCenterStatusCache, executorFactory, userExecutorConfiguration);
+                dataCenterController, sharedInformerFactory, dataCenterStatusCache, executorFactory, userExecutorConfiguration);
         this.context = context;
         this.cqlRoleManager = cqlRoleManager;
         this.cqlKeyspaceManager = cqlKeyspaceManager;
@@ -118,7 +118,7 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
                 // add replication for these keyspaces
                 Completable todo = Completable.complete();
                 for (Map.Entry<String, Integer> entry : replicationMap.entrySet()) {
-                    todo = todo.andThen(this.cqlKeyspaceManager.updateKeyspaceReplicationMap(dc, replicationTaskSpec.getDcName(), entry.getKey(), Math.min(entry.getValue(), replicationTaskSpec.getDcSize()), cqlSessionHandler, false));
+                    todo = todo.andThen(this.cqlKeyspaceManager.updateKeyspaceReplicationMap(dc, dataCenterStatus, replicationTaskSpec.getDcName(), entry.getKey(), Math.min(entry.getValue(), replicationTaskSpec.getDcSize()), cqlSessionHandler, false));
                 }
 
                 // flush sstables in parallel to stream properly
@@ -146,7 +146,7 @@ public class ReplicationTaskReconcilier extends TaskReconcilier {
                         .doFinally(() -> cqlSessionHandler.close());
             }
             case REMOVE: {
-                return this.cqlKeyspaceManager.removeDcFromReplicationMap(dc, replicationTaskSpec.getDcName(), cqlSessionHandler)
+                return this.cqlKeyspaceManager.removeDcFromReplicationMap(dc, dataCenterStatus, replicationTaskSpec.getDcName(), cqlSessionHandler)
                         .toSingleDefault(TaskPhase.SUCCEED)
                         .flatMapCompletable(phase -> finalizeTaskStatus(dc, dataCenterStatus, task, TaskPhase.SUCCEED, "replicationRemove"))
                         .onErrorResumeNext(throwable -> {

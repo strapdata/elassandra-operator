@@ -75,7 +75,7 @@ public class Task {
     }
 
     public String id() {
-        return metadata.getName()+"/"+metadata.getNamespace();
+        return metadata.getNamespace() + "/" + metadata.getName();
     }
 
     @JsonIgnore
