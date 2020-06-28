@@ -38,9 +38,9 @@ public class Key {
         name = null;
     }
 
-    public Key(String name, String namespace) {
-        this.name = name;
+    public Key(String namespace, String name) {
         this.namespace = namespace;
+        this.name = name;
     }
 
     public Key(final V1ObjectMeta metadata) {
@@ -49,6 +49,6 @@ public class Key {
     }
 
     public String id() {
-        return name + "/" +namespace;
+        return namespace + "/" +name;
     }
 }

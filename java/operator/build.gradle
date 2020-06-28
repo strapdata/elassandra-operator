@@ -110,6 +110,7 @@ dependencies {
     compile "io.micronaut:micronaut-security-jwt"
 
     compile "io.kubernetes:client-java:$kubernetesClientVersion"
+    compile "io.kubernetes:client-java-extended:$kubernetesClientVersion"
     compile "javax.inject:javax.inject:1"
     runtime "ch.qos.logback:logback-classic:1.2.3"
 

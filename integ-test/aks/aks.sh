@@ -80,7 +80,7 @@ add_public_vmss_ip() {
    AKS_VMSS=${AKS_VMSS_0::-6}
 
    PUBLIC_IP=$(az vmss list-instance-public-ips -g $AKS_RG_NAME -n $AKS_VMSS | jq -r ".[${1:-0}].ipAddress")
-   kubectl label nodes --overwrite $AKS_VMSS_0 kubernetes.strapdata.com/public-ip=$PUBLIC_IP
+   kubectl label nodes --overwrite $AKS_VMSS_0 elassandra.strapdata.com/public-ip=$PUBLIC_IP
 }
 
 # $# = inbound tcp ports

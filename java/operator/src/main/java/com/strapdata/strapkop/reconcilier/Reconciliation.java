@@ -17,7 +17,8 @@
 
 package com.strapdata.strapkop.reconcilier;
 
-import com.strapdata.strapkop.event.K8sWatchEvent;
+import com.strapdata.strapkop.model.Key;
+import io.kubernetes.client.openapi.models.V1ObjectMeta;
 import io.reactivex.Completable;
 import lombok.*;
 
@@ -26,16 +27,19 @@ import lombok.*;
 @NoArgsConstructor
 @ToString
 @With
-public class Reconciliable {
+public class Reconciliation {
+
+    Key key;
+    String name;
+    Long generation;
+    String resourceVersion;
 
     @ToString.Exclude
     Completable completable;
 
     Kind kind;
 
-    K8sWatchEvent.Type type;
-
-    String resourceVersion;
+    Type type;
 
     Long submitTime;
     Long startTime;
@@ -44,7 +48,23 @@ public class Reconciliable {
         TASK,
         DATACENTER,
         STATEFULSET,
+        DEPLOYMENT,
         ELASSANDRA_POD,
         NODE;
+    }
+
+    public enum Type {
+        INIT,
+        ADDED,
+        MODIFIED,
+        DELETED
+    }
+
+    public Reconciliation(V1ObjectMeta objectMeta, Kind kind, Type type) {
+        this.name = objectMeta.getName();
+        this.kind = kind;
+        this.type = type;
+        this.resourceVersion = objectMeta.getResourceVersion();
+        this.generation = objectMeta.getGeneration();
     }
 }

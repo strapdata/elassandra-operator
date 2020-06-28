@@ -43,7 +43,11 @@ java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --health GREE
 
 # delete PVC
 sleep 2
-kubectl delete pvc data-volume-elassandra-cl1-dc1-0-0 -n $NS
+
+# STS replicas=0 but not deleted => force PVC delete
+PVC=data-volume-elassandra-cl1-dc1-0-0
+kubectl delete pvc $PVC -n $NS --force --grace-period=0 &
+kubectl patch pvc $PVC -n $NS -p '{"metadata":{"finalizers": []}}' --type=merge
 
 # scale up
 scale_elassandra_datacenter $NS cl1 dc1 3

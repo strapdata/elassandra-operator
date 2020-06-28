@@ -24,18 +24,14 @@ import com.google.common.net.InetAddresses;
 import com.strapdata.cassandra.k8s.ElassandraOperatorSeedProvider;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.DataCenterStatusCache;
-import com.strapdata.strapkop.cache.NodeCache;
-import com.strapdata.strapkop.cache.ServiceAccountCache;
 import com.strapdata.strapkop.cache.StatefulsetCache;
 import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRole;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.cql.CqlSessionHandler;
-import com.strapdata.strapkop.handler.NodeHandler;
 import com.strapdata.strapkop.k8s.ElassandraPod;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
-import com.strapdata.strapkop.k8s.Pod;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
@@ -49,6 +45,8 @@ import com.strapdata.strapkop.utils.BackupScheduler;
 import com.strapdata.strapkop.utils.QuantityConverter;
 import io.kubernetes.client.custom.IntOrString;
 import io.kubernetes.client.custom.Quantity;
+import io.kubernetes.client.informer.SharedIndexInformer;
+import io.kubernetes.client.informer.SharedInformerFactory;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.apis.AppsV1Api;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
@@ -139,16 +137,18 @@ public class DataCenterUpdateAction {
 
     private final MeterRegistry meterRegistry;
 
-    private final NodeCache nodeCache;
     private final StatefulsetCache statefulsetCache;
     private final DataCenterStatusCache dataCenterStatusCache;
-    private final ServiceAccountCache serviceAccountCache;
+    private final  SharedIndexInformer<V1ServiceAccount> saSharedIndexInformer;
+
+    final SharedInformerFactory sharedInformerFactory;
 
     private final BackupScheduler backupScheduler;
 
     public final Builder builder = new Builder();
 
     public DataCenterUpdateAction(final ApplicationContext context,
+                                  final SharedInformerFactory sharedInformerFactory,
                                   final CoreV1Api coreApi,
                                   final AppsV1Api appsApi,
                                   final CustomObjectsApi customObjectsApi,
@@ -156,10 +156,8 @@ public class DataCenterUpdateAction {
                                   final AuthorityManager authorityManager,
                                   final CqlRoleManager cqlRoleManager,
                                   final CqlKeyspaceManager cqlKeyspaceManager,
-                                  final NodeCache nodeCache,
                                   final StatefulsetCache statefulsetCache,
                                   final DataCenterStatusCache dataCenterStatusCache,
-                                  final ServiceAccountCache serviceAccountCache,
                                   final JmxmpElassandraProxy jmxmpElassandraProxy,
                                   @Parameter("dataCenter") DataCenter dataCenter,
                                   @Parameter("operation") Operation operation,
@@ -168,6 +166,7 @@ public class DataCenterUpdateAction {
                                   final MeterRegistry meterRegistry,
                                   final PluginRegistry pluginRegistry) {
         this.context = context;
+        this.sharedInformerFactory = sharedInformerFactory;
         this.coreApi = coreApi;
         this.appsApi = appsApi;
         this.customObjectsApi = customObjectsApi;
@@ -183,13 +182,12 @@ public class DataCenterUpdateAction {
         this.dataCenterMetadata = dataCenter.getMetadata();
         this.dataCenterSpec = dataCenter.getSpec();
 
-        this.statefulsetCache = statefulsetCache;
         this.dataCenterStatusCache = dataCenterStatusCache;
-        this.serviceAccountCache = serviceAccountCache;
+        this.statefulsetCache = statefulsetCache;
+        this.saSharedIndexInformer = sharedInformerFactory.getExistingSharedIndexInformer(V1ServiceAccount.class);
 
         this.cqlRoleManager = cqlRoleManager;
         this.cqlKeyspaceManager = cqlKeyspaceManager;
-        this.nodeCache = nodeCache;
 
         this.jmxmpElassandraProxy = jmxmpElassandraProxy;
 
@@ -198,8 +196,10 @@ public class DataCenterUpdateAction {
         this.pluginRegistry = pluginRegistry;
 
         this.key = new Key(dataCenterMetadata);
-        this.dataCenterStatus = dataCenter.getStatus();
-        this.zones = new Zones(dataCenterStatus, nodeCache.values(), this.statefulsetCache.get(key));
+        this.dataCenterStatus = dataCenterStatusCache.getOrDefault(key, dataCenter.getStatus());
+
+        SharedIndexInformer<V1Node> nodeSharedIndexInformer = sharedInformerFactory.getExistingSharedIndexInformer(V1Node.class);
+        this.zones = new Zones(dataCenterStatus, nodeSharedIndexInformer.getIndexer().list(), this.statefulsetCache.getOrDefault(key, new TreeMap<>()));
     }
 
     // sibiling DC are DC in the same cluster, same namespace
@@ -299,32 +299,35 @@ public class DataCenterUpdateAction {
                 })
                 .flatMap(password -> builder.buildPodDisruptionBudget())    // build one PDB per dc
                 .flatMap(pdb -> readUserConfigMap())
-                .flatMap(optionalUserConfig -> {
+                .flatMapCompletable(optionalUserConfig -> {
                     ConfigMapVolumeMounts configMapVolumeMounts = new ConfigMapVolumeMounts(optionalUserConfig);
 
-                    // choose the first k8s node, and build config and sts
-                    V1Node node = nodeCache.values().iterator().next();
-                    RackStatus rackStatus = new RackStatus()
-                            .withDesiredReplicas(1)
-                            .withHealth(Health.RED)
-                            .withIndex(0)
-                            .withName(NodeHandler.getZone(node))
-                            .withFingerprint(configMapVolumeMounts.fingerPrint());
+                    if (dataCenterStatus.getRackStatuses().isEmpty() && !zones.zoneMap.isEmpty()) {
+                        // choose the first k8s node, and build config and sts
+                        RackStatus rackStatus = new RackStatus()
+                                .withDesiredReplicas(1)
+                                .withHealth(Health.RED)
+                                .withIndex(0)
+                                .withName(zones.zoneMap.navigableKeySet().first())
+                                .withFingerprint(configMapVolumeMounts.fingerPrint());
 
-                    dataCenterStatus.getRackStatuses().put(0, rackStatus);
-                    dataCenterStatus.setHealth(Health.RED);
-                    dataCenterStatus.setPhase(DataCenterPhase.RUNNING);
-                    dataCenterStatus.setObservedGeneration(dataCenterMetadata.getGeneration());
-                    configMapVolumeMounts.setRack(rackStatus);
-                    return configMapVolumeMounts.createOrReplaceNamespacedConfigMaps()
-                            // updateRack also call prepareDataCenterSnapshot
-                            .andThen(builder.buildStatefulSetRack(rackStatus, configMapVolumeMounts)
-                                    .flatMap(s -> {
-                                        endOperation("Datacenter resources deployed");
-                                        return k8sResourceUtils.updateDataCenterStatus(dataCenter, dataCenterStatus);
-                                    }));
-                })
-                .ignoreElement();
+                        dataCenterStatus.getRackStatuses().put(0, rackStatus);
+                        dataCenterStatus.setHealth(Health.RED);
+                        dataCenterStatus.setPhase(DataCenterPhase.RUNNING);
+                        dataCenterStatus.setObservedGeneration(dataCenterMetadata.getGeneration());
+                        configMapVolumeMounts.setRack(rackStatus);
+                        return configMapVolumeMounts.createOrReplaceNamespacedConfigMaps()
+                                // updateRack also call prepareDataCenterSnapshot
+                                .andThen(builder.buildStatefulSetRack(rackStatus, configMapVolumeMounts)
+                                        .flatMap(s -> {
+                                            endOperation("Datacenter resources deployed");
+                                            return k8sResourceUtils.updateDataCenterStatus(dataCenter, dataCenterStatus);
+                                        }))
+                                .ignoreElement();
+                    } else {
+                        return nextAction(true);
+                    }
+                });
     }
 
 
@@ -344,7 +347,7 @@ public class DataCenterUpdateAction {
     /**
      * Trigger next action when sts reach the desired state
      */
-    public Completable statefulsetStatusUpdated(V1StatefulSet sts) throws Exception {
+    public Completable statefulsetStatusUpdated(V1StatefulSet sts) {
         logger.debug("########## sts={}/{} generation/observedGeneration={}/{} resourceVersion={} replica/ready/updated={}/{}/{} revision current/updated={}/{}",
                 sts.getMetadata().getName(), sts.getMetadata().getNamespace(),
                 sts.getMetadata().getGeneration(), sts.getStatus().getObservedGeneration(),
@@ -398,22 +401,12 @@ public class DataCenterUpdateAction {
         return false;
     }
 
-    public Completable taskDone(Task task) throws Exception {
+    public Completable taskDone(Task task) {
         logger.debug("########## datacenter={} task={} done", dataCenter.id(), task.id());
         return nextAction(false);
     }
 
-    // do nothing...
-    public Completable unschedulablePod(Pod pod) throws Exception {
-        logger.debug("########## datacenter={} unschedulable pod={}", dataCenter.id(), pod.id());
-        //dataCenterStatus.setLastError("Unschedulable pod=" + pod.getName());
-        //dataCenterStatus.setLastErrorTime(new Date());
-        return Completable.complete();
-        //return nextAction(true);
-    }
-
-
-    public Completable nextAction(final boolean updateStatus) throws Exception {
+    public Completable nextAction(final boolean updateStatus) {
         if (dataCenterSpec.isParked() && !(DataCenterPhase.PARKED.equals(dataCenterStatus.getPhase())))
             return parkDatacenter();
 
@@ -434,7 +427,7 @@ public class DataCenterUpdateAction {
                 .flatMapCompletable(optionalUserConfig -> {
                     ConfigMapVolumeMounts configMapVolumeMounts = new ConfigMapVolumeMounts(optionalUserConfig);
                     String currentFingerprint = dataCenterSpec.elassandraFingerprint() + "-" + configMapVolumeMounts.fingerPrint();
-                    TreeMap<String, V1StatefulSet> statefulSetTreeMap = this.statefulsetCache.get(key);
+                    TreeMap<String, V1StatefulSet> statefulSetTreeMap = this.statefulsetCache.getOrDefault(key, new TreeMap<>());
                     boolean allStsReady = true;
                     for(RackStatus rackStatus : dataCenterStatus.getRackStatuses().values()) {
                         V1StatefulSet v1StatefulSet = statefulSetTreeMap.get(rackStatus.getName());
@@ -503,7 +496,7 @@ public class DataCenterUpdateAction {
                     // check if all racks STS are ready, otherwise wait next reconciliation
                     for(RackStatus rackStatus : dataCenterStatus.getRackStatuses().values()) {
                         V1StatefulSet v1StatefulSet = statefulSetTreeMap.get(rackStatus.getName());
-                        if (!statefulSetIsReady(v1StatefulSet)) {
+                        if (v1StatefulSet != null && !statefulSetIsReady(v1StatefulSet)) {
                             logger.debug("v1StatefulSet={}/{} not ready, waiting", v1StatefulSet.getMetadata().getName(), v1StatefulSet.getMetadata().getNamespace());
                             endOperation("noop, wait for pods ready in rack index=" + rackStatus.getIndex() + " name=" + rackStatus.getName());
                             return k8sResourceUtils.updateDataCenterStatus(dataCenter, dataCenterStatus).ignoreElement();
@@ -537,7 +530,7 @@ public class DataCenterUpdateAction {
                 });
     }
 
-    public Completable parkDatacenter() throws ApiException {
+    public Completable parkDatacenter() {
         List<CompletableSource> todoList = new ArrayList<>();
         TreeMap<String, V1StatefulSet> statefulSetTreeMap = this.statefulsetCache.get(key);
         for (V1StatefulSet v1StatefulSet : statefulSetTreeMap.values()) {
@@ -561,7 +554,7 @@ public class DataCenterUpdateAction {
                 });
     }
 
-    public Completable unparkDatacenter() throws ApiException {
+    public Completable unparkDatacenter() {
         List<CompletableSource> todoList = new ArrayList<>();
         TreeMap<String, V1StatefulSet> statefulSetTreeMap = this.statefulsetCache.get(key);
         for (V1StatefulSet v1StatefulSet : statefulSetTreeMap.values()) {
@@ -591,7 +584,7 @@ public class DataCenterUpdateAction {
 
         // Scaling UP
         final Zone zone = scaleUpZone.get();
-        logger.trace("Scaling UP zone={}", zone);
+        logger.debug("Scaling UP zone={}", zone);
         if (!zone.getSts().isPresent()) {
             // create new sts with replicas = 1,
             Integer rackIndex = dataCenterStatus.getZones().indexOf(zone.name);
@@ -601,7 +594,7 @@ public class DataCenterUpdateAction {
                     .setHealth(Health.RED)
                     .withDesiredReplicas(1)
                     .withFingerprint(configMapVolumeMounts.fingerPrint()));
-            logger.debug("datacenter={} SCALE_UP started in rack={} rackIndex={} size={}",
+            logger.debug("datacenter={} SCALE_UP started in rack={} rackIndex={} zones.size={}",
                     dataCenter.id(), rackStatus.getName(), rackStatus.getIndex(), zone.size);
 
             configMapVolumeMounts.setRack(rackStatus);
@@ -661,7 +654,7 @@ public class DataCenterUpdateAction {
         RackStatus rackStatus = dataCenterStatus.getRackStatuses().get(rackIndex);
 
         if (dataCenterStatus.getBootstrapped() && dataCenterSpec.getReplicas() > 1) {
-            todo = cqlKeyspaceManager.decreaseRfBeforeScalingDownDc(dataCenter, zones.totalReplicas() - 1, cqlSessionHandler)
+            todo = cqlKeyspaceManager.decreaseRfBeforeScalingDownDc(dataCenter, dataCenterStatus, zones.totalReplicas() - 1, cqlSessionHandler)
                     .andThen(Completable.fromAction(() -> {
                         // update the DC status after the decreaseRf because decreaseRf test DC phase is RUNNING...
                         logger.info("datacenter={} SCALE_DOWN started in rack={} size={}, decommissioning pod={}-{}",
@@ -1194,7 +1187,7 @@ public class DataCenterUpdateAction {
                 dataCenterStatus.setBootstrapped(true);
             }
             return new ConfigMapVolumeMountBuilder(configMap, volumeSource, "operator-config-volume-seeds", "/tmp/operator-config-seeds")
-                    .addFile("cassandra.yaml.d/003-cassandra-seeds.yaml", toYamlString(config));
+                    .addFile("cassandra.yaml.d/001-cassandra-seeds.yaml", toYamlString(config));
         }
 
         /**
@@ -1731,7 +1724,12 @@ public class DataCenterUpdateAction {
             // Add the nodeinfo init container to bind on the k8s node public IP if available.
             // If externalDns is enabled, this init-container also publish a DNSEndpoint to expose public DNS name of seed nodes.
             if (dataCenterSpec.getNetworking().nodeInfoRequired()) {
-                V1ServiceAccount serviceAccount = serviceAccountCache.loadIfAbsent(OperatorNames.nodeInfoServiceAccount(dataCenter), dataCenterMetadata.getNamespace()).blockingGet();
+                V1ServiceAccount serviceAccount = saSharedIndexInformer.getIndexer().getByKey(
+                        (dataCenterMetadata.getNamespace() == null ? "" : dataCenterMetadata.getNamespace() +"/" ) + OperatorNames.nodeInfoServiceAccount(dataCenter));
+                if (serviceAccount == null) {
+                    // try a blocking k8s read if not available from the cache.
+                    serviceAccount = k8sResourceUtils.readNamespacedServiceAccount(dataCenterMetadata.getNamespace(), OperatorNames.nodeInfoServiceAccount(dataCenter));
+                }
                 if (serviceAccount != null && serviceAccount.getSecrets() != null && !serviceAccount.getSecrets().isEmpty()) {
                     String nodeInfoSecretName = serviceAccount.getSecrets().get(0).getName();
                     podSpec.addInitContainersItem(buildInitContainerNodeInfo(nodeInfoSecretName, rackStatus));
@@ -1902,7 +1900,11 @@ public class DataCenterUpdateAction {
                 }
             }
 
-            return k8sResourceUtils.createOrReplaceNamespacedStatefulSet(new V1StatefulSet().metadata(statefulSetMetadata).spec(statefulSetSpec));
+            return k8sResourceUtils.createOrReplaceNamespacedStatefulSet(new V1StatefulSet().metadata(statefulSetMetadata).spec(statefulSetSpec))
+                    .map(s -> {
+                        statefulsetCache.updateIfAbsent(s);
+                        return s;
+                    });
         }
 
         private V1Container buildElassandraContainer(RackStatus rack) {
@@ -2120,7 +2122,7 @@ public class DataCenterUpdateAction {
                                     // try first to extract ExternalIP from node
                                     // if ExternalIP isn't set, try to extract public ip annotation
                                     " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o jsonpath='{.status.addresses[?(@.type==\"ExternalIP\")].address}' > /nodeinfo/public-ip " +
-                                    " && ((PUB_IP=`cat /nodeinfo/public-ip` && test \"$PUB_IP\" = \"\" && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"kubernetes.strapdata.com/public-ip\"}}' | awk '!/<no value>/ { print $0 }' > /nodeinfo/public-ip) || true ) " +
+                                    " && ((PUB_IP=`cat /nodeinfo/public-ip` && test \"$PUB_IP\" = \"\" && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o go-template='{{index .metadata.labels \"elassandra.strapdata.com/public-ip\"}}' | awk '!/<no value>/ { print $0 }' > /nodeinfo/public-ip) || true ) " +
                                     " && kubectl get no ${NODE_NAME} --token=\"$NODEINFO_TOKEN\" -o jsonpath='{.status.addresses[?(@.type==\"InternalIP\")].address}' > /nodeinfo/node-ip " +
                                     /*
                                     (dataCenterSpec.getNetworking().getNodeLoadBalancerEnabled() ?
@@ -2272,13 +2274,18 @@ public class DataCenterUpdateAction {
         TreeMap<String, Zone> zoneMap = new TreeMap<>();    // sort racks
 
         public Zones(DataCenterStatus dataCenterStatus, Collection<V1Node> nodes, TreeMap<String, V1StatefulSet> existingStatefulSetsByZone) {
-            for (V1Node node : nodes) {
-                String zoneName = node.getMetadata().getLabels().get(OperatorLabels.ZONE);
-                if (zoneName == null) {
-                    //logger.warn("missing label {} on node {}, ignoring", OperatorLabels.ZONE, node.getMetadata().getName());
-                    continue;
+            for (V1Node node : nodes.stream()
+                    .filter(n -> n.getMetadata().getLabels().get(OperatorLabels.ZONE) != null)
+                    .sorted(new Comparator<V1Node>() {
+                @Override
+                public int compare(V1Node o1, V1Node o2) {
+                    String zone1 = o1.getMetadata().getLabels().get(OperatorLabels.ZONE);
+                    String zone2 = o2.getMetadata().getLabels().get(OperatorLabels.ZONE);
+                    return zone1.compareTo(zone2);
                 }
-                if (dataCenterStatus.getZones().indexOf(zoneName) == -1) {
+            }).collect(Collectors.toList())) {
+                String zoneName = node.getMetadata().getLabels().get(OperatorLabels.ZONE);
+                if (!dataCenterStatus.getZones().contains(zoneName)) {
                     // Register the zone name to keep an ordered zones list and compute consistent rackIndex.
                     dataCenterStatus.getZones().add(zoneName);
                 }

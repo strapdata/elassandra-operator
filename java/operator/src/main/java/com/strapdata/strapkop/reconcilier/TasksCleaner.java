@@ -17,10 +17,9 @@
 
 package com.strapdata.strapkop.reconcilier;
 
-import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
-import io.kubernetes.client.openapi.ApiException;
+import com.strapdata.strapkop.model.k8s.task.Task;
 import io.micronaut.discovery.event.ServiceShutdownEvent;
 import io.micronaut.discovery.event.ServiceStartedEvent;
 import io.micronaut.runtime.event.annotation.EventListener;
@@ -79,12 +78,8 @@ public class TasksCleaner {
                     if (task.getMetadata().getCreationTimestamp().plusMillis(retentionInMs).isBeforeNow()) {
                         logger.debug("Clearing task '{}' older than {} ms", task.getMetadata().getName(), retentionInMs);
                         // trigger the deletion but not wait the end.
-                        try {
-                            k8sResourceUtils.deleteTask(task.getMetadata()).subscribe();
-                            logger.debug("task={} deleted", task.id());
-                        } catch (ApiException ae) {
-                            logger.info("cleaner iteration fails on task '{}' due to : {}", task.getMetadata().getName(), ae.getMessage(), ae);
-                        }
+                        k8sResourceUtils.deleteTask(task.getMetadata()).subscribe();
+                        logger.debug("task={} deleted", task.id());
                     }
                 });
             } catch (Exception e) {

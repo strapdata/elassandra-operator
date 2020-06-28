@@ -18,13 +18,12 @@
 package com.strapdata.strapkop.reconcilier;
 
 import com.google.common.collect.ImmutableMap;
-import com.strapdata.strapkop.cache.*;
+import com.strapdata.strapkop.cache.DataCenterStatusCache;
+import com.strapdata.strapkop.cache.StatefulsetCache;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.cql.CqlSessionHandler;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.K8sSupplier;
-import com.strapdata.strapkop.k8s.OperatorNames;
-import com.strapdata.strapkop.k8s.Pod;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
@@ -33,6 +32,7 @@ import com.strapdata.strapkop.model.k8s.datacenter.Operation;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.plugins.PluginRegistry;
 import com.strapdata.strapkop.plugins.ReaperPlugin;
+import io.kubernetes.client.informer.SharedInformerFactory;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.models.V1Deployment;
 import io.kubernetes.client.openapi.models.V1StatefulSet;
@@ -40,7 +40,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
 import io.reactivex.Completable;
 import io.reactivex.Single;
-import io.reactivex.schedulers.Schedulers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,13 +49,10 @@ import java.util.Date;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
-/**
- * DC controller
- */
 @Singleton
-public class DataCenterController {
+public class DataCenterReconcilier extends Reconcilier<DataCenter> {
 
-    private final Logger logger = LoggerFactory.getLogger(DataCenterController.class);
+    private final Logger logger = LoggerFactory.getLogger(DataCenterReconcilier.class);
 
     @Inject
     ApplicationContext context;
@@ -68,16 +64,10 @@ public class DataCenterController {
     CqlRoleManager cqlRoleManager;
 
     @Inject
-    DataCenterCache dataCenterCache;
-
-    @Inject
     DataCenterStatusCache dataCenterStatusCache;
 
     @Inject
     StatefulsetCache statefulsetCache;
-
-    @Inject
-    ServiceAccountCache serviceAccountCache;
 
     @Inject
     MeterRegistry meterRegistry;
@@ -86,12 +76,16 @@ public class DataCenterController {
     K8sResourceUtils k8sResourceUtils;
 
     @Inject
+    ReaperPlugin reaperPlugin;
+
+    @Inject
     ReconcilierObserver reconcilierObserver;
 
     @Inject
-    ReaperPlugin reaperPlugin;
+    SharedInformerFactory sharedInformerFactory;
 
-    public Completable reconcile(DataCenter dataCenter, Completable action) throws Exception {
+    @Override
+    public Completable reconcile(DataCenter dataCenter, Completable action) {
         return reconcilierObserver.onReconciliationBegin().toSingleDefault(dataCenter)
                 .flatMapCompletable(dc -> {
                     try {
@@ -111,17 +105,12 @@ public class DataCenterController {
                     }
                 })
                 .doOnError(t -> { if (!(t instanceof ReconcilierShutdownException)) reconcilierObserver.failedReconciliationAction(); })
-                .doOnComplete(reconcilierObserver.endReconciliationAction())
-                .observeOn(Schedulers.io());
+                .doOnComplete(reconcilierObserver.endReconciliationAction());
     }
 
-    public Completable initDatacenter(DataCenter dc, Operation op) throws Exception {
+    public Completable initDatacenter(DataCenter dc, Operation op)  {
         return reconcile(dc,
-                statefulsetCache.loadIfAbsent(dc)
-                .flatMap(x -> (dc.getSpec().getNetworking().nodeInfoRequired())
-                        ? serviceAccountCache.load(OperatorNames.nodeInfoServiceAccount(dc), dc.getMetadata().getNamespace()).map(sa -> x)
-                        : Single.just(x))
-                .flatMap(t -> fetchDataCentersSameClusterAndNamespace(dc))
+                fetchDataCentersSameClusterAndNamespace(dc)
                 .flatMapCompletable(dcIterable -> context.createBean(DataCenterUpdateAction.class, dc, op)
                         .setSibilingDc(StreamSupport.stream(dcIterable.spliterator(), false)
                                 .filter(d -> !d.getSpec().getDatacenterName().equals(dc.getSpec().getDatacenterName()))
@@ -135,10 +124,9 @@ public class DataCenterController {
     /**
      * Called when the DC CRD is updated, involving a rolling update of sts.
      */
-    public Completable updateDatacenter(DataCenter dc, Operation op) throws Exception {
+    public Completable updateDatacenter(DataCenter dc, Operation op) {
         return reconcile(dc,
-                statefulsetCache.load(dc)
-                .flatMap(t -> fetchDataCentersSameClusterAndNamespace(dc))
+                fetchDataCentersSameClusterAndNamespace(dc)
                 .flatMapCompletable(dcIterable -> context.createBean(DataCenterUpdateAction.class, dc, op)
                         .setSibilingDc(StreamSupport.stream(dcIterable.spliterator(), false)
                                 .filter(d -> !d.getSpec().getDatacenterName().equals(dc.getSpec().getDatacenterName()))
@@ -149,13 +137,11 @@ public class DataCenterController {
         );
     }
 
-    public Completable statefulsetStatusUpdate(DataCenter dc, Operation op, V1StatefulSet sts) throws Exception {
-        return reconcile(dc, statefulsetCache.loadIfAbsent(dc)
-                .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dc, op))
-                .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.statefulsetStatusUpdated(sts)));
+    public Completable statefulsetStatusUpdate(DataCenter dc, Operation op, V1StatefulSet sts) {
+        return reconcile(dc, context.createBean(DataCenterUpdateAction.class, dc, op).statefulsetStatusUpdated(sts));
     }
 
-    public Completable deploymentAvailable(DataCenter dc, Operation op, V1Deployment deployment) throws Exception {
+    public Completable deploymentAvailable(DataCenter dc, Operation op, V1Deployment deployment) {
         String app = deployment.getMetadata().getLabels().get(OperatorLabels.APP);
         if ("reaper".equals(app)) {
             return reconcile(dc,
@@ -165,33 +151,14 @@ public class DataCenterController {
         return Completable.complete();
     }
 
-    public Completable unschedulablePod(Pod pod) throws Exception {
-        final Key key = new Key(pod.getParent(), pod.getNamespace());
-        DataCenter dc = dataCenterCache.get(key);
-        if (dc != null) {
-            Operation op = new Operation()
-                    .withLastTransitionTime(new Date())
-                    .withTriggeredBy("Unschedulable pod=" + pod.getName());
-            return reconcile(dc, statefulsetCache.loadIfAbsent(dc)
-                    .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dc, op))
-                    .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.unschedulablePod(pod))
-                    .andThen(k8sResourceUtils.updateDataCenterStatus(dc, dc.getStatus()).ignoreElement())
-            );
-        }
-        return Completable.complete();
-    }
-
-    /**
-     * Called when desired state changes
-     */
-    public Completable deleteDatacenter(final DataCenter dataCenter) throws Exception {
+    public Completable deleteDatacenter(final DataCenter dataCenter) {
         final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
         meterRegistry.counter("datacenter.delete").increment();
 
         return reconcilierObserver.onReconciliationBegin()
                 .andThen(pluginRegistry.deleteAll(dataCenter))
                 .andThen(context.createBean(DataCenterDeleteAction.class, dataCenter).deleteDataCenter(cqlSessionHandler))
-                .doOnError(t -> { // TODO au lieu de faire le deleteDC en premier ne faut-il pas faire une action deleteDC sur erreur ou simplement logguer les erreur de deletePlugin ???
+                .doOnError(t -> {
                     logger.warn("An error occured during delete datacenter action:", t);
                     if (!(t instanceof ReconcilierShutdownException)) {
                         reconcilierObserver.failedReconciliationAction();
@@ -201,15 +168,13 @@ public class DataCenterController {
                 .doFinally(() -> cqlSessionHandler.close());
     }
 
-    public Completable taskDone(final DataCenter dc, final Task task) throws Exception {
-        return reconcile(dc,
-                statefulsetCache.load(dc)
-                        .map(stsMap -> context.createBean(DataCenterUpdateAction.class, dc,
+    public Completable taskDone(final DataCenter dc, final Task task) {
+        return reconcile(dc, context.createBean(DataCenterUpdateAction.class, dc,
                                 new Operation()
                                         .withLastTransitionTime(new Date())
-                                        .withTriggeredBy("dc-after-task-" + task.getMetadata().getName())))
-                .flatMapCompletable(dataCenterUpdateAction ->  dataCenterUpdateAction.taskDone(task))
-                .andThen(k8sResourceUtils.updateDataCenterStatus(dc, dc.getStatus()).ignoreElement()));
+                                        .withTriggeredBy("dc-after-task-" + task.getMetadata().getName()))
+                .taskDone(task))
+                .andThen(k8sResourceUtils.updateDataCenterStatus(dc, dc.getStatus()).ignoreElement());
     }
 
     /**
@@ -217,7 +182,7 @@ public class DataCenterController {
      * @param dc
      * @return
      */
-    public Single<Iterable<DataCenter>> fetchDataCentersSameClusterAndNamespace(DataCenter dc) throws ApiException {
+    public Single<Iterable<DataCenter>> fetchDataCentersSameClusterAndNamespace(DataCenter dc) {
         return K8sResourceUtils.listNamespacedResources(dc.getMetadata().getNamespace(), new K8sSupplier<Iterable<DataCenter>>() {
             @Override
             public Iterable<DataCenter> get() throws ApiException {

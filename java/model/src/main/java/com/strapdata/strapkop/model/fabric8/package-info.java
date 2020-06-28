@@ -15,8 +15,4 @@
  * along with the Elassandra-Operator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/**
- * CRDs supported by strapkube (Elassandra-operator CRDs)
- * WARING: use fabric8io kubernetes client, should be consistent with the underling CRD implementation.
- */
 package com.strapdata.strapkop.model.fabric8;
