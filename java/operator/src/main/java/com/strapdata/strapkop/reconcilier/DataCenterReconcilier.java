@@ -40,6 +40,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
 import io.reactivex.Completable;
 import io.reactivex.Single;
+import io.vavr.Tuple2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -110,9 +111,13 @@ public class DataCenterReconcilier extends Reconcilier<DataCenter> {
 
     public Completable initDatacenter(DataCenter dc, Operation op)  {
         return reconcile(dc,
-                fetchDataCentersSameClusterAndNamespace(dc)
-                .flatMapCompletable(dcIterable -> context.createBean(DataCenterUpdateAction.class, dc, op)
-                        .setSibilingDc(StreamSupport.stream(dcIterable.spliterator(), false)
+                Single.zip(
+                        buildDataCenterUpdateAction(dc, op),
+                        fetchDataCentersSameClusterAndNamespace(dc),
+                        Tuple2::new
+                )
+                .flatMapCompletable(tuple ->
+                        tuple._1.setSibilingDc(StreamSupport.stream(tuple._2.spliterator(), false)
                                 .filter(d -> !d.getSpec().getDatacenterName().equals(dc.getSpec().getDatacenterName()))
                                 .map(d -> d.getSpec().getDatacenterName())
                                 .collect(Collectors.toList()))
@@ -126,55 +131,73 @@ public class DataCenterReconcilier extends Reconcilier<DataCenter> {
      */
     public Completable updateDatacenter(DataCenter dc, Operation op) {
         return reconcile(dc,
-                fetchDataCentersSameClusterAndNamespace(dc)
-                .flatMapCompletable(dcIterable -> context.createBean(DataCenterUpdateAction.class, dc, op)
-                        .setSibilingDc(StreamSupport.stream(dcIterable.spliterator(), false)
+                Single.zip(
+                        buildDataCenterUpdateAction(dc, op),
+                        fetchDataCentersSameClusterAndNamespace(dc),
+                        Tuple2::new
+                ).flatMapCompletable(tuple ->
+                        tuple._1.setSibilingDc(StreamSupport.stream(tuple._2.spliterator(), false)
                                 .filter(d -> !d.getSpec().getDatacenterName().equals(dc.getSpec().getDatacenterName()))
                                 .map(d -> d.getSpec().getDatacenterName())
                                 .collect(Collectors.toList()))
-                        .updateDatacenterSpec()
-                )
+                                .updateDatacenterSpec())
         );
     }
 
+    Single<DataCenterUpdateAction> buildDataCenterUpdateAction(DataCenter dc, Operation op) {
+        return Single.fromCallable(() -> context.createBean(
+                DataCenterUpdateAction.class,
+                sharedInformerFactory.getExistingSharedIndexInformer(DataCenter.class).getIndexer().getByKey(dc.id()),
+                op));
+    }
+
     public Completable statefulsetStatusUpdate(DataCenter dc, Operation op, V1StatefulSet sts) {
-        return reconcile(dc, context.createBean(DataCenterUpdateAction.class, dc, op).statefulsetStatusUpdated(sts));
+        logger.debug("sts={}/{} generation/observedGeneration={}/{} resourceVersion={} replica/ready/updated={}/{}/{} revision current/updated={}/{}",
+                sts.getMetadata().getName(), sts.getMetadata().getNamespace(),
+                sts.getMetadata().getGeneration(), sts.getStatus().getObservedGeneration(),
+                sts.getMetadata().getResourceVersion(),
+                sts.getStatus().getReplicas(), sts.getStatus().getReadyReplicas(), sts.getStatus().getUpdatedReplicas(),
+                sts.getStatus().getCurrentRevision(), sts.getStatus().getUpdateRevision());
+        return reconcile(dc,
+                buildDataCenterUpdateAction(dc, op)
+                .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.updateStateThenNextAction())
+        );
     }
 
     public Completable deploymentAvailable(DataCenter dc, Operation op, V1Deployment deployment) {
         String app = deployment.getMetadata().getLabels().get(OperatorLabels.APP);
         if ("reaper".equals(app)) {
             return reconcile(dc,
-                    reaperPlugin.reconcile(context.createBean(DataCenterUpdateAction.class, dc, op))
-                            .flatMapCompletable(b -> k8sResourceUtils.updateDataCenterStatus(dc, dc.getStatus()).ignoreElement()));
+                    buildDataCenterUpdateAction(dc, op)
+                            .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.updateStateThenNextAction()));
         }
         return Completable.complete();
     }
 
     public Completable deleteDatacenter(final DataCenter dataCenter) {
-        final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
-        meterRegistry.counter("datacenter.delete").increment();
-
         return reconcilierObserver.onReconciliationBegin()
                 .andThen(pluginRegistry.deleteAll(dataCenter))
-                .andThen(context.createBean(DataCenterDeleteAction.class, dataCenter).deleteDataCenter(cqlSessionHandler))
+                .andThen(Single.fromCallable(() -> {
+                    final DataCenterDeleteAction dataCenterDeleteAction = context.createBean(DataCenterDeleteAction.class, dataCenter);
+                    final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
+                    return dataCenterDeleteAction.deleteDataCenter(cqlSessionHandler);
+                }))
+                .doFinally(() -> meterRegistry.counter("datacenter.delete").increment())
                 .doOnError(t -> {
                     logger.warn("An error occured during delete datacenter action:", t);
                     if (!(t instanceof ReconcilierShutdownException)) {
                         reconcilierObserver.failedReconciliationAction();
                     }
                 })
-                .doOnComplete(reconcilierObserver.endReconciliationAction())
-                .doFinally(() -> cqlSessionHandler.close());
+                .ignoreElement()
+                .doOnComplete(reconcilierObserver.endReconciliationAction());
     }
 
     public Completable taskDone(final DataCenter dc, final Task task) {
-        return reconcile(dc, context.createBean(DataCenterUpdateAction.class, dc,
-                                new Operation()
-                                        .withLastTransitionTime(new Date())
-                                        .withTriggeredBy("dc-after-task-" + task.getMetadata().getName()))
-                .taskDone(task))
-                .andThen(k8sResourceUtils.updateDataCenterStatus(dc, dc.getStatus()).ignoreElement());
+        return reconcile(dc,
+                buildDataCenterUpdateAction(dc,
+                        new Operation().withLastTransitionTime(new Date()).withTriggeredBy("dc-after-task-" + task.getMetadata().getName()))
+                .flatMapCompletable(dataCenterUpdateAction -> dataCenterUpdateAction.taskDone(task)));
     }
 
     /**

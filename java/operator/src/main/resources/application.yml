@@ -32,6 +32,8 @@ micronaut:
     executors:
         workqueue:
             type: CACHED
+        taskqueue:
+            type: CACHED
         authority:
             type: CACHED
         reaper:

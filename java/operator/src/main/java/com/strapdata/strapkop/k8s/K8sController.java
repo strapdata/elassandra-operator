@@ -3,7 +3,6 @@ package com.strapdata.strapkop.k8s;
 import com.google.common.collect.ImmutableList;
 import com.strapdata.strapkop.cache.DataCenterStatusCache;
 import com.strapdata.strapkop.cache.StatefulsetCache;
-import com.strapdata.strapkop.model.ClusterKey;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
@@ -29,9 +28,6 @@ import io.micronaut.context.annotation.Infrastructure;
 import io.micronaut.discovery.event.ServiceShutdownEvent;
 import io.micronaut.runtime.event.annotation.EventListener;
 import io.micronaut.scheduling.annotation.Async;
-import io.reactivex.Completable;
-import io.reactivex.disposables.Disposable;
-import io.vavr.Tuple2;
 import org.apache.commons.lang3.ObjectUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,8 +37,6 @@ import javax.inject.Singleton;
 import java.util.Date;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Singleton
@@ -67,6 +61,9 @@ public class K8sController {
     WorkQueues workQueues;
 
     @Inject
+    TaskQueues taskQueues;
+
+    @Inject
     SharedInformerFactory sharedInformerFactory;
 
     @Inject
@@ -84,10 +81,9 @@ public class K8sController {
     @Inject
     K8sResourceUtils k8sResourceUtils;
 
-    ConcurrentMap<Tuple2<Key, String>, Disposable> ongoingTasks = new ConcurrentHashMap<>();
-
     public void start() {
         addNodeInformer();
+        addPodInformer();
         addServiceAccountInformer();
         addStatefulSetInformer();
         addDeploymentInformer();
@@ -113,7 +109,7 @@ public class K8sController {
                                     null,
                                     null,
                                     null,
-                                    null,
+                                    null,   // TODO: zone/node filter ?
                                     null,
                                     params.resourceVersion,
                                     params.timeoutSeconds,
@@ -122,6 +118,24 @@ public class K8sController {
                         },
                         V1Node.class,
                         V1NodeList.class);
+    }
+
+    void addPodInformer() {
+        SharedIndexInformer<V1Pod> podInformer =
+                sharedInformerFactory.sharedIndexInformerFor(
+                        (CallGeneratorParams params) -> coreV1Api.listPodForAllNamespacesCall(
+                                null,
+                                null,
+                                null,
+                                OperatorLabels.toSelector(OperatorLabels.MANAGED), // TODO: watch only pods having rack index=0 for seeds ?
+                                null,
+                                null,
+                                params.resourceVersion,
+                                params.timeoutSeconds,
+                                params.watch,
+                                null),
+                        V1Pod.class,
+                        V1PodList.class);
     }
 
     void addServiceAccountInformer() {
@@ -343,17 +357,7 @@ public class K8sController {
             @Override
             public void onDelete(Task task, boolean deletedFinalStateUnknown) {
                 logger.debug("task={}", task.id());
-                meterRegistry.counter("k8s.event.delete", tags).increment();
-                final Tuple2<Key, String> key = new Tuple2<>(
-                        new Key(task.getMetadata().getNamespace(), OperatorNames.dataCenterResource(task.getSpec().getCluster(), task.getSpec().getDatacenter())),
-                        task.getMetadata().getName()
-                );
-                Disposable disposable = ongoingTasks.get(key);
-                if (disposable != null) {
-                    logger.debug("task={} cancelled", task.id());
-                    meterRegistry.counter("k8s.event.cancelled", tags).increment();
-                    disposable.dispose();
-                }
+                // TODO: cancel removed tasks
                 meterRegistry.counter("k8s.event.deleted", tags).increment();
                 managed.decrementAndGet();
             }
@@ -361,25 +365,13 @@ public class K8sController {
     }
 
     public void reconcileTask(Task task, Reconciliation.Type type, AtomicInteger managed) {
-        final ClusterKey clusterKey = new ClusterKey(task.getMetadata().getNamespace(), task.getSpec().getCluster());
+        final Key dcKey = new Key(task.getMetadata().getNamespace(), OperatorNames.dataCenterResource(task.getSpec().getCluster(), task.getSpec().getDatacenter()));
         final TaskStatus taskStatus = task.getStatus();
         logger.debug("task={} generation={} taskStatus={}", task.id(), task.getMetadata().getGeneration(), taskStatus);
         if (taskStatus.getPhase() == null || !taskStatus.getPhase().isTerminated()) {
-            // execute task
-            final Tuple2<Key, String> key = new Tuple2<>(
-                    new Key(task.getMetadata().getNamespace(), OperatorNames.dataCenterResource(task.getSpec().getCluster(), task.getSpec().getDatacenter())),
-                    task.getMetadata().getName()
-            );
-            Completable completable = taskReconcilierResolver.getTaskReconcilier(task).reconcile(task);
-            // keep a task ref to cancel it on delete
-            completable.doFinally(() -> {
-                ongoingTasks.remove(key);
-                managed.decrementAndGet();
-            });
-            ongoingTasks.put(key, completable.subscribe());
-            workQueues.submit(new Reconciliation(task.getMetadata(), Reconciliation.Kind.TASK, type)
-                    .withKey(clusterKey)
-                    .withCompletable(completable));
+            taskQueues.submit(new Reconciliation(task.getMetadata(), Reconciliation.Kind.TASK, type)
+                    .withKey(dcKey)
+                    .withCompletable(taskReconcilierResolver.getTaskReconcilier(task).reconcile(task)));
         }
     }
 
