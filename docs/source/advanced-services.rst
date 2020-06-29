@@ -112,7 +112,7 @@ Thus, you can run separated kibana instances dedicated to specific usages or spe
 
 Here is the datacenter spec to configure kibana deployment:
 
-.. jsonschema:: datacenter-spec.json#/properties/elasticsearch/properties/kibana
+.. jsonschema:: datacenter-spec.json#/properties/kibana
 
 You can enable/disable the Kibana deployment by updating the Elassandra datacenter spec as show in
 the following example:

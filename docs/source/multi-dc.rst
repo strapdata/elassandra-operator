@@ -17,7 +17,7 @@ In order to create your Azure Kubernetes cluster, see the `Azure Quickstart <htt
 .. tip::
 
     To setup an AKS cluster with having a public IP address on each Kubernetes nodes, you need to install the following `Azure preview features
-    <https://docs.microsoft.com/en-us/azure/aks/use-multiple-node-pools#assign-a-public-ip-per-node-for-your-node-pools-preview>`_:
+    <https://docs.microsoft.com/en-us/azure/aks/use-multiple-node-pools#assign-a-public-ip-per-node-for-your-node-pools-preview>`_.
 
     .. code::
 
@@ -147,7 +147,7 @@ CoreDNS installation
 
 GKE is provided with KubeDNS by default, which does not allows to configure host aliases required by our Kubernetes AddressTranslator.
 So we need to install CoreDNS configured to import custom configuration (see `CoreDNS import plugin <https://coredns.io/plugins/import/>`_),
-and configure KubeDNS stub domains to forward to CoreDNS.
+and configure KubeDNS with a stub domain to forward to CoreDNS.
 
 .. code::
 
@@ -385,9 +385,9 @@ Where integ-test/gke/coredns-values.yaml is:
         # i.e. strategy.spinnaker.io/versioned: "false" to ensure configmap isn't renamed
         annotations: {}
 
-Once CoreDNS is installed, we need to add a KubeDNS a stub domain to forward request for domain **internal.strapdata.com**
+Once CoreDNS is installed, add a stub domain to forward request for domain **internal.strapdata.com**
 to the CoreDNS service, and restart KubeDNS pods.
-The **internal.strapdata.com** is just a dummy DNS domain used to resolv public IP addresses to Kubernetes nodes internal IP addresses.
+The **internal.strapdata.com** is just a dummy DNS domain used to resolve public IP addresses to Kubernetes nodes internal IP addresses.
 
 .. code::
 
@@ -561,7 +561,7 @@ On GKE:
 
     kubectl delete pod --namespace kube-system -l k8s-app=coredns
 
-Check DNS resolution:
+Check the CoreDNS custom configuration:
 
 .. code::
 
@@ -590,6 +590,8 @@ Check DNS resolution:
       selfLink: /api/v1/namespaces/kube-system/configmaps/coredns-custom
       uid: dca59c7d-6503-48c1-864f-28ae46319725
 
+Deploy a dnsutil pod:
+
 .. code::
 
     cat <<EOF | kubectl apply -f -
@@ -608,6 +610,8 @@ Check DNS resolution:
         imagePullPolicy: IfNotPresent
       restartPolicy: Always
     EOF
+
+Test resolution of public IP names to internal Kubernetes node IP address:
 
 .. code::
 
