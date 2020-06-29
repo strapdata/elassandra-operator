@@ -81,7 +81,7 @@ script:
 - integ-test/test-scaleup-park-unpark.sh
 - integ-test/test-multiple-dc-1ns.sh
 - integ-test/test-multiple-dc-2ns.sh
-- integ-test/test-replace-pvc.sh
+#- integ-test/test-replace-pvc.sh
 #- integ-test/test-rolling-upgrade.sh # to much for travis !
 deploy:
 # publish docker images, and license report
