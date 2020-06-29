@@ -104,6 +104,19 @@ public class ValidationController {
                         throw new IllegalArgumentException("Cannot change the storageClassName");
                     }
 
+                    // Attempt to change cassandra ssl storage ports
+                    if (!deployedDc.getSpec().getCassandra().getSslStoragePort().equals(dataCenterSpec.getCassandra().getSslStoragePort())) {
+                        throw new IllegalArgumentException("Cannot change the cassandra.sslStoragePort");
+                    }
+                    // Attempt to change cassandra storage ports
+                    if (!deployedDc.getSpec().getCassandra().getStoragePort().equals(dataCenterSpec.getCassandra().getStoragePort())) {
+                        throw new IllegalArgumentException("Cannot change the cassandra.storagePort");
+                    }
+                    // Attempt to change elasticsearch transport port
+                    if (!deployedDc.getSpec().getElasticsearch().getTransportPort().equals(dataCenterSpec.getElasticsearch().getTransportPort())) {
+                        throw new IllegalArgumentException("Cannot change the elasticsearch.transportPort");
+                    }
+
                     // check dc spec consistency
                     checkDatacenterSpecConsistency(dataCenterSpec);
 
