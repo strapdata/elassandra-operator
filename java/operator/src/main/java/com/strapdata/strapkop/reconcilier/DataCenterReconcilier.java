@@ -177,10 +177,10 @@ public class DataCenterReconcilier extends Reconcilier<DataCenter> {
     public Completable deleteDatacenter(final DataCenter dataCenter) {
         return reconcilierObserver.onReconciliationBegin()
                 .andThen(pluginRegistry.deleteAll(dataCenter))
-                .andThen(Single.fromCallable(() -> {
+                .andThen(Completable.fromCallable(() -> {
                     final DataCenterDeleteAction dataCenterDeleteAction = context.createBean(DataCenterDeleteAction.class, dataCenter);
                     final CqlSessionHandler cqlSessionHandler = context.createBean(CqlSessionHandler.class, this.cqlRoleManager);
-                    return dataCenterDeleteAction.deleteDataCenter(cqlSessionHandler);
+                    return dataCenterDeleteAction.deleteDataCenter(cqlSessionHandler).blockingGet();
                 }))
                 .doFinally(() -> meterRegistry.counter("datacenter.delete").increment())
                 .doOnError(t -> {
@@ -189,7 +189,6 @@ public class DataCenterReconcilier extends Reconcilier<DataCenter> {
                         reconcilierObserver.failedReconciliationAction();
                     }
                 })
-                .ignoreElement()
                 .doOnComplete(reconcilierObserver.endReconciliationAction());
     }
 
