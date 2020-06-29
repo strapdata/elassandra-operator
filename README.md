@@ -11,9 +11,9 @@ no downtime and the freedom to choose your cloud provider or run on-premise.
 
 Elassandra Operator features:
 
-* Manage one [Kubernetes StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) per Cassandra rack to ensure data consistency across cloud-provider availability zones.
+* Manage one [Kubernetes StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) per Cassandra rack to ensure data consistency across availability zones.
 * Manage multiple Elassandra/Cassandra datacenters in the same or different Kubernetes clusters, in one or multiple namespaces.
-* Manage rolling configuration changes, rolling upgrade/downgrade of Elassandra.
+* Manage rolling configuration changes, rolling upgrade/downgrade of Elassandra, rolling restarts.
 * Scale up/down Elassandra datacenters.
 * Park/Unpark Elassandra datacenters (and associated Kibana and Cassandra Reaper instances).
 * Implements Elassandra tasks to add/remove datacenters from an Elassandra cluster.
@@ -30,28 +30,18 @@ Elassandra Operator features:
 
 Elassandra Operator version 0.1 is currently Alpha.
 
+* Docker images are available on [dockerhub](https://hub.docker.com/repository/docker/strapdata/elassandra-operator).
+* HELM charts are available at [https://charts.strapdata.com](https://github.com/strapdata/helm-charts)
+
+## Documentation
+
+* Please see the [Elassandra-Operator documentation](https://operator.elassandra.io).
+* Quickstart is available [here](http://operator.elassandra.io/quickstart.html)
+
 ## Minimum Requirements
 
 - Kubernetes cluster, 1.15 or newer.
 - HELM 2
-
-## Documentation
-
-Please see the [Elassandra-Operator documentation](https://operator.elassandra.io)
-
-## Build from source
-
-Publish the docker images (operator + elassandra + cassandra reaper):
-```bash
-./gradlew dockerPush -PregistryUsername=$DOCKER_USERNAME -PregistryPassword=$DOCKER_PASSWORD -PregistryUrl=$DOCKER_URL
-```
-
-Publish in local insecure registry
-```bash
-./gradlew dockerPush -PregistryUrl="localhost:5000" -PregistryInsecure
-```
-
-Build parameters are located in `gradle.properties`.
 
 ## Support
 
@@ -77,22 +67,35 @@ Requirements:
 * Java 8
 * Docker
 * HELM 2
-* Kind (for tests)
+* Kind (for kubernetes tests)
 
-Build:
+### Build from source
 
+Publish the docker images (operator + elassandra + cassandra reaper):
+```bash
+./gradlew dockerPush -PregistryUsername=$DOCKER_USERNAME -PregistryPassword=$DOCKER_PASSWORD -PregistryUrl=$REGISTRY_URL
 ```
-./gradlew dockerPush dockerPushAllVersions -PregistryUrl="localhost:5000" -PregistryInsecure
-./gradlew java:edctl:buildExec
+
+Publish in local insecure registry
+```bash
+./gradlew dockerPush -PregistryUrl="localhost:5000" -PregistryInsecure
 ```
+
+Build parameters are located in `gradle.properties`.
+
+### Testing
+
+We uses [TravisCI](.travis.yml) to build and run automated integration tests on [Kind](https://kind.sigs.k8s.io/docs/user/quick-start/).
+You can also run these [integration tests](integ-test) on GKE or AKS.
 
 Setup test cluster using [Kind](https://kind.sigs.k8s.io/docs/user/quick-start/):
 
 ```
 integ-test/setup-cluster.sh
+integ-test/install_elassandra_operator.sh
 ```
 
-Run integration tests (Run by travis):
+Run integration tests:
 
 ```
 integ-test/test-admission.sh
@@ -102,6 +105,7 @@ integ-test/test-scaleup-park-unpark.sh
 integ-test/test-multiple-dc-1ns.sh
 integ-test/test-multiple-dc-2ns.sh
 integ-test/test-rolling-upgrade.sh
+integ-test/test-replace-pvc.sh
 ```
 
 ## License
@@ -123,6 +127,7 @@ along with the Elassandra-Operator.  If not, see <http://www.gnu.org/licenses/>.
 
 ## Acknowledgments
 
+* Kubernetes is a trademark of THE LINUX FOUNDATION
 * Elasticsearch, Logstash, Beats and Kibana are trademarks of Elasticsearch BV, registered in the U.S. and in other countries.
 * Apache Cassandra, Apache Lucene, Apache, Lucene and Cassandra are trademarks of the Apache Software Foundation.
 * Elassandra is a trademark of Strapdata SAS.
