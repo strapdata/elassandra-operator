@@ -161,7 +161,7 @@ Elassandra Tasks
 
 The Elassandra operators adds an ElassandraTask CRD allowing to manage administration tasks on your Elassandra datacenter.
 With these tasks, you can properly automate adding or removing an Elassandra datacenter from an Elassandra cluster running in one or multiple
-Kubenetes clusters, and watch task status with **edctl**.
+Kubenetes clusters, and watch task status with **edctl**. Tasks are executed sequentially in a datacenter, and concurrently to datacenter reconciliations.
 
 Repair
 ______
