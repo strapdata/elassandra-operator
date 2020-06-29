@@ -30,7 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Plugin registry
+ * Plugin registry (hardcoded)
  */
 @Singleton
 public class PluginRegistry {

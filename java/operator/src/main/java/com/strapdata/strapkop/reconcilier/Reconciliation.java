@@ -54,7 +54,6 @@ public class Reconciliation {
     }
 
     public enum Type {
-        INIT,
         ADDED,
         MODIFIED,
         DELETED
