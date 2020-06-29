@@ -69,7 +69,7 @@ public class TaskQueues {
             ongoingTasks.put(reconciliation.getKey(), reconcile(reconciliation));
             return true;
         } else {
-            Queue<Reconciliation> tasks = pendingTasks.computeIfAbsent(reconciliation.getKey(), k -> new ConcurrentLinkedQueue());
+            Queue<Reconciliation> tasks = pendingTasks.computeIfAbsent(reconciliation.getKey(), k -> new ConcurrentLinkedQueue<>());
             tasks.add(reconciliation);
             logger.debug("datacenter={} Delaying task reconciliation={} queue.size={}",
                     reconciliation.getKey().id(), reconciliation, tasks.size());
