@@ -1,0 +1,354 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Elassandra Operator documentation &mdash; Elassandra Operator Documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="https://media.readthedocs.org/css/sphinx_rtd_theme.css" type="text/css" />
+  <link rel="stylesheet" href="https://media.readthedocs.org/css/readthedocs-doc-embed.css" type="text/css" />
+  <link rel="stylesheet" href="_static/theme_overrides.css" type="text/css" />
+
+  
+  
+    <link rel="shortcut icon" href="_static/favicon.ico"/>
+  
+  
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
+        <script src="_static/custom.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Overview" href="overview.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="#" class="icon icon-home" alt="Documentation Home"> Elassandra-Operator
+          
+
+          
+            
+            <img src="_static/elassandra-operator.png" class="logo" alt="Logo"/>
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="helm-setup.html">HELM setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="operator-setup.html">Operator setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="provisioning.html">Provision a Datacenter</a></li>
+<li class="toctree-l1"><a class="reference internal" href="advanced-services.html">Advanced Services</a></li>
+<li class="toctree-l1"><a class="reference internal" href="operations.html">Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="security.html">Security</a></li>
+<li class="toctree-l1"><a class="reference internal" href="multi-dc.html">Mutli-datacenter deployment</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">Elassandra-Operator</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="#" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Elassandra Operator documentation</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="elassandra-operator-documentation">
+<h1>Elassandra Operator documentation<a class="headerlink" href="#elassandra-operator-documentation" title="Permalink to this headline">¶</a></h1>
+<p>Elassandra Operator is a Kubernetes operator for Elassandra Enterprise.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This operator is currently in a Beta version</p>
+</div>
+<p>Contents:</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="overview.html">Overview</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="overview.html#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="overview.html#how-it-works">How It works</a></li>
+<li class="toctree-l2"><a class="reference internal" href="overview.html#multi-datacenter-cluster">Multi-datacenter cluster</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="overview.html#using-dns-names">Using DNS names</a></li>
+<li class="toctree-l3"><a class="reference internal" href="overview.html#using-the-elassandra-operator">Using the Elassandra operator</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="helm-setup.html">HELM setup</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="helm-setup.html#helm-install">HELM Install</a></li>
+<li class="toctree-l2"><a class="reference internal" href="helm-setup.html#helm-repository">HELM repository</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="operator-setup.html">Operator setup</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="operator-setup.html#helm-chart-configuration">HELM chart configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="operator-setup.html#tls-configuration">TLS Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="operator-setup.html#operator-authorizations">Operator authorizations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="provisioning.html">Provision a Datacenter</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="provisioning.html#peristent-storage">Peristent Storage</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="provisioning.html#persistent-volume-attached-to-availability-zones">Persistent volume attached to availability zones</a></li>
+<li class="toctree-l3"><a class="reference internal" href="provisioning.html#peristent-volume-decommission-policy">Peristent volume decommission policy</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="provisioning.html#network-configuration">Network Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="provisioning.html#in-cluster-networking">In-cluster networking</a></li>
+<li class="toctree-l3"><a class="reference internal" href="provisioning.html#out-of-cluster-networking-with-private-ip-addressing">Out-of-cluster Networking with private IP addressing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="provisioning.html#out-of-cluster-networking-with-public-ip-addressing">Out-of-cluster Networking with Public IP addressing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="provisioning.html#external-dns">External DNS</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="provisioning.html#pod-management">Pod management</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="provisioning.html#pod-template">Pod template</a></li>
+<li class="toctree-l3"><a class="reference internal" href="provisioning.html#pod-affinity">Pod affinity</a></li>
+<li class="toctree-l3"><a class="reference internal" href="provisioning.html#pod-disruption-budget">Pod disruption budget</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="provisioning.html#configuration">Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="provisioning.html#jvm-settings">JVM settings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="provisioning.html#cassandra-settings">Cassandra settings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="provisioning.html#elasticsearch-settings">Elasticsearch settings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="provisioning.html#elassandra-configuration">Elassandra configuration</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="advanced-services.html">Advanced Services</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="advanced-services.html#managed-keyspaces">Managed Keyspaces</a></li>
+<li class="toctree-l2"><a class="reference internal" href="advanced-services.html#continuous-cassandra-repair">Continuous Cassandra repair</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="advanced-services.html#address-translation">Address translation</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="advanced-services.html#kibana-visualisation">Kibana visualisation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="operations.html">Operations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="operations.html#edctl-utility">Edctl utility</a></li>
+<li class="toctree-l2"><a class="reference internal" href="operations.html#datacenter-operations">Datacenter operations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="operations.html#check-the-datacenter-status">Check the datacenter status</a></li>
+<li class="toctree-l3"><a class="reference internal" href="operations.html#scale-up-down-a-datacenter">Scale Up/Down a datacenter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="operations.html#rolling-update">Rolling update</a></li>
+<li class="toctree-l3"><a class="reference internal" href="operations.html#rolling-restart">Rolling restart</a></li>
+<li class="toctree-l3"><a class="reference internal" href="operations.html#park-unpark-a-datacenter">Park/Unpark a datacenter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="operations.html#recover-from-a-node-failure">Recover from a node failure</a></li>
+<li class="toctree-l3"><a class="reference internal" href="operations.html#recover-from-a-disk-failure">Recover from a disk failure</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="operations.html#elassandra-tasks">Elassandra Tasks</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="operations.html#repair">Repair</a></li>
+<li class="toctree-l3"><a class="reference internal" href="operations.html#cleanup">Cleanup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="operations.html#replication">Replication</a></li>
+<li class="toctree-l3"><a class="reference internal" href="operations.html#rebuild">Rebuild</a></li>
+<li class="toctree-l3"><a class="reference internal" href="operations.html#update-routing">Update routing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="operations.html#remove-nodes">Remove nodes</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="security.html">Security</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="security.html#kubernetes-rbac">Kubernetes RBAC</a></li>
+<li class="toctree-l2"><a class="reference internal" href="security.html#certificate-management">Certificate management</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="security.html#datacenter-ca">Datacenter CA</a></li>
+<li class="toctree-l3"><a class="reference internal" href="security.html#generated-certificates">Generated Certificates</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="security.html#elassandra-credentials">Elassandra Credentials</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="multi-dc.html">Mutli-datacenter deployment</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="multi-dc.html#kubernetes">Kubernetes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="multi-dc.html#aks">AKS</a></li>
+<li class="toctree-l3"><a class="reference internal" href="multi-dc.html#gke">GKE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="multi-dc.html#aws">AWS</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="multi-dc.html#operators">Operators</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="multi-dc.html#elassandra-operator">Elassandra Operator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="multi-dc.html#externaldns">ExternalDNS</a></li>
+<li class="toctree-l3"><a class="reference internal" href="multi-dc.html#coredns">CoreDNS</a></li>
+<li class="toctree-l3"><a class="reference internal" href="multi-dc.html#traefik">Traefik</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="multi-dc.html#multi-datacenter-setup">Multi-datacenter setup</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="multi-dc.html#deploy-dc1-on-kube1">Deploy dc1 on kube1</a></li>
+<li class="toctree-l3"><a class="reference internal" href="multi-dc.html#deploy-dc2-on-kube2">Deploy dc2 on kube2</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="multi-dc.html#cleaning-up">Cleaning up</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<div class="section" id="indices-and-tables">
+<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h1>
+<ul class="simple">
+<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
+<li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
+<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
+</ul>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="overview.html" class="btn btn-neutral float-right" title="Overview" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2020, Strapdata
+
+    </p>
+  </div> 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

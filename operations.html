@@ -1,0 +1,505 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Operations &mdash; Elassandra Operator Documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="https://media.readthedocs.org/css/sphinx_rtd_theme.css" type="text/css" />
+  <link rel="stylesheet" href="https://media.readthedocs.org/css/readthedocs-doc-embed.css" type="text/css" />
+  <link rel="stylesheet" href="_static/theme_overrides.css" type="text/css" />
+
+  
+  
+    <link rel="shortcut icon" href="_static/favicon.ico"/>
+  
+  
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
+        <script src="_static/custom.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Security" href="security.html" />
+    <link rel="prev" title="Advanced Services" href="advanced-services.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home" alt="Documentation Home"> Elassandra-Operator
+          
+
+          
+            
+            <img src="_static/elassandra-operator.png" class="logo" alt="Logo"/>
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="helm-setup.html">HELM setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="operator-setup.html">Operator setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="provisioning.html">Provision a Datacenter</a></li>
+<li class="toctree-l1"><a class="reference internal" href="advanced-services.html">Advanced Services</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Operations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#edctl-utility">Edctl utility</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#datacenter-operations">Datacenter operations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#check-the-datacenter-status">Check the datacenter status</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#scale-up-down-a-datacenter">Scale Up/Down a datacenter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#rolling-update">Rolling update</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#rolling-restart">Rolling restart</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#park-unpark-a-datacenter">Park/Unpark a datacenter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#recover-from-a-node-failure">Recover from a node failure</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#recover-from-a-disk-failure">Recover from a disk failure</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#elassandra-tasks">Elassandra Tasks</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#repair">Repair</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#cleanup">Cleanup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#replication">Replication</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#rebuild">Rebuild</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#update-routing">Update routing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#remove-nodes">Remove nodes</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="security.html">Security</a></li>
+<li class="toctree-l1"><a class="reference internal" href="multi-dc.html">Mutli-datacenter deployment</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Elassandra-Operator</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Operations</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/operations.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="operations">
+<h1>Operations<a class="headerlink" href="#operations" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="edctl-utility">
+<h2>Edctl utility<a class="headerlink" href="#edctl-utility" title="Permalink to this headline">¶</a></h2>
+<p>The <strong>edctl</strong> utility (Elassandra Datacenter Ctl) allow to synchronously wait for status condition on an Elassandra Datacenter or Task.</p>
+<p>For example you can wait a datacenter reach the GREEN state with 3 replicas:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --health GREEN --replicas 2
+Waiting elassandra datacenter name=elassandra-cl1-dc1 namespace=ns4 health=GREEN replicas=2 timeout=600s
+ADDED : elassandra-cl1-dc1 phase=RUNNING heath=GREEN replicas=1 reaper=NONE
+MODIFIED : elassandra-cl1-dc1 phase=RUNNING heath=GREEN replicas=2 reaper=NONE
+done 111431ms
+</pre></div>
+</div>
+<p>Or wait an Elassandra task terminates:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>edctl watch-task -n replication-add-$$ -ns $NS --phase SUCCEED
+</pre></div>
+</div>
+</div>
+<div class="section" id="datacenter-operations">
+<h2>Datacenter operations<a class="headerlink" href="#datacenter-operations" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="check-the-datacenter-status">
+<h3>Check the datacenter status<a class="headerlink" href="#check-the-datacenter-status" title="Permalink to this headline">¶</a></h3>
+<p>You can check the Elassandra datacenter status as follow (<strong>edc</strong> is the short name for elassandradatacenters):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">kubectl</span> <span class="n">get</span> <span class="n">edc</span> <span class="n">elassandra</span><span class="o">-</span><span class="n">cl1</span><span class="o">-</span><span class="n">dc1</span> <span class="o">-</span><span class="n">o</span> <span class="n">yaml</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="scale-up-down-a-datacenter">
+<h3>Scale Up/Down a datacenter<a class="headerlink" href="#scale-up-down-a-datacenter" title="Permalink to this headline">¶</a></h3>
+<p>You can scale up or scale down a datacenter by setting the <code class="docutils literal notranslate"><span class="pre">replicas</span></code> attribute in the datacenter spec.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>kubectl patch -n default elassandradatacenters elassandra-mycluster-mydatacenter --type merge --patch <span class="s1">&#39;{ &quot;spec&quot; : { &quot;replicas&quot; : 6 }}&#39;</span>
+</pre></div>
+</div>
+<p>When scaling up:</p>
+<ul class="simple">
+<li><p>The datacenter <code class="docutils literal notranslate"><span class="pre">status.needCleanup</span></code> is set to true right after adding an Elassandra node, indicating a cleanup should be
+done on all nodes in the datacenter. This is up to the administrator to later run a <strong>cleanup</strong> task to cleanup keys no longer belonging to the nodes.</p></li>
+<li><p>Once the datacenter runs the desired number of nodes, the replication factor of managed keyspaces are automatically
+increased up to the target replication factor, and, in order to get consistent reads with consistency level of two or more,
+a repair task is played each time the replication factor is increased by one up to the target replication factor.</p></li>
+</ul>
+<p>When scaling down:</p>
+<ul class="simple">
+<li><p>The removed Elassandra nodes are decommissioned and their data are streamed to the remaining nodes (it can takes a while depending on the data volumes hosted on the removed nodes).</p></li>
+<li><p>Once the datacenter runs the desired number of nodes, the replication factor of managed keyspaces are adjusted to the number of nodes if needed (The Replication Factor of a keyspace should not
+be greater than the number of nodes in the datacenter).</p></li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>When scaling down, you currently have to delete PVCs of the removed Elassandra nodes.
+If you scale-up and re-use these old PVCs, Elassandra nodes won’t start until you delete old PVCs because Cassandra
+hosts IDs stored on these disks were previously used in the cluster, and you will get the following error message:</p>
+<p>..code:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">org</span><span class="o">.</span><span class="n">apache</span><span class="o">.</span><span class="n">cassandra</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">ConfigurationException</span><span class="p">:</span> <span class="n">This</span> <span class="n">node</span> <span class="n">was</span> <span class="n">decommissioned</span> <span class="ow">and</span> <span class="n">will</span> <span class="ow">not</span> <span class="n">rejoin</span> <span class="n">the</span> <span class="n">ring</span> <span class="n">unless</span> <span class="n">cassandra</span><span class="o">.</span><span class="n">override_decommission</span><span class="o">=</span><span class="n">true</span> <span class="n">has</span> <span class="n">been</span> <span class="nb">set</span><span class="p">,</span> <span class="ow">or</span> <span class="nb">all</span> <span class="n">existing</span> <span class="n">data</span> <span class="ow">is</span> <span class="n">removed</span> <span class="ow">and</span> <span class="n">the</span> <span class="n">node</span> <span class="ow">is</span> <span class="n">bootstrapped</span> <span class="n">again</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="rolling-update">
+<h3>Rolling update<a class="headerlink" href="#rolling-update" title="Permalink to this headline">¶</a></h3>
+<p>You can upgrade/downgrade or change any setting by updating the datacenter spec. Such a change trigger a rolling restart of cassandra racks.
+The elassandra-operator trigger one StatefulSet rolling update at a time (update on Cassandra rack at a time, rackStatus.progressState=UPDATING).
+Each rack rolling restart is managed by the StatefulSet RollingUpdate</p>
+<p>In the following example, we upgrade the elassandra image.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>kubectl patch elassandradatacenter elassandra-cl1-dc1 --type<span class="o">=</span><span class="s2">&quot;merge&quot;</span> --patch <span class="s1">&#39;{&quot;spec&quot;: { &quot;elassandraImage&quot;: &quot;strapdata/elassandra-node:6.8.4.5&quot; }}&#39;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="rolling-restart">
+<h3>Rolling restart<a class="headerlink" href="#rolling-restart" title="Permalink to this headline">¶</a></h3>
+<p>In order to rolling restart all Elassandra nodes, just add a dummy annotation to the spec.podTemplate, and this triggers a rolling restart of rack statefulsets one by one.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>kubectl patch elassandradatacenter elassandra-cl1-dc1 --type<span class="o">=</span><span class="s2">&quot;merge&quot;</span> --patch <span class="s1">&#39;{&quot;spec&quot;: { &quot;podTemplate&quot;: { &quot;metadata&quot;: { &quot;annotations&quot;:{&quot;restart&quot;:&quot;1&quot;}}}}}&#39;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="park-unpark-a-datacenter">
+<h3>Park/Unpark a datacenter<a class="headerlink" href="#park-unpark-a-datacenter" title="Permalink to this headline">¶</a></h3>
+<p>You can park/unpark all pods of an Elassandra datacenter by updating the boolean <code class="docutils literal notranslate"><span class="pre">parked</span></code> attribute in the datacenter spec.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>kubectl patch elassandradatacenters elassandra-cl1-dc1 --type merge --patch <span class="s1">&#39;{ &quot;spec&quot; : { &quot;parked&quot; : &quot;true&quot;}}&#39;</span>
+</pre></div>
+</div>
+<p>To “unpark” an Elassandra datacenter :</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>kubectl patch elassandradatacenters elassandra-cl1-dc1 --type merge --patch <span class="s1">&#39;{ &quot;spec&quot; : { &quot;parked&quot; : &quot;false&quot;}}&#39;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="recover-from-a-node-failure">
+<h3>Recover from a node failure<a class="headerlink" href="#recover-from-a-node-failure" title="Permalink to this headline">¶</a></h3>
+<p>When a Kubernetes node is out-of-order or marked unschedulable for some reason, Elassandra pods should move to another Kubernetes node in the same availability zone.</p>
+<p>Due to the <a class="reference external" href="https://kubernetes.io/docs/tasks/run-application/configure-pdb/">PodDisruptionBudged</a> associated to the Elassandra datacenter having
+a <code class="docutils literal notranslate"><span class="pre">maxUnavailable=1</span></code> by default, such move won’t be possible if there is an ongoing
+disruption in the Elassandra datacenter. In such case, check the PDB status and react accordingly if needed:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">kubectl</span> <span class="n">get</span> <span class="n">pdb</span> <span class="n">elassandra</span><span class="o">-</span><span class="n">cl1</span><span class="o">-</span><span class="n">dc1</span> <span class="o">-</span><span class="n">o</span> <span class="n">yaml</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="recover-from-a-disk-failure">
+<h3>Recover from a disk failure<a class="headerlink" href="#recover-from-a-disk-failure" title="Permalink to this headline">¶</a></h3>
+<p>The Elassandra operator generates Cassandra host ID in the form of XXXXXXXX-XXXX-XXX-YYYY-ZZZZZZZZZZZZ where:</p>
+<ul class="simple">
+<li><p>XXXXXXXX-XXXX-XXX is random to uniquely identify the Cassandra node</p></li>
+<li><p>YYYY is the rack index starting from 0</p></li>
+<li><p>ZZZZZZZZZZZZ is the pod index in the underlying rack StatefulSet.</p></li>
+</ul>
+<p>When a node starts with an empty data disk (a new Peristent Volume), if a node with the same rack and pod index is found DEAD NORMAL in the datacenter,
+the Cassandra system property -Dcassandra.replace_address_first_boot=&lt;old_node_ip&gt; is automatically added to replace the dead node.</p>
+<p>So, in the case of a disk failure (lost or corrupted), you just need to delete the PV and restart the pod, as shown here for the Elassandra pod <strong>elassandra-cl1-dc1-1-0</strong>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>PVC=data-volume-elassandra-cl1-dc1-1-0
+PV=$(kubectl get pvc $PVC -o jsonpath=&#39;{.spec.volumeName}&#39;)
+
+kubectl patch pv $PV -p &#39;{&quot;metadata&quot;:{&quot;finalizers&quot;:null}}&#39;
+kubectl patch pvc $PVC -p &#39;{&quot;metadata&quot;:{&quot;finalizers&quot;:null}}&#39;
+
+kubectl delete pv $PV
+kubectl delete pvc $PVC
+</pre></div>
+</div>
+<p>Once the Persistent Volume and Peristent Volume Claim are deleted, delete the pod to trigger a restart with an empty disk and recover.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">kubectl</span> <span class="n">delete</span> <span class="n">pod</span> <span class="n">elassandra</span><span class="o">-</span><span class="n">cl1</span><span class="o">-</span><span class="n">dc1</span><span class="o">-</span><span class="mi">1</span><span class="o">-</span><span class="mi">0</span>
+</pre></div>
+</div>
+<p>When the Elassandra node is restarted, you must update the elasticsearch routing right after data are streamed from the other nodes.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">kubectl</span> <span class="n">exec</span> <span class="o">-</span><span class="n">it</span> <span class="n">elassandra</span><span class="o">-</span><span class="n">cl1</span><span class="o">-</span><span class="n">dc1</span><span class="o">-</span><span class="mi">1</span><span class="o">-</span><span class="mi">0</span> <span class="o">--</span> <span class="n">bash</span> <span class="o">-</span><span class="n">l</span> <span class="o">-</span><span class="n">c</span> <span class="s2">&quot;post _updaterouting&quot;</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="elassandra-tasks">
+<h2>Elassandra Tasks<a class="headerlink" href="#elassandra-tasks" title="Permalink to this headline">¶</a></h2>
+<p>The Elassandra operators adds an ElassandraTask CRD allowing to manage administration tasks on your Elassandra datacenter.
+With these tasks, you can properly automate adding or removing an Elassandra datacenter from an Elassandra cluster running in one or multiple
+Kubenetes clusters, and watch task status with <strong>edctl</strong>. Tasks are executed sequentially in a datacenter, and concurrently to datacenter reconciliations.</p>
+<div class="section" id="repair">
+<h3>Repair<a class="headerlink" href="#repair" title="Permalink to this headline">¶</a></h3>
+<p>The <strong>repair</strong> task sequentially runs a
+<a class="reference external" href="https://cassandra.apache.org/doc/latest/tools/nodetool/repair.html?highlight=repair">nodetool repair</a>
+on all nodes of a datacenter, with waiting by default 10s between each repair. If the keyspace is not specified,
+all keyspaces are repaired.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>cat &lt;&lt;EOF | kubectl apply -f -
+apiVersion: elassandra.strapdata.com/v1beta1
+kind: ElassandraTask
+metadata:
+  name: cleanup-task-$$
+spec:
+  cluster: &quot;cl1&quot;
+  datacenter: &quot;dc1&quot;
+  repair:
+    waitIntervalInSec: 10
+    keyspace: system_auth
+EOF
+</pre></div>
+</div>
+</div>
+<div class="section" id="cleanup">
+<h3>Cleanup<a class="headerlink" href="#cleanup" title="Permalink to this headline">¶</a></h3>
+<p>The <strong>cleanup</strong> task sequentially runs a <a class="reference external" href="https://cassandra.apache.org/doc/latest/tools/nodetool/cleanup.html">nodetool cleanup</a>
+on all nodes of a datacenter, with waiting by default 10s between each cleanup:</p>
+<ul class="simple">
+<li><p>If keyspace is specified, the keyspace is removed from the datacenter <code class="docutils literal notranslate"><span class="pre">status.needCleanupKeyspaces</span></code> set.</p></li>
+<li><p>If keyspace is not specified, all keyspaces are cleaned up and the datacenter <code class="docutils literal notranslate"><span class="pre">status.needCleanup</span></code> is set to true
+and <code class="docutils literal notranslate"><span class="pre">status.needCleanupKeyspaces</span></code> is emptied.</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>cat &lt;&lt;EOF | kubectl apply -f -
+apiVersion: elassandra.strapdata.com/v1beta1
+kind: ElassandraTask
+metadata:
+  name: cleanup-task-$$
+spec:
+  cluster: &quot;cl1&quot;
+  datacenter: &quot;dc1&quot;
+  cleanup:
+    waitIntervalInSec: 10
+    keyspace: system_auth
+EOF
+</pre></div>
+</div>
+</div>
+<div class="section" id="replication">
+<h3>Replication<a class="headerlink" href="#replication" title="Permalink to this headline">¶</a></h3>
+<p>The <strong>replication</strong> task adds or removes a datacenter in the Cassandra schema by updating the keyspace replication map.</p>
+<p>The following replication task adds the datacenter dc2 in the replication maps of system keyspaces and the <strong>foo</strong> user keyspace.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>cat &lt;&lt;EOF | kubectl apply -f -
+apiVersion: elassandra.strapdata.com/v1beta1
+kind: ElassandraTask
+metadata:
+  name: replication-add-$$
+  namespace: $NS
+spec:
+  cluster: &quot;cl1&quot;
+  datacenter: &quot;dc1&quot;
+  replication:
+    action: ADD
+    dcName: &quot;dc2&quot;
+    dcSize: 1
+    replicationMap:
+      foo: 1
+EOF
+</pre></div>
+</div>
+</div>
+<div class="section" id="rebuild">
+<h3>Rebuild<a class="headerlink" href="#rebuild" title="Permalink to this headline">¶</a></h3>
+<p>The <strong>rebuild</strong> task runs a <a class="reference external" href="https://cassandra.apache.org/doc/latest/tools/nodetool/rebuild.html?highlight=rebuild">nodetool rebuild</a>
+on all nodes of a datacenter in order to stream the data from another existing datacenter.</p>
+<p>The following rebuild task rebuild the datacenter <strong>dc2</strong> by streaming data from the datacenter <strong>dc1</strong>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>cat &lt;&lt;EOF | kubectl apply -f -
+apiVersion: elassandra.strapdata.com/v1beta1
+kind: ElassandraTask
+metadata:
+  name: rebuild-dc2-$$
+  namespace: $NS
+spec:
+  cluster: &quot;cl1&quot;
+  datacenter: &quot;dc2&quot;
+  rebuild:
+    srcDcName: &quot;dc1&quot;
+EOF
+</pre></div>
+</div>
+</div>
+<div class="section" id="update-routing">
+<h3>Update routing<a class="headerlink" href="#update-routing" title="Permalink to this headline">¶</a></h3>
+<p>The <strong>updateRouting</strong> task updates the Elasticsearch routing table for all nodes of an Elassandra datacenter.
+This is usually done after a datacenter rebuild when data becomes available to properly open elasticsearch indices.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>cat &lt;&lt;EOF | kubectl apply -f -
+apiVersion: elassandra.strapdata.com/v1beta1
+kind: ElassandraTask
+metadata:
+  name: updaterouting-dc2-$$
+  namespace: $NS
+spec:
+  cluster: &quot;cl1&quot;
+  datacenter: &quot;dc2&quot;
+  updateRouting: {}
+EOF
+</pre></div>
+</div>
+</div>
+<div class="section" id="remove-nodes">
+<h3>Remove nodes<a class="headerlink" href="#remove-nodes" title="Permalink to this headline">¶</a></h3>
+<p>The <strong>removeNodes</strong> task runs a <a class="reference external" href="https://cassandra.apache.org/doc/latest/tools/nodetool/removenode.html">nodetool removenode</a>
+for all nodes of a deleted datacenter. This is usually done after a datacenter is deleted and after replication for
+that datacenter has been remove with a <code class="docutils literal notranslate"><span class="pre">replication</span></code> task.</p>
+<p>The following task is executed on one node of the datacenter <strong>dc1</strong> to remove all nodes from the datacenter <strong>dc2</strong>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>cat &lt;&lt;EOF | kubectl apply -f -
+apiVersion: elassandra.strapdata.com/v1beta1
+kind: ElassandraTask
+metadata:
+  name: removenodes-dc2-$$
+  namespace: $NS
+spec:
+  cluster: &quot;cl1&quot;
+  datacenter: &quot;dc1&quot;
+  removeNodes:
+    dcName: &quot;dc2&quot;
+EOF
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="security.html" class="btn btn-neutral float-right" title="Security" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="advanced-services.html" class="btn btn-neutral float-left" title="Advanced Services" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2020, Strapdata
+
+    </p>
+  </div> 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
