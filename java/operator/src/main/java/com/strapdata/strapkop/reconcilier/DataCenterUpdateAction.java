@@ -1197,6 +1197,9 @@ public class DataCenterUpdateAction {
                 config.put("ssl_storage_port", dataCenterSpec.getCassandra().getSslStoragePort());
                 config.put("native_transport_port", dataCenterSpec.getCassandra().getNativePort());
 
+                // disable dynamic snitch for better stability,
+                config.put("dynamic_snitch", false);
+
                 // compute the number os CPU to adapt the ConcurrentWriter settings (force a min to 1 to avoid the a ThreadPool of 0)
                 final int cpu = Math.max(1, Runtime.getRuntime().availableProcessors());
                 // writer recommendation is 8 * CPUs
@@ -1410,7 +1413,10 @@ public class DataCenterUpdateAction {
                     configMapVolumeMountBuilder.addFile("cassandra.yaml.d/001-authentication.yaml",
                             toYamlString(ImmutableMap.of(
                                     "authenticator", "PasswordAuthenticator",
-                                    "authorizer", "CassandraAuthorizer")));
+                                    "authorizer", "CassandraAuthorizer",
+                                    "roles_validity_in_ms","3000",
+                                    "permissions_validity_in_ms","3000",
+                                    "credentials_validity_in_ms","3000")));
                     break;
                 case LDAP:
                     configMapVolumeMountBuilder.addFile("cassandra.yaml.d/001-authentication.yaml",
