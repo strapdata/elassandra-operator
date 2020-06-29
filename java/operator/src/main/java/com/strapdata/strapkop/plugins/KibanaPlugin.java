@@ -30,10 +30,7 @@ import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
-import com.strapdata.strapkop.model.k8s.datacenter.Authentication;
-import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
-import com.strapdata.strapkop.model.k8s.datacenter.DataCenterSpec;
-import com.strapdata.strapkop.model.k8s.datacenter.KibanaSpace;
+import com.strapdata.strapkop.model.k8s.datacenter.*;
 import com.strapdata.strapkop.reconcilier.DataCenterUpdateAction;
 import com.strapdata.strapkop.ssl.AuthorityManager;
 import io.kubernetes.client.custom.IntOrString;
@@ -185,7 +182,7 @@ public class KibanaPlugin extends AbstractPlugin {
     public Single<Boolean> reconcile(DataCenterUpdateAction dataCenterUpdateAction, List<V1Deployment> deployments) throws ApiException, StrapkopException {
         final DataCenter dataCenter = dataCenterUpdateAction.dataCenter;
         logger.trace("datacenter={} kibana.spec={}", dataCenter.id(), dataCenter.getSpec().getKibana());
-        Set<String> deployedKibanaSpaces = dataCenter.getStatus().getKibanaSpaceNames();
+        Set<String> deployedKibanaSpaces = dataCenterUpdateAction.dataCenterStatus.getKibanaSpaceNames();
         Map<String, KibanaSpace> desiredKibanaMap = getKibanaSpaces(dataCenter);
 
         boolean kibanaEnabled = dataCenter.getSpec().getKibana() != null && dataCenter.getSpec().getKibana().getEnabled();
@@ -196,7 +193,7 @@ public class KibanaPlugin extends AbstractPlugin {
             return delete(dataCenter)
                     .map(s -> {
                         dataCenterUpdateAction.operation.getActions().add("Undeploying kibana");
-                        dataCenter.getStatus().setKibanaSpaceNames(new HashSet<>());
+                        dataCenterUpdateAction.dataCenterStatus.setKibanaSpaceNames(new HashSet<>());
                         return true;
                     });
         }
@@ -206,9 +203,9 @@ public class KibanaPlugin extends AbstractPlugin {
                 Completable.complete() :
                 io.reactivex.Observable.fromIterable(deletedSpaces)
                         .flatMapCompletable(spaceToDelete -> {
-                            logger.debug("Deleting kibana space={}", spaceToDelete);
-                            dataCenterUpdateAction.operation.getActions().add("Deleting kibana space=["+spaceToDelete+"]");
-                            dataCenter.getStatus().getKibanaSpaceNames().remove(spaceToDelete);
+                            logger.debug("Undeploying kibana space={}", spaceToDelete);
+                            dataCenterUpdateAction.operation.getActions().add("Undeploying kibana space=["+spaceToDelete+"]");
+                            dataCenterUpdateAction.dataCenterStatus.getKibanaSpaceNames().remove(spaceToDelete);
                             return deleteSpace(dataCenter, spaceToDelete);
                         });
 
@@ -220,10 +217,10 @@ public class KibanaPlugin extends AbstractPlugin {
                         .filter(k -> newSpaces.contains(k.name()))
                         .collect(Collectors.toList()))
                         .flatMapCompletable(kibanaSpace -> {
-                            logger.debug("Adding kibana space={}", kibanaSpace);
-                            dataCenterUpdateAction.operation.getActions().add("Adding kibana space=["+kibanaSpace.name()+"]");
-                            dataCenter.getStatus().getKibanaSpaceNames().add(kibanaSpace.name());
-                            return createOrReplaceKibanaObjects(dataCenter, kibanaSpace);
+                            logger.debug("Deploying kibana space={}", kibanaSpace);
+                            dataCenterUpdateAction.operation.getActions().add("Deploying kibana space=["+kibanaSpace.name()+"]");
+                            dataCenterUpdateAction.dataCenterStatus.getKibanaSpaceNames().add(kibanaSpace.name());
+                            return createOrReplaceKibanaObjects(dataCenter, dataCenterUpdateAction.dataCenterStatus, kibanaSpace);
                         });
 
         for (V1Deployment deployment : deployments) {
@@ -236,19 +233,19 @@ public class KibanaPlugin extends AbstractPlugin {
             KibanaSpace kibanaSpace = desiredKibanaMap.get(kibanaSpaceName);
             String kibanaSpaceSpecFingerprint = kibanaSpace.fingerprint(dataCenter.getSpec().getKibana().getImage());
             String kibanaSpaceFingerprint = deployment.getMetadata().getLabels().get(OperatorLabels.KIBANA_SPACE_FINGERPRINT);
-            int replicas = kibanaReplicas(dataCenter, kibanaSpace);
+            int replicas = kibanaReplicas(dataCenter, dataCenterUpdateAction.dataCenterStatus, kibanaSpace);
             if (!kibanaSpaceSpecFingerprint.equals(kibanaSpaceFingerprint) || deployment.getSpec().getReplicas() != replicas) {
                 logger.debug("datacenter={} updating deployment={} replicas={}", dataCenter.id(), deployment.getMetadata().getName(), replicas);
                 dataCenterUpdateAction.operation.getActions().add("Updating kibana space=["+kibanaSpace.name()+"]");
                 deployment.getSpec().setReplicas(replicas);
-                createCompletable = createCompletable.andThen(createOrReplaceKibanaObjects(dataCenter, kibanaSpace));
+                createCompletable = createCompletable.andThen(createOrReplaceKibanaObjects(dataCenter, dataCenterUpdateAction.dataCenterStatus, kibanaSpace));
             }
         }
 
         return deleteCompletable.andThen(createCompletable)
                 .toSingleDefault(!deletedSpaces.isEmpty() || !newSpaces.isEmpty())
                 .map(s -> {
-                    dataCenter.getStatus().setKibanaSpaceNames(getKibanaSpaces(dataCenter).keySet());
+                    dataCenterUpdateAction.dataCenterStatus.setKibanaSpaceNames(getKibanaSpaces(dataCenter).keySet());
                     return s;
                 });
     }
@@ -275,18 +272,18 @@ public class KibanaPlugin extends AbstractPlugin {
     /**
      * @return The number of kibana pods depending on ReaperStatus
      */
-    private int kibanaReplicas(final DataCenter dataCenter, KibanaSpace kibanaSpace) {
+    private int kibanaReplicas(final DataCenter dataCenter, final DataCenterStatus dataCenterStatus, KibanaSpace kibanaSpace) {
         if (dataCenter.getSpec().isParked())
             return 0;
 
         Integer version = kibanaSpace.getVersion();
-        return (dataCenter.getStatus().getPhase().isRunning() &&
-                dataCenter.getStatus().getBootstrapped() == true &&
-                dataCenter.getStatus().getKeyspaceManagerStatus().getKeyspaces().contains(kibanaSpace.keyspace(version))) ? kibanaSpace.getReplicas() : 0;
+        return (dataCenterStatus.getPhase().isRunning() &&
+                dataCenterStatus.getBootstrapped() == true &&
+                dataCenterStatus.getKeyspaceManagerStatus().getKeyspaces().contains(kibanaSpace.keyspace(version))) ? kibanaSpace.getReplicas() : 0;
     }
 
 
-    public Completable createOrReplaceKibanaObjects(final DataCenter dataCenter, KibanaSpace kibanaSpace) throws
+    public Completable createOrReplaceKibanaObjects(final DataCenter dataCenter, final DataCenterStatus dataCenterStatus, KibanaSpace kibanaSpace) throws
             ApiException, StrapkopException {
         final V1ObjectMeta dataCenterMetadata = dataCenter.getMetadata();
         final DataCenterSpec dataCenterSpec = dataCenter.getSpec();
@@ -341,7 +338,7 @@ public class KibanaPlugin extends AbstractPlugin {
                 .metadata(meta)
                 .spec(new V1DeploymentSpec()
                         // delay the creation of the reaper pod, after we have created the reaper_db keyspace
-                        .replicas(kibanaReplicas(dataCenter, kibanaSpace))
+                        .replicas(kibanaReplicas(dataCenter, dataCenterStatus, kibanaSpace))
                         .selector(new V1LabelSelector().matchLabels(labels))
                         .template(new V1PodTemplateSpec()
                                 .metadata(new V1ObjectMeta().labels(labels))

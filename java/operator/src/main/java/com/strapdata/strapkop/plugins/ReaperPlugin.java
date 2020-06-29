@@ -166,7 +166,7 @@ public class ReaperPlugin extends AbstractPlugin {
 
         if ((!reaperEnabled || dataCenter.getSpec().isParked()) && !deployments.isEmpty()) {
             return delete(dataCenter).map(b -> {
-                dataCenter.getStatus().setReaperRegistred(false);
+                dataCenterUpdateAction.dataCenterStatus.setReaperRegistred(false);
                 dataCenterUpdateAction.operation.getActions().add("Undeploying cassandra reaper");
                 return true;
             });
@@ -199,10 +199,10 @@ public class ReaperPlugin extends AbstractPlugin {
 
         // TODO: manage scheduled repairs
         if (isRunning && !dataCenterUpdateAction.dataCenterStatus.getReaperRegistred()) {
-            return registerAndSchedule(dataCenter)
+            return registerAndSchedule(dataCenter, dataCenterUpdateAction.dataCenterStatus)
                     .andThen(Single.just(true)
                             .map(b -> {
-                                dataCenterUpdateAction.operation.getActions().add("Registering cassandra reaper");
+                                dataCenterUpdateAction.operation.getActions().add("Cassandra reaper registred");
                                 return b;
                             })
                     );
@@ -581,19 +581,18 @@ public class ReaperPlugin extends AbstractPlugin {
      * As soon as reaper_db keyspace is created, this function try to ping the reaper api and, if success, register the datacenter.
      * THe registration is done only once. If the datacenter is unregistered by the user, it will not register it again automatically.
      */
-    public Completable registerAndSchedule(DataCenter dc) throws StrapkopException, ApiException, MalformedURLException {
+    public Completable registerAndSchedule(DataCenter dc, DataCenterStatus dcStatus) throws StrapkopException, ApiException, MalformedURLException {
         ReaperClient reaperClient = new ReaperClient(dc, this.registrationScheduler);
         return loadReaperAdminPassword(dc)
                 .observeOn(registrationScheduler)
-                .subscribeOn(registrationScheduler)
-                .flatMap(password -> (dc.getStatus().getReaperRegistred())
+                .flatMap(password -> (dcStatus.getReaperRegistred())
                         ? Single.just(true)
                         : reaperClient.registerCluster("admin", password)
                         .retryWhen((Flowable<Throwable> f) -> f.take(3).delay(21, TimeUnit.SECONDS))
                 )
                 .flatMapCompletable(bool -> {
                     if (bool) {
-                        dc.getStatus().setReaperRegistred(true);
+                        dcStatus.setReaperRegistred(true);
                         logger.info("dc={} cassandra-reaper successfully registred", dc.id());
                         return registerScheduledRepair(dc);
                     } else {
@@ -610,8 +609,8 @@ public class ReaperPlugin extends AbstractPlugin {
                     }
                 })
                 .doOnError(e -> {
-                    dc.getStatus().setLastError(e.toString());
-                    dc.getStatus().setLastErrorTime(new Date());
+                    dcStatus.setLastError(e.toString());
+                    dcStatus.setLastErrorTime(new Date());
                     logger.error("datacenter=" + dc.id() + " error while registering in cassandra-reaper", e);
                 });
     }
