@@ -79,12 +79,11 @@ public class SeedsController {
     public Single<List<String>> seeds(@QueryValue("namespace") String namespace,
                                       @QueryValue("clusterName") String clusterName,
                                       @QueryValue("datacenterName") String datacenterName) throws ApiException {
-        DataCenter dataCenter = sharedInformerFactory.getExistingSharedIndexInformer(DataCenter.class).getIndexer().getByKey(
-                namespace + "/" + OperatorNames.dataCenterResource(clusterName, datacenterName));
+        Key dcKey = new Key(namespace, OperatorNames.dataCenterResource(clusterName, datacenterName));
+        DataCenter dataCenter = sharedInformerFactory.getExistingSharedIndexInformer(DataCenter.class).getIndexer().getByKey(dcKey.id());
         if (dataCenter == null)
             throw new IllegalArgumentException("Datacenter not found");
 
-        Key dcKey = new Key(namespace, OperatorNames.dataCenterResource(clusterName, datacenterName));
         TreeMap<String, V1StatefulSet> stsMap = statefulsetCache.get(dcKey);
         if (stsMap == null)
             throw new IllegalArgumentException("No StatefulSet found");
@@ -136,7 +135,7 @@ public class SeedsController {
     @SuppressWarnings("rawtypes")
     public HttpResponse<String> handleError(HttpRequest request, Throwable e) {
         if (e instanceof IllegalArgumentException)
-            return HttpResponse.<String>status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        return HttpResponse.<String>status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+            return HttpResponse.<String>status(HttpStatus.NOT_FOUND, e.getMessage()).body(e.getMessage());
+        return HttpResponse.<String>status(HttpStatus.BAD_REQUEST, e.getMessage()).body(e.getMessage());
     }
 }

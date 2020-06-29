@@ -25,7 +25,9 @@ import com.strapdata.strapkop.cql.CqlRole;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.Key;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenterStatus;
+import io.kubernetes.client.informer.SharedInformerFactory;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.models.V1StatefulSet;
 import io.micronaut.http.MediaType;
@@ -49,6 +51,15 @@ public class DatacenterController {
 
     @Inject
     DataCenterStatusCache dataCenterStatusCache;
+
+    @Inject
+    SharedInformerFactory sharedInformerFactory;
+
+    @Get(value = "/{namespace}/{cluster}/{datacenter}", produces = MediaType.APPLICATION_JSON)
+    public DataCenter datacenter(String namespace, String cluster, String datacenter) {
+        Key dcKey = new Key(namespace, OperatorNames.dataCenterResource(cluster, datacenter));
+        return sharedInformerFactory.getExistingSharedIndexInformer(DataCenter.class).getIndexer().getByKey(dcKey.id());
+    }
 
     @Get(value = "/{namespace}/{cluster}/{datacenter}/_keyspace", produces = MediaType.APPLICATION_JSON)
     public Map<String, CqlKeyspace> managedKeyspaces(String namespace, String cluster, String datacenter) throws ApiException {
