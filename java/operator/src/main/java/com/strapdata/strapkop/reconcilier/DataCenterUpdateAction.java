@@ -52,7 +52,6 @@ import io.kubernetes.client.openapi.apis.AppsV1Api;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.openapi.apis.CustomObjectsApi;
 import io.kubernetes.client.openapi.models.*;
-import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
@@ -135,8 +134,6 @@ public class DataCenterUpdateAction {
 
     private final OperatorConfig operatorConfig;
 
-    private final MeterRegistry meterRegistry;
-
     private final StatefulsetCache statefulsetCache;
     private final DataCenterStatusCache dataCenterStatusCache;
     private final  SharedIndexInformer<V1ServiceAccount> saSharedIndexInformer;
@@ -163,7 +160,6 @@ public class DataCenterUpdateAction {
                                   @Parameter("operation") Operation operation,
                                   final OperatorConfig operatorConfig,
                                   final BackupScheduler backupScheduler,
-                                  final MeterRegistry meterRegistry,
                                   final PluginRegistry pluginRegistry) {
         this.context = context;
         this.sharedInformerFactory = sharedInformerFactory;
@@ -192,7 +188,6 @@ public class DataCenterUpdateAction {
         this.jmxmpElassandraProxy = jmxmpElassandraProxy;
 
         this.backupScheduler = backupScheduler;
-        this.meterRegistry = meterRegistry;
         this.pluginRegistry = pluginRegistry;
 
         this.key = new Key(dataCenterMetadata);
@@ -325,7 +320,7 @@ public class DataCenterUpdateAction {
                                         }))
                                 .ignoreElement();
                     } else {
-                        return nextAction(true);
+                        return updateStateThenNextAction();
                     }
                 });
     }
@@ -341,41 +336,7 @@ public class DataCenterUpdateAction {
                 dataCenterMetadata.getResourceVersion(),
                 dataCenterStatus.getReadyReplicas(), dataCenterSpec.getReplicas());
         dataCenterStatus.setObservedGeneration(dataCenterMetadata.getGeneration());
-        return nextAction(true);
-    }
-
-    /**
-     * Trigger next action when sts reach the desired state
-     */
-    public Completable statefulsetStatusUpdated(V1StatefulSet sts) {
-        logger.debug("########## sts={}/{} generation/observedGeneration={}/{} resourceVersion={} replica/ready/updated={}/{}/{} revision current/updated={}/{}",
-                sts.getMetadata().getName(), sts.getMetadata().getNamespace(),
-                sts.getMetadata().getGeneration(), sts.getStatus().getObservedGeneration(),
-                sts.getMetadata().getResourceVersion(),
-                sts.getStatus().getReplicas(), sts.getStatus().getReadyReplicas(), sts.getStatus().getUpdatedReplicas(),
-                sts.getStatus().getCurrentRevision(), sts.getStatus().getUpdateRevision());
-        logger.trace("status={}", dataCenterStatus);
-
-        Integer rackIndex = Integer.parseInt(sts.getMetadata().getLabels().get(OperatorLabels.RACKINDEX));
-        RackStatus rackStatus = dataCenterStatus.getRackStatuses().computeIfAbsent(rackIndex, k -> {
-            return new RackStatus()
-                    .withIndex(k)
-                    .withName(sts.getMetadata().getLabels().get(OperatorLabels.RACK))
-                    .withDesiredReplicas(sts.getSpec().getReplicas());
-        });
-        rackStatus.setReadyReplicas(ObjectUtils.defaultIfNull(sts.getStatus().getReadyReplicas(), 0));
-        rackStatus.setProgressState(statefulSetIsUpToDate(sts) ? ProgressState.RUNNING : ProgressState.UPDATING);
-        rackStatus.setHealth(rackStatus.health());
-
-        // update the DC total ready repliacs
-        int totalReadyReplicas = dataCenterStatus.getRackStatuses().values().stream()
-                .map(r -> ObjectUtils.defaultIfNull(r.getReadyReplicas(), 0))
-                .reduce(0, (a, b) -> a + b);
-        dataCenterStatus.setReadyReplicas(totalReadyReplicas);
-        dataCenterStatus.setHealth(dataCenterStatus.health());
-
-        logger.debug("rackStatus={}", rackStatus);
-        return nextAction(true);
+        return updateStateThenNextAction();
     }
 
     public boolean statefulSetIsReady(V1StatefulSet sts) {
@@ -405,10 +366,31 @@ public class DataCenterUpdateAction {
 
     public Completable taskDone(Task task) {
         logger.debug("########## datacenter={} task={} done => reconcile", dataCenter.id(), task.id());
-        return nextAction(false);
+        return updateStateThenNextAction();
     }
 
-    public Completable nextAction(final boolean updateStatus) {
+    public Completable updateStateThenNextAction() {
+        return Completable.fromAction(() -> {
+            for(RackStatus rackStatus : dataCenterStatus.getRackStatuses().values()) {
+                V1StatefulSet sts = sharedInformerFactory.getExistingSharedIndexInformer(V1StatefulSet.class).getIndexer()
+                        .getByKey(dataCenterMetadata.getNamespace()+"/"+OperatorNames.stsName(dataCenter, rackStatus.getIndex()));
+                if (sts != null) {
+                    rackStatus.setReadyReplicas(ObjectUtils.defaultIfNull(sts.getStatus().getReadyReplicas(), 0));
+                    rackStatus.setProgressState(statefulSetIsUpToDate(sts) ? ProgressState.RUNNING : ProgressState.UPDATING);
+                    rackStatus.setHealth(rackStatus.health());
+                }
+            }
+
+            // update the DC total ready repliacs
+            int totalReadyReplicas = dataCenterStatus.getRackStatuses().values().stream()
+                    .map(r -> ObjectUtils.defaultIfNull(r.getReadyReplicas(), 0))
+                    .reduce(0, (a, b) -> a + b);
+            dataCenterStatus.setReadyReplicas(totalReadyReplicas);
+            dataCenterStatus.setHealth(dataCenterStatus.health());
+        }).andThen(nextAction(true));
+    }
+
+    Completable nextAction(final boolean updateStatus) {
         if (dataCenterSpec.isParked() && !(DataCenterPhase.PARKED.equals(dataCenterStatus.getPhase())))
             return parkDatacenter();
 
@@ -1531,15 +1513,15 @@ public class DataCenterUpdateAction {
                     OperatorLabels.KEYSTORE, Boolean.TRUE.toString());
 
             // generate statefulset wildcard certificate in a PKCS12 keystore
-            final String wildcardStatefulsetName = "*." + OperatorNames.nodesService(dataCenter) + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local";
+            final String wildcardStatefulsetName = "*." + OperatorNames.nodesService(dataCenter) + "." + dataCenterMetadata.getNamespace() + ".svc";
 
             List<String> dnsNames = new ArrayList<>();
             if (dataCenterSpec.getNetworking().getExternalDns() != null && dataCenterSpec.getNetworking().getExternalDns().getEnabled() && dataCenterSpec.getNetworking().getExternalDns().getDomain() != null) {
                 dnsNames.add("*." + dataCenterSpec.getNetworking().getExternalDns().getDomain());
-                dnsNames.add(OperatorNames.elasticsearchService(dataCenter) + "." + dataCenterMetadata.getNamespace()+ ".svc.cluster.local");
+                dnsNames.add(OperatorNames.elasticsearchService(dataCenter) + "." + dataCenterMetadata.getNamespace()+ ".svc");
             } else {
-                final String headlessServiceName = OperatorNames.nodesService(dataCenter) + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local";
-                final String elasticsearchServiceName = OperatorNames.elasticsearchService(dataCenter) + "." + dataCenterMetadata.getNamespace() + ".svc.cluster.local";
+                final String headlessServiceName = OperatorNames.nodesService(dataCenter) + "." + dataCenterMetadata.getNamespace() + ".svc";
+                final String elasticsearchServiceName = OperatorNames.elasticsearchService(dataCenter) + "." + dataCenterMetadata.getNamespace() + ".svc";
                 dnsNames.add(wildcardStatefulsetName);
                 dnsNames.add(headlessServiceName);
                 dnsNames.add(elasticsearchServiceName);

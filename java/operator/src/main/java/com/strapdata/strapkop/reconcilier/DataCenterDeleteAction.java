@@ -173,6 +173,7 @@ public class DataCenterDeleteAction {
                         break;
                 }
                 logger.info("Deleted dataCenter={}", dataCenter.id());
+                cqlSessionSupplier.close();
             }
         });
     }
