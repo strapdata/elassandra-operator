@@ -11,6 +11,7 @@ env:
   - HELM_URL=https://get.helm.sh
   - HELM_TGZ=helm-v2.14.3-linux-amd64.tar.gz
   - K8S_FLAVOR=kind
+  - REGISTRY_URL=localhost:5000
 language:
   - java
   - bash
@@ -68,8 +69,8 @@ install:
 - kind get clusters
 - docker ps -a
 before_script:
-- ./gradlew java:edctl:buildExec :java:operator:jib dockerPushAllVersions :reaper:pushImage -PregistryUrl="localhost:5000" -PregistryInsecure
-- curl http://localhost:5000/v2/_catalog
+- ./gradlew java:edctl:buildExec :java:operator:jib dockerPushAllVersions :reaper:pushImage -PregistryUrl=${REGISTRY_URL} -PregistryInsecure
+- curl http://${REGISTRY_URL}/v2/_catalog
 - integ-test/install_elassandra_operator.sh
 script:
 #- (cd docs; make clean html SPHINXOPTS="-W"; touch build/html/.nojekyll )
