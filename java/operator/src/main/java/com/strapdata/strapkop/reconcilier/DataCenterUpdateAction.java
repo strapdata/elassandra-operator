@@ -471,12 +471,6 @@ public class DataCenterUpdateAction {
                         return scaleDownDatacenter(configMapVolumeMounts, cqlSessionHandler)
                                 .doFinally(() -> cqlSessionHandler.close());
 
-                    boolean doUpdateStatus = updateStatus;
-                    if (!DataCenterPhase.RUNNING.equals(dataCenterStatus.getPhase())) {
-                        dataCenterStatus.setPhase(DataCenterPhase.RUNNING);
-                        doUpdateStatus = true;
-                    }
-
                     // check if all racks STS are ready, otherwise wait next reconciliation
                     for(RackStatus rackStatus : dataCenterStatus.getRackStatuses().values()) {
                         V1StatefulSet v1StatefulSet = statefulSetTreeMap.get(rackStatus.getName());
@@ -488,7 +482,7 @@ public class DataCenterUpdateAction {
                     }
 
                     // tack if we need to update the datacenter update status
-                    Single<Boolean> doUpdate = doUpdateStatus
+                    Single<Boolean> doUpdate = updateStatus
                         ? k8sResourceUtils.updateDataCenterStatus(dataCenter, dataCenterStatus).map(o -> false)
                         : Single.just(false);
 
