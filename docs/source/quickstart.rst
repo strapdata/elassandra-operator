@@ -8,11 +8,11 @@ deploy the Elassandra operator in the default namespace:
 
     helm install --namespace default --name elassandra-operator --wait strapdata/elassandra-operator
 
-Deploy an Elassandra Datacenter in a dedicated namespace **ns1** with 6 nodes in 3 racks:
+Deploy an Elassandra datacenter (Elasticsearch enabled) in a dedicated namespace **ns1** with 6 nodes (Cassandra racks depends on the zone label on your Kubernetes nodes):
 
 .. parsed-literal::
 
-    helm install --namespace "ns1" --name "ns1-cl1-dc1" --set replicas=6 --wait strapdata/elassandra-datacenter
+    helm install --namespace "ns1" --name "ns1-cl1-dc1" --set replicas=6,elasticsearch.enabled=true,reaper.enabled=true --wait strapdata/elassandra-datacenter
 
 .. note:
 
@@ -24,170 +24,144 @@ Check Elassandra pods status, where pod names are **elassandra-[clusterName]-[dc
 
 .. code::
 
-    kb get all -l app=elassandra
-    NAME                         READY   STATUS    RESTARTS   AGE
-    pod/elassandra-cl1-dc1-0-0   1/1     Running   0          8m29s
-    pod/elassandra-cl1-dc1-0-1   1/1     Running   0          106s
-    pod/elassandra-cl1-dc1-1-0   1/1     Running   0          7m16s
-    pod/elassandra-cl1-dc1-1-1   1/1     Running   0          5m41s
-    pod/elassandra-cl1-dc1-2-0   1/1     Running   0          6m28s
-    pod/elassandra-cl1-dc1-2-1   1/1     Running   1          4m15s
+    kubectl get all -n ns1
+    NAME                                                   READY   STATUS    RESTARTS   AGE
+    pod/elassandra-cl1-dc1-0-0                             1/1     Running   0          31m
+    pod/elassandra-cl1-dc1-1-0                             1/1     Running   0          15m
+    pod/elassandra-cl1-dc1-2-0                             1/1     Running   0          14m
+    pod/elassandra-cl1-dc1-kibana-kibana-89dbb7988-rd25j   1/1     Running   0          30m
+    pod/elassandra-cl1-dc1-reaper-bbbc795f6-c5b2h          1/1     Running   0          30m
 
-    NAME                                       TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)                                            AGE
-    service/elassandra-cl1-dc1                 ClusterIP   None            <none>        38001/TCP,39042/TCP,35001/TCP,9200/TCP,34001/TCP   8m32s
-    service/elassandra-cl1-dc1-elasticsearch   ClusterIP   10.106.35.198   <none>        9200/TCP                                           8m32s
-    service/elassandra-cl1-dc1-external        ClusterIP   10.102.118.49   <none>        39042/TCP,9200/TCP                                 8m32s
+    NAME                                       TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)                                             AGE
+    service/elassandra-cl1-dc1                 ClusterIP   None            <none>        39000/TCP,39001/TCP,39004/TCP,39002/TCP,39006/TCP   31m
+    service/elassandra-cl1-dc1-admin           ClusterIP   10.98.137.58    <none>        39004/TCP                                           31m
+    service/elassandra-cl1-dc1-elasticsearch   ClusterIP   10.111.26.185   <none>        39002/TCP                                           31m
+    service/elassandra-cl1-dc1-external        ClusterIP   10.105.8.20     <none>        39001/TCP,39002/TCP                                 31m
+    service/elassandra-cl1-dc1-kibana-kibana   ClusterIP   10.99.128.39    <none>        5601/TCP                                            30m
+    service/elassandra-cl1-dc1-reaper          ClusterIP   10.111.115.15   <none>        8080/TCP,8081/TCP                                   30m
+
+    NAME                                               READY   UP-TO-DATE   AVAILABLE   AGE
+    deployment.apps/elassandra-cl1-dc1-kibana-kibana   1/1     1            1           30m
+    deployment.apps/elassandra-cl1-dc1-reaper          1/1     1            1           30m
+
+    NAME                                                         DESIRED   CURRENT   READY   AGE
+    replicaset.apps/elassandra-cl1-dc1-kibana-kibana-89dbb7988   1         1         1       30m
+    replicaset.apps/elassandra-cl1-dc1-reaper-bbbc795f6          1         1         1       30m
 
     NAME                                    READY   AGE
-    statefulset.apps/elassandra-cl1-dc1-0   2/2     8m29s
-    statefulset.apps/elassandra-cl1-dc1-1   2/2     7m16s
-    statefulset.apps/elassandra-cl1-dc1-2   2/2     6m28s
+    statefulset.apps/elassandra-cl1-dc1-0   1/1     31m
+    statefulset.apps/elassandra-cl1-dc1-1   1/1     15m
+    statefulset.apps/elassandra-cl1-dc1-2   1/1     14m
 
 Check the Elassandra DataCenter status:
 
 .. code::
 
-    kubectl get edc elassandra-cl1-dc1 -o yaml
+    kubectl get edc elassandra-cl1-dc1 -n ns1 -o yaml | awk '/^status:/{flag=1}flag'
     status:
       bootstrapped: true
-      cqlStatus: NOT_STARTED
+      cqlStatus: ESTABLISHED
+      cqlStatusMessage: Connected to cluster=[cl1] with role=[elassandra_operator] secret=[elassandra-cl1/cassandra.elassandra_operator_password]
       health: GREEN
       keyspaceManagerStatus:
-        keyspaces: []
-        replicas: 0
-      kibanaSpaceNames: []
+        keyspaces:
+        - reaper_db
+        - system_traces
+        - elastic_admin
+        - system_distributed
+        - _kibana_1
+        - system_auth
+        replicas: 3
+      kibanaSpaceNames:
+      - kibana
       needCleanup: true
       needCleanupKeyspaces: []
-      observedGeneration: 1
+      observedGeneration: 2
       operationHistory:
       - actions:
-        - noop, wait for ready racks
-        durationInMs: 82
-        pendingInMs: 124
-        submitDate: "2020-06-12T09:16:20.999Z"
-        triggeredBy: status update statefulset=elassandra-cl1-dc1-0 replicas=1/2
+        - Update keyspace RF for [reaper_db]
+        - Update keyspace RF for [system_traces]
+        - Update keyspace RF for [system_distributed]
+        - Update keyspace RF for [_kibana_1]
+        - Update keyspace RF for [elastic_admin]
+        - Update keyspace RF for [system_auth]
+        - Updating kibana space=[kibana]
+        durationInMs: 54874
+        lastTransitionTime: "2020-06-29T15:16:11.279Z"
+        pendingInMs: 3
+        triggeredBy: Status update statefulset=elassandra-cl1-dc1-2 replicas=1/1
       - actions:
-        - noop, wait for ready racks
-        durationInMs: 6
-        pendingInMs: 62
-        submitDate: "2020-06-12T09:16:20.952Z"
-        triggeredBy: status update statefulset=elassandra-cl1-dc1-0 replicas=1/1
-      - actions:
-        - scale-up rack=c
-        durationInMs: 158
-        pendingInMs: 4
-        submitDate: "2020-06-12T09:16:20.835Z"
-        triggeredBy: status update statefulset=elassandra-cl1-dc1-2 replicas=2/2
-      - actions:
-        - noop, wait for ready racks
-        durationInMs: 88
-        pendingInMs: 110
-        submitDate: "2020-06-12T09:13:51.264Z"
-        triggeredBy: status update statefulset=elassandra-cl1-dc1-2 replicas=1/2
-      - actions:
-        - noop, wait for ready racks
-        durationInMs: 6
-        pendingInMs: 78
-        submitDate: "2020-06-12T09:13:51.199Z"
-        triggeredBy: status update statefulset=elassandra-cl1-dc1-2 replicas=1/1
-      - actions:
-        - scale-up rack=b
-        durationInMs: 133
-        pendingInMs: 1
-        submitDate: "2020-06-12T09:13:51.065Z"
-        triggeredBy: status update statefulset=elassandra-cl1-dc1-1 replicas=2/2
-      - actions:
-        - noop, wait for ready racks
-        durationInMs: 8
-        pendingInMs: 177
-        submitDate: "2020-06-12T09:12:25.769Z"
-        triggeredBy: status update statefulset=elassandra-cl1-dc1-1 replicas=1/2
-      - actions:
-        - noop, wait for ready racks
-        durationInMs: 82
-        pendingInMs: 15
-        submitDate: "2020-06-12T09:12:25.748Z"
-        triggeredBy: status update statefulset=elassandra-cl1-dc1-1 replicas=1/1
-      - actions:
-        - scale-up rack=a
-        durationInMs: 223
-        pendingInMs: 1
-        submitDate: "2020-06-12T09:12:25.524Z"
-        triggeredBy: status update statefulset=elassandra-cl1-dc1-2 replicas=1/1
-      - actions:
-        - noop, wait for ready racks
-        durationInMs: 5
-        pendingInMs: 199
-        submitDate: "2020-06-12T09:11:38.802Z"
-        triggeredBy: status update statefulset=elassandra-cl1-dc1-2 replicas=null/1
-      - actions:
-        - noop, wait for ready racks
-        durationInMs: 75
-        pendingInMs: 24
-        submitDate: "2020-06-12T09:11:38.711Z"
-        triggeredBy: status update statefulset=elassandra-cl1-dc1-2 replicas=null/0
-      - actions:
-        - scale-up rack index=2 name=b
-        durationInMs: 275
+        - scale-up rack index=2 name=c
+        durationInMs: 83
+        lastTransitionTime: "2020-06-29T15:15:15.021Z"
         pendingInMs: 2
-        submitDate: "2020-06-12T09:11:38.437Z"
-        triggeredBy: status update statefulset=elassandra-cl1-dc1-1 replicas=1/1
+        triggeredBy: Status update statefulset=elassandra-cl1-dc1-1 replicas=1/1
       - actions:
-        - noop, wait for ready racks
-        durationInMs: 87
-        pendingInMs: 268
-        submitDate: "2020-06-12T09:10:50.816Z"
-        triggeredBy: status update statefulset=elassandra-cl1-dc1-1 replicas=null/1
+        - scale-up rack index=1 name=b
+        durationInMs: 209
+        lastTransitionTime: "2020-06-29T15:14:23.834Z"
+        pendingInMs: 6
+        triggeredBy: Datacenter modified spec generation=2
       - actions:
-        - noop, wait for ready racks
-        durationInMs: 105
-        pendingInMs: 102
-        submitDate: "2020-06-12T09:10:50.785Z"
-        triggeredBy: status update statefulset=elassandra-cl1-dc1-1 replicas=null/0
+        - Updating kibana space=[kibana]
+        - Cassandra reaper registred
+        durationInMs: 3717
+        lastTransitionTime: "2020-06-29T15:00:15.586Z"
+        pendingInMs: 8
+        triggeredBy: Status update deployment=elassandra-cl1-dc1-reaper
       - actions:
-        - scale-up rack index=1 name=a
-        durationInMs: 403
-        pendingInMs: 4
-        submitDate: "2020-06-12T09:10:50.463Z"
-        triggeredBy: status update statefulset=elassandra-cl1-dc1-0 replicas=1/1
+        - Update keyspace RF for [reaper_db]
+        - Update keyspace RF for [system_traces]
+        - Update keyspace RF for [elastic_admin]
+        - Update keyspace RF for [system_distributed]
+        - Update keyspace RF for [_kibana_1]
+        - Update keyspace RF for [system_auth]
+        - Create or update role=[kibana]
+        - Create or update role=[reaper]
+        - Cassandra reaper deployed
+        - Deploying kibana space=[kibana]
+        durationInMs: 13938
+        lastTransitionTime: "2020-06-29T14:59:36.781Z"
+        pendingInMs: 7
+        triggeredBy: Status update statefulset=elassandra-cl1-dc1-0 replicas=1/1
       - actions:
-        - noop, wait for ready racks
-        durationInMs: 14
-        pendingInMs: 201
-        submitDate: "2020-06-12T09:09:37.737Z"
-        triggeredBy: status update statefulset=elassandra-cl1-dc1-0 replicas=null/1
+        - Datacenter resources deployed
+        durationInMs: 4003
+        lastTransitionTime: "2020-06-29T14:58:11.842Z"
+        pendingInMs: 83
+        triggeredBy: Datacenter added
       phase: RUNNING
       rackStatuses:
         "0":
-          desiredReplicas: 2
-          fingerprint: 3e9c032-3feeca9
+          desiredReplicas: 1
+          fingerprint: eec6512-3feeca9
           health: GREEN
           index: 0
-          name: c
-          progressState: RUNNING
-          readyReplicas: 2
-        "1":
-          desiredReplicas: 2
-          fingerprint: 3e9c032-3feeca9
-          health: GREEN
-          index: 1
           name: a
           progressState: RUNNING
-          readyReplicas: 2
-        "2":
-          desiredReplicas: 2
-          fingerprint: 3e9c032-3feeca9
+          readyReplicas: 1
+        "1":
+          desiredReplicas: 1
+          fingerprint: eec6512-3feeca9
           health: GREEN
-          index: 2
+          index: 1
           name: b
           progressState: RUNNING
-          readyReplicas: 2
-      readyReplicas: 6
-      reaperPhase: NONE
+          readyReplicas: 1
+        "2":
+          desiredReplicas: 1
+          fingerprint: eec6512-3feeca9
+          health: GREEN
+          index: 2
+          name: c
+          progressState: RUNNING
+          readyReplicas: 1
+      readyReplicas: 3
+      reaperRegistred: true
       zones:
-      - c
       - a
       - b
+      - c
 
 CQL connection to an Elassandra node (using the admin role):
 
@@ -199,20 +173,37 @@ CQL connection to an Elassandra node (using the admin role):
     Use HELP for help.
     admin@cqlsh>
 
+Check Elasticsearch indices:
+
+.. code::
+
+    kubectl exec -it pod/elassandra-cl1-dc1-0-0 -n ns1 -- curl -k 'https://localhost:39002/_cat/indices?v'
+    health status index     uuid                   pri rep docs.count docs.deleted store.size pri.store.size
+    green  open   .kibana_1 yr48r36wRiWYqVPaRITgIw   1   0          0            0       230b           230b
+
 List Elassandra datacenter secrets:
 
 .. code::
 
-    kb get secret -n ns1
+    kubectl get secret -n ns1
     NAME                             TYPE                                  DATA   AGE
-    default-token-5tb48              kubernetes.io/service-account-token   3      30h
-    elassandra-cl1                   Opaque                                6      11m
-    elassandra-cl1-ca-key            Opaque                                1      30h
-    elassandra-cl1-ca-pub            Opaque                                2      30h
-    elassandra-cl1-dc1-keystore      Opaque                                2      11m
-    elassandra-cl1-rc                Opaque                                3      11m
-    elassandra-operator-truststore   Opaque                                3      30h
-    ns1-cl1-dc1-token-bls59          kubernetes.io/service-account-token   3      11m
+    default-token-zp5g6              kubernetes.io/service-account-token   3      53m
+    elassandra-cl1                   Opaque                                6      53m
+    elassandra-cl1-ca-key            Opaque                                1      53m
+    elassandra-cl1-ca-pub            Opaque                                2      53m
+    elassandra-cl1-dc1-keystore      Opaque                                2      10m
+    elassandra-cl1-dc1-reaper        kubernetes.io/basic-auth              2      8m32s
+    elassandra-cl1-kibana            Opaque                                1      43m
+    elassandra-cl1-rc                Opaque                                3      10m
+    elassandra-operator-truststore   Opaque                                3      53m
+    kibana1-cl1-dc1-token-trk9d      kubernetes.io/service-account-token   3      10m
+
+In order to connect to Kibana, get the kibana password in the Kubernetes secret **elassandra-cl1-kibana**:
+
+.. code::
+
+    kubectl get secret elassandra-cl1-kibana -n ns1 -o jsonpath='{.data.kibana\.kibana_password}' | base64 -D
+    236fe20e-a155-4f2d-9bf5-a0002c471e59
 
 Connect to Kibana using port-forwarding:
 
