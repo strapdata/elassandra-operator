@@ -33,10 +33,7 @@ import org.slf4j.LoggerFactory;
 import javax.inject.Named;
 import javax.inject.Singleton;
 import java.util.Map;
-import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 @Singleton
 @Infrastructure
@@ -44,9 +41,11 @@ public class WorkQueues {
 
     private static final Logger logger = LoggerFactory.getLogger(WorkQueues.class);
 
-    private final Map<Key, Queue<Reconciliation>> pendingQueues = new ConcurrentHashMap<>();
-    private final Map<Key, Disposable> disposableMap = new ConcurrentHashMap<>();
-    private final Map<Key, AtomicBoolean> processingMap = new ConcurrentHashMap<>();
+    /**
+     * Keep the last submitted delayed reconciliation rather than all the queue...
+     */
+    private final Map<Key, Reconciliation> pendingReconciliations = new ConcurrentHashMap<>();
+    private final Map<Key, Disposable> ongoingReconciliations = new ConcurrentHashMap<>();
 
     final MeterRegistry meterRegistry;
     final Scheduler scheduler;
@@ -56,52 +55,36 @@ public class WorkQueues {
                       @Named("workqueue") UserExecutorConfiguration userExecutorConfiguration) {
         this.scheduler = Schedulers.from(executorFactory.executorService(userExecutorConfiguration));
         this.meterRegistry = meterRegistry;
-        meterRegistry.gaugeMapSize("workqueues.processing", ImmutableList.of(), disposableMap);
-        meterRegistry.gaugeMapSize("workqueues.total", ImmutableList.of(), processingMap);
+        meterRegistry.gaugeMapSize("reconciliation.pending", ImmutableList.of(), pendingReconciliations);
+        meterRegistry.gaugeMapSize("reconciliation.ongoing", ImmutableList.of(), ongoingReconciliations);
     }
 
     public synchronized boolean submit(final Reconciliation reconciliation) {
         reconciliation.setSubmitTime(System.currentTimeMillis());
-        AtomicBoolean processing = processingMap.compute(reconciliation.getKey(), (k,v) -> {
-            if (v == null)
-                v = new AtomicBoolean(false);
-            return v;
-        });
-        if (processing.compareAndSet(false, true)) {
-            reconciliation.setStartTime(System.currentTimeMillis());
+        Disposable ongoingReconciliation = ongoingReconciliations.get(reconciliation.getKey());
+        if (ongoingReconciliation == null) {
             logger.debug("datacenter={} Immediate reconciliation={}", reconciliation.getKey().id(), reconciliation);
-            disposableMap.put(reconciliation.getKey(), reconcile(reconciliation));
+            ongoingReconciliations.put(reconciliation.getKey(), reconcile(reconciliation));
             return true;
         } else {
             logger.debug("datacenter={} Delaying reconciliation={}", reconciliation.getKey().id(), reconciliation);
-            pendingQueues.compute(reconciliation.getKey(), (k, v) -> {
-                if (v == null)
-                    v = new ConcurrentLinkedQueue<>();
-                v.add(reconciliation);
-                return v;
-            });
+            pendingReconciliations.put(reconciliation.getKey(), reconciliation);
             return false;
         }
     }
 
     public synchronized void reconcilied(Key key) {
-        Queue<Reconciliation> pendingQueue = pendingQueues.get(key);
-        if (pendingQueue != null && !pendingQueue.isEmpty()) {
-            Reconciliation reconciliation = pendingQueue.poll();
-            reconciliation.setStartTime(System.currentTimeMillis());
-            logger.debug("datacenter={} Start pending reconciliation={}", reconciliation.getKey().id(), reconciliation);
-            reconcile(reconciliation);
-        } else {
-            AtomicBoolean processing = processingMap.get(key);
-            if (processing != null)
-                processing.set(false);
+        ongoingReconciliations.remove(key);
+        Reconciliation delayedReconciliation = pendingReconciliations.remove(key);
+        if (delayedReconciliation != null) {
+            logger.debug("datacenter={} Start delayed reconciliation={}", delayedReconciliation.getKey().id(), delayedReconciliation);
+            ongoingReconciliations.put(delayedReconciliation.getKey(), reconcile(delayedReconciliation));
         }
     }
 
     public void remove(Key key) {
-        processingMap.remove(key);
-        pendingQueues.remove(key);
-        Disposable disposable = disposableMap.remove(key);
+        pendingReconciliations.remove(key);
+        Disposable disposable = ongoingReconciliations.remove(key);
         if (disposable != null)
             disposable.dispose();
     }
@@ -112,15 +95,12 @@ public class WorkQueues {
                 .observeOn(scheduler)
                 .doFinally(() -> reconcilied(reconciliable.getKey()))
                 .subscribe(() -> {
-                    Queue pendingQueue = pendingQueues.get(reconciliable.getKey());
-                    logger.debug("key={} {}-{} generation/resourceVersion={}/{} pending={}ms execution={}ms pendingQueue.size={}",
+                    logger.debug("key={} {}-{} generation/resourceVersion={}/{} pending={}ms execution={}ms",
                             reconciliable.getKey().id(),
                             reconciliable.getKind(), reconciliable.getType(),
                             reconciliable.getGeneration(), reconciliable.getResourceVersion(),
                             reconciliable.getStartTime() - reconciliable.getSubmitTime(),
-                            System.currentTimeMillis() - reconciliable.getStartTime(),
-                            pendingQueue == null ? null : pendingQueue.size()
-                            );
+                            System.currentTimeMillis() - reconciliable.getStartTime());
                 }, t -> {
                     logger.warn("key=" + reconciliable.getKey().id() + " reconciliable=" + reconciliable + " error:", t);
                 });
