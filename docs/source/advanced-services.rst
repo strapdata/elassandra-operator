@@ -74,7 +74,7 @@ the following example:
 Address translation
 -------------------
 
-When your Elassandra/Cassandra cluster use Kubernetes node's public IP address (see ref:'Out-of-cluster Networking with Public IP addressing'),
+When your Elassandra/Cassandra cluster use Kubernetes node's public IP address,
 application deployed in the same Kubernetes cluster using the Cassandra driver should use a
 `Driver-side Address Translation <https://docs.datastax.com/en/developer/java-driver/3.7/manual/address_resolution/>`_ to connect to Elassandra/Cassandra nodes
 using their internal IP.
@@ -112,7 +112,7 @@ Thus, you can run separated kibana instances dedicated to specific usages or spe
 
 Here is the datacenter spec to configure kibana deployment:
 
-.. jsonschema:: datacenter-spec.json#/properties/elasticsearch
+.. jsonschema:: datacenter-spec.json#/properties/elasticsearch/properties/kibana
 
 You can enable/disable the Kibana deployment by updating the Elassandra datacenter spec as show in
 the following example:

@@ -68,7 +68,7 @@ When scaling down:
         org.apache.cassandra.exceptions.ConfigurationException: This node was decommissioned and will not rejoin the ring unless cassandra.override_decommission=true has been set, or all existing data is removed and the node is bootstrapped again
 
 Rolling update
---------------
+______________
 
 You can upgrade/downgrade or change any setting by updating the datacenter spec. Such a change trigger a rolling restart of cassandra racks.
 The elassandra-operator trigger one StatefulSet rolling update at a time (update on Cassandra rack at a time, rackStatus.progressState=UPDATING).
@@ -81,7 +81,7 @@ In the following example, we upgrade the elassandra image.
     kubectl patch elassandradatacenter elassandra-cl1-dc1 --type="merge" --patch '{"spec": { "elassandraImage": "strapdata/elassandra-node:6.8.4.5" }}'
 
 Rolling restart
----------------
+_______________
 
 In order to rolling restart all Elassandra nodes, just add a dummy annotation to the spec.podTemplate, and this triggers a rolling restart of rack statefulsets one by one.
 
