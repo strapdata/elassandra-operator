@@ -14,7 +14,7 @@ java/edctl/build/libs/edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --health GREE
 
 # create an index
 kubectl exec elassandra-cl1-dc1-0-0 -n $NS -- cqlsh -e "CREATE KEYSPACE foo WITH replication = {'class': 'NetworkTopologyStrategy','dc1':'2'};"
-kubectl exec elassandra-cl1-dc1-0-0 -n $NS -- bash -l -c "for i in {1..$N}; do post foo/bar '{\"foo\":\"bar\"}'; done"
+kubectl exec elassandra-cl1-dc1-0-0 -n $NS -- bash -l -c "for i in {1..$N}; do post foo/bar '{\"foo\":\"bar\"}' 2>/dev/null; done"
 
 # flush to stream SSTables
 kubectl exec elassandra-cl1-dc1-0-0 -n $NS -- bash -l -c 'nodetool $NODETOOL_OPTS -p $NODETOOL_JMX_PORT flush'

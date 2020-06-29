@@ -81,7 +81,7 @@ script:
 - integ-test/test-scaleup-park-unpark.sh
 - integ-test/test-multiple-dc-1ns.sh
 - integ-test/test-multiple-dc-2ns.sh
-#- integ-test/test-replace-pvc.sh
+- integ-test/test-replace-pvc.sh
 #- integ-test/test-rolling-upgrade.sh # to much for travis !
 deploy:
 # publish docker images, and license report
@@ -89,10 +89,7 @@ deploy:
   skip_cleanup: true
   script: >-
     ./gradlew :java:operator:jib dockerPushAllVersions :reaper:pushImage -PregistryUsername=$DOCKER_USERNAME -PregistryPassword=$DOCKER_PASSWORD -PregistryUrl=docker.io &&
-    ./gradlew java:model:publish -PrepoUsername=$NEXUS_USERNAME -PrepoPassword=$NEXUS_PASSWORD &&
-    ./gradlew uploadLicenseReport &&
-    ./gradlew uploadLicenseNotices &&
-  # push to GCR.IO done by the marketplace repository
+    ./gradlew java:model:publish -PrepoUsername=$NEXUS_USERNAME -PrepoPassword=$NEXUS_PASSWORD
   on:
     tags: true
     branch:
