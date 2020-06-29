@@ -81,17 +81,9 @@ script:
 - integ-test/test-scaleup-park-unpark.sh
 - integ-test/test-multiple-dc-1ns.sh
 - integ-test/test-multiple-dc-2ns.sh
-#- integ-test/test-rolling-upgrade.sh
+- integ-test/test-replace-pvc.sh
+#- integ-test/test-rolling-upgrade.sh # to much for travis !
 deploy:
-#- provider: script
-#  skip_cleanup: true
-#  script:
-#  - ./gradlew dockerPush -PregistryUsername=$DOCKER_USERNAME -PregistryPassword=$DOCKER_PASSWORD -PregistryUrl=$DOCKER_URL
-#  - ./gradlew publish -PrepoUsername=$NEXUS_USERNAME -PrepoPassword="$NEXUS_PASSWORD"
-#  on:
-#    tags: false
-#    all_branches: true
-#    condition: $TRAVIS_BRANCH =~ ^develop-.*
 # publish docker images, edctl executable, and license report
 - provider: script
   skip_cleanup: true
