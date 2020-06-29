@@ -184,8 +184,6 @@ Check the Elassandra DataCenter status:
           readyReplicas: 2
       readyReplicas: 6
       reaperPhase: NONE
-      remoteSeeders: []
-      uuid: 59a965cf-b785-4ce3-a025-ba3cef51be36
       zones:
       - c
       - a
@@ -223,10 +221,4 @@ Connect to Kibana using port-forwarding:
     kubectl port-forward pod/kibana 5601:5601
 
 Alternatively, you can setup an ingress controller for the kibana instance.
-
-Watch the Elassandra Datacenter CRD status until it is green, meaning all pods are up and running:
-
-.. code::
-
-    edctl watch-dc -n elassandra-cl1-dc1 -ns $NS --health GREEN
 
