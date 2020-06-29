@@ -41,6 +41,7 @@ public class ElassandraPod {
     private String cluster;
     private String namespace;
     private String parent;
+
     // rack & ssl not always initialize and this object is define as a key in ElassandraPod cache, exclude these fields
     @EqualsAndHashCode.Exclude
     private int rackIndex;

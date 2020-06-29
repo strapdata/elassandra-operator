@@ -43,7 +43,7 @@ public class K8sModule {
     public K8sModule(ApplicationContext applicationContext) throws IOException {
 
         if (applicationContext.getEnvironment().getActiveNames().contains("k8s")) {
-            ApiClient apiClient = ClientBuilder.cluster().build();
+            this.apiClient = ClientBuilder.cluster().build();
 
             // set the global default api-client to the in-cluster one from above
             Configuration.setDefaultApiClient(apiClient);
@@ -52,13 +52,12 @@ public class K8sModule {
             String kubeConfigPath = "~/.kube/config";
 
             // loading the out-of-cluster config, a kubeconfig from file-system
-            ApiClient apiClient = ClientBuilder.kubeconfig(KubeConfig.loadKubeConfig(new FileReader(kubeConfigPath))).build();
+            this.apiClient = ClientBuilder.kubeconfig(KubeConfig.loadKubeConfig(new FileReader(kubeConfigPath))).build();
 
             // set the global default api-client to the in-cluster one from above
             Configuration.setDefaultApiClient(apiClient);
         }
 
-        this.apiClient = ClientBuilder.standard().build();
         this.watchClient =  Config.defaultClient();
 
         // trick to debug k8s calls except for the Watch (not supported)

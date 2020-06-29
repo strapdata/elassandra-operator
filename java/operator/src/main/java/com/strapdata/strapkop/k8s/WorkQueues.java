@@ -73,20 +73,13 @@ public class WorkQueues {
         }
     }
 
-    public synchronized void reconcilied(Key key) {
+    synchronized void reconcilied(Key key) {
         ongoingReconciliations.remove(key);
         Reconciliation delayedReconciliation = pendingReconciliations.remove(key);
         if (delayedReconciliation != null) {
             logger.debug("datacenter={} Start delayed reconciliation={}", delayedReconciliation.getKey().id(), delayedReconciliation);
             ongoingReconciliations.put(delayedReconciliation.getKey(), reconcile(delayedReconciliation));
         }
-    }
-
-    public void remove(Key key) {
-        pendingReconciliations.remove(key);
-        Disposable disposable = ongoingReconciliations.remove(key);
-        if (disposable != null)
-            disposable.dispose();
     }
 
     Disposable reconcile(Reconciliation reconciliable) {
@@ -104,5 +97,12 @@ public class WorkQueues {
                 }, t -> {
                     logger.warn("key=" + reconciliable.getKey().id() + " reconciliable=" + reconciliable + " error:", t);
                 });
+    }
+
+    public void remove(Key key) {
+        pendingReconciliations.remove(key);
+        Disposable disposable = ongoingReconciliations.remove(key);
+        if (disposable != null)
+            disposable.dispose();
     }
 }

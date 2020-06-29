@@ -383,9 +383,10 @@ public class DataCenterUpdateAction {
         int replicas = ObjectUtils.defaultIfNull(stsStatus.getReplicas(), 0);
         int readyReplicas = ObjectUtils.defaultIfNull(stsStatus.getReadyReplicas(), 0);
         if (readyReplicas >= replicas) {
-            logger.debug("datacenter={} sts={} ready", dataCenter.id(), sts.getMetadata().getName());
+            logger.trace("datacenter={} sts={} ready", dataCenter.id(), sts.getMetadata().getName());
             return true;
         }
+        logger.trace("datacenter={} sts={} NOT ready", dataCenter.id(), sts.getMetadata().getName());
         return false;
     }
 
@@ -395,14 +396,15 @@ public class DataCenterUpdateAction {
         int updatedReplicas = ObjectUtils.defaultIfNull(stsStatus.getUpdatedReplicas(), replicas);
         if ((stsStatus.getUpdateRevision() == null || stsStatus.getCurrentRevision().equals(stsStatus.getUpdateRevision()))
                 && updatedReplicas == replicas ) {
-            logger.debug("datacenter={} sts={} upToDate", dataCenter.id(), sts.getMetadata().getName());
+            logger.trace("datacenter={} sts={} up-to-date", dataCenter.id(), sts.getMetadata().getName());
             return true;
         }
+        logger.trace("datacenter={} sts={} NOT up-to-date", dataCenter.id(), sts.getMetadata().getName());
         return false;
     }
 
     public Completable taskDone(Task task) {
-        logger.debug("########## datacenter={} task={} done", dataCenter.id(), task.id());
+        logger.debug("########## datacenter={} task={} done => reconcile", dataCenter.id(), task.id());
         return nextAction(false);
     }
 
@@ -825,11 +827,15 @@ public class DataCenterUpdateAction {
 
     public class Builder {
 
-        public String nodetoolSsl() {
+        private String nodetoolSsl() {
             return "-Djavax.net.ssl.trustStore=" + authorityManager.getPublicCaMountPath() + "/" + AuthorityManager.SECRET_TRUSTSTORE_P12 + " " +
                     "-Djavax.net.ssl.trustStorePassword=" + authorityManager.getCaTrustPass() + " " +
                     "-Djavax.net.ssl.trustStoreType=PKCS12 " +
                     "-Dcom.sun.management.jmxremote.registry.ssl=true";
+        }
+
+        private boolean useJmxOverSSL() {
+            return dataCenterSpec.getCassandra().getSsl() && (!dataCenterSpec.getJvm().getJmxmpEnabled() || (dataCenterSpec.getJvm().getJmxmpEnabled() && dataCenterSpec.getJvm().getJmxmpOverSSL()));
         }
 
         private void addPortsItem(V1Container container, int port, String name, boolean withHostPort) {
@@ -2150,9 +2156,6 @@ public class DataCenterUpdateAction {
         }
     }
 
-    private boolean useJmxOverSSL() {
-        return dataCenterSpec.getCassandra().getSsl() && (!dataCenterSpec.getJvm().getJmxmpEnabled() || (dataCenterSpec.getJvm().getJmxmpEnabled() && dataCenterSpec.getJvm().getJmxmpOverSSL()));
-    }
 
     /**
      * This class holds information about a kubernetes zone (all k8s nodes in a zone and deployed sts)

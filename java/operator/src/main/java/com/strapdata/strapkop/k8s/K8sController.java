@@ -1,7 +1,6 @@
 package com.strapdata.strapkop.k8s;
 
 import com.google.common.collect.ImmutableList;
-import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.DataCenterStatusCache;
 import com.strapdata.strapkop.cache.StatefulsetCache;
 import com.strapdata.strapkop.model.ClusterKey;
@@ -62,9 +61,6 @@ public class K8sController {
     CustomObjectsApi customObjectsApi;
 
     @Inject
-    OperatorConfig operatorConfig;
-
-    @Inject
     MeterRegistry meterRegistry;
 
     @Inject
@@ -92,7 +88,6 @@ public class K8sController {
 
     public void start() {
         addNodeInformer();
-        addPodInformer();
         addServiceAccountInformer();
         addStatefulSetInformer();
         addDeploymentInformer();
@@ -101,13 +96,6 @@ public class K8sController {
 
         sharedInformerFactory.startAllRegisteredInformers();
         logger.info("Kubernetes informer factory started");
-
-        /*
-        logger.info("Starting Kubernetes controller, watching namespace=[{}]", operatorConfig.getWatchNamespace());
-        ExecutorService executor = Executors.newFixedThreadPool(1);
-        executor.execute(() -> leaderElectingController.run());
-        logger.info("Started Kubernetes controller");
-         */
     }
 
     @EventListener
@@ -134,24 +122,6 @@ public class K8sController {
                         },
                         V1Node.class,
                         V1NodeList.class);
-    }
-
-    void addPodInformer() {
-        SharedIndexInformer<V1Pod> podInformer =
-                sharedInformerFactory.sharedIndexInformerFor(
-                        (CallGeneratorParams params) -> coreV1Api.listPodForAllNamespacesCall(
-                                null,
-                                null,
-                                null,
-                                OperatorLabels.toSelector(OperatorLabels.MANAGED),
-                                null,
-                                null,
-                                params.resourceVersion,
-                                params.timeoutSeconds,
-                                params.watch,
-                                null),
-                        V1Pod.class,
-                        V1PodList.class);
     }
 
     void addServiceAccountInformer() {
@@ -320,7 +290,7 @@ public class K8sController {
                                     return false;
                                 })));
             } else {
-                logger.warn("datacenter={}/{} sts={} replicas={}/{} NOOP rackStatus={}",
+                logger.warn("datacenter={}/{} sts={} replicas={}/{} NOOP not ready rackStatus={}",
                         namespace, parent,
                         sts.getMetadata().getName(),
                         sts.getStatus().getReadyReplicas(), sts.getStatus().getReplicas(), rackStatus);
@@ -410,17 +380,6 @@ public class K8sController {
             workQueues.submit(new Reconciliation(task.getMetadata(), Reconciliation.Kind.TASK, type)
                     .withKey(clusterKey)
                     .withCompletable(completable));
-        } else {
-            // purge old task.
-            org.joda.time.DateTime creation = task.getMetadata().getCreationTimestamp();
-            long retentionInstant = System.currentTimeMillis() - operatorConfig.getTaskRetention().getSeconds() * 1000;
-            if (creation.isBefore(retentionInstant)) {
-                logger.info("Delete old terminated task={}", task.id());
-                workQueues.submit(new Reconciliation(task.getMetadata(), Reconciliation.Kind.TASK, type)
-                                .withKey(clusterKey)
-                                .withResourceVersion(task.getMetadata().getResourceVersion())
-                        .withCompletable(k8sResourceUtils.deleteTask(task.getMetadata()).ignoreElement()));
-            }
         }
     }
 
