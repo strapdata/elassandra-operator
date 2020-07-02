@@ -25,12 +25,13 @@ In order to create your Azure Kubernetes cluster, see the `Azure Quickstart <htt
         az extension update --name aks-preview
         az feature register --name NodePublicIPPreview --namespace Microsoft.ContainerService
 
-Create a regional AKS cluster with the Azure network plugin and a default nodepool based
+Create a resource group and regional AKS cluster with the Azure network plugin and a default nodepool based
 on a `VirtualMachineScaleSets <https://docs.microsoft.com/en-us/rest/api/compute/virtualmachinescalesets>`_ that assigns
 a public IP address to each virtual machine:
 
 .. code::
 
+    az group create -l ${AZURE_REGION} -n ${RESOURCE_GROUP_NAME}
     az aks create --name "${K8S_CLUSTER_NAME}" \
                   --resource-group ${RESOURCE_GROUP_NAME} \
                   --network-plugin azure \
@@ -54,20 +55,20 @@ kubernetes custom label ``elassandra.strapdata.com/public-ip`` to each nodes, he
        kubectl label nodes --overwrite $AKS_VMSS_INSTANCE elassandra.strapdata.com/public-ip=$PUBLIC_IP
     }
 
-    add_vmss_public_ip 0
-    add_vmss_public_ip 1
-    add_vmss_public_ip 2
+    NODE_COUNT=$(kubectl get nodes --no-headers | wc -l)
+    for i in $(seq 0 $((NODE_COUNT-1))); do
+      add_vmss_public_ip $i
+    done
 
 As the result, you should have kubernetes nodes properly labeled with zone and public-ip:
 
 .. code::
 
-    kubectl get nodes -o wide -L failure-domain.beta.kubernetes.io/zone,elassandra.strapdata.com/public-ip
-    NAME                                STATUS   ROLES   AGE     VERSION    INTERNAL-IP   EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION      CONTAINER-RUNTIME       ZONE            PUBLIC-IP
-    aks-nodepool1-32762597-vmss000000   Ready    agent   2d20h   v1.15.11   10.240.0.4    <none>        Ubuntu 16.04.6 LTS   4.15.0-1083-azure   docker://3.0.10+azure   northeurope-1   20.54.72.64
-    aks-nodepool1-32762597-vmss000001   Ready    agent   2m32s   v1.15.11   10.240.0.35   <none>        Ubuntu 16.04.6 LTS   4.15.0-1083-azure   docker://3.0.10+azure   northeurope-2   40.113.33.9
-    aks-nodepool1-32762597-vmss000002   Ready    agent   2m29s   v1.15.11   10.240.0.66   <none>        Ubuntu 16.04.6 LTS   4.15.0-1083-azure   docker://3.0.10+azure   northeurope-3   20.54.80.104
-
+    kubectl get nodes -L failure-domain.beta.kubernetes.io/zone,elassandra.strapdata.com/public-ip
+    NAME                                STATUS   ROLES   AGE   VERSION    ZONE           PUBLIC-IP
+    aks-nodepool1-74300635-vmss000000   Ready    agent   54m   v1.15.11   westeurope-1   51.138.75.131
+    aks-nodepool1-74300635-vmss000001   Ready    agent   54m   v1.15.11   westeurope-2   40.113.160.148
+    aks-nodepool1-74300635-vmss000002   Ready    agent   54m   v1.15.11   westeurope-3   51.124.121.185
 
 AKS StorageClass
 ................
@@ -78,15 +79,15 @@ This is done here using the HELM chart strapdata/storageclass.
 
 .. code::
 
-    for z in northeurope-1 northeurope-2 northeurope-3; do
-        helm install --name ssd-$z --namespace kube-system \
+    for z in 1 2 3; do
+        helm install --name ssd-$AZURE_REGION-$z --namespace kube-system \
             --set parameters.kind="Managed" \
             --set parameters.cachingmode="ReadOnly" \
             --set parameters.storageaccounttype="StandardSSD_LRS" \
             --set provisioner="kubernetes.io/azure-disk" \
-            --set zone="${z}" \
-            --set nameOverride="ssd-$z" \
-            $HELM_REPO/storageclass
+            --set zone="$AZURE_REGION-${z}" \
+            --set nameOverride="ssd-$AZURE_REGION-$z" \
+            strapdata/storageclass
     done
 
 AKS Firewall rules
@@ -473,11 +474,11 @@ Operators
 Elassandra Operator
 ___________________
 
-Finally, install the Elassandra operator in the default namespace:
+Install the Elassandra operator in the default namespace:
 
 .. code::
 
-    helm install --namespace default --name elassop --wait $HELM_REPO/elassandra-operator
+    helm install --namespace default --name elassop --wait strapdata/elassandra-operator
 
 ExternalDNS
 ___________
@@ -681,7 +682,7 @@ with Kibana and Cassandra Reaper available through the Traefik ingress controlle
         --set networking.externalDns.root=cl1-dc1 \
         --set kibana.enabled="true",kibana.spaces[0].ingressAnnotations."kubernetes\.io/ingress\.class"="traefik",kibana.spaces[0].ingressSuffix=kibana.${TRAEFIK_FQDN} \
         --set reaper.enabled="true",reaper.ingressAnnotations."kubernetes\.io/ingress\.class"="traefik",reaper.ingressHost=reaper.${TRAEFIK_FQDN} \
-        --wait $HELM_REPO/elassandra-datacenter
+        --wait strapdata/elassandra-datacenter
 
 Key points:
 
@@ -859,7 +860,7 @@ Deploy the datacenter **dc2** of the Elassandra cluster **cl1** in the Kubernete
         --set networking.externalDns.root=cl1-dc2 \
         --set kibana.enabled="true",kibana.spaces[0].ingressAnnotations."kubernetes\.io/ingress\.class"="traefik",kibana.spaces[0].ingressSuffix=kibana.${TRAEFIK_FQDN} \
         --set reaper.enabled="true",reaper.ingressAnnotations."kubernetes\.io/ingress\.class"="traefik",reaper.ingressHost=reaper.${TRAEFIK_FQDN} \
-        --wait $HELM_REPO/elassandra-datacenter
+        --wait strapdata/elassandra-datacenter
 
 Key points :
 
