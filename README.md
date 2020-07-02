@@ -1,4 +1,4 @@
-# Elassandra Operator [![Build Status](https://travis-ci.com/strapdata/elassandra-operator.svg?token=m7zqfSQPuiZqq2siqFNt&branch=master)](https://travis-ci.com/strapdata/elassandra-operator) [![Twitter](https://img.shields.io/twitter/follow/strapdataio?style=social)](https://twitter.com/strapdataio)
+# Elassandra Operator [![Build Status](https://travis-ci.com/strapdata/elassandra-operator.svg?token=m7zqfSQPuiZqq2siqFNt&branch=master)](https://travis-ci.com/strapdata/elassandra-operator) [![GitHub release](https://img.shields.io/github/v/release/strapdata/elassandra-operator.svg)](https://github.com/strapdata/elassandra-operator/releases/latest) [![Twitter](https://img.shields.io/twitter/follow/strapdataio?style=social)](https://twitter.com/strapdataio)
 
 ![Elassandra Logo](docs/source/images/elassandra-operator.png)
 
