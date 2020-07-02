@@ -84,6 +84,16 @@ script:
 - integ-test/test-replace-pvc.sh
 #- integ-test/test-rolling-upgrade.sh # to much for travis !
 deploy:
+- provider: releases
+  overwrite: true
+  draft: false
+  api_key: $GITHUB_TOKEN
+  file:
+    - java/edctl/build/libs/edctl
+  skip_cleanup: true
+  on:
+    tags: true
+    branch: master
 # publish docker images, and license report
 - provider: script
   skip_cleanup: true
