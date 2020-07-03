@@ -103,6 +103,13 @@ import java.util.concurrent.Callable;
                     System.out.println("done " + (end - start) + "ms");
                     return 0;
                 }
+
+                TaskPhase phase = item.object.getStatus().getPhase();
+                if (phase.isTerminated()) {
+                    long end = System.currentTimeMillis();
+                    System.out.println("done " + (end - start) + "ms");
+                    return 1;
+                }
             }
             long end = System.currentTimeMillis();
             System.out.println("timeout " + (end - start) + "ms");
