@@ -85,7 +85,7 @@ import java.util.concurrent.Callable;
                     }.getType());
 
             for (Watch.Response<Task> item : watch) {
-                System.out.printf("\"%tT %s: %s phase=%s %n",
+                System.out.printf("%tT %s: %s phase=%s %n",
                         new Date(),
                         item.type,
                         item.object.getMetadata().getName(),
