@@ -10,7 +10,8 @@ set -x
 BASE_DIR=integ-test
 HELM_REPO=helm/src/main/helm
 
-ELASSANDRA_OPERATOR_TAG=$(awk -F "=" '/version/ { print $2 }' gradle.properties)
+#ELASSANDRA_OPERATOR_TAG=$(awk -F "=" '/version/ { print $2 }' gradle.properties)
+ELASSANDRA_OPERATOR_TAG=latest
 ELASSANDRA_NODE_TAG=$(head -n 1 docker/supportedElassandraVersions.txt)
 
 
