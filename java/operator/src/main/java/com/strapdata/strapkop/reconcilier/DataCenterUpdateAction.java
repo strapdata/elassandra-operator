@@ -553,11 +553,11 @@ public class DataCenterUpdateAction {
     }
 
     public Completable scaleUpDatacenter(ConfigMapVolumeMounts configMapVolumeMounts) throws Exception {
-        Completable todo = Completable.complete();
         Optional<Zone> scaleUpZone = zones.nextToScalueUp();
         if (!scaleUpZone.isPresent()) {
             logger.warn("datacenter={} Cannot scale up replicas={}/{}, no free node", dataCenter.id(), zones.totalReplicas(), dataCenter.getSpec().getReplicas());
-            return todo;
+            endOperation("Cannot scale-up, no node available");
+            return k8sResourceUtils.updateDataCenterStatus(dataCenter, dataCenterStatus).ignoreElement();
         }
 
         // Scaling UP
@@ -576,11 +576,10 @@ public class DataCenterUpdateAction {
                     dataCenter.id(), rackStatus.getName(), rackStatus.getIndex(), zone.size);
 
             configMapVolumeMounts.setRack(rackStatus);
-            return todo
-                    .andThen(configMapVolumeMounts.createOrReplaceNamespacedConfigMaps())
+            return configMapVolumeMounts.createOrReplaceNamespacedConfigMaps()
                     .andThen(builder.buildStatefulSetRack(rackStatus, configMapVolumeMounts)
                             .flatMap(sts -> {
-                                endOperation("scale-up rack index="+rackStatus.getIndex()+" name="+rackStatus.getName());
+                                endOperation("scale-up rack index=" + rackStatus.getIndex() + " name=" + rackStatus.getName());
                                 dataCenterStatus.setNeedCleanup(true);
                                 return k8sResourceUtils.updateDataCenterStatus(dataCenter, dataCenterStatus);
                             })
@@ -603,11 +602,10 @@ public class DataCenterUpdateAction {
 
         // call ConfigMapVolumeMount here to update seeds in case of single rack with multi-nodes
         configMapVolumeMounts.setRack(rackStatus);
-        return todo
-                .andThen(configMapVolumeMounts.createOrReplaceNamespacedConfigMaps()) // update seeds
+        return configMapVolumeMounts.createOrReplaceNamespacedConfigMaps() // update seeds
                 .andThen(k8sResourceUtils.replaceNamespacedStatefulSet(sts)
                         .flatMap(s -> {
-                            endOperation("scale-up rack="+rackStatus.getName());
+                            endOperation("scale-up rack=" + rackStatus.getName());
                             dataCenterStatus.setNeedCleanup(true);
                             return k8sResourceUtils.updateDataCenterStatus(dataCenter, dataCenterStatus);
                         })
