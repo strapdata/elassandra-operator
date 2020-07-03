@@ -524,29 +524,29 @@ If your Kubernetes nodes have the ExternalIP set (like GKE), prepare the coreDNS
 .. code::
 
       HOST_ALIASES=$(kubectl get nodes -o custom-columns='INTERNAL-IP:.status.addresses[?(@.type=="InternalIP")].address,EXTERNAL-IP:.status.addresses[?(@.type=="ExternalIP")].address' --no-headers |\
-      awk '{ gsub(/\./,"-",$2); printf("--set nodes.hosts[%d].name=%s,nodes.hosts[%d].value=%s ",NR-1, $2, NR-1, $1); }')
+      awk '{ gsub(/\./,"-",$2); printf("nodes.hosts[%d].name=%s,nodes.hosts[%d].value=%s,",NR-1, $2, NR-1, $1); }')
 
 If your Kubernetes nodes does not have the ExternalIP set (like AKS), public node IP address should be available through the custom label ``elassandra.strapdata.com/public-ip``.
 
 .. code::
 
-      HOST_ALIASES=$(kubectl get nodes -o custom-columns='INTERNAL-IP:.status.addresses[?(@.type=="InternalIP")].address,PUBLIC-IP:.metadata.labels.kubernetes\.strapdata\.com/public-ip' --no-headers |\
-      awk '{ gsub(/\./,"-",$2); printf("--set nodes.hosts[%d].name=%s,nodes.hosts[%d].value=%s ",NR-1, $2, NR-1, $1); }')
+        HOST_ALIASES=$(kubectl get nodes -o custom-columns='INTERNAL-IP:.status.addresses[?(@.type=="InternalIP")].address,PUBLIC-IP:.metadata.labels.elassandra\.strapdata\.com/public-ip' --no-headers |\
+        awk '{ gsub(/\./,"-",$2); printf("nodes.hosts[%d].name=%s,nodes.hosts[%d].value=%s,",NR-1, $2, NR-1, $1); }')
 
-Then configure the CoreDNS custom config with your DNS name servers, this is Azure name servers in the following example:
+Then configure the CoreDNS custom config with your DNS name servers and host aliases. In the following example, this is Azure DNS name servers:
 
 .. code::
 
-      kubectl delete configmap --namespace kube-system coredns-custom
-      helm install $HELM_DEBUG --name coredns-forwarder --namespace kube-system \
-          --set forwarders.domain="${DNS_DOMAIN}" \
-          --set forwarders.hosts[0]="40.90.4.8" \
-          --set forwarders.hosts[1]="64.4.48.8" \
-          --set forwarders.hosts[2]="13.107.24.8" \
-          --set forwarders.hosts[3]="13.107.160.8" \
-          --set nodes.domain=internal.strapdata.com \
-          $HOST_ALIASES \
-          strapdata/coredns-forwarder
+    kubectl delete configmap --namespace kube-system coredns-custom
+    helm install $HELM_DEBUG --name coredns-forwarder --namespace kube-system \
+      --set forwarders.domain="${DNS_DOMAIN}" \
+      --set forwarders.hosts[0]="40.90.4.8" \
+      --set forwarders.hosts[1]="64.4.48.8" \
+      --set forwarders.hosts[2]="13.107.24.8" \
+      --set forwarders.hosts[3]="13.107.160.8" \
+      --set nodes.domain=internal.strapdata.com \
+      --set $HOST_ALIASES \
+      strapdata/coredns-forwarder
 
 Restart CoreDNS pods to reload our configuration, but this depends on coreDNS deployment labels !
 
@@ -835,7 +835,7 @@ namespace **default**, into the Kubernetes cluster **kube2** namespace **default
 
 .. tip::
 
-    These Elassandra cluster-wide secrets does not include any ownerReference <https://kubernetes.io/docs/concepts/workloads/controllers/garbage-collection/>`_
+    These Elassandra cluster-wide secrets does not include any `ownerReference <https://kubernetes.io/docs/concepts/workloads/controllers/garbage-collection/>`_
     and won't be deleted when deleting the Elassandra datacenter because they could be used by another datacenter.
     So, it's up to you to properly delete these secrets when deleting an Elassandra cluster.
 
@@ -938,7 +938,7 @@ Then on **dc2**, run a rebuild task to stream data from **dc1** and wait for ter
     "19:59:30 ADDED: rebuild-dc2-573 phase=SUCCEED
     done 49ms
 
-If elasticsearch is enabled in **dc2**, you need to run restart Elassandra pods to update the Elasticsearch
+If Elasticsearch is enabled in **dc2**, you need to run restart Elassandra pods to update the Elasticsearch
 cluster state since data have been populated by streaming data from **dc1**.
 
 .. code::
