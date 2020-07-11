@@ -20,6 +20,7 @@ package com.strapdata.strapkop.model.k8s;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.module.jsonSchema.JsonSchema;
 import com.fasterxml.jackson.module.jsonSchema.factories.SchemaFactoryWrapper;
 import com.strapdata.strapkop.model.fabric8.task.TaskSpec;
@@ -51,6 +52,19 @@ public class StrapdataCrdGroup {
         JsonSchema jsonSchema = visitor.finalSchema();
 
         ObjectMapper mapper = new ObjectMapper(new JsonFactory());
+        mapper.configure(SerializationFeature.INDENT_OUTPUT, true);
+        mapper.configure(SerializationFeature.WRITE_ENUMS_USING_TO_STRING, true);
+        mapper.writeValue(output.toFile(), jsonSchema);
+    }
+
+    public static void generateYamlSchema(Class clazz, Path output) throws IOException {
+        ObjectMapper m = new ObjectMapper();
+
+        SchemaFactoryWrapper visitor = new SchemaFactoryWrapper();
+        m.acceptJsonFormatVisitor(m.constructType(clazz), visitor);
+        JsonSchema jsonSchema = visitor.finalSchema();
+
+        ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
         mapper.configure(SerializationFeature.INDENT_OUTPUT, true);
         mapper.configure(SerializationFeature.WRITE_ENUMS_USING_TO_STRING, true);
         mapper.writeValue(output.toFile(), jsonSchema);
