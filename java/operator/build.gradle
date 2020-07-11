@@ -57,6 +57,18 @@ jib {
 }
 tasks.jibDockerBuild.dependsOn project(':java:model').jar
 
+jar {
+    manifest {
+        attributes "Main-Class": mainClassName
+    }
+
+    zip64=true
+    from {
+        configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
+tasks.jar.dependsOn project(':java:model').jar
+
 compileJava {
     sourceCompatibility = 1.8
     targetCompatibility = 1.8
@@ -119,4 +131,13 @@ dependencies {
     compile project(':java:driver-addons')
 
     testCompile "org.mockito:mockito-core:2.+"
+}
+
+task runLocal(type: JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    main = mainClassName
+    environment OPERATOR_PROMETHEUS_ENABLED: "false"
+    environment OPERATOR_SERVER_PORT: "8080"
+    environment OPERATOR_SSL: "false"
+    jvmArgs '-Dmicronaut.environments=local'
 }
