@@ -24,14 +24,12 @@ rules:
 - apiGroups:
   - elassandra.strapdata.com
   resources:
-  - elassandradatacenter
   - elassandradatacenters
-  - elassandradatacenter/status
   - elassandradatacenters/status
-  - elassandratask
+  - elassandradatacenters/finalizers
   - elassandratasks
-  - elassandratask/status
   - elassandratasks/status
+  - elassandratasks/finalizers
   verbs:
   - '*'
 - apiGroups:
