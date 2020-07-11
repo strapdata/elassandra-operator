@@ -37,12 +37,10 @@
     <logger name="com.strapdata.strapkop.cql" level="${LOGBACK_com_strapdata_strapkop_cql:-DEBUG}" />
     <logger name="com.strapdata.strapkop.reconcilier" level="${LOGBACK_com_strapdata_strapkop_reconcilier:-DEBUG}" />
 
-    <!--
-    <logger name="io.micronaut.http.client" level="TRACE"/>
-    <logger name="io.micronaut.http.server" level="TRACE"/>
-    <logger name="io.netty" level="TRACE"/>
-    <logger name="io.kubernetes.client" level="TRACE"/>
-    -->
+    <logger name="io.micronaut.http.client" level="${LOGBACK_io_micronaut_http_client:-WARN}"/>
+    <logger name="io.micronaut.http.server" level="${LOGBACK_io_micronaut_http_server:-WARN}"/>
+    <logger name="io.netty" level="${LOGBACK_io.netty:-WARN}"/>
+    <logger name="io.kubernetes.client" level="${LOGBACK_io_kubernetes_client:-WARN}"/>
 
     <root level="INFO">
         <appender-ref ref="STDOUT" />
