@@ -65,8 +65,4 @@ public class TaskSpec {
     @SerializedName("backup")
     @Expose
     private BackupTaskSpec backup;
-
-    @SerializedName("test")
-    @Expose
-    private TestTaskSpec test;
 }
