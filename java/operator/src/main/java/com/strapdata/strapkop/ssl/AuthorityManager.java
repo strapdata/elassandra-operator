@@ -88,6 +88,9 @@ public class AuthorityManager {
     K8sResourceUtils k8sResourceUtils;
 
     @Inject
+    SslConfiguration sslConfiguration;
+
+    @Inject
     ServerSslConfiguration serverSslConfiguration;
 
     private final AsyncLoadingCache<Tuple2<String,String>, X509CertificateAndPrivateKey> cache;
@@ -208,7 +211,10 @@ public class AuthorityManager {
                         return Single.just(new X509CertificateAndPrivateKey(new String(certsBytes), new String(key)));
                     }
                 })
-                .flatMap(x -> storeOperatorTruststoreAsSecret(namespace).toSingleDefault(x));
+                .flatMap(x -> sslConfiguration.isEnabled()
+                        ? storeOperatorTruststoreAsSecret(namespace).toSingleDefault(x)
+                        : Single.just(x)
+                );
     }
 
     /**

@@ -19,7 +19,7 @@ micronaut:
     application:
         name: elassandra-operator
     ssl:
-        enabled: true
+        enabled: ${OPERATOR_SSL:true}
         port: ${OPERATOR_SERVER_PORT:443}
     server:
         ssl:
