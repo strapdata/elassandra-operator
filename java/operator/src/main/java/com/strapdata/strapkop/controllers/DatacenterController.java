@@ -24,17 +24,24 @@ import com.strapdata.strapkop.cql.CqlKeyspaceManager;
 import com.strapdata.strapkop.cql.CqlRole;
 import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.k8s.OperatorNames;
+import com.strapdata.strapkop.k8s.WorkQueues;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenterStatus;
+import com.strapdata.strapkop.model.k8s.datacenter.Operation;
+import com.strapdata.strapkop.reconcilier.DataCenterReconcilier;
+import com.strapdata.strapkop.reconcilier.Reconciliation;
 import io.kubernetes.client.informer.SharedInformerFactory;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.models.V1StatefulSet;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Post;
 
 import javax.inject.Inject;
+import java.util.Date;
 import java.util.Map;
 
 @Controller("/datacenter")
@@ -55,6 +62,47 @@ public class DatacenterController {
     @Inject
     SharedInformerFactory sharedInformerFactory;
 
+    @Inject
+    WorkQueues workQueues;
+
+    @Inject
+    DataCenterReconcilier dataCenterReconcilier;
+
+    /**
+     * Trigger a datacenter reconciliation
+     * @param namespace
+     * @param cluster
+     * @param datacenter
+     * @return
+     */
+    @Post(value = "/{namespace}/{cluster}/{datacenter}")
+    public HttpStatus reconcileDataCenter(String namespace, String cluster, String datacenter) {
+        Key dcKey = new Key(namespace, OperatorNames.dataCenterResource(cluster, datacenter));
+        DataCenter dc = sharedInformerFactory.getExistingSharedIndexInformer(DataCenter.class).getIndexer().getByKey(dcKey.id());
+        if (dc != null) {
+            workQueues.submit(new Reconciliation(dc.getMetadata(), Reconciliation.Kind.DATACENTER, Reconciliation.Type.MODIFIED)
+                    .withKey(new Key(dc.getMetadata()))
+                    .withCompletable(dataCenterReconcilier.updateDatacenter(
+                            dc,
+                            new Operation()
+                                    .withLastTransitionTime(new Date())
+                                    .withTriggeredBy("Datacenter modified spec generation=" + dc.getMetadata().getGeneration())
+                            )
+                    )
+            );
+            return HttpStatus.ACCEPTED;
+        } else {
+            return HttpStatus.NOT_FOUND;
+        }
+    }
+
+    /**
+     * Get the datacenter CRD
+     * @param namespace
+     * @param cluster
+     * @param datacenter
+     * @return
+     */
     @Get(value = "/{namespace}/{cluster}/{datacenter}", produces = MediaType.APPLICATION_JSON)
     public DataCenter datacenter(String namespace, String cluster, String datacenter) {
         Key dcKey = new Key(namespace, OperatorNames.dataCenterResource(cluster, datacenter));
