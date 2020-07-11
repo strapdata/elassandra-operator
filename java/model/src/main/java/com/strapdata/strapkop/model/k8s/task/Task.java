@@ -24,6 +24,7 @@ import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
 import io.kubernetes.client.openapi.models.V1ObjectMeta;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 
 import java.util.Date;
@@ -34,6 +35,7 @@ import java.util.Date;
 @NoArgsConstructor
 @Getter
 @ToString
+@Schema(name="Task", description = "Elassandra task CRD")
 public class Task {
 
     public static final String NAME = "elassandratask";

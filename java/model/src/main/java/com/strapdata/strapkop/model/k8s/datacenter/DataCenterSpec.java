@@ -22,23 +22,29 @@ import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 import com.strapdata.strapkop.model.GsonUtils;
 import io.kubernetes.client.openapi.models.*;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.With;
 import org.apache.commons.codec.digest.DigestUtils;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 @Data
 @With
 @AllArgsConstructor
 @NoArgsConstructor
+@Schema(name="DataCenterSpec", description="Elassandra Datacenter specification")
 public class DataCenterSpec {
 
     @JsonPropertyDescription("Cassandra cluster name")
     @SerializedName("clusterName")
     @Expose
+    @Schema(description = "Elassandra cluster name", minLength = 2, maxLength = 16, required = true)
     private String clusterName;
 
     @JsonPropertyDescription("Cassandra datacenter name")

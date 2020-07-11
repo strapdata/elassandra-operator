@@ -17,6 +17,7 @@
 
 package com.strapdata.strapkop.model.k8s.datacenter;
 
+import com.fasterxml.jackson.annotation.JsonClassDescription;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
@@ -35,6 +36,7 @@ import java.util.Map;
 @With
 @AllArgsConstructor
 @NoArgsConstructor
+@JsonClassDescription("Elasticsearch configuration")
 public class Elasticsearch {
 
     @JsonPropertyDescription("Enable Elasticsearch, default is true")
