@@ -81,21 +81,10 @@ spec:
                   - SLACK
               elassandraImage:
                 type: string
-              imagePullPolicy:
-                type: string
-              imagePullSecrets:
-                type: array
-                items:
-                  type: string
               maxPodUnavailable:
                 type: integer
                 format: int32
-              serviceAccount:
-                type: string
               podTemplate:
-                type: object
-                xKubernetesPreserveUnknownFields: true
-              resources:
                 type: object
                 xKubernetesPreserveUnknownFields: true
               dataVolumeClaim:

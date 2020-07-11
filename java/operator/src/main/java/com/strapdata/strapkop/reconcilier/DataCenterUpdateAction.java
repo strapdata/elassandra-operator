@@ -1305,65 +1305,73 @@ public class DataCenterUpdateAction {
                         "JVM_OPTS=\"${JVM_OPTS} -Xdebug -Xnoagent -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=${POD_IP}:" + dataCenterSpec.getJvm().getJdbPort() + "\"");
             }
 
-            // heap size and GC settings
-            if (dataCenterSpec.getJvm().isComputeJvmMemorySettings() && dataCenterSpec.getResources() != null && dataCenterSpec.getResources().getLimits() != null) {
-                Map<String, Quantity> resourceLimitsQuantity = dataCenterSpec.getResources().getLimits();
-                final long memoryLimit = QuantityConverter.toMegaBytes(resourceLimitsQuantity.get("memory"));
-                final long coreCount = QuantityConverter.toCpu(resourceLimitsQuantity.get("cpu"));
+            // heap size and GC settings from the elassandra container resources
+            if (dataCenterSpec.getPodTemplate() != null && dataCenterSpec.getPodTemplate().getSpec() != null && !dataCenterSpec.getPodTemplate().getSpec().getContainers().isEmpty()) {
+                final V1PodSpec podSpec = dataCenterSpec.getPodTemplate().getSpec();
+                final Optional<V1Container> elassandraV1Container = podSpec.getContainers().stream().filter(c -> c.getName().equals("elassandra")).findFirst();
+                if (dataCenterSpec.getJvm().isComputeJvmMemorySettings() &&
+                        elassandraV1Container.isPresent() &&
+                        elassandraV1Container.get().getResources() != null &&
+                        elassandraV1Container.get().getResources().getLimits() != null) {
+                    Map<String, Quantity> resourceLimitsQuantity = elassandraV1Container.get().getResources().getLimits();
+                    final long memoryLimit = QuantityConverter.toMegaBytes(resourceLimitsQuantity.get("memory"));
+                    final long coreCount = QuantityConverter.toCpu(resourceLimitsQuantity.get("cpu"));
 
-                // same as stock cassandra-env.sh
-                final double jvmHeapSizeInMb = Math.max(
-                        Math.min(memoryLimit / 2, 1.5 * 1024),
-                        Math.min(memoryLimit / 4, 8 * 1024)
-                );
+                    // same as stock cassandra-env.sh
+                    final double jvmHeapSizeInMb = Math.max(
+                            Math.min(memoryLimit / 2, 1.5 * 1024),
+                            Math.min(memoryLimit / 4, 8 * 1024)
+                    );
 
-                final double youngGenSizeInMb = Math.min(
-                        100 * coreCount,
-                        jvmHeapSizeInMb / 4
-                );
+                    final double youngGenSizeInMb = Math.min(
+                            100 * coreCount,
+                            jvmHeapSizeInMb / 4
+                    );
 
-                logger.debug("cluster={} dc={} namespace={} memoryLimit={} cpuLimit={} coreCount={} jvmHeapSizeInMb={} youngGenSizeInMb={}",
-                        dataCenterSpec.getClusterName(), dataCenterSpec.getDatacenterName(), dataCenterMetadata.getNamespace(),
-                        memoryLimit, resourceLimitsQuantity.get("cpu").getNumber(), coreCount, jvmHeapSizeInMb, youngGenSizeInMb);
+                    logger.debug("cluster={} dc={} namespace={} memoryLimit={} cpuLimit={} coreCount={} jvmHeapSizeInMb={} youngGenSizeInMb={}",
+                            dataCenterSpec.getClusterName(), dataCenterSpec.getDatacenterName(), dataCenterMetadata.getNamespace(),
+                            memoryLimit, resourceLimitsQuantity.get("cpu").getNumber(), coreCount, jvmHeapSizeInMb, youngGenSizeInMb);
 
-                if (jvmHeapSizeInMb < 1.2 * 1024) {
-                    logger.warn("Cannot deploy elassandra with less than 1.2Gb heap, please increase your kubernetes memory limits if you are in production environment");
-                }
-
-                final boolean useG1GC = (jvmHeapSizeInMb > 12 * 1024);
-                //final StringWriter writer = new StringWriter();
-                StringBuilder jvmGCOptions = new StringBuilder(500);
-
-                jvmGCOptions.append(String.format(Locale.ROOT, "-Xms%dm", (long) jvmHeapSizeInMb) + "\n"); // min heap size
-                jvmGCOptions.append(String.format(Locale.ROOT, "-Xmx%dm", (long) jvmHeapSizeInMb) + "\n"); // max heap size
-
-                // copied from stock jvm.options
-                if (useG1GC) {
-                    jvmGCOptions.append("-XX:+UseG1GC\n");
-                    jvmGCOptions.append("-XX:G1RSetUpdatingPauseTimePercent=5\n");
-                    jvmGCOptions.append("-XX:MaxGCPauseMillis=500\n");
-
-                    if (jvmHeapSizeInMb > 12 * 1024) {
-                        jvmGCOptions.append("-XX:InitiatingHeapOccupancyPercent=70\n");
+                    if (jvmHeapSizeInMb < 1.2 * 1024) {
+                        logger.warn("Cannot deploy elassandra with less than 1.2Gb heap, please increase your kubernetes memory limits if you are in production environment");
                     }
 
-                    // TODO: tune -XX:ParallelGCThreads, -XX:ConcGCThreads
-                } else {
-                    jvmGCOptions.append(String.format(Locale.ROOT, "-Xmn%dm", (long) youngGenSizeInMb) + "\n"); // young gen size
-                    jvmGCOptions.append("-XX:+UseParNewGC\n");
-                    jvmGCOptions.append("-XX:+UseConcMarkSweepGC\n");
-                    jvmGCOptions.append("-XX:+CMSParallelRemarkEnabled\n");
-                    jvmGCOptions.append("-XX:SurvivorRatio=8\n");
-                    jvmGCOptions.append("-XX:MaxTenuringThreshold=1\n");
-                    jvmGCOptions.append("-XX:CMSInitiatingOccupancyFraction=75\n");
-                    jvmGCOptions.append("-XX:+UseCMSInitiatingOccupancyOnly\n");
-                    jvmGCOptions.append("-XX:CMSWaitDuration=10000\n");
-                    jvmGCOptions.append("-XX:+CMSParallelInitialMarkEnabled\n");
-                    jvmGCOptions.append("-XX:+CMSEdenChunksRecordAlways\n");
-                    jvmGCOptions.append("-XX:+CMSClassUnloadingEnabled\n");
+                    final boolean useG1GC = (jvmHeapSizeInMb > 12 * 1024);
+                    //final StringWriter writer = new StringWriter();
+                    StringBuilder jvmGCOptions = new StringBuilder(500);
+
+                    jvmGCOptions.append(String.format(Locale.ROOT, "-Xms%dm", (long) jvmHeapSizeInMb) + "\n"); // min heap size
+                    jvmGCOptions.append(String.format(Locale.ROOT, "-Xmx%dm", (long) jvmHeapSizeInMb) + "\n"); // max heap size
+
+                    // copied from stock jvm.options
+                    if (useG1GC) {
+                        jvmGCOptions.append("-XX:+UseG1GC\n");
+                        jvmGCOptions.append("-XX:G1RSetUpdatingPauseTimePercent=5\n");
+                        jvmGCOptions.append("-XX:MaxGCPauseMillis=500\n");
+
+                        if (jvmHeapSizeInMb > 12 * 1024) {
+                            jvmGCOptions.append("-XX:InitiatingHeapOccupancyPercent=70\n");
+                        }
+
+                        // TODO: tune -XX:ParallelGCThreads, -XX:ConcGCThreads
+                    } else {
+                        jvmGCOptions.append(String.format(Locale.ROOT, "-Xmn%dm", (long) youngGenSizeInMb) + "\n"); // young gen size
+                        jvmGCOptions.append("-XX:+UseParNewGC\n");
+                        jvmGCOptions.append("-XX:+UseConcMarkSweepGC\n");
+                        jvmGCOptions.append("-XX:+CMSParallelRemarkEnabled\n");
+                        jvmGCOptions.append("-XX:SurvivorRatio=8\n");
+                        jvmGCOptions.append("-XX:MaxTenuringThreshold=1\n");
+                        jvmGCOptions.append("-XX:CMSInitiatingOccupancyFraction=75\n");
+                        jvmGCOptions.append("-XX:+UseCMSInitiatingOccupancyOnly\n");
+                        jvmGCOptions.append("-XX:CMSWaitDuration=10000\n");
+                        jvmGCOptions.append("-XX:+CMSParallelInitialMarkEnabled\n");
+                        jvmGCOptions.append("-XX:+CMSEdenChunksRecordAlways\n");
+                        jvmGCOptions.append("-XX:+CMSClassUnloadingEnabled\n");
+                    }
+                    configMapVolumeMountBuilder.addFile("jvm.options.d/001-jvm-memory-gc.options", jvmGCOptions.toString());
                 }
-                configMapVolumeMountBuilder.addFile("jvm.options.d/001-jvm-memory-gc.options", jvmGCOptions.toString());
             }
+
 
 
             // TODO: maybe tune -Dcassandra.available_processors=number_of_processors - Wait till we build C* for Java 11
@@ -1688,11 +1696,6 @@ public class DataCenterUpdateAction {
                             )
                     );
 
-            // use the elassandra service account if not specified in podTemplate
-            if (podSpec.getServiceAccountName() == null) {
-                podSpec.setServiceAccountName(dataCenterSpec.getServiceAccount());
-            }
-
             // https://kubernetes.io/fr/docs/concepts/services-networking/dns-pod-service/#politique-dns-du-pod
             if (dataCenterSpec.getNetworking().getHostNetworkEnabled()) {
                 podSpec.setHostNetwork(true);
@@ -1725,15 +1728,6 @@ public class DataCenterUpdateAction {
                     podSpec.addInitContainersItem(buildInitContainerNodeInfo(nodeInfoSecretName, rackStatus));
                 } else {
                     logger.warn("datacenter={} nodeinfo secret not found for serviceaccount={}", dataCenter, key);
-                }
-            }
-
-            {
-                if (dataCenterSpec.getImagePullSecrets() != null) {
-                    for (String secretName : dataCenterSpec.getImagePullSecrets()) {
-                        final V1LocalObjectReference pullSecret = new V1LocalObjectReference().name(secretName);
-                        podSpec.addImagePullSecretsItem(pullSecret);
-                    }
                 }
             }
 
@@ -1935,12 +1929,10 @@ public class DataCenterUpdateAction {
             final V1Container cassandraContainer = new V1Container()
                     .name(containerName)
                     .image(dataCenterSpec.getElassandraImage())
-                    .imagePullPolicy(dataCenterSpec.getImagePullPolicy())
                     .terminationMessagePolicy("FallbackToLogsOnError")
                     .securityContext(new V1SecurityContext()
                             .runAsUser(CASSANDRA_USER_ID)
                             .capabilities(new V1Capabilities().add(ImmutableList.of("IPC_LOCK", "SYS_RESOURCE"))))
-                    .resources(dataCenterSpec.getResources())
                     .addVolumeMountsItem(new V1VolumeMount()
                             .name("data-volume")
                             .mountPath("/var/lib/cassandra")

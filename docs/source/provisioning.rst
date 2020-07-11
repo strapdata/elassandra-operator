@@ -11,8 +11,6 @@ Before deploying a datacenter, adjust your setting in the HELM values.yaml file:
     image:
       elassandraRepository: strapdata/elassandra-node-dev
       tag: 6.8.4.5
-      pullPolicy: Always
-      pullSecrets: []
 
     # Elassandra node affinity STRICT or SLACK
     nodeAffinityPolicy: STRICT
@@ -342,7 +340,7 @@ Pod template
 
 You can customize Elassandra, Cassandra Reaper and Kibana pods by providing your
 own `PodTemplate <https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/#pod-templates>`_.
-Thus, you can add labels, annotations, initContainers, environment variables, specify serviceAccount or priorityClassName, or customize resources.
+Thus, you can add labels, annotations, imagePullSecret, initContainers, environment variables, specify serviceAccount or priorityClassName, or customize resources.
 
 For example, you can install custom Elasticsearch plugins before the elassandra container starts with
 an `initContainer <https://kubernetes.io/docs/concepts/workloads/pods/init-containers/>`_, as shown bellow:

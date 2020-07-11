@@ -82,28 +82,10 @@ public class DataCenterSpec {
     @Expose
     private java.lang.String elassandraImage;
 
-    @JsonPropertyDescription("Image pull policy")
-    @SerializedName("imagePullPolicy")
-    @Expose
-    private java.lang.String imagePullPolicy;
-
-    @SerializedName("imagePullSecrets")
-    @Expose
-    private List<java.lang.String> imagePullSecrets;
-
-
     @JsonPropertyDescription("PodDisruptionBudget max unavailable Elassandra pod")
     @SerializedName("maxPodUnavailable")
     @Expose
     private Integer maxPodUnavailable = 1;
-
-    /**
-     * ServiceAccount used by the operator to deploy pods (Elassandra, Reaper, kibana...)
-     */
-    @JsonPropertyDescription("ServiceAccount used by the operator to deploy pods, unless overwritten by podTemplate")
-    @SerializedName("serviceAccount")
-    @Expose
-    private String serviceAccount;
 
     /**
      * PodTemplate provides pod customisation (labels, resource, annotations, affinity rules, resource, priorityClassName, serviceAccountName) for the elassandra pods
@@ -112,14 +94,6 @@ public class DataCenterSpec {
     @SerializedName("podTemplate")
     @Expose
     private V1PodTemplateSpec podTemplate = new V1PodTemplateSpec();
-
-    /**
-     * Resource requirements for the Elassandra containers.
-     **/
-    @JsonPropertyDescription("Resource requirements for Elassandra pods")
-    @SerializedName("resources")
-    @Expose
-    private V1ResourceRequirements resources = null;
 
     /**
      * PVC spec
@@ -247,10 +221,7 @@ public class DataCenterSpec {
         // * scheduledBackups (DC reconciliation is useless in this case, we only want to update Scheduler)
         acc.add(podsAffinityPolicy);
         acc.add(elassandraImage);
-        acc.add(imagePullPolicy);
-        acc.add(imagePullSecrets);
         acc.add(webHookUrl);
-        acc.add(resources);
         acc.add(podTemplate);
         acc.add(networking);
         acc.add(cassandra);

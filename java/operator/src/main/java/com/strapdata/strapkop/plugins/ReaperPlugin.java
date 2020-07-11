@@ -319,19 +319,12 @@ public class ReaperPlugin extends AbstractPlugin {
                 : new V1PodSpec())
                 .addContainersItem(container);
 
-        if (dataCenterSpec.getImagePullSecrets() != null) {
-            for (String secretName : dataCenterSpec.getImagePullSecrets()) {
-                final V1LocalObjectReference pullSecret = new V1LocalObjectReference().name(secretName);
-                reaperPodSpec.addImagePullSecretsItem(pullSecret);
-            }
-        }
-
         final V1PodSpec elassandraPodSpec = (dataCenterSpec.getPodTemplate() != null && dataCenterSpec.getPodTemplate().getSpec() != null
                 ? dataCenterSpec.getPodTemplate().getSpec()
                 : new V1PodSpec());
         // inherit service account
         if (reaperPodSpec.getServiceAccountName() == null) {
-            reaperPodSpec.setServiceAccountName(dataCenterSpec.getServiceAccount());
+            reaperPodSpec.setServiceAccountName(elassandraPodSpec.getServiceAccount());
         }
         // inherit the priorityClassName of the Elassandra datacenter if not specified
         if (reaperPodSpec.getPriorityClassName() == null) {

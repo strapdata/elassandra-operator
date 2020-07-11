@@ -327,7 +327,7 @@ public class KibanaPlugin extends AbstractPlugin {
 
         // inherit service account
         if (kibanaSpacePodSpec.getServiceAccountName() == null) {
-            kibanaSpacePodSpec.setServiceAccountName(dataCenterSpec.getServiceAccount());
+            kibanaSpacePodSpec.setServiceAccountName(elassandraPodSpec.getServiceAccount());
         }
         // inherit the priorityClassName of the Elassandra datacenter if not specified
         if (kibanaSpacePodSpec.getPriorityClassName() == null) {
@@ -345,13 +345,6 @@ public class KibanaPlugin extends AbstractPlugin {
                                 .spec(kibanaSpacePodSpec)
                         )
                 );
-
-        if (dataCenterSpec.getImagePullSecrets() != null) {
-            for (String secretName : dataCenterSpec.getImagePullSecrets()) {
-                final V1LocalObjectReference pullSecret = new V1LocalObjectReference().name(secretName);
-                kibanaSpacePodSpec.addImagePullSecretsItem(pullSecret);
-            }
-        }
 
         container
                 .name("kibana")
