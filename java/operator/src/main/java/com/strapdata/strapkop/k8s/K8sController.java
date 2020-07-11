@@ -67,7 +67,7 @@ public class K8sController {
     SharedInformerFactory sharedInformerFactory;
 
     @Inject
-    DataCenterReconcilier dataCenterController;
+    DataCenterReconcilier dataCenterReconcilier;
 
     @Inject
     DataCenterStatusCache dataCenterStatusCache;
@@ -186,7 +186,7 @@ public class K8sController {
                         dataCenter.id(), dataCenter.getStatus().getRackStatuses());
                 workQueues.submit(new Reconciliation(dataCenter.getMetadata(), Reconciliation.Kind.DATACENTER, Reconciliation.Type.ADDED)
                             .withKey(new Key(dataCenter.getMetadata()))
-                            .withCompletable(dataCenterController.initDatacenter(dataCenter, new Operation()
+                            .withCompletable(dataCenterReconcilier.initDatacenter(dataCenter, new Operation()
                                     .withLastTransitionTime(new Date())
                                     .withTriggeredBy("Datacenter added"))
                                     .doOnComplete(() -> {
@@ -201,7 +201,7 @@ public class K8sController {
                     logger.debug("dc={} generation={}", oldObj.id(), newObj.getMetadata().getGeneration());
                     workQueues.submit(new Reconciliation(newObj.getMetadata(), Reconciliation.Kind.DATACENTER, Reconciliation.Type.MODIFIED)
                             .withKey(new Key(newObj.getMetadata()))
-                            .withCompletable(dataCenterController.updateDatacenter(
+                            .withCompletable(dataCenterReconcilier.updateDatacenter(
                                     newObj,
                                     new Operation()
                                             .withLastTransitionTime(new Date())
@@ -215,7 +215,7 @@ public class K8sController {
                 logger.debug("dc={}", dc.id());
                 workQueues.submit(new Reconciliation(dc.getMetadata(), Reconciliation.Kind.DATACENTER, Reconciliation.Type.DELETED)
                         .withKey(new Key(dc.getMetadata()))
-                        .withCompletable(dataCenterController.deleteDatacenter(dc)
+                        .withCompletable(dataCenterReconcilier.deleteDatacenter(dc)
                                 .doOnComplete(() -> {
                                     managed.decrementAndGet();
                                     meterRegistry.counter("k8s.event.deleted", tags).increment();
@@ -295,7 +295,7 @@ public class K8sController {
                                 sts.getStatus().getReadyReplicas() + "/" + sts.getStatus().getReplicas());
                 workQueues.submit(new Reconciliation(sts.getMetadata(), Reconciliation.Kind.STATEFULSET, Reconciliation.Type.MODIFIED)
                         .withKey(key)
-                        .withCompletable(dataCenterController.statefulsetStatusUpdate(dataCenter, op, sts)
+                        .withCompletable(dataCenterReconcilier.statefulsetStatusUpdate(dataCenter, op, sts)
                                 .onErrorComplete(t -> {
                                     if (t instanceof NoSuchElementException) {
                                         return true;
@@ -433,7 +433,7 @@ public class K8sController {
                         .withTriggeredBy("Status update deployment=" + deployment.getMetadata().getName());
                 workQueues.submit(new Reconciliation(deployment.getMetadata(), Reconciliation.Kind.DEPLOYMENT, Reconciliation.Type.MODIFIED)
                         .withKey(key)
-                        .withCompletable(dataCenterController.deploymentAvailable(dataCenter, op, deployment)));
+                        .withCompletable(dataCenterReconcilier.deploymentAvailable(dataCenter, op, deployment)));
             }
         }
     }

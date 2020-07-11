@@ -133,6 +133,14 @@ public class DataCenterStatus {
     private List<String> zones = new ArrayList<>();
 
     /**
+     * Number of replica in the datacenter.
+     */
+    @JsonPropertyDescription("Number of Elassandra nodes in the datacenter")
+    @SerializedName("replicas")
+    @Expose
+    private Integer replicas = 0;
+
+    /**
      * Number of replica ready in the datacenter.
      */
     @JsonPropertyDescription("Number of Elassandra nodes ready in the datacenter")

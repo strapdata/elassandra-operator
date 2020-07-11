@@ -15,7 +15,7 @@
 # along with the Elassandra-Operator.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-apiVersion: apiextensions.k8s.io/v1beta1
+apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   # name must match the spec fields below, and be in the form: <plural>.<group>
@@ -25,10 +25,474 @@ spec:
   # group name to use for REST API: /apis/<group>/<version>
   group: elassandra.strapdata.com
   # version name to use for REST API: /apis/<group>/<version>
-  version: v1beta1
+  versions:
+  - name: v1beta1
+    served: true
+    storage: true
+    subresources:
+      scale:
+        specReplicasPath: .spec.replicas
+        statusReplicasPath: .status.replicas
+      status: {}
+    additionalPrinterColumns:
+    - jsonPath: .status.health
+      name: health
+      type: string
+    - jsonPath: .status.readyReplicas
+      description: Ready nodes
+      name: nodes
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: age
+      type: date
+    schema:
+      openAPIV3Schema:
+        description: Elassandra DataCenter CRD
+        type: object
+        properties:
+          apiVersion:
+            type: string
+          kind:
+            type: string
+          metadata:
+            type: object
+          spec:
+            type: object
+            description: Elassandra Datacenter specification
+            properties:
+              clusterName:
+                type: string
+              datacenterName:
+                type: string
+              replicas:
+                type: integer
+                format: int32
+              parked:
+                type: boolean
+              autoScaleMode:
+                type: string
+                enum:
+                  - MANUAL
+                  - NODEPOOL
+              podsAffinityPolicy:
+                type: string
+                enum:
+                  - STRICT
+                  - SLACK
+              elassandraImage:
+                type: string
+              imagePullPolicy:
+                type: string
+              imagePullSecrets:
+                type: array
+                items:
+                  type: string
+              maxPodUnavailable:
+                type: integer
+                format: int32
+              serviceAccount:
+                type: string
+              podTemplate:
+                type: object
+                xKubernetesPreserveUnknownFields: true
+              resources:
+                type: object
+                xKubernetesPreserveUnknownFields: true
+              dataVolumeClaim:
+                type: object
+                xKubernetesPreserveUnknownFields: true
+              decommissionPolicy:
+                type: string
+                enum:
+                  - KEEP_PVC
+                  - DELETE_PVC
+                  - SNAPSHOT_AND_DELETE_PVC
+              userConfigMapVolumeSource:
+                type: object
+                xKubernetesPreserveUnknownFields: true
+              userSecretVolumeSource:
+                type: object
+                xKubernetesPreserveUnknownFields: true
+              prometheus:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                  port:
+                    type: integer
+                    format: int32
+              networking:
+                type: object
+                properties:
+                  hostPortEnabled:
+                    type: boolean
+                  hostNetworkEnabled:
+                    type: boolean
+                  externalDns:
+                    type: object
+                    properties:
+                      enabled:
+                        type: boolean
+                      root:
+                        type: string
+                      domain:
+                        type: string
+                      ttl:
+                        type: integer
+                        format: int32
+              jvm:
+                type: object
+                properties:
+                  computeJvmMemorySettings:
+                    type: boolean
+                  jmxPort:
+                    type: integer
+                    format: int32
+                  jmxmpEnabled:
+                    type: boolean
+                  jmxmpOverSSL:
+                    type: boolean
+                  jdbPort:
+                    type: integer
+                    format: int32
+              cassandra:
+                type: object
+                properties:
+                  workload:
+                    type: string
+                    enum:
+                      - WRITE
+                      - READ_WRITE
+                      - READ
+                  authentication:
+                    type: string
+                    enum:
+                      - NONE
+                      - CASSANDRA
+                      - LDAP
+                  ssl:
+                    type: boolean
+                  commitlogsInitContainer:
+                    type: boolean
+                  snitchPreferLocal:
+                    type: boolean
+                  remoteSeeds:
+                    type: array
+                    items:
+                      type: string
+                  remoteSeeders:
+                    type: array
+                    items:
+                      type: string
+                  nativePort:
+                    type: integer
+                    format: int32
+                  storagePort:
+                    type: integer
+                    format: int32
+                  sslStoragePort:
+                    type: integer
+                    format: int32
+              reaper:
+                type: object
+                properties:
+                  image:
+                    type: string
+                  podTemplate:
+                    type: object
+                    xKubernetesPreserveUnknownFields: true
+                  jwtSecret:
+                    type: string
+                  enabled:
+                    type: boolean
+                  loggingLevel:
+                    type: string
+                  ingressHost:
+                    type: string
+                  ingressAdminHost:
+                    type: string
+                  ingressAnnotations:
+                    type: object
+                    additionalProperties:
+                      type: string
+                  scheduledRepairs:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        owner:
+                          type: string
+                        keyspace:
+                          type: string
+                        tables:
+                          type: array
+                          items:
+                            type: string
+                        blacklistedTables:
+                          type: array
+                          items:
+                            type: string
+                        segmentCount:
+                          type: integer
+                          format: int32
+                        repairParallelism:
+                          type: string
+                          enum:
+                            - SEQUENTIAL
+                            - PARALLEL
+                            - DATACENTER_AWARE
+                        intensity:
+                          type: number
+                          format: double
+                        incrementalRepair:
+                          type: boolean
+                        scheduleDaysBetween:
+                          type: integer
+                          format: int32
+                        scheduleTriggerTime:
+                          type: string
+                        repairThreadCount:
+                          type: integer
+                          format: int32
+              managedKeyspaces:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    keyspace:
+                      type: string
+                    rf:
+                      type: integer
+                      format: int32
+                    repair:
+                      type: boolean
+                    role:
+                      type: string
+                    superuser:
+                      type: boolean
+                    login:
+                      type: boolean
+                    secretName:
+                      type: string
+                    secretKey:
+                      type: string
+                    grantStatements:
+                      type: array
+                      items:
+                        type: string
+              elasticsearch:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                  httpPort:
+                    type: integer
+                    format: int32
+                  transportPort:
+                    type: integer
+                    format: int32
+                  loadBalancerEnabled:
+                    type: boolean
+                  loadBalancerIp:
+                    type: string
+                  ingressEnabled:
+                    type: boolean
+                  ingressAnnotations:
+                    type: object
+                    additionalProperties:
+                      type: string
+                  datacenterGroup:
+                    type: string
+                  datacenterTags:
+                    type: array
+                    items:
+                      type: string
+                  enterprise:
+                    type: object
+                    properties:
+                      enabled:
+                        type: boolean
+                      jmx:
+                        type: boolean
+                      https:
+                        type: boolean
+                      ssl:
+                        type: boolean
+                      aaa:
+                        type: object
+                        properties:
+                          enabled:
+                            type: boolean
+                          audit:
+                            type: boolean
+                      cbs:
+                        type: boolean
+              kibana:
+                type: object
+                properties:
+                  image:
+                    type: string
+                  enabled:
+                    type: boolean
+                  spaces:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        keyspaces:
+                          type: array
+                          items:
+                            type: string
+                        statements:
+                          type: array
+                          items:
+                            type: string
+                        replicas:
+                          type: integer
+                          format: int32
+                        ingressSuffix:
+                          type: string
+                        ingressAnnotations:
+                          type: object
+                          additionalProperties:
+                            type: string
+                        version:
+                          type: integer
+                          format: int32
+                        podTemplate:
+                          type: object
+                          xKubernetesPreserveUnknownFields: true
+              webHookUrl:
+                type: string
+              scheduledBackups:
+                type: object
+          status:
+            type: object
+            properties:
+              observedGeneration:
+                type: integer
+                format: int64
+              operationHistory:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    triggeredBy:
+                      type: string
+                    actions:
+                      type: array
+                      items:
+                        type: string
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+                    pendingInMs:
+                      type: integer
+                      format: int64
+                    durationInMs:
+                      type: integer
+                      format: int64
+              phase:
+                type: string
+                enum:
+                  - RUNNING
+                  - PARKED
+              health:
+                type: string
+                enum:
+                  - UNKNOWN
+                  - GREEN
+                  - YELLOW
+                  - RED
+              needCleanup:
+                type: boolean
+              needCleanupKeyspaces:
+                type: array
+                items:
+                  type: string
+              bootstrapped:
+                type: boolean
+              lastError:
+                type: string
+              lastErrorTime:
+                type: string
+                format: date-time
+              cqlStatus:
+                type: string
+                enum:
+                  - NOT_STARTED
+                  - ESTABLISHED
+                  - ERRORED
+              cqlStatusMessage:
+                type: string
+              configMapFingerPrint:
+                type: string
+              currentTask:
+                type: string
+              zones:
+                type: array
+                items:
+                  type: string
+              replicas:
+                type: integer
+                format: int32
+              readyReplicas:
+                type: integer
+                format: int32
+              rackStatuses:
+                type: object
+                additionalProperties:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    index:
+                      type: integer
+                      format: int32
+                    progressState:
+                      type: string
+                      enum:
+                        - RUNNING
+                        - UPDATING
+                    health:
+                      type: string
+                      enum:
+                        - UNKNOWN
+                        - GREEN
+                        - YELLOW
+                        - RED
+                    fingerprint:
+                      type: string
+                    replicas:
+                      type: integer
+                      format: int32
+                    readyReplicas:
+                      type: integer
+                      format: int32
+              keyspaceManagerStatus:
+                type: object
+                properties:
+                  replicas:
+                    type: integer
+                    format: int32
+                  keyspaces:
+                    type: array
+                    items:
+                      type: string
+              kibanaSpaceNames:
+                type: array
+                items:
+                  type: string
+              reaperRegistred:
+                type: boolean
   # either Namespaced or Cluster
   scope: Namespaced
   names:
+    categories:
+    - elassandra
+    - cassandra
     # plural name to be used in the URL: /apis/<group>/<version>/<plural>
     plural: elassandradatacenters
     # singular name to be used as an alias on the CLI and for display
@@ -38,6 +502,3 @@ spec:
     # shortNames allow shorter string to match your resource on the CLI
     shortNames:
     - edc
-  subresources:
-    # status enables the status subresource.
-    status: {}

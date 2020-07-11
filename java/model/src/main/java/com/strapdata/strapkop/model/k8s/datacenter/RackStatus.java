@@ -74,10 +74,10 @@ public class RackStatus {
     /**
      * Number of replica desired in the underlying sts.
      */
-    @JsonPropertyDescription("Number of replica desired in the underlying StatefulSet")
-    @SerializedName("desiredReplicas")
+    @JsonPropertyDescription("Number of replica in the underlying StatefulSet")
+    @SerializedName("replicas")
     @Expose
-    private Integer desiredReplicas = 0;
+    private Integer replicas = 0;
 
     /**
      * Number of replica ready in the underlying sts.
@@ -88,9 +88,9 @@ public class RackStatus {
     private Integer readyReplicas = 0;
 
     public Health health() {
-        if (readyReplicas != null && desiredReplicas != null && desiredReplicas == readyReplicas)
+        if (readyReplicas != null && replicas != null && replicas == readyReplicas)
             return Health.GREEN;
-        if (readyReplicas != null && readyReplicas > 0 && desiredReplicas != null && desiredReplicas - readyReplicas == 1)
+        if (readyReplicas != null && readyReplicas > 0 && replicas != null && replicas - readyReplicas == 1)
             return Health.YELLOW;
         return Health.RED;
     }

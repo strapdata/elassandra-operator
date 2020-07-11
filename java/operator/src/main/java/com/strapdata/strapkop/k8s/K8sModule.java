@@ -27,6 +27,8 @@ import io.kubernetes.client.util.KubeConfig;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -36,6 +38,8 @@ import java.io.IOException;
 @Factory
 public class K8sModule {
 
+    private static final Logger logger = LoggerFactory.getLogger(K8sModule.class);
+
     private final ApiClient apiClient;
     private final ApiClient watchClient;
     private final ApiClient debuggableApiClient;
@@ -43,16 +47,20 @@ public class K8sModule {
     public K8sModule(ApplicationContext applicationContext) throws IOException {
 
         if (applicationContext.getEnvironment().getActiveNames().contains("k8s")) {
+            logger.info("Kube cluster={}:{}", System.getenv(Config.ENV_SERVICE_HOST), System.getenv(Config.ENV_SERVICE_PORT));
             this.apiClient = ClientBuilder.cluster().build();
 
             // set the global default api-client to the in-cluster one from above
             Configuration.setDefaultApiClient(apiClient);
         } else {
-            // file path to your KubeConfig
-            String kubeConfigPath = "~/.kube/config";
-
             // loading the out-of-cluster config, a kubeconfig from file-system
-            this.apiClient = ClientBuilder.kubeconfig(KubeConfig.loadKubeConfig(new FileReader(kubeConfigPath))).build();
+            String kubeConfigPath = "~/.kube/config";
+            if (System.getenv("KUBE_CONFIG") != null)
+                kubeConfigPath = System.getenv("KUBE_CONFIG");
+
+            KubeConfig kubeConfig = KubeConfig.loadKubeConfig(new FileReader(kubeConfigPath.replaceFirst("^~", System.getProperty("user.home"))));
+            logger.info("Kube context={}", kubeConfig.getCurrentContext());
+            this.apiClient = ClientBuilder.kubeconfig(kubeConfig).build();
 
             // set the global default api-client to the in-cluster one from above
             Configuration.setDefaultApiClient(apiClient);
@@ -83,20 +91,16 @@ public class K8sModule {
 
     @Bean
     @Singleton
-    public ApiextensionsV1beta1Api providesApiExtensionsV1beta1Api() {
-        return new ApiextensionsV1beta1Api(apiClient);
-    }
+    public NetworkingV1beta1Api providesNetworkingV1beta1Api() { return new NetworkingV1beta1Api(apiClient); }
+
+    @Bean
+    @Singleton
+    public ApiextensionsV1Api provideApiextensionsV1Api() { return new ApiextensionsV1Api(apiClient); }
 
     @Bean
     @Singleton
     public CustomObjectsApi provideCustomObjectsApi() {
         return new CustomObjectsApi(apiClient);
-    }
-
-    @Bean
-    @Singleton
-    public ExtensionsV1beta1Api provideExtensionsV1beta1Api() {
-        return new ExtensionsV1beta1Api(apiClient);
     }
 
     @Bean

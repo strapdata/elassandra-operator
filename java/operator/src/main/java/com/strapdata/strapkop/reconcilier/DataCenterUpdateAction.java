@@ -136,7 +136,7 @@ public class DataCenterUpdateAction {
 
     private final StatefulsetCache statefulsetCache;
     private final DataCenterStatusCache dataCenterStatusCache;
-    private final  SharedIndexInformer<V1ServiceAccount> saSharedIndexInformer;
+    private final SharedIndexInformer<V1ServiceAccount> saSharedIndexInformer;
 
     final SharedInformerFactory sharedInformerFactory;
 
@@ -300,7 +300,7 @@ public class DataCenterUpdateAction {
                     if (dataCenterStatus.getRackStatuses().isEmpty() && !zones.zoneMap.isEmpty()) {
                         // choose the first k8s node, and build config and sts
                         RackStatus rackStatus = new RackStatus()
-                                .withDesiredReplicas(1)
+                                .withReplicas(1)
                                 .withHealth(Health.RED)
                                 .withIndex(0)
                                 .withName(zones.zoneMap.navigableKeySet().first())
@@ -386,6 +386,10 @@ public class DataCenterUpdateAction {
                     .map(r -> ObjectUtils.defaultIfNull(r.getReadyReplicas(), 0))
                     .reduce(0, (a, b) -> a + b);
             dataCenterStatus.setReadyReplicas(totalReadyReplicas);
+            int totalReplicas = dataCenterStatus.getRackStatuses().values().stream()
+                    .map(r -> ObjectUtils.defaultIfNull(r.getReplicas(), 0))
+                    .reduce(0, (a, b) -> a + b);
+            dataCenterStatus.setReplicas(totalReplicas);
             dataCenterStatus.setHealth(dataCenterStatus.health());
         }).andThen(nextAction(true));
     }
@@ -460,7 +464,7 @@ public class DataCenterUpdateAction {
 
                     // check if need to scale up or down
                     int totalReplicas = dataCenterStatus.getRackStatuses().values().stream()
-                            .map(r -> r.getDesiredReplicas())
+                            .map(r -> r.getReplicas())
                             .reduce(0, (a, b) -> a + b);
                     if (totalReplicas < dataCenter.getSpec().getReplicas() && Health.GREEN.equals(dataCenterStatus.health()))
                         return scaleUpDatacenter(configMapVolumeMounts);
@@ -540,7 +544,7 @@ public class DataCenterUpdateAction {
             RackStatus rackStatus = dataCenterStatus.getRackStatuses().get(rackIndex);
             logger.debug("DataCenter={} UNPARKING rack={}", dataCenter.id(), rackStatus);
 
-            v1StatefulSet.getSpec().setReplicas(rackStatus.getDesiredReplicas());
+            v1StatefulSet.getSpec().setReplicas(rackStatus.getReplicas());
             todoList.add(k8sResourceUtils.replaceNamespacedStatefulSet(v1StatefulSet).ignoreElement());
         }
         return Completable.mergeArray(todoList.toArray(new CompletableSource[todoList.size()]))
@@ -570,7 +574,7 @@ public class DataCenterUpdateAction {
                     .setName(zone.name)
                     .setIndex(idx)
                     .setHealth(Health.RED)
-                    .withDesiredReplicas(1)
+                    .withReplicas(1)
                     .withFingerprint(configMapVolumeMounts.fingerPrint()));
             logger.debug("datacenter={} SCALE_UP started in rack={} rackIndex={} zones.size={}",
                     dataCenter.id(), rackStatus.getName(), rackStatus.getIndex(), zone.size);
@@ -597,8 +601,8 @@ public class DataCenterUpdateAction {
                 .setIndex(idx)
                 .setHealth(Health.RED)
                 .withFingerprint(configMapVolumeMounts.fingerPrint()));
-        rackStatus.setDesiredReplicas(sts.getSpec().getReplicas());
-        logger.debug("datacenter={} SCALE_UP started in rack={} desiredReplicas={}", dataCenter.id(), rackStatus.getName(), rackStatus.getDesiredReplicas());
+        rackStatus.setReplicas(sts.getSpec().getReplicas());
+        logger.debug("datacenter={} SCALE_UP started in rack={} desiredReplicas={}", dataCenter.id(), rackStatus.getName(), rackStatus.getReplicas());
 
         // call ConfigMapVolumeMount here to update seeds in case of single rack with multi-nodes
         configMapVolumeMounts.setRack(rackStatus);
@@ -643,7 +647,7 @@ public class DataCenterUpdateAction {
                             ));
         }
 
-        rackStatus.setDesiredReplicas(sts.getSpec().getReplicas() - 1);
+        rackStatus.setReplicas(sts.getSpec().getReplicas() - 1);
         sts.getSpec().setReplicas(sts.getSpec().getReplicas() - 1);
 
         configMapVolumeMounts.setRack(rackStatus);
@@ -1302,10 +1306,10 @@ public class DataCenterUpdateAction {
             }
 
             // heap size and GC settings
-            if (dataCenterSpec.getJvm().isComputeJvmMemorySettings() && dataCenterSpec.getResources() != null) {
-                Map<String, Quantity> resourceQuantity = Optional.ofNullable(dataCenterSpec.getResources().getRequests()).orElse(dataCenterSpec.getResources().getLimits());
-                final long memoryLimit = QuantityConverter.toMegaBytes(resourceQuantity.get("memory"));
-                final long coreCount = QuantityConverter.toCpu(resourceQuantity.get("cpu"));
+            if (dataCenterSpec.getJvm().isComputeJvmMemorySettings() && dataCenterSpec.getResources() != null && dataCenterSpec.getResources().getLimits() != null) {
+                Map<String, Quantity> resourceLimitsQuantity = dataCenterSpec.getResources().getLimits();
+                final long memoryLimit = QuantityConverter.toMegaBytes(resourceLimitsQuantity.get("memory"));
+                final long coreCount = QuantityConverter.toCpu(resourceLimitsQuantity.get("cpu"));
 
                 // same as stock cassandra-env.sh
                 final double jvmHeapSizeInMb = Math.max(
@@ -1320,7 +1324,7 @@ public class DataCenterUpdateAction {
 
                 logger.debug("cluster={} dc={} namespace={} memoryLimit={} cpuLimit={} coreCount={} jvmHeapSizeInMb={} youngGenSizeInMb={}",
                         dataCenterSpec.getClusterName(), dataCenterSpec.getDatacenterName(), dataCenterMetadata.getNamespace(),
-                        memoryLimit, resourceQuantity.get("cpu").getNumber(), coreCount, jvmHeapSizeInMb, youngGenSizeInMb);
+                        memoryLimit, resourceLimitsQuantity.get("cpu").getNumber(), coreCount, jvmHeapSizeInMb, youngGenSizeInMb);
 
                 if (jvmHeapSizeInMb < 1.2 * 1024) {
                     logger.warn("Cannot deploy elassandra with less than 1.2Gb heap, please increase your kubernetes memory limits if you are in production environment");
@@ -1855,7 +1859,7 @@ public class DataCenterUpdateAction {
                     // if the serviceName references a headless service, kubeDNS to create an A record for
                     // each pod : $(podName).$(serviceName).$(namespace).svc.cluster.local
                     .serviceName(OperatorNames.nodesService(dataCenter))
-                    .replicas(rackStatus.getDesiredReplicas())
+                    .replicas(rackStatus.getReplicas())
                     .selector(new V1LabelSelector().matchLabels(rackLabels))
                     .template(new V1PodTemplateSpec()
                             .metadata(templateMetadata)
@@ -1883,6 +1887,8 @@ public class DataCenterUpdateAction {
                             .storageClassName(storageClassName);
                     statefulSetSpec.setVolumeClaimTemplates(ImmutableList.of(new V1PersistentVolumeClaim()
                             .metadata(new V1ObjectMeta().name("data-volume")).spec(v1PersistentVolumeClaimSpec)));
+                } else {
+                    logger.warn("datacenter={} No dataVolumeClaim found", dataCenter.id());
                 }
             }
 

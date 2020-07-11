@@ -63,81 +63,99 @@ public class ValidationController {
         }
     }
 
+    private AdmissionReview failedAdminssionReview(AdmissionReview admissionReview, Throwable t) {
+        Status status = new Status();
+        status.setCode(400);
+        status.setMessage(t.getMessage());
+        return new AdmissionReviewBuilder()
+                .withApiVersion(admissionReview.getApiVersion())
+                .withResponse(new AdmissionResponseBuilder()
+                        .withAllowed(false)
+                        .withStatus(status)
+                        .withUid(admissionReview.getRequest().getUid()).build())
+                .build();
+    }
+
     /**
      * Use the fabric8 datacenter for webhook admission.
+     *
      * @param admissionReview
      * @return
      * @throws ApiException
      */
-    @Post(value = "/", consumes = MediaType.APPLICATION_JSON)
+    @Post(value = "/", consumes = MediaType.APPLICATION_JSON, produces = MediaType.APPLICATION_JSON)
     public Single<AdmissionReview> validate(@QueryValue("timeout") Duration timeout,
-                                            @Body AdmissionReview admissionReview) throws ApiException {
-        logger.warn("input admissionReview={}", admissionReview);
-        com.strapdata.strapkop.model.fabric8.datacenter.DataCenter datacenter = (com.strapdata.strapkop.model.fabric8.datacenter.DataCenter) admissionReview.getRequest().getObject();
-        DataCenterSpec dataCenterSpec = datacenter.getSpec();
+                                            @Body AdmissionReview admissionReview) {
+        logger.debug("Validating admissionReview={}", admissionReview);
+        try {
+            com.strapdata.strapkop.model.fabric8.datacenter.DataCenter datacenter = (com.strapdata.strapkop.model.fabric8.datacenter.DataCenter) admissionReview.getRequest().getObject();
+            DataCenterSpec dataCenterSpec = datacenter.getSpec();
+            Key dcKey = new Key(admissionReview.getRequest().getNamespace(), admissionReview.getRequest().getName());
 
-        if (admissionReview.getRequest().getName() == null) {
-            checkDatacenterSpecConsistency(dataCenterSpec);
-            // resource created.
-            return Single.just(new AdmissionReviewBuilder()
-                    .withResponse(new AdmissionResponseBuilder()
-                            .withAllowed(true)
-                            .withUid(admissionReview.getRequest().getUid()).build())
-                    .build());
-        }
-
-        Key dcKey = new Key(admissionReview.getRequest().getNamespace(), admissionReview.getRequest().getName());
-        return k8sResourceUtils.readDatacenter(dcKey)
-                .map(deployedDc -> {
-                    // Attempt to change the clusterName
-                    if (!deployedDc.getSpec().getClusterName().equals(dataCenterSpec.getClusterName())) {
-                        throw new IllegalArgumentException("Cannot change the cassandra cluster name");
-                    }
-
-                    // Attempt to change the datacenterName
-                    if (!deployedDc.getSpec().getDatacenterName().equals(dataCenterSpec.getDatacenterName())) {
-                        throw new IllegalArgumentException("Cannot change the cassandra datacenter name");
-                    }
-
-                    // Attempt to change the storageClassName
-                    if (!deployedDc.getSpec().getDataVolumeClaim().getStorageClassName().equals(dataCenterSpec.getDataVolumeClaim().getStorageClassName())) {
-                        throw new IllegalArgumentException("Cannot change the storageClassName");
-                    }
-
-                    // Attempt to change cassandra ssl storage ports
-                    if (!deployedDc.getSpec().getCassandra().getSslStoragePort().equals(dataCenterSpec.getCassandra().getSslStoragePort())) {
-                        throw new IllegalArgumentException("Cannot change the cassandra.sslStoragePort");
-                    }
-                    // Attempt to change cassandra storage ports
-                    if (!deployedDc.getSpec().getCassandra().getStoragePort().equals(dataCenterSpec.getCassandra().getStoragePort())) {
-                        throw new IllegalArgumentException("Cannot change the cassandra.storagePort");
-                    }
-                    // Attempt to change elasticsearch transport port
-                    if (!deployedDc.getSpec().getElasticsearch().getTransportPort().equals(dataCenterSpec.getElasticsearch().getTransportPort())) {
-                        throw new IllegalArgumentException("Cannot change the elasticsearch.transportPort");
-                    }
-
-                    // check dc spec consistency
+            if (admissionReview.getRequest().getOldObject() == null) {
+                try {
                     checkDatacenterSpecConsistency(dataCenterSpec);
-
-                    logger.debug("Accept datacenter={}", datacenter);
-                    return new AdmissionReviewBuilder()
+                    logger.info("Accept dc={}", dcKey);
+                    return Single.just(new AdmissionReviewBuilder()
+                            .withApiVersion(admissionReview.getApiVersion())
                             .withResponse(new AdmissionResponseBuilder()
                                     .withAllowed(true)
                                     .withUid(admissionReview.getRequest().getUid()).build())
-                            .build();
-                })
-                .onErrorReturn(t -> {
-                    logger.warn("Invalid datacenter key=" + dcKey, t);
-                    Status status = new Status();
-                    status.setCode(400);
-                    status.setMessage(t.getMessage());
-                    return new AdmissionReviewBuilder()
-                            .withResponse(new AdmissionResponseBuilder()
-                                    .withAllowed(false)
-                                    .withStatus(status)
-                                    .withUid(admissionReview.getRequest().getUid()).build())
-                            .build();
-                });
+                            .build());
+                } catch (Throwable t) {
+                    logger.warn("Admission failed dc=" + dcKey + ":", t);
+                    return Single.just(failedAdminssionReview(admissionReview, t));
+                }
+            }
+
+            return k8sResourceUtils.readDatacenter(dcKey)
+                    .map(deployedDc -> {
+                        // Attempt to change the clusterName
+                        if (!deployedDc.getSpec().getClusterName().equals(dataCenterSpec.getClusterName())) {
+                            throw new IllegalArgumentException("Cannot change the cassandra cluster name");
+                        }
+
+                        // Attempt to change the datacenterName
+                        if (!deployedDc.getSpec().getDatacenterName().equals(dataCenterSpec.getDatacenterName())) {
+                            throw new IllegalArgumentException("Cannot change the cassandra datacenter name");
+                        }
+
+                        // Attempt to change the storageClassName
+                        if (!deployedDc.getSpec().getDataVolumeClaim().getStorageClassName().equals(dataCenterSpec.getDataVolumeClaim().getStorageClassName())) {
+                            throw new IllegalArgumentException("Cannot change the storageClassName");
+                        }
+
+                        // Attempt to change cassandra ssl storage ports
+                        if (!deployedDc.getSpec().getCassandra().getSslStoragePort().equals(dataCenterSpec.getCassandra().getSslStoragePort())) {
+                            throw new IllegalArgumentException("Cannot change the cassandra.sslStoragePort");
+                        }
+                        // Attempt to change cassandra storage ports
+                        if (!deployedDc.getSpec().getCassandra().getStoragePort().equals(dataCenterSpec.getCassandra().getStoragePort())) {
+                            throw new IllegalArgumentException("Cannot change the cassandra.storagePort");
+                        }
+                        // Attempt to change elasticsearch transport port
+                        if (!deployedDc.getSpec().getElasticsearch().getTransportPort().equals(dataCenterSpec.getElasticsearch().getTransportPort())) {
+                            throw new IllegalArgumentException("Cannot change the elasticsearch.transportPort");
+                        }
+
+                        // check dc spec consistency
+                        checkDatacenterSpecConsistency(dataCenterSpec);
+
+                        logger.info("Accept dc={}", dcKey);
+                        return new AdmissionReviewBuilder()
+                                .withApiVersion(admissionReview.getApiVersion())
+                                .withResponse(new AdmissionResponseBuilder()
+                                        .withAllowed(true)
+                                        .withUid(admissionReview.getRequest().getUid()).build())
+                                .build();
+                    })
+                    .onErrorReturn(t -> {
+                        logger.warn("Admission failed dc=" + dcKey + ":", t);
+                        return failedAdminssionReview(admissionReview, t);
+                    });
+        } catch(Throwable t) {
+            logger.warn("Admission failed dc=" + admissionReview.getRequest().getNamespace() +"/" + admissionReview.getRequest().getName() + ":", t);
+            return Single.just(failedAdminssionReview(admissionReview, t));
+        }
     }
 }

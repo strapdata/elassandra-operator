@@ -20,8 +20,8 @@ package com.strapdata.strapkop.preflight;
 import com.strapdata.strapkop.k8s.K8sController;
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
 import io.kubernetes.client.openapi.ApiException;
-import io.kubernetes.client.openapi.apis.ApiextensionsV1beta1Api;
-import io.kubernetes.client.openapi.models.V1beta1CustomResourceDefinition;
+import io.kubernetes.client.openapi.apis.ApiextensionsV1Api;
+import io.kubernetes.client.openapi.models.V1CustomResourceDefinition;
 import io.kubernetes.client.util.Yaml;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +39,7 @@ public class CreateCustomResourceDefinitions implements Preflight<Void> {
     static final Logger logger = LoggerFactory.getLogger(CreateCustomResourceDefinitions.class);
 
     @Inject
-    ApiextensionsV1beta1Api apiExtensionsApi;
+    ApiextensionsV1Api apiExtensionsApi;
 
     @Inject
     K8sController kubernetesController;
@@ -56,7 +56,7 @@ public class CreateCustomResourceDefinitions implements Preflight<Void> {
         try (final InputStream resourceStream = StrapdataCrdGroup.class.getResourceAsStream(resourceName);
              final InputStreamReader resourceReader = new InputStreamReader(resourceStream);) {
 
-            final V1beta1CustomResourceDefinition crdDefinition = Yaml.loadAs(resourceReader, V1beta1CustomResourceDefinition.class);
+            final V1CustomResourceDefinition crdDefinition = Yaml.loadAs(resourceReader, V1CustomResourceDefinition.class);
             final String crdName = crdDefinition.getMetadata().getName();
 
             try {
@@ -67,6 +67,7 @@ public class CreateCustomResourceDefinitions implements Preflight<Void> {
                     logger.info("Custom Resource Definition {} already exists.", crdName);
                     return;
                 }
+                logger.warn("error code=" + e.getCode() + " body=" + e.getResponseBody(), e);
                 throw e;
             }
         }

@@ -520,45 +520,45 @@ public class ReaperPlugin extends AbstractPlugin {
             dataCenterSpec.getReaper().getIngressAnnotations().entrySet().stream()
                     .map(e -> ingressMeta.putAnnotationsItem(e.getKey(), e.getValue()));
         }
-        final ExtensionsV1beta1Ingress ingress;
+        final NetworkingV1beta1Ingress ingress;
         if (!Strings.isNullOrEmpty(dataCenterSpec.getReaper().getIngressHost()) || !Strings.isNullOrEmpty(dataCenterSpec.getReaper().getIngressAdminHost())) {
             String reaperAppHost = dataCenterSpec.getReaper().getIngressHost();
             String reaperAdminHost = dataCenterSpec.getReaper().getIngressAdminHost();
             logger.info("Creating reaper ingress for reaperAppHost={} reaperAdminHost={}", reaperAppHost, reaperAdminHost);
-            ExtensionsV1beta1IngressSpec extensionsV1beta1IngressSpec = new ExtensionsV1beta1IngressSpec();
+            NetworkingV1beta1IngressSpec networkingV1beta1IngressSpec = new NetworkingV1beta1IngressSpec();
             if (!Strings.isNullOrEmpty(dataCenterSpec.getReaper().getIngressHost())) {
-                extensionsV1beta1IngressSpec
-                        .addRulesItem(new ExtensionsV1beta1IngressRule()
+                networkingV1beta1IngressSpec
+                        .addRulesItem(new NetworkingV1beta1IngressRule()
                                 .host(reaperAppHost)
-                                .http(new ExtensionsV1beta1HTTPIngressRuleValue()
-                                        .addPathsItem(new ExtensionsV1beta1HTTPIngressPath()
+                                .http(new NetworkingV1beta1HTTPIngressRuleValue()
+                                        .addPathsItem(new NetworkingV1beta1HTTPIngressPath()
                                                 .path("/")
-                                                .backend(new ExtensionsV1beta1IngressBackend()
+                                                .backend(new NetworkingV1beta1IngressBackend()
                                                         .serviceName(reaperName(dataCenter))
                                                         .servicePort(new IntOrString(APP_SERVICE_PORT)))
                                         )
                                 )
                         )
-                        .addTlsItem(new ExtensionsV1beta1IngressTLS().addHostsItem(reaperAppHost));
+                        .addTlsItem(new NetworkingV1beta1IngressTLS().addHostsItem(reaperAppHost));
             }
             if (!Strings.isNullOrEmpty(dataCenterSpec.getReaper().getIngressAdminHost())) {
-                extensionsV1beta1IngressSpec
-                        .addRulesItem(new ExtensionsV1beta1IngressRule()
+                networkingV1beta1IngressSpec
+                        .addRulesItem(new NetworkingV1beta1IngressRule()
                                 .host(reaperAdminHost)
-                                .http(new ExtensionsV1beta1HTTPIngressRuleValue()
-                                        .addPathsItem(new ExtensionsV1beta1HTTPIngressPath()
+                                .http(new NetworkingV1beta1HTTPIngressRuleValue()
+                                        .addPathsItem(new NetworkingV1beta1HTTPIngressPath()
                                                 .path("/")
-                                                .backend(new ExtensionsV1beta1IngressBackend()
+                                                .backend(new NetworkingV1beta1IngressBackend()
                                                         .serviceName(reaperName(dataCenter))
                                                         .servicePort(new IntOrString(ADMIN_SERVICE_PORT)))
                                         )
                                 )
                         )
-                        .addTlsItem(new ExtensionsV1beta1IngressTLS().addHostsItem(reaperAdminHost));
+                        .addTlsItem(new NetworkingV1beta1IngressTLS().addHostsItem(reaperAdminHost));
             }
-            ingress = new ExtensionsV1beta1Ingress()
+            ingress = new NetworkingV1beta1Ingress()
                     .metadata(ingressMeta)
-                    .spec(extensionsV1beta1IngressSpec);
+                    .spec(networkingV1beta1IngressSpec);
         } else {
             ingress = null;
         }

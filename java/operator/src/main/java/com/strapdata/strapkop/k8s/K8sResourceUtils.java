@@ -68,7 +68,7 @@ public class K8sResourceUtils {
     protected CustomObjectsApi customObjectsApi;
 
     @Inject
-    protected ExtensionsV1beta1Api extensionsV1beta1Api;
+    protected NetworkingV1beta1Api networkingV1beta1Api;
 
     @Inject
     protected PolicyV1beta1Api policyV1beta1Api;
@@ -80,7 +80,6 @@ public class K8sResourceUtils {
     public interface ApiCallable {
         void call() throws ApiException;
     }
-
 
     public static <T> Single<Iterable<T>> listNamespacedResources(String namespace, K8sSupplier<Iterable<T>> lister) {
         return Single.fromCallable(new Callable<Iterable<T>>() {
@@ -225,10 +224,10 @@ public class K8sResourceUtils {
                 () -> coreApi.createNamespacedService(namespace, service, null, null, null));
     }
 
-    public Single<ExtensionsV1beta1Ingress> createOrReplaceNamespacedIngress(final ExtensionsV1beta1Ingress ingress) throws ApiException {
+    public Single<NetworkingV1beta1Ingress> createOrReplaceNamespacedIngress(final NetworkingV1beta1Ingress ingress) throws ApiException {
         final String namespace = ingress.getMetadata().getNamespace();
         return createOrReplaceResource(namespace, ingress,
-                () -> extensionsV1beta1Api.createNamespacedIngress(namespace, ingress, null, null, null),
+                () -> networkingV1beta1Api.createNamespacedIngress(namespace, ingress, null, null, null),
                 () -> {
                     // CANNOT UPDATE ingres (like service)
                     // extensionsV1beta1Api.replaceNamespacedIngress(ingress.getMetadata().getName(), ingress.getMetadata().getNamespace(), ingress, null, null)
@@ -470,7 +469,7 @@ public class K8sResourceUtils {
         return Completable.fromAction(new Action() {
             @Override
             public void run() throws Exception {
-                for(ExtensionsV1beta1Ingress ingress : listNamespacedIngress(namespace, null, labelSelector)) {
+                for(NetworkingV1beta1Ingress ingress : listNamespacedIngress(namespace, null, labelSelector)) {
                     try {
                         deleteIngress(ingress);
                         logger.debug("Deleted Ingress namespace={} name={}", ingress.getMetadata().getNamespace(), ingress.getMetadata().getName());
@@ -482,9 +481,9 @@ public class K8sResourceUtils {
         });
     }
 
-    public V1Status deleteIngress(final ExtensionsV1beta1Ingress ingress) throws ApiException {
+    public V1Status deleteIngress(final NetworkingV1beta1Ingress ingress) throws ApiException {
             final V1ObjectMeta metadata = ingress.getMetadata();
-            return extensionsV1beta1Api.deleteNamespacedIngress(metadata.getName(), metadata.getNamespace(), null, null, null, null, null, new V1DeleteOptions());
+            return networkingV1beta1Api.deleteNamespacedIngress(metadata.getName(), metadata.getNamespace(), null, null, null, null, null, new V1DeleteOptions());
     }
 
     public V1Status deleteConfigMap(final V1ConfigMap configMap) throws ApiException {
@@ -544,8 +543,8 @@ public class K8sResourceUtils {
                     logger.debug("Deleting DataCenter namespace={} name={}", metadata.getNamespace(), metadata.getName());
                     V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
                     Call call = customObjectsApi.deleteNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, DataCenter.VERSION,
-                            metadata.getNamespace(), DataCenter.PLURAL, metadata.getName(), deleteOptions,
-                            null, null, "Foreground", null);
+                            metadata.getNamespace(), DataCenter.PLURAL, metadata.getName(), null,
+                            null, null, "Foreground", deleteOptions, null);
                     final ApiResponse<DataCenter> apiResponse = customObjectsApi.getApiClient().execute(call, DataCenter.class);
                     return apiResponse.getData();
                 } catch (ApiException e) {
@@ -848,21 +847,21 @@ public class K8sResourceUtils {
         return new ResourceListIterable<>(firstPage);
     }
 
-    public Iterable<ExtensionsV1beta1Ingress> listNamespacedIngress(final String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) throws ApiException {
-        class V1IngressPage implements ResourceListIterable.Page<ExtensionsV1beta1Ingress> {
-            private final ExtensionsV1beta1IngressList ingressList;
+    public Iterable<NetworkingV1beta1Ingress> listNamespacedIngress(final String namespace, @Nullable final String fieldSelector, @Nullable final String labelSelector) throws ApiException {
+        class V1IngressPage implements ResourceListIterable.Page<NetworkingV1beta1Ingress> {
+            private final NetworkingV1beta1IngressList ingressList;
 
             private V1IngressPage(final String continueToken) throws ApiException {
-                ingressList = extensionsV1beta1Api.listNamespacedIngress(namespace, null, null, continueToken, fieldSelector, labelSelector, null, null, null, false);
+                ingressList = networkingV1beta1Api.listNamespacedIngress(namespace, null, null, continueToken, fieldSelector, labelSelector, null, null, null, false);
             }
 
             @Override
-            public Collection<ExtensionsV1beta1Ingress> items() {
+            public Collection<NetworkingV1beta1Ingress> items() {
                 return ingressList.getItems();
             }
 
             @Override
-            public ResourceListIterable.Page<ExtensionsV1beta1Ingress> nextPage() throws ApiException {
+            public ResourceListIterable.Page<NetworkingV1beta1Ingress> nextPage() throws ApiException {
                 final String continueToken = ingressList.getMetadata().getContinue();
 
                 if (Strings.isNullOrEmpty(continueToken))
@@ -1001,24 +1000,22 @@ public class K8sResourceUtils {
      */
 
     public Single<DataCenterStatus> updateDataCenterStatus(final DataCenter dc, final DataCenterStatus dcStatus) {
-        // read before write to avoid 409 conflict
         final Key key = new Key(dc.getMetadata());
-        return readDatacenter(key)
-                .map(currentDc -> {
-                    currentDc.setStatus(dcStatus);
-                    return currentDc;
-                })
-                .flatMap(currentDc ->
-                        Single.fromCallable(new Callable<DataCenterStatus>() {
-                            @Override
-                            public DataCenterStatus call() throws Exception {
-                                customObjectsApi.replaceNamespacedCustomObjectStatus(StrapdataCrdGroup.GROUP, DataCenter.VERSION,
-                                        dc.getMetadata().getNamespace(), DataCenter.PLURAL, dc.getMetadata().getName(), currentDc);
-                                dataCenterStatusCache.put(key, currentDc.getStatus());
-                                return currentDc.getStatus();
-                            }
-                        })
-                );
+        return Single.fromCallable(new Callable<DataCenterStatus>() {
+            @Override
+            public DataCenterStatus call() throws Exception {
+                try {
+                    dc.setStatus(dcStatus);
+                    customObjectsApi.replaceNamespacedCustomObjectStatus(StrapdataCrdGroup.GROUP, DataCenter.VERSION,
+                            dc.getMetadata().getNamespace(), DataCenter.PLURAL, dc.getMetadata().getName(), dc, null, "elassandra-operator");
+                    dataCenterStatusCache.put(key, dc.getStatus());
+                    return dc.getStatus();
+                } catch (ApiException e) {
+                    logger.warn("error code=" + e.getCode() + " body=" + e.getResponseBody(), e);
+                    throw e;
+                }
+            }
+        });
     }
 
 
@@ -1035,7 +1032,7 @@ public class K8sResourceUtils {
                 })
                 .flatMap(task2 -> Single.fromCallable(() ->
                         customObjectsApi.replaceNamespacedCustomObjectStatus(StrapdataCrdGroup.GROUP, Task.VERSION,
-                            task2.getMetadata().getNamespace(), Task.PLURAL, task2.getMetadata().getName(), task2)));
+                            task2.getMetadata().getNamespace(), Task.PLURAL, task2.getMetadata().getName(), task2, null, null)));
     }
 
     /*
@@ -1071,7 +1068,7 @@ public class K8sResourceUtils {
             public Task call() throws Exception {
                 try {
                     final Call call = customObjectsApi.createNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, Task.VERSION,
-                            task.getMetadata().getNamespace(), Task.PLURAL, task, null, null);
+                            task.getMetadata().getNamespace(), Task.PLURAL, task, null, null, null, null);
                     final ApiResponse<Task> apiResponse = customObjectsApi.getApiClient().execute(call, Task.class);
                     return apiResponse.getData();
                 } catch(ApiException e) {
@@ -1106,8 +1103,8 @@ public class K8sResourceUtils {
                     logger.debug("Deleting DataCenter namespace={} name={}", metadata.getNamespace(), metadata.getName());
                     V1DeleteOptions deleteOptions = new V1DeleteOptions().propagationPolicy("Foreground");
                     Call call = customObjectsApi.deleteNamespacedCustomObjectCall(StrapdataCrdGroup.GROUP, Task.VERSION,
-                            metadata.getNamespace(), Task.PLURAL, metadata.getName(), deleteOptions,
-                            null, null, "Foreground", null);
+                            metadata.getNamespace(), Task.PLURAL, metadata.getName(), null,
+                            null, null, "Foreground", deleteOptions, null);
                     final ApiResponse<Task> apiResponse = customObjectsApi.getApiClient().execute(call, Task.class);
                     return apiResponse.getData();
                 } catch (ApiException e) {
