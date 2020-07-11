@@ -76,14 +76,25 @@ Publish the docker images (operator + elassandra + cassandra reaper):
 ./gradlew dockerPush -PregistryUsername=$DOCKER_USERNAME -PregistryPassword=$DOCKER_PASSWORD -PregistryUrl=$REGISTRY_URL
 ```
 
-Publish in local insecure registry
+Publish in local insecure registry:
 ```bash
 ./gradlew dockerPush -PregistryUrl="localhost:5000" -PregistryInsecure
 ```
 
 Build parameters are located in `gradle.properties`.
 
-### Testing
+### Run
+
+You can deploy the Elassandra-Operator into your Kubernetes cluster as a single pod deployment (see the HELM chart), 
+or run it outside the Kubernetes cluster, mainly for dev purposes:
+```bash
+./gradlew runLocal
+```
+
+When running outside the Kubernetes cluster, webhook validation is not possible, and the operator listen
+for incoming HTTP connections on port 8080 (see the java/operator/gradle.build).
+
+### Integration Tests
 
 We uses [TravisCI](.travis.yml) to build and run automated integration tests on [Kind](https://kind.sigs.k8s.io/docs/user/quick-start/).
 You can also run these [integration tests](integ-test) on GKE or AKS.
