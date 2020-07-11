@@ -21,7 +21,6 @@ package com.strapdata.strapkop.model.fabric8.task;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.strapdata.strapkop.model.k8s.task.BackupTaskSpec;
-import com.strapdata.strapkop.model.k8s.task.TestTaskSpec;
 import io.fabric8.kubernetes.api.model.KubernetesResource;
 import lombok.*;
 
