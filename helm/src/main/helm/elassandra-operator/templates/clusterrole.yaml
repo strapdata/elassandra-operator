@@ -43,12 +43,6 @@ rules:
   - configmaps
   - secrets
   verbs: ['*']
-- apiGroups:
-  - policy
-  resources:
-  - poddisruptionbudgets
-  - poddisruptionbudgets/status
-  verbs: ['get', 'create', 'update', 'delete', 'list']
 - apiGroups: ['']
   resources:
   - pods
@@ -62,10 +56,16 @@ rules:
   - persistentvolumes
   verbs: ['get', 'create', 'update', 'delete', 'list']
 - apiGroups:
-  - extensions
+  - "extensions"
+  - "networking.k8s.io"
   resources:
-    - ingress
-    - ingresses
+  - ingresses
+  verbs: ['get', 'create', 'update', 'delete', 'list']
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  - poddisruptionbudgets/status
   verbs: ['get', 'create', 'update', 'delete', 'list']
 - nonResourceURLs: ["/version", "/version/*"]
   verbs: ['get']
