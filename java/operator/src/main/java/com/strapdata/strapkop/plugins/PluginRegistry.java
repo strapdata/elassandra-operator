@@ -20,6 +20,7 @@ package com.strapdata.strapkop.plugins;
 import com.google.common.collect.ImmutableList;
 import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
 import com.strapdata.strapkop.reconcilier.DataCenterUpdateAction;
+import io.kubernetes.client.openapi.ApiException;
 import io.reactivex.Completable;
 import io.reactivex.Single;
 import org.slf4j.Logger;
@@ -72,9 +73,16 @@ public class PluginRegistry {
             try {
                 pluginSingles.add(plugin.reconcile(dataCenterUpdateAction)
                         .onErrorResumeNext(t -> {
-                            logger.warn("datacenter="+dataCenterUpdateAction.dataCenter.id()+
-                                            " plugin="+plugin.getClass().getName()+
-                                            " reconcile failed, error:", t);
+                            if (t instanceof ApiException) {
+                                ApiException e = (ApiException) t;
+                                logger.warn("datacenter=" + dataCenterUpdateAction.dataCenter.id() +
+                                        " plugin=" + plugin.getClass().getName() +
+                                        " reconcile failed, error code=" + e.getCode() + " body="+ e.getResponseBody(), e);
+                            } else {
+                                logger.warn("datacenter=" + dataCenterUpdateAction.dataCenter.id() +
+                                        " plugin=" + plugin.getClass().getName() +
+                                        " reconcile failed, error:", t);
+                            }
                             return Single.just(false);
                         }));
             } catch (Exception e) {
