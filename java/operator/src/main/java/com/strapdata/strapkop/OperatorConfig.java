@@ -68,4 +68,9 @@ public class OperatorConfig {
      * CQL schema agreement wait in seconds
      */
     int maxSchemaAgreementWaitSeconds = 30;
+
+    /**
+     * Run the sysctl init container if true.
+     */
+    Boolean runSysctl;
 }

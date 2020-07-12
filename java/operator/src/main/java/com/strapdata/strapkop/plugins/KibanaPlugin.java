@@ -220,7 +220,7 @@ public class KibanaPlugin extends AbstractPlugin {
                             logger.debug("Deploying kibana space={}", kibanaSpace);
                             dataCenterUpdateAction.operation.getActions().add("Deploying kibana space=["+kibanaSpace.name()+"]");
                             dataCenterUpdateAction.dataCenterStatus.getKibanaSpaceNames().add(kibanaSpace.name());
-                            return createOrReplaceKibanaObjects(dataCenter, dataCenterUpdateAction.dataCenterStatus, kibanaSpace);
+                            return createOrReplaceKibanaObjects(dataCenterUpdateAction, kibanaSpace);
                         });
 
         for (V1Deployment deployment : deployments) {
@@ -238,7 +238,7 @@ public class KibanaPlugin extends AbstractPlugin {
                 logger.debug("datacenter={} updating deployment={} replicas={}", dataCenter.id(), deployment.getMetadata().getName(), replicas);
                 dataCenterUpdateAction.operation.getActions().add("Updating kibana space=["+kibanaSpace.name()+"]");
                 deployment.getSpec().setReplicas(replicas);
-                createCompletable = createCompletable.andThen(createOrReplaceKibanaObjects(dataCenter, dataCenterUpdateAction.dataCenterStatus, kibanaSpace));
+                createCompletable = createCompletable.andThen(createOrReplaceKibanaObjects(dataCenterUpdateAction, kibanaSpace));
             }
         }
 
@@ -283,17 +283,17 @@ public class KibanaPlugin extends AbstractPlugin {
     }
 
 
-    public Completable createOrReplaceKibanaObjects(final DataCenter dataCenter, final DataCenterStatus dataCenterStatus, KibanaSpace kibanaSpace) throws
+    public Completable createOrReplaceKibanaObjects(final DataCenterUpdateAction dataCenterUpdateAction, KibanaSpace kibanaSpace) throws
             ApiException, StrapkopException {
+        final DataCenter dataCenter = dataCenterUpdateAction.dataCenter;
+        final DataCenterStatus dataCenterStatus = dataCenterUpdateAction.dataCenterStatus;
         final V1ObjectMeta dataCenterMetadata = dataCenter.getMetadata();
         final DataCenterSpec dataCenterSpec = dataCenter.getSpec();
         final Integer version = kibanaSpace.getVersion();
 
         final Map<String, String> labels = kibanaSpaceLabels(dataCenter, kibanaSpace.name());
 
-        final V1ObjectMeta meta = (kibanaSpace.getPodTemplate() != null && kibanaSpace.getPodTemplate().getMetadata() != null
-                ? kibanaSpace.getPodTemplate().getMetadata()
-                : new V1ObjectMeta())
+        final V1ObjectMeta meta = dataCenterUpdateAction.builder.cloneV1ObjectMetaFromPodTemplate(kibanaSpace.getPodTemplate())
                 .name(kibanaNameDc(dataCenter, kibanaSpace))
                 .namespace(dataCenterMetadata.getNamespace());
         for(Map.Entry<String, String> entry : labels.entrySet())
@@ -301,23 +301,10 @@ public class KibanaPlugin extends AbstractPlugin {
         meta.putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, dataCenter.getMetadata().getGeneration().toString());
         meta.putAnnotationsItem(OperatorLabels.KIBANA_SPACE_FINGERPRINT, kibanaSpace.fingerprint(dataCenter.getSpec().getKibana().getImage()));
 
-        final V1Container container = new V1Container();
-        final V1PodSpec kibanaSpacePodSpec = (kibanaSpace.getPodTemplate() != null && kibanaSpace.getPodTemplate().getSpec() != null
-                ? kibanaSpace.getPodTemplate().getSpec()
-                : new V1PodSpec())
-                .addContainersItem(container);
-        final V1PodSpec elassandraPodSpec = (dataCenterSpec.getPodTemplate() != null && dataCenterSpec.getPodTemplate().getSpec() != null
-                ? dataCenterSpec.getPodTemplate().getSpec()
-                : new V1PodSpec());
-
-        // use podTemplate resources if available for the "kibana" container
-        Map<String, V1Container> containerTemplates = kibanaSpacePodSpec.getContainers().stream().collect(Collectors.toMap(V1Container::getName, Function.identity()));
-        V1Container kibanaContainerTemplate = containerTemplates.get("kibana");
-        if (kibanaContainerTemplate != null && kibanaContainerTemplate.getResources() != null) {
-            container.resources(kibanaContainerTemplate.getResources());
-        } else {
+        final V1Container kibanaContainer = dataCenterUpdateAction.builder.cloneV1ContainerFromPodTemplate(kibanaSpace.getPodTemplate(), "kibana");
+        if (kibanaContainer.getResources() == null) {
             // default kibana resources
-            container.resources(new V1ResourceRequirements()
+            kibanaContainer.resources(new V1ResourceRequirements()
                     .putRequestsItem("cpu", Quantity.fromString("250m"))
                     .putRequestsItem( "memory", Quantity.fromString("1Gi"))
                     .putLimitsItem("cpu", Quantity.fromString("1000m"))
@@ -325,14 +312,20 @@ public class KibanaPlugin extends AbstractPlugin {
             );
         }
 
+        final V1PodSpec kibanaPodSpec = dataCenterUpdateAction.builder.clonePodSpecFromPodTemplate(kibanaSpace.getPodTemplate());
+        final V1PodSpec elassandraPodSpec = dataCenterUpdateAction.builder.clonePodSpecFromPodTemplate(dataCenterSpec.getPodTemplate());
+
         // inherit service account
-        if (kibanaSpacePodSpec.getServiceAccountName() == null) {
-            kibanaSpacePodSpec.setServiceAccountName(elassandraPodSpec.getServiceAccount());
+        if (kibanaPodSpec.getServiceAccountName() == null) {
+            kibanaPodSpec.setServiceAccountName(elassandraPodSpec.getServiceAccount());
         }
         // inherit the priorityClassName of the Elassandra datacenter if not specified
-        if (kibanaSpacePodSpec.getPriorityClassName() == null) {
-            kibanaSpacePodSpec.setPriorityClassName(elassandraPodSpec.getPriorityClassName());
+        if (kibanaPodSpec.getPriorityClassName() == null) {
+            kibanaPodSpec.setPriorityClassName(elassandraPodSpec.getPriorityClassName());
         }
+        Map<String, V1Container> containerMap = kibanaPodSpec.getContainers().stream().collect(Collectors.toMap(V1Container::getName, Function.identity()));
+        containerMap.put(kibanaContainer.getName(), kibanaContainer);
+        kibanaPodSpec.setContainers(new ArrayList<>(containerMap.values()));
 
         final V1Deployment deployment = new V1Deployment()
                 .metadata(meta)
@@ -341,12 +334,12 @@ public class KibanaPlugin extends AbstractPlugin {
                         .replicas(kibanaReplicas(dataCenter, dataCenterStatus, kibanaSpace))
                         .selector(new V1LabelSelector().matchLabels(labels))
                         .template(new V1PodTemplateSpec()
-                                .metadata(new V1ObjectMeta().labels(labels))
-                                .spec(kibanaSpacePodSpec)
+                                .metadata(meta)
+                                .spec(kibanaPodSpec)
                         )
                 );
 
-        container
+        kibanaContainer
                 .name("kibana")
                 .image(dataCenter.getSpec().getKibana().getImage())
                 .terminationMessagePolicy("FallbackToLogsOnError")
@@ -399,7 +392,7 @@ public class KibanaPlugin extends AbstractPlugin {
         // kibana with cassandra authentication
         if (!Objects.equals(dataCenterSpec.getCassandra().getAuthentication(), Authentication.NONE)) {
             String kibanaSecretName = kibanaName(dataCenter, kibanaSpace);
-            container
+            kibanaContainer
                     .addEnvItem(new V1EnvVar()
                             .name("ELASTICSEARCH_USERNAME")
                             .value(kibanaSpace.role())
@@ -419,13 +412,13 @@ public class KibanaPlugin extends AbstractPlugin {
 
         // kibana with cassandra ssl on native port
         if (Boolean.TRUE.equals(dataCenterSpec.getCassandra().getSsl())) {
-            kibanaSpacePodSpec.addVolumesItem(new V1Volume()
+            kibanaPodSpec.addVolumesItem(new V1Volume()
                     .name("truststore")
                     .secret(new V1SecretVolumeSource()
                             .secretName(authorityManager.getPublicCaSecretName(dataCenterSpec.getClusterName()))
                     )
             );
-            container
+            kibanaContainer
                     .addEnvItem(new V1EnvVar()
                             .name("ELASTICSEARCH_SSL_VERIFICATIONMODE")
                             .value("none")

@@ -8,24 +8,22 @@ autoScaleMode: "MANUAL"
 image:
   elassandraRepository: strapdata/elassandra-node
   tag: latest
-  pullPolicy: Always
-  pullSecrets: []
 
 # Elassandra node affinity STRICT or SLACK
 nodeAffinityPolicy: STRICT
 maxPodUnavailable: 1
 rbacEnabled: true
-serviceAccount:
-podTemplate: {}
-
-# Resource config
-resources:
-  requests:
-    cpu: 500m
-    memory: 1Gi
-  limits:
-    cpu: 2000m
-    memory: 2Gi
+podTemplate:
+  spec:
+    containers:
+      - name: elassandra
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 2Gi
 
 # Storage config
 dataVolumeClaim:

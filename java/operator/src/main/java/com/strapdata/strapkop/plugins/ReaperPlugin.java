@@ -22,7 +22,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.StrapkopException;
-import com.strapdata.strapkop.cql.*;
+import com.strapdata.strapkop.cql.CqlKeyspace;
+import com.strapdata.strapkop.cql.CqlKeyspaceManager;
+import com.strapdata.strapkop.cql.CqlRole;
+import com.strapdata.strapkop.cql.CqlRoleManager;
 import com.strapdata.strapkop.k8s.K8sResourceUtils;
 import com.strapdata.strapkop.k8s.OperatorNames;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
@@ -178,7 +181,7 @@ public class ReaperPlugin extends AbstractPlugin {
         }
 
         if (deployments.isEmpty()) {
-            return createOrReplaceReaperObjects(dataCenter)
+            return createOrReplaceReaperObjects(dataCenterUpdateAction)
                     .map(b -> {
                         dataCenterUpdateAction.operation.getActions().add("Cassandra reaper deployed");
                         return true;
@@ -187,7 +190,7 @@ public class ReaperPlugin extends AbstractPlugin {
 
         V1Deployment deployment = deployments.get(0);
         if (!isUpToDate(dataCenter, deployment)) {
-            return createOrReplaceReaperObjects(dataCenter)
+            return createOrReplaceReaperObjects(dataCenterUpdateAction)
                     .map(b -> {
                         dataCenterUpdateAction.operation.getActions().add("Cassandra reaper updated");
                         return true;
@@ -241,7 +244,8 @@ public class ReaperPlugin extends AbstractPlugin {
     }
 
 
-    public Single<Boolean> createOrReplaceReaperObjects(final DataCenter dataCenter) throws ApiException, StrapkopException, IOException {
+    public Single<Boolean> createOrReplaceReaperObjects(final DataCenterUpdateAction dataCenterUpdateAction) throws ApiException, StrapkopException, IOException {
+        final DataCenter dataCenter = dataCenterUpdateAction.dataCenter;
         final Reaper reaper = dataCenter.getSpec().getReaper();
         final DataCenterSpec dataCenterSpec = dataCenter.getSpec();
         final V1ObjectMeta dataCenterMetadata = dataCenter.getMetadata();
@@ -249,14 +253,11 @@ public class ReaperPlugin extends AbstractPlugin {
         final Map<String, String> labels = reaperLabels(dataCenter);
 
         String datacenterGeneration = dataCenter.getMetadata().getGeneration().toString();
-        final V1ObjectMeta meta = (reaper.getPodTemplate() != null && reaper.getPodTemplate().getMetadata() != null
-                ? reaper.getPodTemplate().getMetadata()
-                : new V1ObjectMeta())
+        final V1ObjectMeta meta = dataCenterUpdateAction.builder.cloneV1ObjectMetaFromPodTemplate(reaper.getPodTemplate())
                 .name(reaperName(dataCenter))
                 .namespace(dataCenterMetadata.getNamespace());
         for (Map.Entry<String, String> entry : labels.entrySet())
             meta.putLabelsItem(entry.getKey(), entry.getValue());
-
         meta.putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, datacenterGeneration);
         meta.putAnnotationsItem(OperatorLabels.REAPER_FINGERPRINT, dataCenter.getSpec().getReaper().reaperFingerprint());
 
@@ -284,17 +285,10 @@ public class ReaperPlugin extends AbstractPlugin {
         if (!deployRepear)
             return Single.just(false);
 
-        V1Container container = null;
-        if (reaper.getPodTemplate() != null &&
-                reaper.getPodTemplate().getSpec() != null &&
-                reaper.getPodTemplate().getSpec().getContainers() != null) {
-            // use podTemplate if available
-            container = reaper.getPodTemplate().getSpec().getContainers().stream().collect(Collectors.toMap(V1Container::getName, Function.identity())).get("reaper");
-        }
-        if (container == null) {
+        V1Container reaperContainer = dataCenterUpdateAction.builder.cloneV1ContainerFromPodTemplate(reaper.getPodTemplate(), "reaper");
+        if (reaperContainer.getResources() == null) {
             // default reaper resources
-            container = new V1Container()
-                    .resources(new V1ResourceRequirements()
+            reaperContainer.resources(new V1ResourceRequirements()
                     .putRequestsItem("cpu", Quantity.fromString("100m"))
                     .putRequestsItem("memory", Quantity.fromString("512Mi"))
                     .putLimitsItem("cpu", Quantity.fromString("1000m"))
@@ -314,14 +308,9 @@ public class ReaperPlugin extends AbstractPlugin {
             }
         }
 
-        final V1PodSpec reaperPodSpec = (dataCenterSpec.getReaper().getPodTemplate() != null && dataCenterSpec.getReaper().getPodTemplate().getSpec() != null
-                ? dataCenterSpec.getReaper().getPodTemplate().getSpec()
-                : new V1PodSpec())
-                .addContainersItem(container);
+        V1PodSpec reaperPodSpec = dataCenterUpdateAction.builder.clonePodSpecFromPodTemplate(reaper.getPodTemplate());
+        final V1PodSpec elassandraPodSpec = dataCenterUpdateAction.builder.clonePodSpecFromPodTemplate(dataCenterSpec.getPodTemplate());
 
-        final V1PodSpec elassandraPodSpec = (dataCenterSpec.getPodTemplate() != null && dataCenterSpec.getPodTemplate().getSpec() != null
-                ? dataCenterSpec.getPodTemplate().getSpec()
-                : new V1PodSpec());
         // inherit service account
         if (reaperPodSpec.getServiceAccountName() == null) {
             reaperPodSpec.setServiceAccountName(elassandraPodSpec.getServiceAccount());
@@ -331,6 +320,10 @@ public class ReaperPlugin extends AbstractPlugin {
             reaperPodSpec.setPriorityClassName(elassandraPodSpec.getPriorityClassName());
         }
 
+        Map<String, V1Container> containerMap = reaperPodSpec.getContainers().stream().collect(Collectors.toMap(V1Container::getName, Function.identity()));
+        containerMap.put(reaperContainer.getName(), reaperContainer);
+        reaperPodSpec.setContainers(new ArrayList<>(containerMap.values()));
+
         final V1Deployment deployment = new V1Deployment()
                 .metadata(meta)
                 .spec(new V1DeploymentSpec()
@@ -338,14 +331,14 @@ public class ReaperPlugin extends AbstractPlugin {
                         .replicas(reaperReplicas(dataCenter))
                         .selector(new V1LabelSelector().matchLabels(labels))
                         .template(new V1PodTemplateSpec()
-                                .metadata(new V1ObjectMeta().labels(labels))
+                                .metadata(meta)
                                 .spec(reaperPodSpec)
                         )
                 );
 
         // common configuration
         String contactPoint = OperatorNames.nodesService(dataCenter) + "." + dataCenter.getMetadata().getNamespace() + ".svc.cluster.local";
-        container
+        reaperContainer
                 .name("reaper")
                 .image(dataCenterSpec.getReaper().getImage())
                 .imagePullPolicy("Always")
@@ -424,7 +417,7 @@ public class ReaperPlugin extends AbstractPlugin {
         ;
 
         if (dataCenterSpec.getNetworking().getExternalDns() != null && dataCenterSpec.getNetworking().getExternalDns().getEnabled() == true) {
-            container
+            reaperContainer
                     .addEnvItem(new V1EnvVar().name("REAPER_CASS_ADDRESS_TRANSLATOR_ENABLED").value("true"))
                     .addEnvItem(new V1EnvVar().name("REAPER_CASS_ADDRESS_TRANSLATOR_TYPE").value("kubernetesDnsTranslator"))
                     .addEnvItem(new V1EnvVar().name("JMX_ADDRESS_TRANSLATOR_TYPE").value("kubernetesDnsTranslator"))
@@ -433,7 +426,7 @@ public class ReaperPlugin extends AbstractPlugin {
 
         // reaper with cassandra authentication
         if (!Objects.equals(dataCenterSpec.getCassandra().getAuthentication(), Authentication.NONE)) {
-            container
+            reaperContainer
                     .addEnvItem(new V1EnvVar()
                             .name("REAPER_CASS_AUTH_ENABLED")
                             .value("true")
@@ -452,7 +445,7 @@ public class ReaperPlugin extends AbstractPlugin {
                             )
                     );
         } else {
-            container.addEnvItem(new V1EnvVar()
+            reaperContainer.addEnvItem(new V1EnvVar()
                     .name("REAPER_CASS_AUTH_ENABLED")
                     .value("false")
             );
@@ -469,7 +462,7 @@ public class ReaperPlugin extends AbstractPlugin {
                     )
             );
 
-            container
+            reaperContainer
                     .addEnvItem(new V1EnvVar()
                             .name("REAPER_CASS_NATIVE_PROTOCOL_SSL_ENCRYPTION_ENABLED")
                             .value("true")
@@ -482,13 +475,13 @@ public class ReaperPlugin extends AbstractPlugin {
             javaOptsBuilder.append(" -Dssl.enable=true -Djavax.net.ssl.trustStore=/truststore/truststore.p12 -Djavax.net.ssl.trustStorePassword=changeit ");
 
         } else {
-            container.addEnvItem(new V1EnvVar()
+            reaperContainer.addEnvItem(new V1EnvVar()
                     .name("REAPER_CASS_NATIVE_PROTOCOL_SSL_ENCRYPTION_ENABLED")
                     .value("false")
             );
         }
 
-        container.addEnvItem(new V1EnvVar()
+        reaperContainer.addEnvItem(new V1EnvVar()
                 .name("JAVA_OPTS")
                 .value(javaOptsBuilder.toString()));
 

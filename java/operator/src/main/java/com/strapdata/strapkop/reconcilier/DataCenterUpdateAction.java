@@ -75,6 +75,7 @@ import java.io.StringWriter;
 import java.security.GeneralSecurityException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -301,6 +302,7 @@ public class DataCenterUpdateAction {
                         // choose the first k8s node, and build config and sts
                         RackStatus rackStatus = new RackStatus()
                                 .withReplicas(1)
+                                .withReadyReplicas(0)
                                 .withHealth(Health.RED)
                                 .withIndex(0)
                                 .withName(zones.zoneMap.navigableKeySet().first())
@@ -372,9 +374,11 @@ public class DataCenterUpdateAction {
     public Completable updateStateThenNextAction() {
         return Completable.fromAction(() -> {
             for(RackStatus rackStatus : dataCenterStatus.getRackStatuses().values()) {
-                V1StatefulSet sts = sharedInformerFactory.getExistingSharedIndexInformer(V1StatefulSet.class).getIndexer()
-                        .getByKey(dataCenterMetadata.getNamespace()+"/"+OperatorNames.stsName(dataCenter, rackStatus.getIndex()));
-                if (sts != null) {
+                String stsKey = dataCenterMetadata.getNamespace()+"/"+OperatorNames.stsName(dataCenter, rackStatus.getIndex());
+                V1StatefulSet sts = sharedInformerFactory.getExistingSharedIndexInformer(V1StatefulSet.class).getIndexer().getByKey(stsKey);
+                if (sts == null) {
+                    logger.warn("datacenter={} sts={} not found in cache", dataCenter.id(), stsKey);
+                } else {
                     rackStatus.setReadyReplicas(ObjectUtils.defaultIfNull(sts.getStatus().getReadyReplicas(), 0));
                     rackStatus.setProgressState(statefulSetIsUpToDate(sts) ? ProgressState.RUNNING : ProgressState.UPDATING);
                     rackStatus.setHealth(rackStatus.health());
@@ -434,7 +438,7 @@ public class DataCenterUpdateAction {
                             String stsFingerprint = v1StatefulSet == null ? null : v1StatefulSet.getSpec().getTemplate().getMetadata().getAnnotations().get(OperatorLabels.DATACENTER_FINGERPRINT);
                             // Trigger an update if ConfigMap fingerprint or DC generation are different
                             if (!currentFingerprint.equals(stsFingerprint)) {
-                                logger.debug("datacenter={} fingerprint={} sts={} fingerprint={} not match => rolling update sts",
+                                logger.debug("datacenter={} fingerprint={} sts={} stsFingerprint={} not match => rolling update sts",
                                         dataCenter.id(), currentFingerprint, v1StatefulSet == null ? null : v1StatefulSet.getMetadata().getName(), stsFingerprint);
 
                                 rackStatus.setFingerprint(currentFingerprint);
@@ -1636,13 +1640,16 @@ public class DataCenterUpdateAction {
                 cassandraContainer.addPortsItem(new V1ContainerPort().name(PROMETHEUS_PORT_NAME).containerPort(dataCenterSpec.getPrometheus().getPort()));
             }
 
-            final V1PodSpec podSpec = (dataCenterSpec.getPodTemplate() != null && dataCenterSpec.getPodTemplate().getSpec() != null
-                    ? dataCenterSpec.getPodTemplate().getSpec()
-                    : new V1PodSpec())
-                    .securityContext(new V1PodSecurityContext().fsGroup(CASSANDRA_GROUP_ID))
-                    .addInitContainersItem(buildInitContainerVmMaxMapCount())
-                    .addContainersItem(cassandraContainer)
-                    .addVolumesItem(new V1Volume()
+            final V1PodSpec podSpec = clonePodSpecFromPodTemplate();
+            Map<String, V1Container> containerMap = podSpec.getContainers().stream().collect(Collectors.toMap(V1Container::getName, Function.identity()));
+            containerMap.put("elassandra", cassandraContainer);
+            podSpec.setContainers(new ArrayList<>(containerMap.values()));
+
+            if (podSpec.getSecurityContext() == null)
+                // set default fsGroup
+                podSpec.securityContext(new V1PodSecurityContext().fsGroup(CASSANDRA_GROUP_ID));
+
+            podSpec.addVolumesItem(new V1Volume()
                             .name("podinfo")
                             .downwardAPI(new V1DownwardAPIVolumeSource()
                                     .addItemsItem(new V1DownwardAPIVolumeFile()
@@ -1696,6 +1703,10 @@ public class DataCenterUpdateAction {
                             )
                     );
 
+            if (operatorConfig.getRunSysctl()) {
+                podSpec.addInitContainersItem(buildInitContainerSysctl());
+            }
+
             // https://kubernetes.io/fr/docs/concepts/services-networking/dns-pod-service/#politique-dns-du-pod
             if (dataCenterSpec.getNetworking().getHostNetworkEnabled()) {
                 podSpec.setHostNetwork(true);
@@ -1735,20 +1746,24 @@ public class DataCenterUpdateAction {
             final V1NodeSelectorTerm nodeSelectorTerm = new V1NodeSelectorTerm()
                     .addMatchExpressionsItem(new V1NodeSelectorRequirement()
                             .key(OperatorLabels.ZONE).operator("In").addValuesItem(rackStatus.getName()));
+
+            V1Affinity affinity = cloneV1AffinityFromPodTemplate();
+            V1NodeAffinity nodeAffinity = affinity.getNodeAffinity();
+            if (nodeAffinity == null) {
+                nodeAffinity = new V1NodeAffinity();
+                affinity.setNodeAffinity(nodeAffinity);
+            }
             switch (dataCenterSpec.getPodsAffinityPolicy()) {
                 case STRICT:
-                    podSpec.affinity(new V1Affinity()
-                            .nodeAffinity(new V1NodeAffinity()
-                                    .requiredDuringSchedulingIgnoredDuringExecution(new V1NodeSelector()
-                                            .addNodeSelectorTermsItem(nodeSelectorTerm))));
+                    nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution(
+                            new V1NodeSelector().addNodeSelectorTermsItem(nodeSelectorTerm));
                     break;
                 case SLACK:
-                    podSpec.affinity(new V1Affinity()
-                            .nodeAffinity(new V1NodeAffinity()
-                                    .addPreferredDuringSchedulingIgnoredDuringExecutionItem(new V1PreferredSchedulingTerm()
-                                            .weight(100).preference(nodeSelectorTerm))));
+                    nodeAffinity.addPreferredDuringSchedulingIgnoredDuringExecutionItem(
+                            new V1PreferredSchedulingTerm().weight(100).preference(nodeSelectorTerm));
                     break;
             }
+            podSpec.setAffinity(affinity);
 
             // add configmap volumes
             for (final ConfigMapVolumeMountBuilder configMapVolumeMountBuilder : configMapVolumeMounts) {
@@ -1827,9 +1842,7 @@ public class DataCenterUpdateAction {
 
             // CRD spec + configMap fingerprint
             String fingerprint = dataCenterSpec.elassandraFingerprint() + "-" + configMapVolumeMounts.fingerPrint();
-            final V1ObjectMeta templateMetadata = (dataCenterSpec.getPodTemplate() != null && dataCenterSpec.getPodTemplate().getMetadata() != null
-                    ? dataCenterSpec.getPodTemplate().getMetadata()
-                    : new V1ObjectMeta())
+            final V1ObjectMeta templateMetadata = cloneV1ObjectMetaFromPodTemplate()
                     .putAnnotationsItem(OperatorLabels.DATACENTER_FINGERPRINT, fingerprint)
                     .putAnnotationsItem(OperatorLabels.DATACENTER_GENERATION, dataCenter.getMetadata().getGeneration().toString())
                     .putAnnotationsItem(OperatorLabels.PVC_DECOMMISSION_POLICY, dataCenterSpec.getDecommissionPolicy().getValue());
@@ -1925,15 +1938,114 @@ public class DataCenterUpdateAction {
                     .addEnvItem(new V1EnvVar().name("STOP_AFTER_COMMITLOG_REPLAY").value("true"));
         }
 
+        private V1ObjectMeta cloneV1ObjectMetaFromPodTemplate() {
+            return cloneV1ObjectMetaFromPodTemplate(dataCenterSpec.getPodTemplate());
+        }
+
+        public V1ObjectMeta cloneV1ObjectMetaFromPodTemplate(V1PodTemplateSpec podTemplateSpec) {
+            V1ObjectMeta metadata = new V1ObjectMeta();
+            if (podTemplateSpec != null && podTemplateSpec.getMetadata() != null) {
+                V1ObjectMeta template = dataCenterSpec.getPodTemplate().getMetadata();
+                metadata.setAnnotations(template.getAnnotations());
+                metadata.setLabels(template.getLabels());
+                metadata.setFinalizers(template.getFinalizers());
+            }
+            return metadata;
+        }
+
+        private V1PodSpec clonePodSpecFromPodTemplate() {
+            return clonePodSpecFromPodTemplate(dataCenterSpec.getPodTemplate());
+        }
+
+        public V1PodSpec clonePodSpecFromPodTemplate(V1PodTemplateSpec podTemplateSpec) {
+            V1PodSpec podSpec = new V1PodSpec();
+            if (podTemplateSpec != null && podTemplateSpec.getSpec() != null) {
+                V1PodSpec template = podTemplateSpec.getSpec();
+                podSpec.setAffinity(template.getAffinity());
+                podSpec.setDnsConfig(template.getDnsConfig());
+                podSpec.setDnsPolicy(template.getDnsPolicy());
+                podSpec.setImagePullSecrets(template.getImagePullSecrets());
+                podSpec.setNodeSelector(template.getNodeSelector());
+                podSpec.setOverhead(template.getOverhead());
+                podSpec.setPriority(template.getPriority());
+                podSpec.setPriorityClassName(template.getPriorityClassName());
+                podSpec.setPreemptionPolicy(template.getPreemptionPolicy());
+                podSpec.setRuntimeClassName(template.getRuntimeClassName());
+                podSpec.setServiceAccountName(template.getServiceAccountName());
+                podSpec.setServiceAccount(template.getServiceAccount());
+                podSpec.setSecurityContext(template.getSecurityContext());
+                podSpec.setSchedulerName(template.getSchedulerName());
+                podSpec.setSubdomain(template.getSubdomain());
+            }
+            return podSpec;
+        }
+
+        private V1Affinity cloneV1AffinityFromPodTemplate() {
+            return cloneV1AffinityFromPodTemplate(dataCenterSpec.getPodTemplate());
+        }
+
+        public V1Affinity cloneV1AffinityFromPodTemplate(V1PodTemplateSpec podTemplateSpec) {
+            V1Affinity affinity = new V1Affinity();
+            if (podTemplateSpec != null && podTemplateSpec.getSpec() != null && podTemplateSpec.getSpec().getAffinity() != null) {
+                V1Affinity template = podTemplateSpec.getSpec().getAffinity();
+                affinity.setNodeAffinity(template.getNodeAffinity());
+                affinity.setPodAffinity(template.getPodAffinity());
+                affinity.setPodAntiAffinity(template.getPodAntiAffinity());
+            }
+            return affinity;
+        }
+
+        private V1Container cloneV1ContainerFromPodTemplate(String containerName) {
+            return cloneV1ContainerFromPodTemplate(dataCenterSpec.getPodTemplate(), containerName);
+        }
+
+        public V1Container cloneV1ContainerFromPodTemplate(V1PodTemplateSpec podTemplateSpec, String containerName) {
+            final V1Container container = new V1Container().name(containerName);
+            if (podTemplateSpec != null && podTemplateSpec.getSpec() != null && !podTemplateSpec.getSpec().getContainers().isEmpty()) {
+                final V1PodSpec podSpec = podTemplateSpec.getSpec();
+                Optional<V1Container> templateContainer = podSpec.getContainers().stream().filter(c -> containerName.equals(c.getName())).findFirst();
+                if (templateContainer.isPresent()) {
+                    // clone podTemplate container
+                    V1Container template  = templateContainer.get();
+                    container.setSecurityContext(template.getSecurityContext());
+                    container.setArgs(template.getArgs());
+                    container.setCommand(template.getCommand());
+                    container.setEnv(template.getEnv());
+                    container.setEnvFrom(template.getEnvFrom());
+                    container.setImage(template.getImage());
+                    container.setImagePullPolicy(template.getImagePullPolicy());
+                    container.setLifecycle(template.getLifecycle());
+                    container.setLivenessProbe(template.getLivenessProbe());
+                    container.setReadinessProbe(template.getReadinessProbe());
+                    container.setStartupProbe(template.getStartupProbe());
+                    container.setPorts(template.getPorts());
+                    container.setResources(template.getResources());
+                    container.setStdin(template.getStdin());
+                    container.setStdinOnce(template.getStdinOnce());
+                    container.setTerminationMessagePath(template.getTerminationMessagePath());
+                    container.setTerminationMessagePolicy(template.getTerminationMessagePolicy());
+                    container.setVolumeDevices(template.getVolumeDevices());
+                    container.setVolumeMounts(template.getVolumeMounts());
+                    container.setWorkingDir(template.getWorkingDir());
+                }
+            }
+            return container;
+        }
+
         private V1Container buildElassandraBaseContainer(String containerName, RackStatus rack) {
-            final V1Container cassandraContainer = new V1Container()
-                    .name(containerName)
-                    .image(dataCenterSpec.getElassandraImage())
-                    .terminationMessagePolicy("FallbackToLogsOnError")
-                    .securityContext(new V1SecurityContext()
-                            .runAsUser(CASSANDRA_USER_ID)
-                            .capabilities(new V1Capabilities().add(ImmutableList.of("IPC_LOCK", "SYS_RESOURCE"))))
-                    .addVolumeMountsItem(new V1VolumeMount()
+            V1Container cassandraContainer = cloneV1ContainerFromPodTemplate("elassandra");
+            cassandraContainer.setName(containerName);
+
+            // add the default security context if not set
+            if (cassandraContainer.getSecurityContext() == null)
+                cassandraContainer.setSecurityContext(new V1SecurityContext()
+                        .runAsUser(CASSANDRA_USER_ID)
+                        .capabilities(new V1Capabilities().add(ImmutableList.of("IPC_LOCK", "SYS_RESOURCE"))));
+
+            cassandraContainer.setImage(dataCenterSpec.getElassandraImage());
+            cassandraContainer.setTerminationMessagePolicy("FallbackToLogsOnError");
+
+            cassandraContainer.addVolumeMountsItem(new V1VolumeMount()
                             .name("data-volume")
                             .mountPath("/var/lib/cassandra")
                     )
@@ -2040,10 +2152,10 @@ public class DataCenterUpdateAction {
          * System tunning init container
          * @return
          */
-        private V1Container buildInitContainerVmMaxMapCount() {
+        private V1Container buildInitContainerSysctl() {
             return new V1Container()
                     .securityContext(new V1SecurityContext().privileged(true))
-                    .name("system-tune")
+                    .name("sysctl")
                     .image("busybox")
                     .imagePullPolicy("IfNotPresent")
                     .terminationMessagePolicy("FallbackToLogsOnError")

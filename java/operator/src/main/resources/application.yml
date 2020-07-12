@@ -88,5 +88,6 @@ operator:
     operatorNamespace: "${OPERATOR_NAMESPACE:default}"
     watchNamespace: "${OPERATOR_WATCH_NAMESPACE:}"
     serviceName: "${OPERATOR_SERVICE_NAME:elassandra-operator}"
+    runSysctl: "${OPERATOR_RUN_SYSCTL:true}"
     tasks:
         retentionPeriod: "${OPERATOR_TASKS_RETENTION:7D}"
