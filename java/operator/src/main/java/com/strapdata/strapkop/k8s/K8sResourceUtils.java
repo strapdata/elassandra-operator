@@ -1000,22 +1000,24 @@ public class K8sResourceUtils {
      */
 
     public Single<DataCenterStatus> updateDataCenterStatus(final DataCenter dc, final DataCenterStatus dcStatus) {
+        // read before write to avoid 409 conflict
         final Key key = new Key(dc.getMetadata());
-        return Single.fromCallable(new Callable<DataCenterStatus>() {
-            @Override
-            public DataCenterStatus call() throws Exception {
-                try {
-                    dc.setStatus(dcStatus);
-                    customObjectsApi.replaceNamespacedCustomObjectStatus(StrapdataCrdGroup.GROUP, DataCenter.VERSION,
-                            dc.getMetadata().getNamespace(), DataCenter.PLURAL, dc.getMetadata().getName(), dc, null, "elassandra-operator");
-                    dataCenterStatusCache.put(key, dc.getStatus());
-                    return dc.getStatus();
-                } catch (ApiException e) {
-                    logger.warn("error code=" + e.getCode() + " body=" + e.getResponseBody(), e);
-                    throw e;
-                }
-            }
-        });
+        return readDatacenter(key)
+                .map(currentDc -> {
+                    currentDc.setStatus(dcStatus);
+                    return currentDc;
+                })
+                .flatMap(currentDc ->
+                        Single.fromCallable(new Callable<DataCenterStatus>() {
+                            @Override
+                            public DataCenterStatus call() throws Exception {
+                                customObjectsApi.replaceNamespacedCustomObjectStatus(StrapdataCrdGroup.GROUP, DataCenter.VERSION,
+                                        dc.getMetadata().getNamespace(), DataCenter.PLURAL, dc.getMetadata().getName(), currentDc, null, "elassandra-operator");
+                                dataCenterStatusCache.put(key, currentDc.getStatus());
+                                return currentDc.getStatus();
+                            }
+                        })
+                );
     }
 
 
