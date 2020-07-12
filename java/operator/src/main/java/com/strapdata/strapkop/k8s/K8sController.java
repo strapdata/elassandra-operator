@@ -185,14 +185,14 @@ public class K8sController {
                 logger.debug("dc={} status.rackStatus={}",
                         dataCenter.id(), dataCenter.getStatus().getRackStatuses());
                 workQueues.submit(new Reconciliation(dataCenter.getMetadata(), Reconciliation.Kind.DATACENTER, Reconciliation.Type.ADDED)
-                            .withKey(new Key(dataCenter.getMetadata()))
-                            .withCompletable(dataCenterReconcilier.initDatacenter(dataCenter, new Operation()
-                                    .withLastTransitionTime(new Date())
-                                    .withTriggeredBy("Datacenter added"))
-                                    .doOnComplete(() -> {
-                                        managed.incrementAndGet();
-                                        meterRegistry.counter("k8s.event.add", tags).increment();
-                                    })));
+                        .withKey(new Key(dataCenter.getMetadata()))
+                        .withCompletable(dataCenterReconcilier.initDatacenter(dataCenter, new Operation()
+                                .withLastTransitionTime(new Date())
+                                .withTriggeredBy("Datacenter added"))
+                                .doOnComplete(() -> {
+                                    managed.incrementAndGet();
+                                    meterRegistry.counter("k8s.event.add", tags).increment();
+                                })));
             }
 
             @Override
@@ -281,40 +281,34 @@ public class K8sController {
         final Key key = new Key(namespace, parent);
 
         DataCenter dataCenter = sharedInformerFactory.getExistingSharedIndexInformer(DataCenter.class).getIndexer().getByKey(namespace + "/" + parent);
-        if (dataCenter != null) {
-            DataCenterStatus dataCenterStatus = dataCenterStatusCache.getOrDefault(key, dataCenter.getStatus());
-            RackStatus rackStatus = dataCenterStatus.getRackStatuses().get(Integer.parseInt(sts.getMetadata().getLabels().get(OperatorLabels.RACKINDEX)));
-            if (rackStatus == null || ObjectUtils.defaultIfNull(rackStatus.getReadyReplicas(), 0) != ObjectUtils.defaultIfNull(sts.getStatus().getReadyReplicas(), 0)) {
-                logger.info("datacenter={}/{} sts={} replicas={}/{}, triggering a dc statefulSetStatusUpdate",
-                        namespace, parent,
-                        sts.getMetadata().getName(),
-                        sts.getStatus().getReadyReplicas(), sts.getStatus().getReplicas());
-                Operation op = new Operation()
-                        .withLastTransitionTime(new Date())
-                        .withTriggeredBy("Status update statefulset=" + sts.getMetadata().getName() + " replicas=" +
-                                sts.getStatus().getReadyReplicas() + "/" + sts.getStatus().getReplicas());
-                workQueues.submit(new Reconciliation(sts.getMetadata(), Reconciliation.Kind.STATEFULSET, Reconciliation.Type.MODIFIED)
-                        .withKey(key)
-                        .withCompletable(dataCenterReconcilier.statefulsetStatusUpdate(dataCenter, op, sts)
-                                .onErrorComplete(t -> {
-                                    if (t instanceof NoSuchElementException) {
-                                        return true;
-                                    }
-                                    logger.warn("datacenter={}/{} statefulSetUpdate failed: {}", parent, namespace, t.toString());
-                                    return false;
-                                })));
-            } else {
-                logger.warn("datacenter={}/{} sts={} replicas={}/{} NOOP not ready rackStatus={}",
-                        namespace, parent,
-                        sts.getMetadata().getName(),
-                        sts.getStatus().getReadyReplicas(), sts.getStatus().getReplicas(), rackStatus);
-            }
-        } else {
-                logger.warn("datacenter={}/{} sts={} replicas={}/{} NOOP datacenter CRD not found",
-                        namespace, parent,
-                        sts.getMetadata().getName(),
-                        sts.getStatus().getReadyReplicas(), sts.getStatus().getReplicas());
+        if (dataCenter == null) {
+            logger.warn("datacenter={}/{} sts={} replicas={}/{} datacenter CRD not found, ignoring event",
+                    namespace, parent,
+                    sts.getMetadata().getName(),
+                    sts.getStatus().getReadyReplicas(), sts.getStatus().getReplicas());
+            return;
         }
+
+        logger.debug("datacenter={}/{} sts={} replicas={}/{}, triggering a dc statefulSetStatusUpdate",
+                namespace, parent,
+                sts.getMetadata().getName(),
+                sts.getStatus().getReadyReplicas(), sts.getStatus().getReplicas());
+
+        workQueues.submit(new Reconciliation(sts.getMetadata(), Reconciliation.Kind.STATEFULSET, Reconciliation.Type.MODIFIED)
+                .withKey(key)
+                .withCompletable(dataCenterReconcilier.statefulsetStatusUpdate(dataCenter,
+                        new Operation()
+                                .withLastTransitionTime(new Date())
+                                .withTriggeredBy("Status update statefulset=" + sts.getMetadata().getName() + " replicas=" +
+                                        sts.getStatus().getReadyReplicas() + "/" + sts.getStatus().getReplicas()),
+                        sts)
+                        .onErrorComplete(t -> {
+                            if (t instanceof NoSuchElementException) {
+                                return true;
+                            }
+                            logger.warn("datacenter={}/{} statefulSetUpdate failed: {}", parent, namespace, t.toString());
+                            return false;
+                        })));
     }
 
     void addTaskInformer() {
@@ -349,7 +343,7 @@ public class K8sController {
                 logger.debug("task={}", task.id());
                 meterRegistry.counter("k8s.event.modified", tags).increment();
                 Long oldGeneration = oldTask.getMetadata().getGeneration();
-                if ( task.getMetadata().getGeneration() > oldGeneration) {
+                if (task.getMetadata().getGeneration() > oldGeneration) {
                     reconcileTask(task, Reconciliation.Type.MODIFIED, managed);
                 }
             }
