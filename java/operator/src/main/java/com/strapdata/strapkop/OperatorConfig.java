@@ -51,9 +51,6 @@ public class OperatorConfig {
      */
     String operatorNamespace;
 
-    @Nullable
-    int k8sWatchPeriodInSec = 300;
-
     /**
      * Terminated task retention
      */
@@ -73,4 +70,9 @@ public class OperatorConfig {
      * Run the sysctl init container if true.
      */
     Boolean runSysctl;
+
+    /**
+     * Install CRD on startup.
+     */
+    Boolean installCrd;
 }

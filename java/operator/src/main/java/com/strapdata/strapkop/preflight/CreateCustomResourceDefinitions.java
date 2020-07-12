@@ -17,6 +17,7 @@
 
 package com.strapdata.strapkop.preflight;
 
+import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.k8s.K8sController;
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
 import io.kubernetes.client.openapi.ApiException;
@@ -44,10 +45,16 @@ public class CreateCustomResourceDefinitions implements Preflight<Void> {
     @Inject
     K8sController kubernetesController;
 
+    @Inject
+    OperatorConfig operatorConfig;
+
     @Override
     public Void call() throws Exception {
-        createCrdFromResource("/datacenter-crd.yaml");
-        createCrdFromResource("/task-crd.yaml");
+        if (operatorConfig.getInstallCrd()) {
+            createCrdFromResource("/datacenter-crd.yaml");
+            createCrdFromResource("/task-crd.yaml");
+        }
+        logger.info("Watching for resources in namespace={}", operatorConfig.getWatchNamespace());
         kubernetesController.start();   // start when CRD are deployed
         return null;
     }
