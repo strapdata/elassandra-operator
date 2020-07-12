@@ -79,7 +79,7 @@ public class CqlKeyspace implements CqlReconciliable {
                 Single.just(this) :
                 sessionSupplier.getSessionWithSchemaAgreed(dataCenter, dataCenterStatus)
                         .flatMap(session -> {
-                        int targetRf = Math.max(1, Math.min(rf, dataCenter.getSpec().getReplicas()));
+                        int targetRf = Math.max(1, Math.min(rf, dataCenter.getStatus().getReplicas()));
                         String query = String.format(Locale.ROOT, "CREATE KEYSPACE IF NOT EXISTS \"%s\" WITH replication = {'class': 'NetworkTopologyStrategy', '%s':'%d'}; ",
                                 name, dataCenter.getSpec().getDatacenterName(), targetRf);
                         logger.debug("dc={} query={}", dataCenter.id(), query);
