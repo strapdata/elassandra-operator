@@ -72,6 +72,7 @@ before_script:
 - ./gradlew java:edctl:buildExec :java:operator:jib dockerPushAllVersions :reaper:pushImage -PregistryUrl=${REGISTRY_URL} -PregistryInsecure
 - curl http://${REGISTRY_URL}/v2/_catalog
 - integ-test/install_elassandra_operator.sh
+- sleep 5 && kubectl get crd
 script:
 #- (cd docs; make clean html SPHINXOPTS="-W"; touch build/html/.nojekyll )
 - (cd docs; make clean html; touch build/html/.nojekyll )
