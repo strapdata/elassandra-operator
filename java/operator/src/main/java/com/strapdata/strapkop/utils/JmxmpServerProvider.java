@@ -50,7 +50,7 @@ public class JmxmpServerProvider {
     public void createJMXMPServer()  throws IOException
     {
         final Integer jmxmpPort = operatorConfig.getJmxmpPort();
-        if (jmxmpPort != null) {
+        if (jmxmpPort != null && jmxmpPort > 0) {
             Map<String, Object> env = new HashMap<>();
             // Mark the JMX server as a permanently exported object. This allows the JVM to exit with the
             // server running and also exempts it from the distributed GC scheduler which otherwise would
