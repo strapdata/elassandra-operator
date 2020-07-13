@@ -34,15 +34,21 @@ spec:
       terminationGracePeriodSeconds: 45
       initContainers:
         # build a PKCS12 keystore from the TLS secret for the micronaut server
-        - name: init-tls-cert
-          image: frapsoft/openssl
-          command: ['sh', '-c', "openssl pkcs12 -export -in /tls-secret/tls.crt -inkey /tls-secret/tls.key -out /tls/operator.p12 -passout pass:changeit"]
+        - name: tlshook
+          image: strapdata/tlshook:0.1
+          imagePullPolicy: Always
+          terminationMessagePolicy: "FallbackToLogsOnError"
           volumeMounts:
           - name: tls-secret-volume
             readOnly: true
             mountPath: "/tls-secret"
           - name: tls-volume
             mountPath: "/tls"
+          env:
+          - name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
       containers:
         - name: {{ template "elassandra-operator.name" . }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -52,19 +58,21 @@ spec:
             - name: tls-volume
               mountPath: "/tls"
           ports:
-            - containerPort: {{ default 443 .Values.serverPort }}
+            - containerPort: {{ default 8443 .Values.serverPort }}
               name: https
             - containerPort: {{ default 8081 .Values.managementPort }}
               name: management
-            - containerPort: {{ default "-1" .Values.jmxmpPort }}
+            {{- if .Values.jmxmpPort }}
+            - containerPort: {{ .Values.jmxmpPort }}
               name: jmxmp
+            {{- end }}
             - containerPort: 5005
               name: jdb
           readinessProbe:
             httpGet:
               scheme: HTTPS
               path: /ready
-              port: {{ default 443 .Values.serverPort }}
+              port: {{ default 8443 .Values.serverPort }}
             initialDelaySeconds: 5
             periodSeconds: 10
           lifecycle:
@@ -72,20 +80,28 @@ spec:
               httpGet:
                 scheme: HTTPS
                 path: /shutdown/graceful
-                port: {{ default 443 .Values.serverPort }}
+                port: {{ default 8443 .Values.serverPort }}
           resources:
 {{ toYaml .Values.resources | indent 12 }}
           env:
           - name: OPERATOR_SERVICE_NAME
             value: {{ template "elassandra-operator.name" . }}
+          {{- if .Values.serverPort }}
           - name: OPERATOR_SERVER_PORT
-            value: {{ default "443" .Values.serverPort | quote }}
+            value: {{ .Values.serverPort | quote }}
+          {{- end }}
+          {{- if .Values.managementPort }}
           - name: OPERATOR_MANAGEMENT_PORT
-            value: {{ default "8081" .Values.managementPort | quote }}
+            value: {{ .Values.managementPort | quote }}
+          {{- end }}
+          {{- if .Values.jmxmpPort }}
           - name: OPERATOR_JMXMP_PORT
-            value: {{ default "-1" .Values.jmxmpPort | quote }}
+            value: {{ .Values.jmxmpPort | quote }}
+          {{- end }}
+          {{- if .Values.prometheusEnabled }}
           - name: OPERATOR_PROMETHEUS_ENABLED
-            value: {{ default "true" .Values.prometheusEnabled | quote }}
+            value: {{ .Values.prometheusEnabled | quote }}
+          {{- end }}
           - name: OPERATOR_TASKS_RETENTION
             value: {{ default "7D" .Values.taskRetention | quote }}
           - name: ADDRESS_TRANSLATOR_DNS_DOMAIN

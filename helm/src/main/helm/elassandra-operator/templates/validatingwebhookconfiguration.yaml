@@ -2,7 +2,7 @@
 apiVersion: admissionregistration.k8s.io/v1beta1
 kind: ValidatingWebhookConfiguration
 metadata:
-  name: {{ template "elassandra-operator.fullname" . }}
+  name: elassandra-operator-webhook
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ template "elassandra-operator.name" . }}
@@ -11,7 +11,7 @@ metadata:
     operator: elassandra
     release: {{ .Release.Name }}
 webhooks:
-  - name: "elassandradatacenter-webhook.elassandra.strapdata.com"
+  - name: "elassandra-operator-webhook.k8s.strapdata.com"
     rules:
       - apiGroups: ["elassandra.strapdata.com"]
         apiVersions: ["v1beta1"]
@@ -19,11 +19,12 @@ webhooks:
         resources: ["elassandradatacenters"]
         scope: "*"
     clientConfig:
-      caBundle: {{ .Values.tls.crt | quote }}
+      caBundle: Cg==
       service:
         name: {{ template "elassandra-operator.name" . }}
         namespace: {{ .Release.Namespace }}
         path: "/validation"
+        port: {{ default 8443 .Values.serverPort }}
     admissionReviewVersions: ["v1", "v1beta1"]
     failurePolicy: {{ default "Fail" .Values.webhook.failurePolicy | quote }}
     matchPolicy: "Equivalent"

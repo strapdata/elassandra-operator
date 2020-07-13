@@ -1,0 +1,20 @@
+import com.bmuschko.gradle.docker.tasks.image.DockerBuildImage
+import com.bmuschko.gradle.docker.tasks.image.DockerPushImage
+
+plugins {
+    id 'base'
+    id 'com.bmuschko.docker-remote-api'
+}
+
+def webhookImageName =  registryUrl + (registryUrl.length() > 0 ? "/" : "" ) + "strapdata/tlshook:0.1"
+println("webhookImageName=$webhookImageName")
+
+task buildImage(type: DockerBuildImage) {
+    inputDir = file('.')
+    images.add(webhookImageName)
+}
+
+task pushImage(type: DockerPushImage) {
+    dependsOn "buildImage"
+    images = [ webhookImageName ]
+}

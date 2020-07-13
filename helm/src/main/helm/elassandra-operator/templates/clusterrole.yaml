@@ -10,6 +10,12 @@ metadata:
   name: {{ template "elassandra-operator.fullname" . }}
 rules:
 - apiGroups:
+  - "authorization.k8s.io"
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+- apiGroups:
   - extensions
   resources:
   - thirdpartyresources
@@ -31,7 +37,13 @@ rules:
   - elassandratasks/status
   - elassandratasks/finalizers
   verbs:
-  - '*'
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
 - apiGroups:
   - apps
   resources:
@@ -47,34 +59,72 @@ rules:
   resources:
   - pods
   - serviceaccounts
-  verbs: ['get', 'list', 'watch']
+  verbs:
+  - get
+  - list
+  - watch
 - apiGroups: ['']
   resources:
   - services
   - endpoints
   - persistentvolumeclaims
   - persistentvolumes
-  verbs: ['get', 'create', 'update', 'delete', 'list']
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
 - apiGroups:
   - "extensions"
   - "networking.k8s.io"
   resources:
   - ingresses
-  verbs: ['get', 'create', 'update', 'delete', 'list']
+  verbs:
+  - get
+  - list
+  - create
+  - update
+  - delete
 - apiGroups:
   - policy
   resources:
   - poddisruptionbudgets
   - poddisruptionbudgets/status
-  verbs: ['get', 'create', 'update', 'delete', 'list']
+  verbs:
+  - get
+  - list
+  - create
+  - update
+  - delete
 - nonResourceURLs: ["/version", "/version/*"]
-  verbs: ['get']
+  verbs:
+  - get
 - apiGroups: ['']
   resources:
   - nodes
-  verbs: ['list', 'watch']
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - mutatingwebhookconfigurations
+  - validatingwebhookconfigurations
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
 - apiGroups: ['']
   resources:
   - namespaces
-  verbs: ['list']
+  verbs:
+  - list
 {{- end }}

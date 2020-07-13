@@ -11,8 +11,8 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    - port: {{ default 443 .Values.serverPort }}
-      targetPort: {{ default 443 .Values.serverPort }}
+    - port: {{ default 8443 .Values.serverPort }}
+      targetPort: {{ default 8443 .Values.serverPort }}
       protocol: TCP
       name: https
     - port: {{ default 8081 .Values.managementPort }}
@@ -22,3 +22,5 @@ spec:
   selector:
     app: {{ template "elassandra-operator.name" . }}
     release: {{ .Release.Name }}
+  sessionAffinity: None
+  type: ClusterIP
