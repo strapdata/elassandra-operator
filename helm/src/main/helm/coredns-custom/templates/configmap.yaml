@@ -3,7 +3,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: coredns-custom
-  namespace: kube-system
+  namespace: {{ .Release.Namespace }}
 data:
   hosts.override: |
     hosts nodes.hosts {{ .Values.nodes.domain }} {
