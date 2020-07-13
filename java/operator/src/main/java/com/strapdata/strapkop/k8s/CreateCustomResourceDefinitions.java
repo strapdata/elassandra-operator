@@ -15,11 +15,11 @@
  * along with the Elassandra-Operator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.strapdata.strapkop.preflight;
+package com.strapdata.strapkop.k8s;
 
 import com.strapdata.strapkop.OperatorConfig;
-import com.strapdata.strapkop.k8s.K8sController;
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
+import com.strapdata.strapkop.preflight.Preflight;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.apis.ApiextensionsV1Api;
 import io.kubernetes.client.openapi.models.V1CustomResourceDefinition;
@@ -54,8 +54,6 @@ public class CreateCustomResourceDefinitions implements Preflight<Void> {
             createCrdFromResource("/datacenter-crd.yaml");
             createCrdFromResource("/task-crd.yaml");
         }
-        logger.info("Watching for resources in namespace={}", operatorConfig.getWatchNamespace());
-        kubernetesController.start();   // start when CRD are deployed
         return null;
     }
 
@@ -78,5 +76,10 @@ public class CreateCustomResourceDefinitions implements Preflight<Void> {
                 throw e;
             }
         }
+    }
+
+    @Override
+    public int order() {
+        return 1;
     }
 }

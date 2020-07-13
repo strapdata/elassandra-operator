@@ -20,7 +20,7 @@ micronaut:
         name: elassandra-operator
     ssl:
         enabled: ${OPERATOR_SSL:true}
-        port: ${OPERATOR_SERVER_PORT:443}
+        port: ${OPERATOR_SERVER_PORT:8443}
     server:
         ssl:
             key-store:
@@ -44,7 +44,7 @@ micronaut:
         enabled: true
         export:
             prometheus:
-                enabled: ${OPERATOR_PROMETHEUS_ENABLED:true}
+                enabled: ${OPERATOR_PROMETHEUS_ENABLED:false}
                 step: PT1M
                 descriptions: true
 endpoints:
@@ -83,11 +83,11 @@ jackson:
     module-scan: true
     serialization-inclusion: NON_NULL
 operator:
-    jmxmpPort: ${OPERATOR_JMXMP_PORT:7199}
-    k8sWatchPeriodInSec: ${OPERATOR_K8S_WATCH_PERIOD:180}
+    jmxmpPort: "${OPERATOR_JMXMP_PORT:-1}"
     operatorNamespace: "${OPERATOR_NAMESPACE:default}"
     watchNamespace: "${OPERATOR_WATCH_NAMESPACE:}"
     serviceName: "${OPERATOR_SERVICE_NAME:elassandra-operator}"
     runSysctl: "${OPERATOR_RUN_SYSCTL:true}"
+    installCrd: "${OPERATOR_INSTALL_CRD:true}"
     tasks:
         retentionPeriod: "${OPERATOR_TASKS_RETENTION:7D}"

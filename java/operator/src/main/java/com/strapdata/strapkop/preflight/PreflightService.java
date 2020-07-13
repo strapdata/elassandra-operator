@@ -25,7 +25,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 
 /**
  * Creates CRD defintion and defaultCA
@@ -46,14 +49,20 @@ public class PreflightService {
 
     public static class PreflightCompletedEvent {
     }
-    
+
     @EventListener
     @Async
     void onStartup(ServiceStartedEvent event) {
-        
+
+        Collections.sort(new ArrayList(preflights), new Comparator<Preflight<?>>() {
+            @Override
+            public int compare(Preflight o1, Preflight o2) {
+                return o1.order() - o2.order();
+            }
+        });
         for (Preflight<?> preflight : preflights) {
-    
             try {
+                logger.debug("Execute preflight order={}", preflight.order());
                 preflight.call();
             } catch (Exception e) {
                 e.printStackTrace();

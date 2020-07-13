@@ -1,6 +1,7 @@
 package com.strapdata.strapkop.k8s;
 
 import com.google.common.collect.ImmutableList;
+import com.strapdata.strapkop.OperatorConfig;
 import com.strapdata.strapkop.cache.DataCenterStatusCache;
 import com.strapdata.strapkop.cache.StatefulsetCache;
 import com.strapdata.strapkop.model.Key;
@@ -10,6 +11,7 @@ import com.strapdata.strapkop.model.k8s.datacenter.*;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskList;
 import com.strapdata.strapkop.model.k8s.task.TaskStatus;
+import com.strapdata.strapkop.preflight.Preflight;
 import com.strapdata.strapkop.reconcilier.DataCenterReconcilier;
 import com.strapdata.strapkop.reconcilier.Reconciliation;
 import com.strapdata.strapkop.reconcilier.TaskResolver;
@@ -41,7 +43,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 @Singleton
 @Infrastructure
-public class K8sController {
+public class K8sController implements Preflight<K8sController> {
 
     private final Logger logger = LoggerFactory.getLogger(K8sController.class);
 
@@ -80,6 +82,9 @@ public class K8sController {
 
     @Inject
     K8sResourceUtils k8sResourceUtils;
+
+    @Inject
+    OperatorConfig operatorConfig;
 
     public void start() {
         addNodeInformer();
@@ -121,61 +126,111 @@ public class K8sController {
     }
 
     void addPodInformer() {
-        SharedIndexInformer<V1Pod> podInformer =
-                sharedInformerFactory.sharedIndexInformerFor(
-                        (CallGeneratorParams params) -> coreV1Api.listPodForAllNamespacesCall(
-                                null,
-                                null,
-                                null,
-                                OperatorLabels.toSelector(OperatorLabels.MANAGED), // TODO: watch only pods having rack index=0 for seeds ?
-                                null,
-                                null,
-                                params.resourceVersion,
-                                params.timeoutSeconds,
-                                params.watch,
-                                null),
-                        V1Pod.class,
-                        V1PodList.class);
+        SharedIndexInformer<V1Pod> podInformer = operatorConfig.getWatchNamespace() == null
+                ? sharedInformerFactory.sharedIndexInformerFor(
+                (CallGeneratorParams params) -> coreV1Api.listPodForAllNamespacesCall(
+                        null,
+                        null,
+                        null,
+                        OperatorLabels.toSelector(OperatorLabels.MANAGED), // TODO: watch only pods having rack index=0 for seeds ?
+                        null,
+                        null,
+                        params.resourceVersion,
+                        params.timeoutSeconds,
+                        params.watch,
+                        null),
+                V1Pod.class,
+                V1PodList.class)
+                : sharedInformerFactory.sharedIndexInformerFor(
+                (CallGeneratorParams params) -> coreV1Api.listNamespacedPodCall(
+                        operatorConfig.getWatchNamespace(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        OperatorLabels.toSelector(OperatorLabels.MANAGED), // TODO: watch only pods having rack index=0 for seeds ?
+                        null,
+                        params.resourceVersion,
+                        params.timeoutSeconds,
+                        params.watch,
+                        null),
+                V1Pod.class,
+                V1PodList.class);
     }
 
     void addServiceAccountInformer() {
-        SharedIndexInformer<V1ServiceAccount> saInformer =
-                sharedInformerFactory.sharedIndexInformerFor(
-                        (CallGeneratorParams params) -> coreV1Api.listServiceAccountForAllNamespacesCall(
-                                null,
-                                null,
-                                null,
-                                OperatorLabels.toSelector(OperatorLabels.MANAGED),
-                                null,
-                                null,
-                                params.resourceVersion,
-                                params.timeoutSeconds,
-                                params.watch,
-                                null),
-                        V1ServiceAccount.class,
-                        V1ServiceAccountList.class);
+        SharedIndexInformer<V1ServiceAccount> saInformer = operatorConfig.getWatchNamespace() == null
+                ? sharedInformerFactory.sharedIndexInformerFor(
+                (CallGeneratorParams params) -> coreV1Api.listServiceAccountForAllNamespacesCall(
+                        null,
+                        null,
+                        null,
+                        OperatorLabels.toSelector(OperatorLabels.MANAGED),
+                        null,
+                        null,
+                        params.resourceVersion,
+                        params.timeoutSeconds,
+                        params.watch,
+                        null),
+                V1ServiceAccount.class,
+                V1ServiceAccountList.class)
+                : sharedInformerFactory.sharedIndexInformerFor(
+                (CallGeneratorParams params) -> coreV1Api.listNamespacedServiceAccountCall(
+                        operatorConfig.getWatchNamespace(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        OperatorLabels.toSelector(OperatorLabels.MANAGED),
+                        null,
+                        params.resourceVersion,
+                        params.timeoutSeconds,
+                        params.watch,
+                        null),
+                V1ServiceAccount.class,
+                V1ServiceAccountList.class);
     }
 
     void addDataCenterInformer() {
-        SharedIndexInformer<DataCenter> dcInformer =
-                sharedInformerFactory.sharedIndexInformerFor(
-                        (CallGeneratorParams params) -> {
-                            return customObjectsApi.listClusterCustomObjectCall(
-                                    StrapdataCrdGroup.GROUP,
-                                    DataCenter.VERSION,
-                                    DataCenter.PLURAL,
-                                    null,
-                                    null,
-                                    null,
-                                    null,
-                                    null,
-                                    params.resourceVersion,
-                                    params.timeoutSeconds,
-                                    params.watch, null);
-                        },
-                        DataCenter.class,
-                        DataCenterList.class,
-                        5000);
+        SharedIndexInformer<DataCenter> dcInformer = operatorConfig.getWatchNamespace() == null
+                ? sharedInformerFactory.sharedIndexInformerFor(
+                (CallGeneratorParams params) -> {
+                    return customObjectsApi.listClusterCustomObjectCall(
+                            StrapdataCrdGroup.GROUP,
+                            DataCenter.VERSION,
+                            DataCenter.PLURAL,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            params.resourceVersion,
+                            params.timeoutSeconds,
+                            params.watch, null);
+                },
+                DataCenter.class,
+                DataCenterList.class,
+                5000)
+                : sharedInformerFactory.sharedIndexInformerFor(
+                (CallGeneratorParams params) -> {
+                    return customObjectsApi.listNamespacedCustomObjectCall(
+                            StrapdataCrdGroup.GROUP,
+                            DataCenter.VERSION,
+                            operatorConfig.getWatchNamespace(),
+                            DataCenter.PLURAL,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            params.resourceVersion,
+                            params.timeoutSeconds,
+                            params.watch, null);
+                },
+                DataCenter.class,
+                DataCenterList.class,
+                5000);
+
         dcInformer.addEventHandlerWithResyncPeriod(new ResourceEventHandler<DataCenter>() {
             AtomicInteger managed = new AtomicInteger(0);
             List<Tag> tags = ImmutableList.of(new ImmutableTag("type", "datacenter"));
@@ -226,21 +281,36 @@ public class K8sController {
     }
 
     void addStatefulSetInformer() {
-        SharedIndexInformer<V1StatefulSet> stsInformer =
-                sharedInformerFactory.sharedIndexInformerFor(
-                        (CallGeneratorParams params) -> appsApi.listStatefulSetForAllNamespacesCall(
-                                null,
-                                null,
-                                null,
-                                OperatorLabels.toSelector(OperatorLabels.MANAGED),
-                                null,
-                                null,
-                                params.resourceVersion,
-                                params.timeoutSeconds,
-                                params.watch,
-                                null),
-                        V1StatefulSet.class,
-                        V1StatefulSetList.class);
+        SharedIndexInformer<V1StatefulSet> stsInformer = operatorConfig.getWatchNamespace() == null
+                ? sharedInformerFactory.sharedIndexInformerFor(
+                (CallGeneratorParams params) -> appsApi.listStatefulSetForAllNamespacesCall(
+                        null,
+                        null,
+                        null,
+                        OperatorLabels.toSelector(OperatorLabels.MANAGED),
+                        null,
+                        null,
+                        params.resourceVersion,
+                        params.timeoutSeconds,
+                        params.watch,
+                        null),
+                V1StatefulSet.class,
+                V1StatefulSetList.class)
+                : sharedInformerFactory.sharedIndexInformerFor(
+                (CallGeneratorParams params) -> appsApi.listNamespacedStatefulSetCall(
+                        operatorConfig.getWatchNamespace(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        OperatorLabels.toSelector(OperatorLabels.MANAGED),
+                        null,
+                        params.resourceVersion,
+                        params.timeoutSeconds,
+                        params.watch,
+                        null),
+                V1StatefulSet.class,
+                V1StatefulSetList.class);
 
         stsInformer.addEventHandlerWithResyncPeriod(new ResourceEventHandler<V1StatefulSet>() {
             AtomicInteger managed = new AtomicInteger(0);
@@ -312,20 +382,35 @@ public class K8sController {
     }
 
     void addTaskInformer() {
-        SharedIndexInformer<Task> taskInformer =
-                sharedInformerFactory.sharedIndexInformerFor(
-                        (CallGeneratorParams params) -> customObjectsApi.listClusterCustomObjectCall(
-                                StrapdataCrdGroup.GROUP,
-                                Task.VERSION,
-                                Task.PLURAL,
-                                null,
-                                null,
-                                null,
-                                null,
-                                null,
-                                params.resourceVersion, params.timeoutSeconds, params.watch, null),
-                        Task.class,
-                        TaskList.class);
+        SharedIndexInformer<Task> taskInformer = operatorConfig.getWatchNamespace() == null
+                ? sharedInformerFactory.sharedIndexInformerFor(
+                (CallGeneratorParams params) -> customObjectsApi.listClusterCustomObjectCall(
+                        StrapdataCrdGroup.GROUP,
+                        Task.VERSION,
+                        Task.PLURAL,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        params.resourceVersion, params.timeoutSeconds, params.watch, null),
+                Task.class,
+                TaskList.class)
+                : sharedInformerFactory.sharedIndexInformerFor(
+                (CallGeneratorParams params) -> customObjectsApi.listNamespacedCustomObjectCall(
+                        StrapdataCrdGroup.GROUP,
+                        Task.VERSION,
+                        operatorConfig.getWatchNamespace(),
+                        Task.PLURAL,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        params.resourceVersion, params.timeoutSeconds, params.watch, null),
+                Task.class,
+                TaskList.class);
+
         taskInformer.addEventHandlerWithResyncPeriod(new ResourceEventHandler<Task>() {
 
             AtomicInteger managed = new AtomicInteger(0);
@@ -370,21 +455,36 @@ public class K8sController {
     }
 
     void addDeploymentInformer() {
-        SharedIndexInformer<V1Deployment> deploymentInformer =
-                sharedInformerFactory.sharedIndexInformerFor(
-                        (CallGeneratorParams params) -> appsApi.listDeploymentForAllNamespacesCall(
-                                null,
-                                null,
-                                null,
-                                OperatorLabels.toSelector(OperatorLabels.MANAGED),
-                                null,
-                                null,
-                                params.resourceVersion,
-                                params.timeoutSeconds,
-                                params.watch,
-                                null),
-                        V1Deployment.class,
-                        V1DeploymentList.class);
+        SharedIndexInformer<V1Deployment> deploymentInformer = operatorConfig.getWatchNamespace() == null
+                ? sharedInformerFactory.sharedIndexInformerFor(
+                (CallGeneratorParams params) -> appsApi.listDeploymentForAllNamespacesCall(
+                        null,
+                        null,
+                        null,
+                        OperatorLabels.toSelector(OperatorLabels.MANAGED),
+                        null,
+                        null,
+                        params.resourceVersion,
+                        params.timeoutSeconds,
+                        params.watch,
+                        null),
+                V1Deployment.class,
+                V1DeploymentList.class)
+                : sharedInformerFactory.sharedIndexInformerFor(
+                (CallGeneratorParams params) -> appsApi.listNamespacedDeploymentCall(
+                        operatorConfig.getWatchNamespace(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        OperatorLabels.toSelector(OperatorLabels.MANAGED),
+                        null,
+                        params.resourceVersion,
+                        params.timeoutSeconds,
+                        params.watch,
+                        null),
+                V1Deployment.class,
+                V1DeploymentList.class);
         deploymentInformer.addEventHandlerWithResyncPeriod(new ResourceEventHandler<V1Deployment>() {
             AtomicInteger managed = new AtomicInteger(0);
             List<Tag> tags = ImmutableList.of(new ImmutableTag("type", "task"));
@@ -430,5 +530,23 @@ public class K8sController {
                         .withCompletable(dataCenterReconcilier.deploymentAvailable(dataCenter, op, deployment)));
             }
         }
+    }
+
+    /**
+     * Computes a result, or throws an exception if unable to do so.
+     *
+     * @return computed result
+     * @throws Exception if unable to compute a result
+     */
+    @Override
+    public K8sController call() throws Exception {
+        logger.info("Watching for resources in namespace={}", operatorConfig.getWatchNamespace());
+        start();
+        return this;
+    }
+
+    @Override
+    public int order() {
+        return 100;
     }
 }
