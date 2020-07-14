@@ -47,7 +47,12 @@ subprojects {
       exclude group: 'com.google.guava', module: 'guava'
     }
 
-    implementation "io.kubernetes:client-java:${kubernetesClientVersion}"
+    implementation(group: 'io.kubernetes', name: 'client-java', version: "${kubernetesClientVersion}") {
+      exclude group: 'com.squareup.okhttp3'
+    }
+    implementation "com.squareup.okhttp3:okhttp:3.14.9"
+    implementation "com.squareup.okhttp3:logging-interceptor:3.14.9"
+
     implementation "javax.inject:javax.inject:1"
 
     runtime "ch.qos.logback:logback-classic:1.2.3"
