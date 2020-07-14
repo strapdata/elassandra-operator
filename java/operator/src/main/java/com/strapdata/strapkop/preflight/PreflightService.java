@@ -25,10 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
+import java.util.*;
 
 /**
  * Creates CRD defintion and defaultCA
@@ -39,10 +36,10 @@ public class PreflightService {
     static final Logger logger = LoggerFactory.getLogger(PreflightService.class);
 
     private final ApplicationEventPublisher eventPublisher;
-    private final Collection<Preflight<?>> preflights;
+    private final Collection<Preflight> preflights;
     private volatile boolean executed = false;
 
-    public PreflightService(ApplicationEventPublisher eventPublisher, Collection<Preflight<?>> preflights) {
+    public PreflightService(ApplicationEventPublisher eventPublisher, Collection<Preflight> preflights) {
         this.eventPublisher = eventPublisher;
         this.preflights = preflights;
     }
@@ -54,19 +51,19 @@ public class PreflightService {
     @Async
     void onStartup(ServiceStartedEvent event) {
 
-        Collections.sort(new ArrayList(preflights), new Comparator<Preflight<?>>() {
+        List<Preflight> preflightList = new ArrayList<>(preflights);
+        Collections.sort(preflightList, new Comparator<Preflight>() {
             @Override
             public int compare(Preflight o1, Preflight o2) {
                 return o1.order() - o2.order();
             }
         });
-        for (Preflight<?> preflight : preflights) {
+        for (Preflight preflight : preflightList) {
             try {
-                logger.debug("Execute preflight order={}", preflight.order());
+                logger.info("Execute preflight class={} order={}", preflight.getClass().getName(), preflight.order());
                 preflight.call();
             } catch (Exception e) {
-                e.printStackTrace();
-                // TODO: should we refuse to start here ?
+                logger.warn("error:", e);
             }
         }
 

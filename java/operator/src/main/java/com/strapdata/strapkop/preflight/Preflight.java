@@ -19,7 +19,7 @@ package com.strapdata.strapkop.preflight;
 
 import java.util.concurrent.Callable;
 
-public interface Preflight<T> extends Callable<T> {
+public interface Preflight extends Callable<Void> {
     default int order() {
         return 0;
     }
