@@ -27,8 +27,8 @@ micronaut:
                 type: "${OPERATOR_KEYSTORE_TYPE:PKCS12}"
                 path: "${OPERATOR_KEYSTORE_PATH:`file:/tls/operator.p12`}"
                 password: "${OPERATOR_KEYSTORE_PASSWORD:changeit}"
-#        netty:
-#            log-level: TRACE
+        netty:
+            log-level: TRACE
     executors:
         workqueue:
             type: CACHED
@@ -89,5 +89,7 @@ operator:
     serviceName: "${OPERATOR_SERVICE_NAME:elassandra-operator}"
     runSysctl: "${OPERATOR_RUN_SYSCTL:true}"
     installCrd: "${OPERATOR_INSTALL_CRD:true}"
+    nodeDnsZone: "${OPERATOR_NODE_DNS_ZONE:}"
+    nodeDnsTtl: "${OPERATOR_NODE_DNS_TTL:60}"
     tasks:
         retentionPeriod: "${OPERATOR_TASKS_RETENTION:7D}"

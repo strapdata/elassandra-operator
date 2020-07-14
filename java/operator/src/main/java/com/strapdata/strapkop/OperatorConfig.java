@@ -75,4 +75,10 @@ public class OperatorConfig {
      * Install CRD on startup.
      */
     Boolean installCrd;
+
+    /**
+     * Publish a DNSEndpoint for Kubernetes nodes to resolve public IP to internal IP
+     */
+    String nodeDnsZone;
+    Long   nodeDnsTtl;
 }
