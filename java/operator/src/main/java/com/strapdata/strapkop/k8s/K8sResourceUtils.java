@@ -127,7 +127,7 @@ public class K8sResourceUtils {
                     try {
                         return replace.get();
                     } catch (final ApiException e2) {
-                        logger.error("replace error code={} namespace={} object={}", e2.getCode(), namespace, t);
+                        logger.error("replace error namespace={} object={} code={} body={}", namespace, t, e2.getCode(), e.getResponseBody());
                         throw e2;
                     }
                 }
