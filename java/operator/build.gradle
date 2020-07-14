@@ -23,7 +23,8 @@ jib {
     from {
         // TODO make it configurable to allow bash exec ???
         //image = 'openjdk:alpine'
-        image = 'adoptopenjdk:8-jre-hotspot-bionic'
+        //image = 'adoptopenjdk:8-jdk-hotspot'
+        image = 'adoptopenjdk:8u222-b10-jdk-hotspot'    // downgrade jdk because of a prohibited TLS suite with openshift 4.1 !
         //image = 'gcr.io/distroless/java:8'
     }
     to {
@@ -44,6 +45,7 @@ jib {
                     '-XX:+ExitOnOutOfMemoryError',
                     '-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005',
                     '-XshowSettings:vm'
+                    //,'-Djavax.net.debug=ssl:plaintext'
         ]
         mainClass = mainClassName
         ports = ['8080']
@@ -136,8 +138,18 @@ dependencies {
 task runLocal(type: JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
     main = mainClassName
-    environment OPERATOR_PROMETHEUS_ENABLED: "false"
     environment OPERATOR_SERVER_PORT: "8080"
     environment OPERATOR_SSL: "false"
     jvmArgs '-Dmicronaut.environments=local'
+}
+
+task runLocal2(type: JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    main = mainClassName
+    environment OPERATOR_SERVER_PORT: "8080"
+    environment OPERATOR_SSL: "false"
+    environment OPERATOR_INSTALL_CRD: "false"
+    environment OPERATOR_WATCH_NAMESPACE: "strapdata"
+    //environment OPERATOR_NODE_DNS_ZONE: "test.strapkube.com"
+    jvmArgs '-Djavax.net.debug=ssl,handshake'
 }
