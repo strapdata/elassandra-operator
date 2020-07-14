@@ -7,7 +7,9 @@ import com.strapdata.strapkop.cache.StatefulsetCache;
 import com.strapdata.strapkop.model.Key;
 import com.strapdata.strapkop.model.k8s.OperatorLabels;
 import com.strapdata.strapkop.model.k8s.StrapdataCrdGroup;
-import com.strapdata.strapkop.model.k8s.datacenter.*;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenter;
+import com.strapdata.strapkop.model.k8s.datacenter.DataCenterList;
+import com.strapdata.strapkop.model.k8s.datacenter.Operation;
 import com.strapdata.strapkop.model.k8s.task.Task;
 import com.strapdata.strapkop.model.k8s.task.TaskList;
 import com.strapdata.strapkop.model.k8s.task.TaskStatus;
@@ -43,7 +45,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 @Singleton
 @Infrastructure
-public class K8sController implements Preflight<K8sController> {
+public class K8sController implements Preflight {
 
     private final Logger logger = LoggerFactory.getLogger(K8sController.class);
 
@@ -86,6 +88,8 @@ public class K8sController implements Preflight<K8sController> {
     @Inject
     OperatorConfig operatorConfig;
 
+    SharedIndexInformer<V1Node> nodeInformer;
+
     public void start() {
         addNodeInformer();
         addPodInformer();
@@ -106,7 +110,7 @@ public class K8sController implements Preflight<K8sController> {
     }
 
     void addNodeInformer() {
-        SharedIndexInformer<V1Node> nodeInformer =
+        this.nodeInformer =
                 sharedInformerFactory.sharedIndexInformerFor(
                         (CallGeneratorParams params) -> {
                             return coreV1Api.listNodeCall(
@@ -124,6 +128,7 @@ public class K8sController implements Preflight<K8sController> {
                         V1Node.class,
                         V1NodeList.class);
     }
+
 
     void addPodInformer() {
         SharedIndexInformer<V1Pod> podInformer = operatorConfig.getWatchNamespace() == null
@@ -539,10 +544,10 @@ public class K8sController implements Preflight<K8sController> {
      * @throws Exception if unable to compute a result
      */
     @Override
-    public K8sController call() throws Exception {
+    public Void call() throws Exception {
         logger.info("Watching for resources in namespace={}", operatorConfig.getWatchNamespace());
         start();
-        return this;
+        return null;
     }
 
     @Override

@@ -35,7 +35,7 @@ import java.io.InputStreamReader;
 /**
  * Deploy CRDs (Helm does not manage properly installation when CRD already exists)
  */
-public class CreateCustomResourceDefinitions implements Preflight<Void> {
+public class CreateCustomResourceDefinitions implements Preflight {
 
     static final Logger logger = LoggerFactory.getLogger(CreateCustomResourceDefinitions.class);
 
