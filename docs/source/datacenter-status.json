@@ -121,7 +121,7 @@
           },
           "fingerprint" : {
             "type" : "string",
-            "description" : "Datacenter spec and user configmap fingerprint"
+            "description" : "Rack fingerprint"
           },
           "desiredReplicas" : {
             "type" : "integer",

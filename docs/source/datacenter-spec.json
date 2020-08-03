@@ -72,6 +72,30 @@
               "type" : "object",
               "id" : "urn:jsonschema:org:joda:time:DateTime",
               "properties" : {
+                "yearOfCentury" : {
+                  "type" : "integer"
+                },
+                "centuryOfEra" : {
+                  "type" : "integer"
+                },
+                "weekOfWeekyear" : {
+                  "type" : "integer"
+                },
+                "weekyear" : {
+                  "type" : "integer"
+                },
+                "yearOfEra" : {
+                  "type" : "integer"
+                },
+                "secondOfDay" : {
+                  "type" : "integer"
+                },
+                "minuteOfDay" : {
+                  "type" : "integer"
+                },
+                "dayOfMonth" : {
+                  "type" : "integer"
+                },
                 "millisOfDay" : {
                   "type" : "integer"
                 },
@@ -90,27 +114,6 @@
                 "millisOfSecond" : {
                   "type" : "integer"
                 },
-                "weekOfWeekyear" : {
-                  "type" : "integer"
-                },
-                "weekyear" : {
-                  "type" : "integer"
-                },
-                "yearOfEra" : {
-                  "type" : "integer"
-                },
-                "yearOfCentury" : {
-                  "type" : "integer"
-                },
-                "centuryOfEra" : {
-                  "type" : "integer"
-                },
-                "secondOfDay" : {
-                  "type" : "integer"
-                },
-                "minuteOfDay" : {
-                  "type" : "integer"
-                },
                 "era" : {
                   "type" : "integer"
                 },
@@ -118,9 +121,6 @@
                   "type" : "integer"
                 },
                 "dayOfWeek" : {
-                  "type" : "integer"
-                },
-                "dayOfMonth" : {
                   "type" : "integer"
                 },
                 "year" : {
@@ -181,105 +181,6 @@
             "generation" : {
               "type" : "integer"
             },
-            "initializers" : {
-              "type" : "object",
-              "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1Initializers",
-              "properties" : {
-                "pending" : {
-                  "type" : "array",
-                  "items" : {
-                    "type" : "object",
-                    "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1Initializer",
-                    "properties" : {
-                      "name" : {
-                        "type" : "string"
-                      }
-                    }
-                  }
-                },
-                "result" : {
-                  "type" : "object",
-                  "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1Status",
-                  "properties" : {
-                    "apiVersion" : {
-                      "type" : "string"
-                    },
-                    "code" : {
-                      "type" : "integer"
-                    },
-                    "details" : {
-                      "type" : "object",
-                      "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1StatusDetails",
-                      "properties" : {
-                        "causes" : {
-                          "type" : "array",
-                          "items" : {
-                            "type" : "object",
-                            "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1StatusCause",
-                            "properties" : {
-                              "field" : {
-                                "type" : "string"
-                              },
-                              "message" : {
-                                "type" : "string"
-                              },
-                              "reason" : {
-                                "type" : "string"
-                              }
-                            }
-                          }
-                        },
-                        "group" : {
-                          "type" : "string"
-                        },
-                        "kind" : {
-                          "type" : "string"
-                        },
-                        "name" : {
-                          "type" : "string"
-                        },
-                        "retryAfterSeconds" : {
-                          "type" : "integer"
-                        },
-                        "uid" : {
-                          "type" : "string"
-                        }
-                      }
-                    },
-                    "kind" : {
-                      "type" : "string"
-                    },
-                    "message" : {
-                      "type" : "string"
-                    },
-                    "metadata" : {
-                      "type" : "object",
-                      "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ListMeta",
-                      "properties" : {
-                        "remainingItemCount" : {
-                          "type" : "integer"
-                        },
-                        "resourceVersion" : {
-                          "type" : "string"
-                        },
-                        "selfLink" : {
-                          "type" : "string"
-                        },
-                        "continue" : {
-                          "type" : "string"
-                        }
-                      }
-                    },
-                    "reason" : {
-                      "type" : "string"
-                    },
-                    "status" : {
-                      "type" : "string"
-                    }
-                  }
-                }
-              }
-            },
             "labels" : {
               "type" : "object",
               "additionalProperties" : {
@@ -295,7 +196,10 @@
                   "apiVersion" : {
                     "type" : "string"
                   },
-                  "fields" : {
+                  "fieldsType" : {
+                    "type" : "string"
+                  },
+                  "fieldsV1" : {
                     "type" : "any"
                   },
                   "manager" : {
@@ -917,10 +821,17 @@
                           },
                           "gmsaCredentialSpecName" : {
                             "type" : "string"
+                          },
+                          "runAsUserName" : {
+                            "type" : "string"
                           }
                         }
                       }
                     }
+                  },
+                  "startupProbe" : {
+                    "type" : "object",
+                    "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1Probe"
                   },
                   "stdin" : {
                     "type" : "boolean"
@@ -1024,6 +935,116 @@
             "enableServiceLinks" : {
               "type" : "boolean"
             },
+            "ephemeralContainers" : {
+              "type" : "array",
+              "items" : {
+                "type" : "object",
+                "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1EphemeralContainer",
+                "properties" : {
+                  "args" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "string"
+                    }
+                  },
+                  "command" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "string"
+                    }
+                  },
+                  "env" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "object",
+                      "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1EnvVar"
+                    }
+                  },
+                  "envFrom" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "object",
+                      "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1EnvFromSource"
+                    }
+                  },
+                  "image" : {
+                    "type" : "string"
+                  },
+                  "imagePullPolicy" : {
+                    "type" : "string"
+                  },
+                  "lifecycle" : {
+                    "type" : "object",
+                    "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1Lifecycle"
+                  },
+                  "livenessProbe" : {
+                    "type" : "object",
+                    "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1Probe"
+                  },
+                  "name" : {
+                    "type" : "string"
+                  },
+                  "ports" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "object",
+                      "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ContainerPort"
+                    }
+                  },
+                  "readinessProbe" : {
+                    "type" : "object",
+                    "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1Probe"
+                  },
+                  "resources" : {
+                    "type" : "object",
+                    "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1ResourceRequirements"
+                  },
+                  "securityContext" : {
+                    "type" : "object",
+                    "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1SecurityContext"
+                  },
+                  "startupProbe" : {
+                    "type" : "object",
+                    "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1Probe"
+                  },
+                  "stdin" : {
+                    "type" : "boolean"
+                  },
+                  "stdinOnce" : {
+                    "type" : "boolean"
+                  },
+                  "targetContainerName" : {
+                    "type" : "string"
+                  },
+                  "terminationMessagePath" : {
+                    "type" : "string"
+                  },
+                  "terminationMessagePolicy" : {
+                    "type" : "string"
+                  },
+                  "tty" : {
+                    "type" : "boolean"
+                  },
+                  "volumeDevices" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "object",
+                      "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1VolumeDevice"
+                    }
+                  },
+                  "volumeMounts" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "object",
+                      "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1VolumeMount"
+                    }
+                  },
+                  "workingDir" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            },
             "hostAliases" : {
               "type" : "array",
               "items" : {
@@ -1080,6 +1101,13 @@
               "type" : "object",
               "additionalProperties" : {
                 "type" : "string"
+              }
+            },
+            "overhead" : {
+              "type" : "object",
+              "additionalProperties" : {
+                "type" : "object",
+                "$ref" : "urn:jsonschema:io:kubernetes:client:custom:Quantity"
               }
             },
             "preemptionPolicy" : {
@@ -1193,6 +1221,28 @@
                     "type" : "integer"
                   },
                   "value" : {
+                    "type" : "string"
+                  }
+                }
+              }
+            },
+            "topologySpreadConstraints" : {
+              "type" : "array",
+              "items" : {
+                "type" : "object",
+                "id" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1TopologySpreadConstraint",
+                "properties" : {
+                  "labelSelector" : {
+                    "type" : "object",
+                    "$ref" : "urn:jsonschema:io:kubernetes:client:openapi:models:V1LabelSelector"
+                  },
+                  "maxSkew" : {
+                    "type" : "integer"
+                  },
+                  "topologyKey" : {
+                    "type" : "string"
+                  },
+                  "whenUnsatisfiable" : {
                     "type" : "string"
                   }
                 }
@@ -2037,12 +2087,6 @@
           "type" : "string",
           "enum" : [ "WRITE", "READ_WRITE", "READ" ]
         },
-        "config" : {
-          "type" : "object",
-          "additionalProperties" : {
-            "type" : "any"
-          }
-        },
         "authentication" : {
           "type" : "string",
           "enum" : [ "NONE", "CASSANDRA", "LDAP" ]
@@ -2185,7 +2229,7 @@
           },
           "rf" : {
             "type" : "integer",
-            "description" : "Managed keyspace replication factor"
+            "description" : "Managed keyspace target replication factor"
           },
           "repair" : {
             "type" : "boolean",

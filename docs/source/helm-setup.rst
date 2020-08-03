@@ -16,6 +16,14 @@ Install HELM 2 in your kubernetes cluster:
     kubectl create clusterrolebinding tiller-cluster-rule --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
     helm init --wait --service-account tiller
 
+.. warning::
+
+    For Kubernetes version 1.16+, install HELM with the following command:
+
+    .. code::
+
+        helm init --service-account tiller --override spec.selector.matchLabels.'name'='tiller',spec.selector.matchLabels.'app'='helm' --output yaml | sed 's@apiVersion: extensions/v1beta1@apiVersion: apps/v1@' | kubectl apply -f -
+
 For more information, see the `HELM 2 website <https://v2.helm.sh/docs/install/>`_,
 and apply `Best practices for securing HELM and Tiller <https://v2.helm.sh/docs/securing_installation/#best-practices-for-securing-helm-and-tiller>`_.
 

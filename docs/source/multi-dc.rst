@@ -9,464 +9,10 @@ Kubernetes
 
 Here is instruction to prepare your Kubernetes cluster before deploying the Elassandra stack.
 
-AKS
-___
-
-In order to create your Azure Kubernetes cluster, see the `Azure Quickstart <https://docs.microsoft.com/en-us/azure/aks/kubernetes-walkthrough>`_.
-
-.. tip::
-
-    To setup an AKS cluster with having a public IP address on each Kubernetes nodes, you need to install the following `Azure preview features
-    <https://docs.microsoft.com/en-us/azure/aks/use-multiple-node-pools#assign-a-public-ip-per-node-for-your-node-pools-preview>`_.
-
-    .. code::
-
-        az extension add --name aks-preview
-        az extension update --name aks-preview
-        az feature register --name NodePublicIPPreview --namespace Microsoft.ContainerService
-
-Create a resource group and regional AKS cluster with the Azure network plugin and a default nodepool based
-on a `VirtualMachineScaleSets <https://docs.microsoft.com/en-us/rest/api/compute/virtualmachinescalesets>`_ that assigns
-a public IP address to each virtual machine:
-
-.. code::
-
-    az group create -l ${AZURE_REGION} -n ${RESOURCE_GROUP_NAME}
-    az aks create --name "${K8S_CLUSTER_NAME}" \
-                  --resource-group ${RESOURCE_GROUP_NAME} \
-                  --network-plugin azure \
-                  --node-count 3 \
-                  --node-vm-size Standard_D2_v3 \
-                  --vm-set-type VirtualMachineScaleSets \
-                  --output table \
-                  --zone 1 2 3 \
-                  --enable-node-public-ip
-    az aks get-credentials --name "${K8S_CLUSTER_NAME}" --resource-group $RESOURCE_GROUP_NAME --output table
-
-Unfortunately, AKS does not map VM's public IP address to the Kubernetes node external IP address, so the trick is to add these public IP addresses as a
-kubernetes custom label ``elassandra.strapdata.com/public-ip`` to each nodes, here for the first Kubernetes node in our AKS cluster:
-
-.. code::
-
-    add_vmss_public_ip() {
-       AKS_RG_NAME=$(az resource show --namespace Microsoft.ContainerService --resource-type managedClusters -g $RESOURCE_GROUP_NAME -n $K8S_CLUSTER_NAME | jq -r .properties.nodeResourceGroup)
-       AKS_VMSS_INSTANCE=$(kubectl get nodes -o json | jq -r ".items[${1:-0}].metadata.name")
-       PUBLIC_IP=$(az vmss list-instance-public-ips -g $AKS_RG_NAME -n ${AKS_VMSS_INSTANCE::-6} | jq -r ".[${1:-0}].ipAddress")
-       kubectl label nodes --overwrite $AKS_VMSS_INSTANCE elassandra.strapdata.com/public-ip=$PUBLIC_IP
-    }
-
-    NODE_COUNT=$(kubectl get nodes --no-headers | wc -l)
-    for i in $(seq 0 $((NODE_COUNT-1))); do
-      add_vmss_public_ip $i
-    done
-
-As the result, you should have kubernetes nodes properly labeled with zone and public-ip:
-
-.. code::
-
-    kubectl get nodes -L failure-domain.beta.kubernetes.io/zone,elassandra.strapdata.com/public-ip
-    NAME                                STATUS   ROLES   AGE   VERSION    ZONE           PUBLIC-IP
-    aks-nodepool1-74300635-vmss000000   Ready    agent   54m   v1.15.11   westeurope-1   51.138.75.131
-    aks-nodepool1-74300635-vmss000001   Ready    agent   54m   v1.15.11   westeurope-2   40.113.160.148
-    aks-nodepool1-74300635-vmss000002   Ready    agent   54m   v1.15.11   westeurope-3   51.124.121.185
-
-AKS StorageClass
-................
-
-Azure persistent volumes are bound to an availability zone, so we need to defined one storageClass per zone in our Kubernetes cluster,
-and each Elassandra rack or statefulSet will be bound to the corresponding storageClass.
-This is done here using the HELM chart strapdata/storageclass.
-
-.. code::
-
-    for z in 1 2 3; do
-        helm install --name ssd-$AZURE_REGION-$z --namespace kube-system \
-            --set parameters.kind="Managed" \
-            --set parameters.cachingmode="ReadOnly" \
-            --set parameters.storageaccounttype="StandardSSD_LRS" \
-            --set provisioner="kubernetes.io/azure-disk" \
-            --set zone="$AZURE_REGION-${z}" \
-            --set nameOverride="ssd-$AZURE_REGION-$z" \
-            strapdata/storageclass
-    done
-
-AKS Firewall rules
-..................
-
-Finally, you may need to authorize inbound Elassandra connections on the following TCP ports:
-
-* Cassandra storage port (usually 7000 or 7001) for internode connections
-* Cassandra native CQL port (usually 9042) for client to node connections.
-* Elasticsearch HTTP port (usually 9200) for the Elasticsearch REST API.
-
-Assuming you deploy an Elassandra datacenter respectively using ports 39000, 39001, and 39002 exposed to the internet, with no source IP address restrictions:
-
-.. code::
-
-    AKS_RG_NAME=$(az resource show --namespace Microsoft.ContainerService --resource-type managedClusters -g $RESOURCE_GROUP_NAME -n "${K8S_CLUSTER_NAME}" | jq -r .properties.nodeResourceGroup)
-    NSG_NAME=$(az network nsg list -g $AKS_RG_NAME | jq -r .[0].name)
-    az network nsg rule create \
-        --resource-group $AKS_RG_NAME \
-        --nsg-name $NSG_NAME \
-        --name elassandra_inbound \
-        --description "Elassandra inbound rule" \
-        --priority 2000 \
-        --access Allow \
-        --source-address-prefixes Internet \
-        --protocol Tcp \
-        --direction Inbound \
-        --destination-address-prefixes '*' \
-        --destination-port-ranges 39000-39002
-
-Your Kubernetes cluster is now ready to deploy an Elassandra datacenter accessible from the internet world.
-
-GKE
-___
-
-Create a `Regional Kubernetes cluster <https://cloud.google.com/kubernetes-engine/docs/how-to/creating-a-regional-cluster>`_ on GCP:
-
-.. code::
-
-    gcloud container clusters create $K8S_CLUSTER_NAME \
-      --region $GCLOUD_REGION \
-      --project $GCLOUD_PROJECT \
-      --machine-type "n1-standard-2" \
-      --cluster-version=1.15 \
-      --tags=$K8S_CLUSTER_NAME \
-      --num-nodes "1"
-    gcloud container clusters get-credentials $K8S_CLUSTER_NAME --region $GCLOUD_REGION --project $GCLOUD_PROJECT
-
-Enable RBAC:
-
-.. code::
-
-    kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-admin --user $(gcloud config get-value account)
-
-
-CoreDNS installation
-....................
-
-GKE is provided with KubeDNS by default, which does not allows to configure host aliases required by our Kubernetes AddressTranslator.
-So we need to install CoreDNS configured to import custom configuration (see `CoreDNS import plugin <https://coredns.io/plugins/import/>`_),
-and configure KubeDNS with a stub domain to forward to CoreDNS.
-
-.. code::
-
-    helm install --name coredns --namespace=kube-system -f integ-test/gke/coredns-values.yaml stable/coredns
-
-Where integ-test/gke/coredns-values.yaml is:
-
-.. code::
-
-    # Default values for coredns.
-    # This is a YAML-formatted file.
-    # Declare variables to be passed into your templates.
-
-    image:
-      repository: coredns/coredns
-      tag: "1.6.9"
-      pullPolicy: IfNotPresent
-
-    replicaCount: 1
-
-    resources:
-      limits:
-        cpu: 100m
-        memory: 128Mi
-      requests:
-        cpu: 100m
-        memory: 128Mi
-
-    serviceType: "ClusterIP"
-
-    prometheus:
-      service:
-        enabled: false
-        annotations:
-          prometheus.io/scrape: "true"
-          prometheus.io/port: "9153"
-      monitor:
-        enabled: false
-        additionalLabels: {}
-        namespace: ""
-
-    service:
-      # clusterIP: ""
-      # loadBalancerIP: ""
-      # externalTrafficPolicy: ""
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "9153"
-
-    serviceAccount:
-      create: false
-      # The name of the ServiceAccount to use
-      # If not set and create is true, a name is generated using the fullname template
-      name:
-
-    rbac:
-      # If true, create & use RBAC resources
-      create: true
-      # If true, create and use PodSecurityPolicy
-      pspEnable: false
-      # The name of the ServiceAccount to use.
-      # If not set and create is true, a name is generated using the fullname template
-      # name:
-
-    # isClusterService specifies whether chart should be deployed as cluster-service or normal k8s app.
-    isClusterService: true
-
-    # Optional priority class to be used for the coredns pods. Used for autoscaler if autoscaler.priorityClassName not set.
-    priorityClassName: ""
-
-    # Default zone is what Kubernetes recommends:
-    # https://kubernetes.io/docs/tasks/administer-cluster/dns-custom-nameservers/#coredns-configmap-options
-    servers:
-      - zones:
-          - zone: .
-        port: 53
-        plugins:
-          - name: errors
-          # Serves a /health endpoint on :8080, required for livenessProbe
-          - name: health
-            configBlock: |-
-              lameduck 5s
-          # Serves a /ready endpoint on :8181, required for readinessProbe
-          - name: ready
-          # Required to query kubernetes API for data
-          - name: kubernetes
-            parameters: cluster.local in-addr.arpa ip6.arpa
-            configBlock: |-
-              pods insecure
-              fallthrough in-addr.arpa ip6.arpa
-              ttl 30
-          # Serves a /metrics endpoint on :9153, required for serviceMonitor
-          - name: prometheus
-            parameters: 0.0.0.0:9153
-          - name: forward
-            parameters: . /etc/resolv.conf
-          - name: cache
-            parameters: 30
-          - name: loop
-          - name: reload
-          - name: loadbalance
-          - name: import
-            parameters: "custom/*.override"
-
-    # Complete example with all the options:
-    # - zones:                 # the `zones` block can be left out entirely, defaults to "."
-    #   - zone: hello.world.   # optional, defaults to "."
-    #     scheme: tls://       # optional, defaults to "" (which equals "dns://" in CoreDNS)
-    #   - zone: foo.bar.
-    #     scheme: dns://
-    #     use_tcp: true        # set this parameter to optionally expose the port on tcp as well as udp for the DNS protocol
-    #                          # Note that this will not work if you are also exposing tls or grpc on the same server
-    #   port: 12345            # optional, defaults to "" (which equals 53 in CoreDNS)
-    #   plugins:               # the plugins to use for this server block
-    #   - name: kubernetes     # name of plugin, if used multiple times ensure that the plugin supports it!
-    #     parameters: foo bar  # list of parameters after the plugin
-    #     configBlock: |-      # if the plugin supports extra block style config, supply it here
-    #       hello world
-    #       foo bar
-
-    # expects input structure as per specification https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.11/#affinity-v1-core
-    # for example:
-    #   affinity:
-    #     nodeAffinity:
-    #      requiredDuringSchedulingIgnoredDuringExecution:
-    #        nodeSelectorTerms:
-    #        - matchExpressions:
-    #          - key: foo.bar.com/role
-    #            operator: In
-    #            values:
-    #            - master
-    affinity: {}
-
-    # Node labels for pod assignment
-    # Ref: https://kubernetes.io/docs/user-guide/node-selection/
-    nodeSelector: {}
-
-    # expects input structure as per specification https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.11/#toleration-v1-core
-    # for example:
-    #   tolerations:
-    #   - key: foo.bar.com/role
-    #     operator: Equal
-    #     value: master
-    #     effect: NoSchedule
-    tolerations: []
-
-    # https://kubernetes.io/docs/tasks/run-application/configure-pdb/#specifying-a-poddisruptionbudget
-    podDisruptionBudget: {}
-
-    # configure custom zone files as per https://coredns.io/2017/05/08/custom-dns-entries-for-kubernetes/
-    zoneFiles: []
-    #  - filename: example.db
-    #    domain: example.com
-    #    contents: |
-    #      example.com.   IN SOA sns.dns.icann.com. noc.dns.icann.com. 2015082541 7200 3600 1209600 3600
-    #      example.com.   IN NS  b.iana-servers.net.
-    #      example.com.   IN NS  a.iana-servers.net.
-    #      example.com.   IN A   192.168.99.102
-    #      *.example.com. IN A   192.168.99.102
-
-    # optional array of extra volumes to create
-    extraVolumes:
-      - name: custom-config-volume
-        configMap:
-          name: coredns-custom
-    # - name: some-volume-name
-    #   emptyDir: {}
-    # optional array of mount points for extraVolumes
-    extraVolumeMounts:
-      - name: custom-config-volume
-        mountPath: /etc/coredns/custom
-    # - name: some-volume-name
-    #   mountPath: /etc/wherever
-
-    # optional array of secrets to mount inside coredns container
-    # possible usecase: need for secure connection with etcd backend
-    extraSecrets: []
-    # - name: etcd-client-certs
-    #   mountPath: /etc/coredns/tls/etcd
-    # - name: some-fancy-secret
-    #   mountPath: /etc/wherever
-
-    # Custom labels to apply to Deployment, Pod, Service, ServiceMonitor. Including autoscaler if enabled.
-    customLabels: {}
-
-    ## Configue a cluster-proportional-autoscaler for coredns
-    # See https://github.com/kubernetes-incubator/cluster-proportional-autoscaler
-    autoscaler:
-      # Enabled the cluster-proportional-autoscaler
-      enabled: false
-
-      # Number of cores in the cluster per coredns replica
-      coresPerReplica: 256
-      # Number of nodes in the cluster per coredns replica
-      nodesPerReplica: 16
-      # Min size of replicaCount
-      min: 0
-      # Max size of replicaCount (default of 0 is no max)
-      max: 0
-      # Whether to include unschedulable nodes in the nodes/cores calculations - this requires version 1.8.0+ of the autoscaler
-      includeUnschedulableNodes: false
-      # If true does not allow single points of failure to form
-      preventSinglePointFailure: true
-
-      image:
-        repository: k8s.gcr.io/cluster-proportional-autoscaler-amd64
-        tag: "1.8.0"
-        pullPolicy: IfNotPresent
-
-      # Optional priority class to be used for the autoscaler pods. priorityClassName used if not set.
-      priorityClassName: ""
-
-      # expects input structure as per specification https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.11/#affinity-v1-core
-      affinity: {}
-
-      # Node labels for pod assignment
-      # Ref: https://kubernetes.io/docs/user-guide/node-selection/
-      nodeSelector: {}
-
-      # expects input structure as per specification https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.11/#toleration-v1-core
-      tolerations: []
-
-      # resources for autoscaler pod
-      resources:
-        requests:
-          cpu: "20m"
-          memory: "10Mi"
-        limits:
-          cpu: "20m"
-          memory: "10Mi"
-
-      # Options for autoscaler configmap
-      configmap:
-        ## Annotations for the coredns-autoscaler configmap
-        # i.e. strategy.spinnaker.io/versioned: "false" to ensure configmap isn't renamed
-        annotations: {}
-
-Once CoreDNS is installed, add a stub domain to forward request for domain **internal.strapdata.com**
-to the CoreDNS service, and restart KubeDNS pods.
-The **internal.strapdata.com** is just a dummy DNS domain used to resolve public IP addresses to Kubernetes nodes internal IP addresses.
-
-.. code::
-
-    COREDNS_SERVICE_IP=$(kubectl get  service -l k8s-app=coredns  -n kube-system -o jsonpath='{.items[0].spec.clusterIP}')
-    KUBEDNS_STUB_DOMAINS="{\\\"internal.strapdata.com\\\": [\\\"$COREDNS_SERVICE_IP\\\"]}"
-    kubectl patch configmap/kube-dns -n kube-system -p "{\"data\": {\"stubDomains\": \"$KUBEDNS_STUB_DOMAINS\"}}"
-    kubectl delete pod -l k8s-app=coredns -n kube-system
-
-GKE StorageClass
-................
-
-Google cloud persistent volumes are bound to an availability zone, so we need to defined one storageClass per zone in our Kubernetes cluster,
-and each Elassandra rack or statefulSet will be bound to the corresponding storageClass.
-This is done here using the HELM chart strapdata/storageclass.
-
-.. code::
-
-    for z in europe-west1-b europe-west1-c europe-west1-d; do
-        helm install --name ssd-$z --namespace kube-system \
-            --set parameters.type="pd-ssd" \
-            --set provisioner="kubernetes.io/gce-pd" \
-            --set zone=$z,nameOverride=ssd-$z \
-            strapdata/storageclass
-    done
-
-GKE Firewall rules
-..................
-
-Finally, you may need to authorize inbound Elassandra connections on the following TCP ports:
-
-* Cassandra storage port (usually 7000 or 7001) for internode connections
-* Cassandra native CQL port (usually 9042) for client to node connections.
-* Elasticsearch HTTP port (usually 9200) for the Elasticsearch REST API.
-
-Assuming you deploy an Elassandra datacenter respectively using ports 39000, 39001, and 39002 exposed to the internet, with no source IP address restrictions,
-and Kubernetes nodes are properly tagged:
-
-.. code::
-
-    VPC_NETWORK=$(gcloud container clusters describe $K8S_CLUSTER_NAME --region $GCLOUD_REGION --format='value(network)')
-    NODE_POOLS_TARGET_TAGS=$(gcloud container clusters describe $K8S_CLUSTER_NAME --region $GCLOUD_REGION --format='value[terminator=","](nodePools.config.tags)' --flatten='nodePools[].config.tags[]' | sed 's/,\{2,\}//g')
-    gcloud compute firewall-rules create "allow-elassandra-inbound" \
-      --allow tcp:39000-39002 \
-      --network="$VPC_NETWORK" \
-      --target-tags="$NODE_POOLS_TARGET_TAGS" \
-      --description="Allow elassandra inbound" \
-      --direction INGRESS
-
-Webhook in GKE private cluster
-..............................
-
-When Google configure the control plane for **private clusters**, they automatically configure VPC peering between your
-Kubernetes cluster’s network and a separate Google managed project. In order to restrict what Google are able to access within your cluster,
-the firewall rules configured restrict access to your Kubernetes pods. This means that in order to use the webhook component
-with a GKE private cluster, you must configure an additional firewall rule to allow the GKE control plane access to your webhook pod.
-
-You can read more information on how to add firewall rules for the GKE control plane nodes in the GKE docs.
-Alternatively, you can disable the hooks by setting webhookEnabled=false in your datacenter spec.
-
-.. code::
-
-    VPC_NETWORK=$(gcloud container clusters describe $K8S_CLUSTER_NAME --region $GCLOUD_REGION --format='value(network)')
-    MASTER_IPV4_CIDR_BLOCK=$(gcloud container clusters describe $K8S_CLUSTER_NAME --region $GCLOUD_REGION --format='value(clusterIpv4Cidr)')
-    NODE_POOLS_TARGET_TAGS=$(gcloud container clusters describe $K8S_CLUSTER_NAME --region $GCLOUD_REGION --format='value[terminator=","](nodePools.config.tags)' --flatten='nodePools[].config.tags[]' | sed 's/,\{2,\}//g')
-
-    gcloud compute firewall-rules create "allow-apiserver-to-admission-webhook-443" \
-      --allow tcp:8443 \
-      --network="$VPC_NETWORK" \
-      --source-ranges="$MASTER_IPV4_CIDR_BLOCK" \
-      --target-tags="$NODE_POOLS_TARGET_TAGS" \
-      --description="Allow apiserver access to admission webhook pod on port 443" \
-      --direction INGRESS
-
-
-AWS
-___
-
-Coming soon...
+.. include:: csp/aks.rst
+.. include:: csp/gke.rst
+.. include:: csp/aws.rst
+.. include:: csp/ibm.rst
 
 Operators
 ---------
@@ -478,7 +24,7 @@ Install the Elassandra operator in the default namespace:
 
 .. code::
 
-    helm install --namespace default --name elassop --wait strapdata/elassandra-operator
+    helm install --namespace default --name elassop --wait $HELM_REPO/elassandra-operator
 
 ExternalDNS
 ___________
@@ -513,54 +59,11 @@ _______
 
 The Kubernetes CoreDNS is used for two reasons:
 
-* Resolve DNS name of you DNS zone from inside the Kubernetes cluster using DNS forwarders.
+* Resolve DNS name of your private DNS zone from inside the Kubernetes cluster using DNS forwarders.
 * Reverse resolution of the broadcast Elassandra public IP addresses to Kubernetes nodes private IP.
 
 You can deploy the CodeDNS custom configuration with the strapdata coredns-forwarder HELM chart to basically install (or replace)
 the coredns-custom configmap, and restart coreDNS pods.
-
-If your Kubernetes nodes have the ExternalIP set (like GKE), prepare the coreDNS with this command:
-
-.. code::
-
-      HOST_ALIASES=$(kubectl get nodes -o custom-columns='INTERNAL-IP:.status.addresses[?(@.type=="InternalIP")].address,EXTERNAL-IP:.status.addresses[?(@.type=="ExternalIP")].address' --no-headers |\
-      awk '{ gsub(/\./,"-",$2); printf("nodes.hosts[%d].name=%s,nodes.hosts[%d].value=%s,",NR-1, $2, NR-1, $1); }')
-
-If your Kubernetes nodes does not have the ExternalIP set (like AKS), public node IP address should be available through the custom label ``elassandra.strapdata.com/public-ip``.
-
-.. code::
-
-        HOST_ALIASES=$(kubectl get nodes -o custom-columns='INTERNAL-IP:.status.addresses[?(@.type=="InternalIP")].address,PUBLIC-IP:.metadata.labels.elassandra\.strapdata\.com/public-ip' --no-headers |\
-        awk '{ gsub(/\./,"-",$2); printf("nodes.hosts[%d].name=%s,nodes.hosts[%d].value=%s,",NR-1, $2, NR-1, $1); }')
-
-Then configure the CoreDNS custom config with your DNS name servers and host aliases. In the following example, this is Azure DNS name servers:
-
-.. code::
-
-    kubectl delete configmap --namespace kube-system coredns-custom
-    helm install $HELM_DEBUG --name coredns-forwarder --namespace kube-system \
-      --set forwarders.domain="${DNS_DOMAIN}" \
-      --set forwarders.hosts[0]="40.90.4.8" \
-      --set forwarders.hosts[1]="64.4.48.8" \
-      --set forwarders.hosts[2]="13.107.24.8" \
-      --set forwarders.hosts[3]="13.107.160.8" \
-      --set nodes.domain=internal.strapdata.com \
-      --set $HOST_ALIASES \
-      strapdata/coredns-forwarder
-
-Restart CoreDNS pods to reload our configuration, but this depends on coreDNS deployment labels !
-
-On AKS:
-
-.. code::
-
-    kubectl delete pod --namespace kube-system -l k8s-app=kube-dns
-
-On GKE:
-
-.. code::
-
-    kubectl delete pod --namespace kube-system -l k8s-app=coredns
 
 Check the CoreDNS custom configuration:
 
@@ -569,12 +72,6 @@ Check the CoreDNS custom configuration:
     kubectl get configmap -n kube-system coredns-custom -o yaml
     apiVersion: v1
     data:
-      dns.server: |
-        test.strapkube.com:53 {
-            errors
-            cache 30
-            forward test.strapkube.com 40.90.4.8 64.4.48.8 13.107.24.8 13.107.160.8
-        }
       hosts.override: |
         hosts nodes.hosts internal.strapdata.com {
             10.132.0.57 146-148-117-125.internal.strapdata.com 146-148-117-125
@@ -666,7 +163,7 @@ with Kibana and Cassandra Reaper available through the Traefik ingress controlle
 
 .. code::
 
-    helm install --namespace default --name "default-cl1-dc1" \
+    helm install --namespace $NAMESPACE --name "default-cl1-dc1" \
         --set dataVolumeClaim.storageClassName="ssd-{zone}" \
         --set cassandra.sslStoragePort="39000" \
         --set cassandra.nativePort="39001" \
@@ -680,9 +177,9 @@ with Kibana and Cassandra Reaper available through the Traefik ingress controlle
         --set networking.externalDns.enabled=true \
         --set networking.externalDns.domain=${DNS_DOMAIN} \
         --set networking.externalDns.root=cl1-dc1 \
-        --set kibana.enabled="true",kibana.spaces[0].ingressAnnotations."kubernetes\.io/ingress\.class"="traefik",kibana.spaces[0].ingressSuffix=kibana.${TRAEFIK_FQDN} \
-        --set reaper.enabled="true",reaper.ingressAnnotations."kubernetes\.io/ingress\.class"="traefik",reaper.ingressHost=reaper.${TRAEFIK_FQDN} \
-        --wait strapdata/elassandra-datacenter
+        --set kibana.enabled=true,kibana.spaces[0].ingressAnnotations."kubernetes\.io/ingress\.class"="traefik",kibana.spaces[0].ingressSuffix=kibana.${TRAEFIK_FQDN} \
+        --set reaper.enabled=true,reaper.ingressAnnotations."kubernetes\.io/ingress\.class"="traefik",reaper.ingressHost=reaper.${TRAEFIK_FQDN} \
+        --wait $HELM_REPO/elassandra-datacenter
 
 Key points:
 
@@ -830,7 +327,7 @@ namespace **default**, into the Kubernetes cluster **kube2** namespace **default
 .. code::
 
     for s in elassandra-cl1 elassandra-cl1-ca-pub elassandra-cl1-ca-key elassandra-cl1-kibana; do
-        kubectl get secret $s --context kube1 --export -n default -o yaml | kubectl apply --context gke_strapkube1_europe-west1_kube2 -n default -f -
+        kubectl get secret $s --context $SRC_CONTEXT --export -n $SRC_NAMESPACE -o yaml | kubectl apply --context $CONTEXT -n $NAMESPACE -f -
     done
 
 .. tip::
@@ -843,24 +340,24 @@ Deploy the datacenter **dc2** of the Elassandra cluster **cl1** in the Kubernete
 
 .. code::
 
-    helm install --namespace default --name "default-cl1-dc2" \
+    helm install --namespace $NAMESPACE --name "$NAMESPACE-cl1-dc2" \
         --set dataVolumeClaim.storageClassName="ssd-{zone}" \
-        --set cassandra.sslStoragePort="39000" \
-        --set cassandra.nativePort="39001" \
-        --set elasticsearch.httpPort="39002" \
-        --set elasticsearch.transportPort="39003" \
-        --set jvm.jmxPort="39004" \
-        --set jvm.jdb="39005" \
-        --set prometheus.port="39006" \
-        --set replicas="3" \
+        --set cassandra.sslStoragePort=39000 \
+        --set cassandra.nativePort=39001 \
+        --set elasticsearch.httpPort=39002 \
+        --set elasticsearch.transportPort=39003 \
+        --set jvm.jmxPort=39004 \
+        --set jvm.jdb=39005 \
+        --set prometheus.port=39006 \
+        --set replicas=3 \
         --set cassandra.remoteSeeds[0]=cassandra-cl1-dc1-0-0.${DNS_DOMAIN} \
         --set networking.hostNetworkEnabled=true \
         --set networking.externalDns.enabled=true \
         --set networking.externalDns.domain=${DNS_DOMAIN} \
         --set networking.externalDns.root=cl1-dc2 \
-        --set kibana.enabled="true",kibana.spaces[0].ingressAnnotations."kubernetes\.io/ingress\.class"="traefik",kibana.spaces[0].ingressSuffix=kibana.${TRAEFIK_FQDN} \
-        --set reaper.enabled="true",reaper.ingressAnnotations."kubernetes\.io/ingress\.class"="traefik",reaper.ingressHost=reaper.${TRAEFIK_FQDN} \
-        --wait strapdata/elassandra-datacenter
+        --set kibana.enabled=true,kibana.spaces[0].ingressAnnotations."kubernetes\.io/ingress\.class"="traefik",kibana.spaces[0].ingressSuffix=kibana.${TRAEFIK_FQDN} \
+        --set reaper.enabled=true,reaper.ingressAnnotations."kubernetes\.io/ingress\.class"="traefik",reaper.ingressHost=reaper.${TRAEFIK_FQDN} \
+        --wait $HELM_REPO/elassandra-datacenter
 
 Key points :
 
@@ -1042,3 +539,4 @@ Uninstall the Elassandra operator and remove CRDs:
 
     helm delete --purge elassandra-operator
     kubectl delete crd elassandradatacenters.elassandra.strapdata.com elassandratasks.elassandra.strapdata.com
+
