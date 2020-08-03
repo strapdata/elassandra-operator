@@ -10,6 +10,38 @@ metadata:
     release: {{ .Release.Name }}
   name: {{ template "elassandra.resourceName" . }}-nodeinfo
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app: {{ template "elassandra.resourceName" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+  name: {{ template "elassandra.resourceName" . }}-node-reader
+rules:
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: RoleBinding
+metadata:
+  labels:
+    app: {{ template "elassandra.resourceName" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+  name: {{ template "elassandra.resourceName" . }}-nodeinfo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ template "elassandra.resourceName" . }}-node-reader
+subjects:
+  - kind: ServiceAccount
+    name: {{ template "elassandra.resourceName" . }}-nodeinfo
+    namespace: {{ .Release.Namespace }}
+---
 # Create a service account API token bound to the nodeinfo serviceaccount
 # Must to be created after serviceaccount, otherwise deleted by the token controller
 # see https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#manually-create-a-service-account-api-token

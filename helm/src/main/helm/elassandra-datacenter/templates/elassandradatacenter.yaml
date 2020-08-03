@@ -26,11 +26,6 @@ spec:
   webHookUrl: {{ .Values.webHookUrl }}
   {{- end }}
   elassandraImage: "{{ .Values.image.elassandraRepository }}:{{ .Values.image.tag }}"
-  {{- if .Values.serviceAccount }}
-  serviceAccount: {{ .Values.serviceAccount  }}
-  {{ else }}
-  serviceAccount: {{ template "elassandra.serviceAccount" . }}
-  {{- end }}
   {{- if .Values.podTemplate }}
   podTemplate:
 {{ toYaml .Values.podTemplate | indent 4 }}
