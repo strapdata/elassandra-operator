@@ -1959,6 +1959,7 @@ public class DataCenterUpdateAction {
 
         public V1PodSpec clonePodSpecFromPodTemplate(V1PodTemplateSpec podTemplateSpec) {
             V1PodSpec podSpec = new V1PodSpec();
+
             if (podTemplateSpec != null && podTemplateSpec.getSpec() != null) {
                 V1PodSpec template = podTemplateSpec.getSpec();
                 podSpec.setAffinity(template.getAffinity());
@@ -1971,12 +1972,16 @@ public class DataCenterUpdateAction {
                 podSpec.setPriorityClassName(template.getPriorityClassName());
                 podSpec.setPreemptionPolicy(template.getPreemptionPolicy());
                 podSpec.setRuntimeClassName(template.getRuntimeClassName());
-                podSpec.setServiceAccountName(template.getServiceAccountName());
                 podSpec.setServiceAccount(template.getServiceAccount());
+                podSpec.setServiceAccountName(template.getServiceAccountName());
                 podSpec.setSecurityContext(template.getSecurityContext());
                 podSpec.setSchedulerName(template.getSchedulerName());
                 podSpec.setSubdomain(template.getSubdomain());
             }
+
+            // for security reasons, all datacenters run with its own serviceAccount
+            if (podSpec.getServiceAccountName() == null)
+                podSpec.setServiceAccountName(OperatorNames.serviceAccount(dataCenterMetadata.getNamespace(), dataCenterSpec.getClusterName(), dataCenterSpec.getDatacenterName()));
             return podSpec;
         }
 

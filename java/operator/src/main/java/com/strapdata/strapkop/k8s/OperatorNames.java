@@ -153,6 +153,10 @@ public class OperatorNames {
                 dc.getSpec().getNetworking().getExternalDns().getDomain());
     }
 
+    public static String serviceAccount(final String namespace, final String clusterName, String dcName) {
+        return String.format(Locale.ROOT, "%s-%s-%s", namespace, clusterName, dcName);
+    }
+
     public static String generateTaskName(DataCenter dc, String taskType) {
         return OperatorNames.dataCenterChildObjectName("%s-" + taskType + "-" + UUID.randomUUID().toString().substring(0, 8), dc);
     }
