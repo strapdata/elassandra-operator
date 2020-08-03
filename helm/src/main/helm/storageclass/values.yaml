@@ -7,3 +7,5 @@ zone: "europe-west1-b"
 # Storage parameters and provisioner
 parameters:
 provisioner:
+reclaimPolicy: Delete
+volumeBindingMode: Immediate

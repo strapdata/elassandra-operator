@@ -11,8 +11,8 @@ parameters:
 {{ toYaml .Values.parameters | indent 2 }}
 
 allowVolumeExpansion: true
-reclaimPolicy: Delete
-volumeBindingMode: Immediate
+reclaimPolicy: {{ .Values.reclaimPolicy }}
+volumeBindingMode: {{ .Values.volumeBindingMode }}
 allowedTopologies:
   - matchLabelExpressions:
       {{- if .Values.region }}
