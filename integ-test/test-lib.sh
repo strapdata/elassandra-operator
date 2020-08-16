@@ -73,13 +73,13 @@ destroy_cluster() {
 }
 
 init_helm() {
-   echo "Installing HELM"
-   kubectl create serviceaccount --namespace kube-system tiller
-   kubectl create clusterrolebinding tiller-cluster-rule --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
-   #helm init --wait --service-account tiller
+  echo "Installing HELM"
+  kubectl create serviceaccount --namespace kube-system tiller
+  kubectl create clusterrolebinding tiller-cluster-rule --clusterrole=cluster-admin --serviceaccount=kube-system:tiller
+  #helm init --wait --service-account tiller
+  # HELM 2 K8s 1.16+ apiVersion issue
+  helm init  --wait --service-account tiller --override spec.selector.matchLabels.'name'='tiller',spec.selector.matchLabels.'app'='helm' --output yaml | sed 's@apiVersion: extensions/v1beta1@apiVersion: apps/v1@' | kubectl apply -f -
 
-  # K8s 1.16+ apiVersion issue
-  helm init --service-account tiller --override spec.selector.matchLabels.'name'='tiller',spec.selector.matchLabels.'app'='helm' --output yaml | sed 's@apiVersion: extensions/v1beta1@apiVersion: apps/v1@' | kubectl apply -f -
   helm repo add bitnami https://charts.bitnami.com/bitnami
   echo "HELM installed"
 }
@@ -142,7 +142,7 @@ install_elassandra_datacenter() {
     fi
 
     helm install --namespace "$ns" --name "$ns-$cl-$dc" \
-    --set image.elassandraRepository=$REGISTRY_URL/strapdata/elassandra-node${registry} \
+    --set image.repository=$REGISTRY_URL/strapdata/elassandra-node${registry} \
     --set image.tag=$ELASSANDRA_NODE_TAG \
     --set dataVolumeClaim.storageClassName=${STORAGE_CLASS_NAME:-"standard"} \
     --set kibana.enabled="false" \

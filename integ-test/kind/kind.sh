@@ -5,6 +5,8 @@ STORAGE_CLASS_NAME="server-storage"
 REGISTRY_NAME='kind-registry'
 REGISTRY_PORT='5000'
 
+#KIND_IMAGE="kindest/node:v1.15.11@sha256:6cc31f3533deb138792db2c7d1ffc36f7456a06f1db5556ad3b6927641016f50"
+KIND_IMAGE="kindest/node:v1.16.9@sha256:7175872357bc85847ec4b1aba46ed1d12fa054c83ac7a8a11f5c268957fd5765"
 
 create_cluster() {
   case "${2:-6}" in
@@ -17,9 +19,7 @@ create_cluster() {
 
 # $1 = cluster name
 create_kind_cluster3() {
-  #kind create cluster --name ${1:-cluster1} --config integ-test/kind/kind-config-worker-3.yaml --image kindest/node:v1.15.11@sha256:6cc31f3533deb138792db2c7d1ffc36f7456a06f1db5556ad3b6927641016f50
-  kind create cluster --name ${1:-cluster1} --config $KIND_DIR/kind-config-worker-3.yaml --image kindest/node:v1.16.9@sha256:7175872357bc85847ec4b1aba46ed1d12fa054c83ac7a8a11f5c268957fd5765
-  #kind create cluster --name ${1:-cluster1} --config $KIND_DIR/kind-config-worker-3.yaml --image kindest/node:v1.15.7@sha256:e2df133f80ef633c53c0200114fce2ed5e1f6947477dbc83261a6a921169488d
+  kind create cluster --name ${1:-cluster1} --config $KIND_DIR/kind-config-worker-3.yaml --image $KIND_IMAGE
   kubectl apply -f integ-test/kind/kind-storageclass.yaml
 
   # Add zone label
@@ -56,7 +56,7 @@ create_local_registry() {
 # create registry container unless it already exists
 create_kind_cluster6_with_local_registry() {
   # create a cluster with the local registry enabled in containerd
-  cat <<EOF | kind create cluster --name ${1:-cluster1} --image kindest/node:v1.15.11@sha256:6cc31f3533deb138792db2c7d1ffc36f7456a06f1db5556ad3b6927641016f50 --config=-
+  cat <<EOF | kind create cluster --name ${1:-cluster1} --image $KIND_IMAGE --config=-
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
@@ -97,7 +97,7 @@ EOF
 
 create_kind_cluster3_with_local_registry() {
   # create a cluster with the local registry enabled in containerd
-  cat <<EOF | kind create cluster --name ${1:-cluster1} --image kindest/node:v1.15.11@sha256:6cc31f3533deb138792db2c7d1ffc36f7456a06f1db5556ad3b6927641016f50 --config=-
+  cat <<EOF | kind create cluster --name ${1:-cluster1} --image $KIND_IMAGE --config=-
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
