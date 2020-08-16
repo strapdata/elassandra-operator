@@ -77,7 +77,7 @@ public class DataCenterSpec {
     @Expose
     private PodsAffinityPolicy podsAffinityPolicy = PodsAffinityPolicy.STRICT;
 
-    @JsonPropertyDescription("Elassandra docker image")
+    @JsonPropertyDescription("Elassandra image")
     @SerializedName("elassandraImage")
     @Expose
     private java.lang.String elassandraImage;
