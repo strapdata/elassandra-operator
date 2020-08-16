@@ -25,7 +25,7 @@ spec:
   {{- if .Values.webHookUrl }}
   webHookUrl: {{ .Values.webHookUrl }}
   {{- end }}
-  elassandraImage: "{{ .Values.image.elassandraRepository }}:{{ .Values.image.tag }}"
+  elassandraImage: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
   {{- if .Values.podTemplate }}
   podTemplate:
 {{ toYaml .Values.podTemplate | indent 4 }}

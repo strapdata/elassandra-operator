@@ -2048,8 +2048,6 @@ public class DataCenterUpdateAction {
                         .capabilities(new V1Capabilities().add(ImmutableList.of("IPC_LOCK", "SYS_RESOURCE"))));
 
             cassandraContainer.setImage(dataCenterSpec.getElassandraImage());
-            cassandraContainer.setTerminationMessagePolicy("FallbackToLogsOnError");
-
             cassandraContainer.addVolumeMountsItem(new V1VolumeMount()
                             .name("data-volume")
                             .mountPath("/var/lib/cassandra")

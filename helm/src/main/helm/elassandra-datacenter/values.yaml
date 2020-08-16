@@ -6,7 +6,7 @@ parked: false
 autoScaleMode: "MANUAL"
 
 image:
-  elassandraRepository: strapdata/elassandra-node
+  repository: strapdata/elassandra-node
   tag: latest
 
 # Elassandra node affinity STRICT or SLACK
@@ -17,6 +17,8 @@ podTemplate:
   spec:
     containers:
       - name: elassandra
+        imagePullPolicy: Always
+        terminationMessagePolicy: FallbackToLogsOnError
         resources:
           requests:
             cpu: 500m
@@ -117,9 +119,9 @@ kibana:
   spaces:
     - name: ""
       keyspaces: []
-      podTemplate:
-      ingressSuffix:
-      ingressAnnotations: {}
+#      podTemplate:
+#      ingressSuffix:
+#      ingressAnnotations: {}
 
 # Prometheus metrics exporter
 prometheus:

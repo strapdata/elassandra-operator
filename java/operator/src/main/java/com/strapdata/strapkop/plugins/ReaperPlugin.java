@@ -341,8 +341,6 @@ public class ReaperPlugin extends AbstractPlugin {
         reaperContainer
                 .name("reaper")
                 .image(dataCenterSpec.getReaper().getImage())
-                .imagePullPolicy("Always")
-                .terminationMessagePolicy("FallbackToLogsOnError")
                 .addPortsItem(new V1ContainerPort()
                         .name(APP_SERVICE_NAME)
                         .containerPort(APP_SERVICE_PORT)

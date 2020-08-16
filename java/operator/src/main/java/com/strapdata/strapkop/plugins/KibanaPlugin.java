@@ -342,7 +342,6 @@ public class KibanaPlugin extends AbstractPlugin {
         kibanaContainer
                 .name("kibana")
                 .image(dataCenter.getSpec().getKibana().getImage())
-                .terminationMessagePolicy("FallbackToLogsOnError")
                 .addPortsItem(new V1ContainerPort()
                         .name("kibana")
                         .containerPort(5601)
