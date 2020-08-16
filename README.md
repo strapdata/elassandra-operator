@@ -73,12 +73,12 @@ Requirements:
 
 Publish the docker images (operator + elassandra + cassandra reaper):
 ```bash
-./gradlew dockerPush -PregistryUsername=$DOCKER_USERNAME -PregistryPassword=$DOCKER_PASSWORD -PregistryUrl=$REGISTRY_URL
+./gradlew java:edctl:buildExec dockerPush -PregistryUsername=$DOCKER_USERNAME -PregistryPassword=$DOCKER_PASSWORD -PregistryUrl=$REGISTRY_URL
 ```
 
 Publish in local insecure registry:
 ```bash
-./gradlew dockerPush -PregistryUrl="localhost:5000" -PregistryInsecure
+./gradlew java:edctl:buildExec dockerPush -PregistryUrl="localhost:5000" -PregistryInsecure
 ```
 
 Build parameters are located in `gradle.properties`.
